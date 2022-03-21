@@ -2,6 +2,7 @@ import datetime
 import decimal
 import json
 import logging
+import math
 import random
 import re
 import time
@@ -58,7 +59,7 @@ from inventory.serializers import PutPlanManagementSerializer, \
     SulfurDepotModelSerializer, SulfurDepotSiteModelSerializer, SulfurDataModelSerializer, DepotSulfurModelSerializer, \
     DepotPalltInfoModelSerializer, OutBoundDeliveryOrderSerializer, OutBoundDeliveryOrderDetailSerializer, \
     OutBoundTasksSerializer, WmsInventoryMaterialSerializer, WmsNucleinManagementSerializer, \
-    MaterialOutHistoryOtherSerializer, MaterialOutHistorySerializer
+    MaterialOutHistoryOtherSerializer, MaterialOutHistorySerializer, WMSExceptHandleSerializer
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
@@ -86,7 +87,7 @@ from .conf import wms_ip, wms_port, cb_ip, cb_port
 from .models import MaterialInventory as XBMaterialInventory
 from .models import BzFinalMixingRubberInventory
 from .serializers import XBKMaterialInventorySerializer
-from .utils import export_xls, OUTWORKUploader, OUTWORKUploaderLB
+from .utils import export_xls, OUTWORKUploader, OUTWORKUploaderLB, HFSystem
 
 logger = logging.getLogger('send_log')
 
@@ -2463,6 +2464,7 @@ class WmsStorageSummaryView(APIView):
         参数：?material_name=物料名称&material_no=物料编码&zc_material_code=中策物料编码&batch_no=批次号&pdm_no=PDM号&st=入库开始时间&et=入库结束时间&quality_status=# 品质状态 1：合格 3：不合格
     """
     DATABASE_CONF = WMS_CONF
+    permission_classes = (IsAuthenticated, )
 
     def get(self, request):
         factory = self.request.query_params.get('factory')  # 厂家
@@ -2666,6 +2668,7 @@ class WmsStorageView(ListAPIView):
 class WmsInventoryStockView(APIView):
     """WMS库存货位信息，参数：material_name=原材料名称&material_no=原材料编号&quality_status=品质状态1合格3不合格&entrance_name=出库口名称"""
     DATABASE_CONF = WMS_CONF
+    permission_classes = (IsAuthenticated, )
 
     def get(self, request, *args, **kwargs):
         material_name = self.request.query_params.get('material_name')
@@ -2752,6 +2755,7 @@ class WmsInventoryStockView(APIView):
 class WmsInStockView(APIView):
     """根据当前货物外伸位地址获取内伸位数据, 参数：entrance_name=出库口名称&space_id=货位地址"""
     DATABASE_CONF = WMS_CONF
+    permission_classes = (IsAuthenticated, )
 
     def get(self, request):
         out_space_id = self.request.query_params.get('space_id')
@@ -2870,13 +2874,36 @@ class WMSRelease(APIView):
 class WMSExceptHandleView(APIView):
     permission_classes = (IsAuthenticated,)
 
-    @atomic
+    def get(self, request):
+        material_code = self.request.query_params.get('material_code', None)
+        lot_no = self.request.query_params.get('lot_no', None)
+        batch_no = self.request.query_params.get('batch_no', None)
+        if batch_no:
+            queryset = []
+            nums = WMSExceptHandle.objects.filter(batch_no=batch_no).values_list('num', flat=True)
+            for num in set(nums):
+                queryset.append(WMSExceptHandle.objects.filter(batch_no=batch_no, num=num).first())
+        else:
+            queryset = WMSExceptHandle.objects.filter(material_code=material_code,lot_no=lot_no).order_by('id')
+        if queryset:
+            serializer = WMSExceptHandleSerializer(instance=queryset, many=True)
+            data = serializer.data
+        else:
+            data = []
+        return Response({'results': data})
+
     def post(self, request):
         data = self.request.data
-        WMSExceptHandle.objects.create(
-            created_user=self.request.user,
-            **data
-        )
+        batch_no = data.get('batch_no')
+        lot_no = data.pop('lot_no', None)
+        lst = []
+        obj = WMSExceptHandle.objects.filter(batch_no=batch_no).last()
+        num = 1
+        if obj:
+            num = obj.num + 1
+        for item in lot_no:
+            lst.append(WMSExceptHandle(**data, lot_no=item, created_user=self.request.user, num=num))
+        WMSExceptHandle.objects.bulk_create(lst)
         return Response('保存成功')
 
 
@@ -3040,6 +3067,7 @@ order by left_days;""".format(expire_days, material_code, quality_status)
 class WmsInventoryWeightStockView(APIView):
     """WMS库存货位信息，参数：material_name=原材料名称&material_no=原材料编号&quality_status=品质状态1合格3不合格&entrance_name=出库口名称"""
     DATABASE_CONF = WMS_CONF
+    permission_classes = (IsAuthenticated, )
 
     def get(self, request, *args, **kwargs):
         material_name = self.request.query_params.get('material_name')
@@ -3109,6 +3137,7 @@ class WmsInventoryWeightStockView(APIView):
 class InventoryEntranceView(APIView):
     """获取所有出库口名称"""
     DATABASE_CONF = WMS_CONF
+    permission_classes = (IsAuthenticated, )
 
     def get(self, request):
         sql = 'select name, EntranceCode from t_inventory_entrance where Type=2;'
@@ -3128,6 +3157,7 @@ class InventoryEntranceView(APIView):
 class WMSMaterialGroupNameView(APIView):
     """获取所有原材料库物料组名称"""
     DATABASE_CONF = WMS_CONF
+    permission_classes = (IsAuthenticated, )
 
     def get(self, request):
         sql = 'select Name from t_inventory_material_group;'
@@ -3145,6 +3175,7 @@ class WMSMaterialGroupNameView(APIView):
 class WMSTunnelView(APIView):
     """获取所有原材料库巷道名称"""
     DATABASE_CONF = WMS_CONF
+    permission_classes = (IsAuthenticated, )
 
     def get(self, request):
         sql = 'select TunnelName, TunnelCode from t_inventory_tunnel;'
@@ -3164,6 +3195,7 @@ class WMSInventoryView(APIView):
     """原材料库存信息，material_name=原材料名称&material_no=原材料编号&material_group_name=物料组名称&tunnel_name=巷道名称&page=页数&page_size=每页数量"""
     DATABASE_CONF = WMS_CONF
     FILE_NAME = '原材料库存统计'
+    permission_classes = (IsAuthenticated, )
 
     def export_xls(self, result):
         response = HttpResponse(content_type='application/vnd.ms-excel')
@@ -4503,6 +4535,7 @@ class InOutBoundSummaryView(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class LIBRARYINVENTORYView(ListAPIView):
+    permission_classes = (IsAuthenticated, )
 
     def get_result(self, model, db, store_name, warehouse_name, location_status, **kwargs):
         # 各胶料封闭货位数据
@@ -4874,6 +4907,7 @@ class WmsInventoryMaterialViewSet(GenericAPIView):
     DB = 'wms'
     queryset = WmsInventoryMaterial.objects.all()
     serializer_class = WmsInventoryMaterialSerializer
+    permission_classes = (IsAuthenticated, )
 
     def get(self, request, *args, **kwargs):
         queryset = WmsInventoryMaterial.objects.using(self.DB).all()
@@ -4916,6 +4950,7 @@ class WmsInventoryMaterialViewSet(GenericAPIView):
 @method_decorator([api_recorder], name="dispatch")
 class WMSStockSummaryView(APIView):
     DATABASE_CONF = WMS_CONF
+    permission_classes = (IsAuthenticated, )
 
     def export_xls(self, result):
         response = HttpResponse(content_type='application/vnd.ms-excel')
@@ -5107,6 +5142,17 @@ class WMSOutTaskView(ListAPIView):
     permission_classes = (IsAuthenticated,)
     DB = 'wms'
 
+    def get_serializer_context(self):
+        """
+        Extra context provided to the serializer class.
+        """
+        return {
+            'request': self.request,
+            'format': self.format_kwarg,
+            'view': self,
+            'db': self.DB
+        }
+
     def get_queryset(self):
         query_set = MaterialOutHistoryOther.objects.using(self.DB).order_by('-id')
         order_no = self.request.query_params.get('order_no')
@@ -5202,7 +5248,8 @@ class WMSOutTaskDetailView(ListAPIView):
             'request': self.request,
             'format': self.format_kwarg,
             'view': self,
-            'entrance_data': entrance_data
+            'entrance_data': entrance_data,
+            'db': self.DB
         }
 
     def list(self, request, *args, **kwargs):
@@ -5233,6 +5280,7 @@ class THOutTaskDetailView(WMSOutTaskDetailView):
 
 @method_decorator([api_recorder], name="dispatch")
 class WmsOutboundOrderView(APIView):
+    permission_classes = (IsAuthenticated, )
     URL = WMS_URL
     ORDER_TYPE = 1
 
@@ -5281,8 +5329,11 @@ class WmsOutboundOrderView(APIView):
                 "AllocationInventoryDetails": details
             }
         # headers = {"UserId": 75, "tenantNumber": 1}
+        MaterialOutboundOrder.objects.create(order_no=task_num,
+                                             created_username=self.request.user.username,
+                                             order_type=self.ORDER_TYPE)
         try:
-            res = requests.post(url, json=data, timeout=5)
+            res = requests.post(url, json=data, timeout=10)
         except Exception as e:
             raise ValidationError('请求出库失败，请联系管理员！')
         try:
@@ -5290,9 +5341,6 @@ class WmsOutboundOrderView(APIView):
         except Exception:
             resp = {}
         resp_status = resp.get('state')
-        MaterialOutboundOrder.objects.create(order_no=task_num,
-                                             created_username=self.request.user.username,
-                                             order_type=self.ORDER_TYPE)
         if resp_status != 1:
             raise ValidationError('出库失败：{}'.format(resp.get('msg')))
         return Response('成功')
@@ -5307,6 +5355,7 @@ class THOutboundOrderView(WmsOutboundOrderView):
 @method_decorator([api_recorder], name="dispatch")
 class WwsCancelTaskView(APIView):
     URL = WMS_URL
+    permission_classes = (IsAuthenticated, )
 
     def post(self, request):
         task_num = self.request.data.get('task_num')
@@ -5337,6 +5386,7 @@ class THCancelTaskView(WwsCancelTaskView):
 @method_decorator([api_recorder], name="dispatch")
 class HFStockView(APIView):
     DATABASE_CONF = HF_CONF
+    permission_classes = (IsAuthenticated, )
 
     def get(self, request):
         st = self.request.query_params.get('st')
@@ -5365,32 +5415,29 @@ class HFStockView(APIView):
                    ProductNo,
                    ProductName,
                    TaskState,
-                   OastNo,
                    count(*)
             from dsp_OastTask
             {}
-            group by ProductNo, ProductName, TaskState, OastNo;""".format(extra_where_str)
+            group by ProductNo, ProductName, TaskState;""".format(extra_where_str)
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)
         temp = sc.all()
         result = {}
         for item in temp:
             material_no = item[0]
-            qty = item[4]
+            qty = item[3]
             task_state = item[2]
             if material_no not in result:
-                underway_qty = baking_qty = finished_qty = indoor_qty = outbound_qty = 0
+                underway_qty = waiting_qty = baking_qty = finished_qty = indoor_qty = outbound_qty = 0
                 if task_state == 1:  # 入库中
-                    if not item[3]:  # 没有烤箱编号
-                        underway_qty += qty
-                    else:  # 有烤箱编号
-                        indoor_qty += qty
+                    underway_qty += qty
                 elif task_state == 2:  # 烘烤运行中
                     baking_qty += qty
                     indoor_qty += qty
                 elif task_state == 3:  # 出库中
-                    finished_qty += qty
-                    indoor_qty += qty
+                    outbound_qty += qty
+                #     indoor_qty += qty
                 elif task_state == 4:  # 等待烘烤
+                    waiting_qty += qty
                     indoor_qty += qty
                 elif task_state == 5:  # 等待出库
                     finished_qty += qty
@@ -5400,23 +5447,22 @@ class HFStockView(APIView):
                 result[item[0]] = {'material_no': item[0],
                                    'material_name': item[1],
                                    'underway_qty': underway_qty,
+                                   'waiting_qty': waiting_qty,
                                    'baking_qty': baking_qty,
                                    'finished_qty': finished_qty,
                                    'indoor_qty': indoor_qty,
                                    'outbound_qty': outbound_qty}
             else:
                 if task_state == 1:  # 入库中
-                    if not item[3]:  # 没有烤箱编号
-                        result[item[0]]['underway_qty'] += qty
-                    else:  # 有烤箱编号
-                        result[item[0]]['indoor_qty'] += qty
+                    result[item[0]]['underway_qty'] += qty
                 elif task_state == 2:  # 烘烤运行中
                     result[item[0]]['baking_qty'] += qty
                     result[item[0]]['indoor_qty'] += qty
                 elif task_state == 3:  # 出库中
-                    result[item[0]]['finished_qty'] += qty
-                    result[item[0]]['indoor_qty'] += qty
+                    result[item[0]]['outbound_qty'] += qty
+                #     result[item[0]]['indoor_qty'] += qty
                 elif task_state == 4:  # 等待烘烤
+                    result[item[0]]['waiting_qty'] += qty
                     result[item[0]]['indoor_qty'] += qty
                 elif task_state == 5:  # 等待出库
                     result[item[0]]['finished_qty'] += qty
@@ -5440,25 +5486,30 @@ class HFStockView(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class HFStockDetailView(APIView):
     DATABASE_CONF = HF_CONF
+    permission_classes = (IsAuthenticated, )
 
     def get(self, request):
         st = self.request.query_params.get('st')  # 开始时间
         et = self.request.query_params.get('et')  # 结束时间
         material_no = self.request.query_params.get('material_no')  # 物料编码
-        data_type = self.request.query_params.get('data_type')  # 3：输送途中 4：正在烘  5：已经烘完 6：烘房小计 7：已出库
+        data_type = self.request.query_params.get('data_type')  # 3：输送途中 4：正在烘  5：已经烘完 6：烘房小计 7：已出库 8:等待烘烤
+        page = int(self.request.query_params.get('page', 1))
+        page_size = int(self.request.query_params.get('page_size', 10))
         if not all([material_no, data_type]):
             raise ValidationError('参数缺失！')
         extra_where_str = "where ProductNo = '{}'".format(material_no)
         if data_type == '3':  # 输送途中
-            extra_where_str += "and TaskState=1 and (OastNo is null or OastNo=0)"
+            extra_where_str += " and TaskState=1"
+        if data_type == '8':  # 等待烘烤
+            extra_where_str += " and TaskState=4"
         if data_type == '4':  # 正在烘
-            extra_where_str += "and TaskState=2"
+            extra_where_str += " and TaskState=2"
         if data_type == '5':  # 已经烘完
-            extra_where_str += "and TaskState in (3, 5)"
+            extra_where_str += " and TaskState=5"
         if data_type == '6':  # 烘房小计
-            extra_where_str += "and (TaskState in (2, 3, 4, 5)) or (TaskState=1 and (OastNo is not null and OastNo!=0))"
+            extra_where_str += " and TaskState in (2, 4, 5)"
         if data_type == '7':  # 已出库
-            extra_where_str += "and TaskState=6"
+            extra_where_str += " and TaskState in (3, 6)"
         if st:
             extra_where_str += " and TaskStartTime >= '{}'".format(st)
         if et:
@@ -5468,17 +5519,19 @@ class HFStockDetailView(APIView):
                 TaskState,
                 ProductName,
                 ProductNo,
-                'pc',
                 RFID,
-                'rksj',
-                'cksj',
                 OastStartTime,
-                OastEntTime,
-                'qrsj'
-            from dsp_OastTask {}""".format(extra_where_str)
+                OastEntTime
+            from dsp_OastTask {} order by OastNo OFFSET {} ROWS FETCH FIRST {} ROWS ONLY
+            """.format(extra_where_str, (page-1)*page_size, page_size)
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)
         temp = sc.all()
         result = []
+
+        count_sql = 'select count(*) from dsp_OastTask {}'.format(extra_where_str)
+        sc = SqlClient(sql=count_sql, **self.DATABASE_CONF)
+        temp2 = sc.all()
+        count = temp2[0][0]
         for item in temp:
             result.append(
                 {
@@ -5486,15 +5539,91 @@ class HFStockDetailView(APIView):
                     'status': item[1],
                     'material_name': item[2],
                     'material_no': item[3],
-                    'batch_no': item[4],
-                    'pallet_no': item[5],
-                    'inbound_time': item[6],
-                    'outbound_time': item[7],
-                    'baking_start_time': item[8],
-                    'baking_end_time': item[9],
-                    'confirm_time': item[10]
+                    'pallet_no': item[4],
+                    'baking_start_time': '' if not item[5] else item[5].strftime('%Y-%m-%d %H:%M:%S'),
+                    'baking_end_time': '' if not item[6] else item[6].strftime('%Y-%m-%d %H:%M:%S')
                 }
             )
         sc.close()
+        return Response({'result': result, 'count': count})
 
-        return Response(result)
+
+@method_decorator([api_recorder], name="dispatch")
+class HFRealStatusView(APIView):
+    permission_classes = (IsAuthenticated,)
+    DATABASE_CONF = HF_CONF
+
+    def get(self, request):
+        data_type = self.request.query_params.get('type')
+        page = int(self.request.query_params.get('page', 1))
+        page_size = int(self.request.query_params.get('page_size', 10))
+        response_data = {}
+        try:
+            if data_type == '0':  # 烘箱状态
+                hf = HFSystem()
+                hf_info = hf.get_hf_info()
+                # 非运行中不展示开始时间和时长
+                for i in hf_info:
+                    if i['OastState'] != 2:
+                        i.update({'OastStartTime': '', 'OastServiceTime': ''})
+                response_data['results'] = hf_info
+            elif data_type == '1':  # 任务列表
+                sql = f"""select F_Id, TaskState, ProductName, RFID, TaskStartTime, OastInTime, OastOutTime, 
+                                 OastStartTime, OastEntTime, TaskEntTime, RoadWay, OastNo from dsp_OastTask where 
+                                 TaskState != 6 order by -F_Id """
+                sc = SqlClient(sql=sql, **self.DATABASE_CONF)
+                res = sc.all()
+                all_pages = math.ceil(len(res) / page_size)
+                data = res[(page - 1) * page_size: page * page_size] if all_pages > page else res[
+                                                                                              (page - 1) * page_size:]
+                hf_info = []
+                for i in data:
+                    run_time = None
+                    if i[7]:
+                        now_date = datetime.datetime.now()
+                        end_time = now_date if not i[8] else i[8]
+                        diff_time = end_time - i[7]
+                        h_time, m_time = divmod(int(diff_time.total_seconds()) // 60, 60)
+                        run_time = f'{h_time}小时{m_time}分钟'
+                    hf_info.append({'F_Id': i[0],
+                                    'TaskState': i[1],
+                                    'ProductName': i[2],
+                                    'RFID': i[3],
+                                    'OastNo': i[11],
+                                    'TaskStartTime': '' if not i[4] else i[4].strftime("%Y-%m-%d %H:%M:%S"),
+                                    'OastInTime': '' if not i[5] else i[5].strftime("%Y-%m-%d %H:%M:%S"),
+                                    'OastOutTime': '' if not i[6] else i[6].strftime("%Y-%m-%d %H:%M:%S"),
+                                    'RoadWay': i[10],
+                                    'TaskEntTime': '' if not i[9] else i[9].strftime("%Y-%m-%d %H:%M:%S"),
+                                    'Runtime': run_time})
+                response_data.update({'all_pages': all_pages, 'total_data': len(res), 'results': hf_info})
+            else:  # 待入箱列表
+                sql = f"""select F_Id, ProductName, RFID, TaskStartTime, RoadWay from dsp_OastTask where OastNo = 0
+                          order by -F_id"""
+                sc = SqlClient(sql=sql, **self.DATABASE_CONF)
+                res = sc.all()
+                all_pages = math.ceil(len(res) / page_size)
+                data = res[(page - 1) * page_size: page * page_size] if all_pages > page else res[
+                                                                                              (page - 1) * page_size:]
+                hf_info = []
+                for i in data:
+                    hf_info.append(
+                        {'F_Id': i[0],
+                         'ProductName': i[1],
+                         'RFID': i[2],
+                         'TaskStartTime': '' if not i[3] else i[3].strftime("%Y-%m-%d %H:%M:%S"),
+                         'RoadWay': i[4]})
+                response_data.update({'all_pages': all_pages, 'total_data': len(res), 'results': hf_info})
+        except Exception as e:
+            raise ValidationError(e.args[0])
+        return Response(response_data)
+
+    def post(self, request):
+        """烘箱手动出库 OastNo: '1' """
+        try:
+            hf = HFSystem()
+            res = hf.manual_out_hf(self.request.data)
+        except Exception as e:
+            raise ValidationError(e.args[0])
+        else:
+            return Response(res)

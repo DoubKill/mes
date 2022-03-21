@@ -315,6 +315,8 @@ class EquipWarehouseOrderFilter(django_filters.rest_framework.FilterSet):
     s_time = django_filters.CharFilter(field_name='created_date__date', lookup_expr='gte')
     e_time = django_filters.CharFilter(field_name='created_date__date', lookup_expr='lte')
     created_user = django_filters.CharFilter(field_name='created_user__username', lookup_expr='icontains')
+    spare_code = django_filters.CharFilter(field_name='order_detail__equip_spare__spare_code', lookup_expr='icontains')
+    spare_name = django_filters.CharFilter(field_name='order_detail__equip_spare__spare_name', lookup_expr='icontains')
 
     class Meta:
         model = EquipWarehouseOrder

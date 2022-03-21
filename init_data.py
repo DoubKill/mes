@@ -935,7 +935,20 @@ permission_data = [
     {'id': 954, 'code': 'view_material_hf_summary', 'name': '查看', 'parent_id': 953},
     {'id': 955, 'code': 'export_material_hf_summary', 'name': '导出', 'parent_id': 953},
 
-    # 下一个 957开始
+    {'id': 957, 'code': 'material_hf_real_data', 'name': '烘房状态实时显示', 'parent_id': None},
+    {'id': 958, 'code': 'view_material_hf_real_data', 'name': '查看', 'parent_id': 957},
+    {'id': 959, 'code': 'outbound_material_hf_real_data', 'name': '出库', 'parent_id': 957},
+
+    {'id': 960, 'code': 'material_add_print', 'name': '通用及原材料卡片补打', 'parent_id': None},
+    {'id': 961, 'code': 'view_material_add_print', 'name': '查看', 'parent_id': 960},
+    {'id': 962, 'code': 'add_material_add_print', 'name': '新建', 'parent_id': 960},
+    {'id': 963, 'code': 'print_material_add_print', 'name': '打印', 'parent_id': 960},
+
+    {'id': 964, 'code': 'addrubber_print', 'name': '胶片流转卡补打', 'parent_id': None},
+    {'id': 965, 'code': 'view_addrubber_print', 'name': '查看', 'parent_id': 964},
+    {'id': 966, 'code': 'print_addrubber_print', 'name': '打印', 'parent_id': 964},
+
+    # 下一个 967 开始
 ]
 
 
