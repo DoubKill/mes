@@ -1783,11 +1783,11 @@ class UpdateFlagCountView(APIView):
                 pre_fix = now_date.strftime('%Y%m%d')[2:]
                 processing_plan = Plan.objects.using(equip_no).filter(state='运行中', actno__gte=1).last()
                 if not processing_plan:
-                    plan_recipes = list(Plan.objects.using(equip_no).filter(planid__gte=pre_fix, state=['运行中', '等待']).values_list('recipe', flat=True).distinct())
+                    plan_recipes = Plan.objects.using(equip_no).filter(planid__gte=pre_fix, state=['运行中', '等待'], recipe=recipe_name).last()
                 else:
-                    plan_recipes = list(Plan.objects.using(equip_no).filter(id__gte=processing_plan.id, state__in=['运行中', '等待']).values_list('recipe', flat=True).distinct())
-                if recipe_name in plan_recipes:
-                    raise ValidationError('该配方正在配料, 无法停用')
+                    plan_recipes = Plan.objects.using(equip_no).filter(id__gte=processing_plan.id, state__in=['运行中', '等待'], recipe=recipe_name).last()
+                if plan_recipes:
+                    raise ValidationError(f'该配方存在状态为{plan_recipes.state}计划, 无法停用')
             else:  # 有同名配方不可启用
                 if RecipePre.objects.using(equip_no).filter(name=recipe_name, use_not=use_not):
                     raise ValidationError('存在同名已经启用的配方')
