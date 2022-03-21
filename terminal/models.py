@@ -80,6 +80,7 @@ class LoadMaterialLog(models.Model):
     bra_code = models.CharField(max_length=64, help_text='条形码')
     weight_time = models.DateTimeField(help_text='上料时间', null=True)
     status = models.PositiveIntegerField(help_text='状态', choices=STATUS_CHOICE, blank=True, null=True)
+    created_username = models.CharField(max_length=8, help_text='投入人', null=True, blank=True)
 
     class Meta:
         db_table = 'load_material_log'
@@ -123,6 +124,7 @@ class WeightPackageLog(AbstractEntity):
     merge_flag = models.BooleanField(help_text='是否合包', default=False)
     split_count = models.IntegerField(help_text='机配分包数', default=1)
     machine_manual_weight = models.DecimalField(decimal_places=3, max_digits=8, help_text='配方料包展示重量', default=0)
+    ip_address = models.CharField(max_length=64, help_text='下发打印任务的ip地址', null=True, blank=True)
 
     @property
     def total_weight(self):
@@ -668,6 +670,7 @@ class WeightPackageManual(AbstractEntity):
     print_count = models.IntegerField(help_text='打印张数', null=True, blank=True)
     print_flag = models.IntegerField(help_text='打印状态', default=False)
     real_count = models.IntegerField(help_text='配置数量', null=True, blank=True)
+    ip_address = models.CharField(max_length=64, help_text='下发打印任务的ip地址', null=True, blank=True)
 
     @property
     def manual_weight_names(self):
@@ -725,6 +728,7 @@ class WeightPackageSingle(AbstractEntity):
     package_count = models.IntegerField(help_text='配置数量')
     print_count = models.IntegerField(help_text='打印张数', null=True, blank=True)
     print_flag = models.IntegerField(help_text='打印状态', default=False)
+    ip_address = models.CharField(max_length=64, help_text='下发打印任务的ip地址', null=True, blank=True)
 
     class Meta:
         db_table = 'weight_package_single'
@@ -765,6 +769,17 @@ class MachineManualRelation(models.Model):
     class Meta:
         db_table = 'machine_manual_relation'
         verbose_name_plural = verbose_name = '合包配料机配与人工配关联关系'
+
+
+class EquipHaltReason(AbstractEntity):
+    """密炼机台停机原因"""
+    halt_type = models.CharField(max_length=16, help_text='停机原因类别')
+    halt_reason = models.CharField(max_length=16, help_text='停机原因明细')
+    halt_desc = models.CharField(max_length=16, help_text='停机原因备注', null=True, blank=True)
+
+    class Meta:
+        db_table = 'equip_halt_reason'
+        verbose_name_plural = verbose_name = '密炼机台停机原因'
 
     # class TempPlan(models.Model):
 #     id = models.BigIntegerField(db_column='ID')  # Field name made lowercase.

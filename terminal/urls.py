@@ -18,7 +18,7 @@ from terminal.views import BatchBasicInfoView, BatchProductionInfoView, BatchPro
     FeedingErrorLampForCarbonView, FeedingOperateResultForCarbonView, CarbonOutCheckView, CarbonOutTaskView, \
     MaterialInfoIssue, ReplaceMaterialViewSet, ReturnRubberViewSet, ToleranceKeyword, ToleranceRuleViewSet, \
     WeightPackageManualViewSet, GetManualInfo, WeightPackageSingleViewSet, GetMaterialTolerance, UpdateFlagCountView, \
-    MaterialDetailsAux, GetXlRecipesInfoView, XlRecipeNoticeView
+    MaterialDetailsAux, GetXlRecipesInfoView, XlRecipeNoticeView, ApplyHaltEquipView, FormulaPreparationView
 
 router = DefaultRouter()
 router.register('batch-log', LoadMaterialLogViewSet)  # 终端投料履历管理
@@ -68,6 +68,8 @@ urlpatterns = [
     path('power-tank-batching/', PowderTankBatchingView.as_view()),  # 粉料投料(PDA)
     path('carbon-out-task/', CarbonOutTaskView.as_view()),  # 下达炭黑出库任务
     path('xl-recipe-notice/', XlRecipeNoticeView.as_view()),  # 下传称量配方
+    path('apply-halt-equip/', ApplyHaltEquipView.as_view()),  # 密炼终端停机申请
+    path('formula-preparation/', FormulaPreparationView.as_view()),  # 密炼终端查看配方详细信息(备料)
 
     # 炭黑投料：wcs与mes交互
     path('FeedingErrorLampForCarbon/', FeedingErrorLampForCarbonView.as_view()),  # 炭黑解包方请求mes防错结果

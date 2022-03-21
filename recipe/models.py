@@ -167,7 +167,8 @@ class ProductBatching(AbstractEntity):
             material_names.add(weight_cnt_type.name)
         return material_names
 
-    def get_product_batch(self, equip_no, plan_classes_uid):
+    def get_product_batch(self, classes_plan):
+        equip_no, plan_classes_uid = classes_plan.equip.equip_no, classes_plan.plan_classes_uid
         material_name_weight, cnt_type_details = [], []
         # 获取机台配方
         sfj_recipe = ProductBatching.objects.using('SFJ').filter(stage_product_batch_no=self.stage_product_batch_no,
@@ -178,7 +179,15 @@ class ProductBatching(AbstractEntity):
                                                                             ~Q(material__material_name__icontains='掺料'),
                                                                             product_batching=sfj_recipe,
                                                                             delete_flag=False, type=1)
-            material_name_weight = list(sfj_details.values('material__material_name', 'actual_weight'))
+            # 查看是否存在对搭设置
+            mixed = self.product_batching_mixed.all()
+            if mixed:
+                material_name_weight = list(sfj_details.exclude(material__material_name__in=list(mixed.values_list('f_feed_name', 's_feed_name'))).values('material__material_name', 'actual_weight'))
+                l_mixed = mixed.last()
+                material_name_weight += [{'material__material_name': l_mixed.f_feed_name, 'actual_weight': l_mixed.f_weight},
+                                         {'material__material_name': l_mixed.s_feed_name, 'actual_weight': l_mixed.s_weight}]
+            else:
+                material_name_weight = list(sfj_details.values('material__material_name', 'actual_weight'))
             from terminal.models import OtherMaterialLog
             common_scan = OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, other_type='通用料包', status=1)
             if not common_scan:  # 扫的通用料包码则过滤掉细料
@@ -403,3 +412,21 @@ class ProductBatchingEquip(models.Model):
     class Meta:
         db_table = 'product_batching_equip'
         verbose_name_plural = verbose_name = '机台配方详情'
+
+
+class ProductBatchingMixed(models.Model):
+    product_batching = models.ForeignKey(ProductBatching, on_delete=models.CASCADE, help_text='配方id',
+                                         related_name='product_batching_mixed')
+    f_feed = models.CharField(max_length=8, help_text='对搭原料段次1')
+    s_feed = models.CharField(max_length=8, help_text='对搭原料段次2')
+    f_feed_name = models.CharField(max_length=16, help_text='对搭原料名1')
+    s_feed_name = models.CharField(max_length=16, help_text='对搭原料名2')
+    f_ratio = models.IntegerField(help_text='对搭原料名1比例')
+    s_ratio = models.IntegerField(help_text='对搭原料名2比例')
+    f_weight = models.DecimalField(decimal_places=3, max_digits=6, help_text='对搭原料名1重量')
+    s_weight = models.DecimalField(decimal_places=3, max_digits=6, help_text='对搭原料名2重量')
+
+    class Meta:
+        db_table = 'product_batching_mixed'
+        verbose_name_plural = verbose_name = '对搭设置表'
+

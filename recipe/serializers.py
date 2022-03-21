@@ -1,6 +1,7 @@
 import logging
 import uuid
 from datetime import datetime
+from email.policy import default
 
 from django.db.models import Q
 from django.db.transaction import atomic
@@ -12,7 +13,7 @@ from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from recipe.models import Material, ProductInfo, ProductBatching, ProductBatchingDetail, \
     MaterialAttribute, MaterialSupplier, WeighBatchingDetail, WeighCntType, ZCMaterial, ERPMESMaterialRelation, \
-    ProductBatchingEquip
+    ProductBatchingEquip, ProductBatchingMixed
 
 sync_logger = logging.getLogger('sync_log')
 
@@ -131,8 +132,6 @@ class ProductBatchingDetailSerializer(BaseModelSerializer):
         res = super().to_representation(instance)
         batching_info = ProductBatchingEquip.objects.filter(product_batching=instance.product_batching,
                                                             batching_detail_equip=instance, type=instance.type)
-        if instance.product_batching.used_type not in [6, 7]:
-            batching_info = batching_info.filter(is_used=True)
         update_data = {i.equip_no: i.feeding_mode for i in batching_info}
         res.update({'master': update_data, 'is_manual': batching_info.first().is_manual if batching_info.first() else False})
         return res
@@ -184,7 +183,10 @@ class ProductBatchingListSerializer(BaseModelSerializer):
         # 返回配方可用机台
         enable_equip = list(ProductBatchingEquip.objects.filter(product_batching=instance).values_list('equip_no', flat=True).distinct())
         send_success_equip = list(ProductBatchingEquip.objects.filter(product_batching=instance, send_recipe_flag=True).values_list('equip_no', flat=True).distinct())
-        res.update({'enable_equip': enable_equip, 'send_success_equip': send_success_equip})
+        mixed = ProductBatchingMixed.objects.filter(product_batching=instance).first()
+        mixed_ratio = {} if not mixed else {'stage': {'f_feed': mixed.f_feed, 's_feed': mixed.s_feed},
+                                            'ratio': {'f_ratio': mixed.f_ratio, 's_ratio': mixed.s_ratio}}
+        res.update({'enable_equip': enable_equip, 'send_success_equip': send_success_equip, 'mixed_ratio': mixed_ratio})
         return res
 
     class Meta:
@@ -233,6 +235,7 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
     """)
     create_new = serializers.BooleanField(default=False)
     new_recipe_id = serializers.IntegerField(default=0)
+    mixed_ratio = serializers.DictField(default={})
 
     @atomic()
     def create(self, validated_data):
@@ -241,6 +244,7 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
         stage_product_batch_no = validated_data.get('stage_product_batch_no')
         create_new = validated_data.pop('create_new')
         new_recipe_id = validated_data.pop('new_recipe_id')
+        mixed_ratio = validated_data.pop('mixed_ratio')
         if stage_product_batch_no:
             # 传胶料编码则代表是特殊配方
             validated_data.pop('site', None)
@@ -267,6 +271,7 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
                     WeighBatchingDetail.objects.filter(weigh_cnt_type__in=weight_cnt_types_info).delete()
                     weight_cnt_types_info.delete()
                 ProductBatchingEquip.objects.filter(product_batching=new_recipe).delete()
+                ProductBatchingMixed.objects.filter(product_batching=new_recipe).delete()
                 new_recipe.delete()
         validated_data['stage_product_batch_no'] = mes_recipe_name
         stage_product_batch_no = mes_recipe_name
@@ -315,6 +320,17 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
                                         'material': cnt_detail, 'handle_material_name': handle_material_name,
                                         'cnt_type_detail_equip': cnt_detail_instance}
                                 ProductBatchingEquip.objects.create(**data)
+        if mixed_ratio:
+            feeds, ratios = mixed_ratio['stage'], mixed_ratio['ratio']
+            f_s = instance.batching_details.filter(Q(material__material_name__icontains=feeds['f_feed']) | Q(material__material_name__icontains=feeds['s_feed'])).last()
+            if not f_s:
+                raise serializers.ValidationError('对搭设置的段次信息在配方中不存在')
+            f_weight, s_weight = round(float(f_s.actual_weight) * (ratios['f_ratio'] / sum(ratios.values())), 3), round(float(f_s.actual_weight) * (ratios['s_ratio'] / sum(ratios.values())), 3)
+            created_data = {'product_batching': instance, 'f_feed': feeds['f_feed'], 's_feed': feeds['s_feed'],
+                            'f_feed_name': stage_product_batch_no.replace(instance.stage.global_name, feeds['f_feed']),
+                            's_feed_name': stage_product_batch_no.replace(instance.stage.global_name, feeds['s_feed']),
+                            'f_ratio': ratios['f_ratio'], 's_ratio': ratios['s_ratio'], 'f_weight': f_weight, 's_weight': s_weight}
+            ProductBatchingMixed.objects.create(**created_data)
         try:
             material_type = GlobalCode.objects.filter(global_type__type_name='原材料类别',
                                                       global_name=instance.stage.global_name).first()
@@ -331,8 +347,9 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
 
     class Meta:
         model = ProductBatching
-        fields = ('factory', 'site', 'product_info', 'precept', 'stage_product_batch_no', 'weight_cnt_types', 'create_new',
-                  'stage', 'versions', 'batching_details', 'equip', 'id', 'dev_type', 'production_time_interval', 'new_recipe_id')
+        fields = ('factory', 'site', 'product_info', 'precept', 'stage_product_batch_no', 'weight_cnt_types', 'equip',
+                  'create_new', 'stage', 'versions', 'batching_details', 'id', 'dev_type', 'production_time_interval',
+                  'new_recipe_id', 'mixed_ratio')
         extra_kwargs = {
             'stage_product_batch_no': {
                 'allow_blank': True,
@@ -350,7 +367,7 @@ class WeighCntTypeDetailRetrieveSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         res = super().to_representation(instance)
         batching_info = ProductBatchingEquip.objects.filter(product_batching=instance.weigh_cnt_type.product_batching,
-                                                            cnt_type_detail_equip=instance, is_used=True, type=4)
+                                                            cnt_type_detail_equip=instance, type=4)
         update_data = {i.equip_no: i.feeding_mode for i in batching_info}
         res.update({'master': update_data})
         return res
@@ -420,6 +437,7 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
     cnt_type_ids = serializers.ListField(required=False, allow_empty=True, allow_null=True)
     weight_detail_ids = serializers.ListField(required=False, allow_empty=True, allow_null=True)
     del_batching_equip = serializers.ListField(required=False, allow_empty=True, allow_null=True)
+    mixed_ratio = serializers.DictField(default={})
 
     @atomic()
     def update(self, instance, validated_data):
@@ -427,6 +445,7 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
             raise serializers.ValidationError('操作无效！')
         batching_details = validated_data.pop('batching_details', None)
         weight_cnt_types = validated_data.pop('weight_cnt_types', None)
+        mixed_ratio = validated_data.pop('mixed_ratio')
         batching_detail_ids = validated_data.pop('batching_detail_ids', [])
         cnt_type_ids = validated_data.pop('cnt_type_ids', [])
         del_batching_equip = validated_data.pop('del_batching_equip', [])
@@ -543,6 +562,22 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
                         if master:
                             # 去除配方下发状态颜色
                             ProductBatchingEquip.objects.filter(product_batching=instance, equip_no__in=master.keys()).update(send_recipe_flag=False)
+        if mixed_ratio:
+            feeds, ratios = mixed_ratio['stage'], mixed_ratio['ratio']
+            f_s = instance.batching_details.filter(Q(material__material_name__icontains=feeds['f_feed']) | Q(material__material_name__icontains=feeds['s_feed'])).last()
+            if not f_s:
+                raise serializers.ValidationError('对搭设置的段次信息在配方中不存在')
+            f_weight, s_weight = round(float(f_s.actual_weight) * (ratios['f_ratio'] / sum(ratios.values())), 3), round(float(f_s.actual_weight) * (ratios['s_ratio'] / sum(ratios.values())), 3)
+            mixed_recipe = ProductBatchingMixed.objects.filter(product_batching=instance)
+            ready_data = {'f_feed': feeds['f_feed'], 's_feed': feeds['s_feed'], 's_weight': s_weight,
+                          'f_feed_name': instance.stage_product_batch_no.replace(instance.stage.global_name, feeds['f_feed']),
+                          's_feed_name': instance.stage_product_batch_no.replace(instance.stage.global_name, feeds['s_feed']),
+                          'f_ratio': ratios['f_ratio'], 's_ratio': ratios['s_ratio'], 'f_weight': f_weight}
+            if mixed_recipe:
+                mixed_recipe.update(**ready_data)
+            else:
+                ready_data.update({'product_batching': instance})
+                ProductBatchingMixed.objects.create(**ready_data)
         for cnt_type_instance in instance.weight_cnt_types.filter(delete_flag=False):
             if not cnt_type_instance.weight_details.filter(delete_flag=False).exists():
                 cnt_type_instance.delete_flag = True
@@ -554,7 +589,7 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
     class Meta:
         model = ProductBatching
         fields = ('id', 'batching_details', 'dev_type', 'production_time_interval', 'weight_cnt_types',
-                  'batching_detail_ids', 'cnt_type_ids', 'weight_detail_ids', 'del_batching_equip')
+                  'batching_detail_ids', 'cnt_type_ids', 'weight_detail_ids', 'del_batching_equip', 'mixed_ratio')
 
 
 class ProductBatchingPartialUpdateSerializer(BaseModelSerializer):
