@@ -1244,6 +1244,35 @@ class WeightBatchingLogListViewSet(ListAPIView):
     filter_backends = [DjangoFilterBackend]
     filter_class = WeightBatchingLogListFilter
 
+    def list(self, request, *args, **kwargs):
+        opera_type = self.request.query_params.get('opera_type')
+        bra_code = self.request.query_params.get('bra_code')
+        queryset = self.filter_queryset(self.get_queryset())
+        if opera_type == '1':
+            try:
+                res = material_out_barcode(bra_code)
+            except Exception as e:
+                raise ValidationError(e.args[0])
+            data = []
+            if res:
+                data.append(res)
+        elif opera_type == '2':
+            data = queryset.filter(status=1).order_by('-id').annotate(created_username=F('created_user__username'))\
+                .values('id', 'bra_code', 'batch_time', 'created_username')
+        else:
+            # 按条码分组
+            group_data = queryset.filter(status=1).values('bra_code').annotate(max_id=Max('id'), total_num=Count('id')).order_by('-max_id')
+            data = []
+            for i in group_data:
+                total_num = i['total_num'] if i['total_num'] else 0
+                display_record = dict(queryset.filter(id=i['max_id']).annotate(created_username=F('created_user__username')).values()[0])
+                display_record.update({'total_num': total_num, 'batch_time': display_record.get('batch_time').strftime('%Y:%m:%d %H:%M:%S')})
+                data.append(display_record)
+            page = self.paginate_queryset(data)
+            if page is not None:
+                return self.get_paginated_response(page)
+        return Response(data)
+
 
 @method_decorator([api_recorder], name="dispatch")
 class ForceFeedStock(APIView):
