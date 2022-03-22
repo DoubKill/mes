@@ -5142,6 +5142,17 @@ class WMSOutTaskView(ListAPIView):
     permission_classes = (IsAuthenticated,)
     DB = 'wms'
 
+    def get_serializer_context(self):
+        """
+        Extra context provided to the serializer class.
+        """
+        return {
+            'request': self.request,
+            'format': self.format_kwarg,
+            'view': self,
+            'db': self.DB
+        }
+
     def get_queryset(self):
         query_set = MaterialOutHistoryOther.objects.using(self.DB).order_by('-id')
         order_no = self.request.query_params.get('order_no')
@@ -5237,7 +5248,8 @@ class WMSOutTaskDetailView(ListAPIView):
             'request': self.request,
             'format': self.format_kwarg,
             'view': self,
-            'entrance_data': entrance_data
+            'entrance_data': entrance_data,
+            'db': self.DB
         }
 
     def list(self, request, *args, **kwargs):

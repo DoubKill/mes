@@ -1834,8 +1834,11 @@ class MaterialOutHistoryOtherSerializer(serializers.ModelSerializer):
     initiator = serializers.SerializerMethodField()
 
     def get_initiator(self, obj):
+        db = self.context['db']
+        order_type = 1 if db == 'wms' else 2
         if obj.initiator == 'MES':
-            order = MaterialOutboundOrder.objects.filter(order_no=obj.order_no).first()
+            order = MaterialOutboundOrder.objects.filter(order_no=obj.order_no,
+                                                         order_type=order_type).first()
             if order:
                 return order.created_username
             return obj.initiator
@@ -1855,8 +1858,11 @@ class MaterialOutHistorySerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
 
     def get_initiator(self, obj):
+        db = self.context['db']
+        order_type = 1 if db == 'wms' else 2
         if obj.task.initiator == 'MES':
-            order = MaterialOutboundOrder.objects.filter(order_no=obj.task.order_no).first()
+            order = MaterialOutboundOrder.objects.filter(order_no=obj.task.order_no,
+                                                         order_type=order_type).first()
             if order:
                 return order.created_username
             return obj.task.initiator
