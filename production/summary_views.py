@@ -595,7 +595,7 @@ class IndexProductionAnalyze(APIView):
                     inner join plan_schedule ps on wsp.plan_schedule_id = ps.id
                     inner join equip e on pcp.equip_id = e.id
                     inner join product_batching pb on pcp.product_batching_id = pb.id
-                    inner join global_code gc on pb.stage_id = gc.id
+                    left join global_code gc on pb.stage_id = gc.id
                 where pcp.delete_flag=0 {}
                 group by ps.day_time, gc.global_name) tmp
             group by day_time, stage_name order by day_time;""".format(plan_extra_where_str)
@@ -618,7 +618,7 @@ class IndexProductionAnalyze(APIView):
                     trains_feedbacks tf
                 inner join product_classes_plan pcp on tf.plan_classes_uid=pcp.plan_classes_uid
                 inner join product_batching pb on pb.ID=pcp.product_batching_id
-                inner join global_code gc on gc.ID=pb.stage_id
+                left join global_code gc on gc.ID=pb.stage_id
                 {}
                 group by tf.factory_date, gc.global_name order by tf.factory_date) tmp
             group by factory_date, stage_name order by factory_date;""".format(actual_extra_where_str)
