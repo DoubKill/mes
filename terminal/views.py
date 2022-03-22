@@ -1648,60 +1648,64 @@ class XLPlanVIewSet(ModelViewSet):
         """称量计划结转班次"""
         equip_no = self.request.data.get('equip_no')
         next_classes = self.request.data.get('next_classes')
-        factory_date = get_current_factory_date()
-        if not factory_date:
-            raise ValidationError('获取工厂日期和班次失败, 无法结转计划')
-        now_date, now_classes = factory_date.get('factory_date'), factory_date.get('classes')
-        date_time = now_date.strftime('%Y-%m-%d')
-        now_time = date_time + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        # 同班次不可结转
-        if now_classes == next_classes:
-            raise ValidationError('同班次无法结转计划')
-        if now_classes == '中班' and next_classes != '夜班':
-            raise ValidationError(f'当前{now_classes}只能切换到夜班')
-        if now_classes == '夜班' and next_classes != '早班':
-            raise ValidationError(f'当前{now_classes}只能切换到早班')
+        now_datetime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        now_date, now_time = now_datetime[:10], now_datetime[11:]
+        if next_classes == '早班' and '07:45:00' <= now_time <= '08:15:00':
+            msg = self.handle_trans(equip_no, next_classes, now_datetime)
+            if msg:
+                raise ValidationError(msg)
+        elif next_classes == '中班' and '15:45:00' <= now_time <= '16:15:00':
+            msg = self.handle_trans(equip_no, next_classes, now_datetime)
+            if msg:
+                raise ValidationError(msg)
+        elif next_classes == '夜班' and ('19:45:00' <= now_time <= '20:15:00' or '23:45' <= now_time <= '24:00'):
+            msg = self.handle_trans(equip_no, next_classes, now_datetime)
+            if msg:
+                raise ValidationError(msg)
+        else:
+            raise ValidationError('切换时间段与班次不匹配: 早班: 07:45-08:15 中班: 15:45-16:15 夜班: 19:45-20:15 23:45-24:00')
+        return Response('切换班次计划成功')
+
+    def handle_trans(self, equip_no, next_classes, now_datetime):
         with atomic(using=equip_no):
-            y_date_time = (now_date + timedelta(days=1)).strftime('%Y-%m-%d')
-            date_time_filter = [date_time] if now_classes in ['早班', '中班'] else [date_time, y_date_time]
+            now_date = now_datetime[:10]
+            # 获取最新计划的班次
+            plans = Plan.objects.using(equip_no).filter(state__in=['运行中', '等待'], date_time=now_date).order_by('order_by')
+            if not plans:
+                return '未找到运行中或者等待的计划'
+            if plans.first().grouptime == next_classes:
+                return '切换班次失败: 所选切换班次与当前班次一致'
             order_by_list = [0]
-            order_rule = ["date_time", "-grouptime", "order_by"] if now_classes > next_classes else ["date_time", "grouptime", "order_by"]
-            other_plan = Plan.objects.using(equip_no).filter(date_time__in=date_time_filter, grouptime__in=[now_classes, next_classes],
-                                                             state__in=['运行中', '等待']).order_by(*order_rule)
-            if not other_plan:
-                raise ValidationError('未找到可切换的计划')
-            processing_plan = []
-            plan_datas = other_plan.values('recipe', 'recipe_id', 'recipe_ver', 'state', 'setno', 'actno', 'date_time', 'merge_flag')
-            client = CLSystem(equip_no)
             handle_plan_data = {}
-            for index, plan in enumerate(other_plan):
+            plan_data = plans.values('recipe', 'recipe_id', 'recipe_ver', 'state', 'setno', 'actno', 'date_time', 'merge_flag')
+            for index, plan in enumerate(plans):
                 if plan.state == '运行中' and plan.actno:
-                    if processing_plan:
-                        raise ValidationError(f'当前班次[{now_classes}]运行中的计划超过1条, 无法结转')
+                    if 'stop' in handle_plan_data:
+                        return '正在配料计划超过1条'
                     first_plan_id = datetime.datetime.now().strftime('%Y%m%d%H%M%S')[2:]
-                    p_data = plan_datas[index]
+                    p_data = plan_data[index]
                     p_data.update({'planid': first_plan_id, 'grouptime': next_classes, 'oper': self.request.user.username,
-                                   'order_by': 1, 'date_time': date_time if now_classes != '夜班' else y_date_time,
-                                   'setno': p_data['setno'] - p_data['actno'], 'actno': None, 'addtime': now_time})
+                                   'order_by': 1, 'date_time': now_date, 'setno': p_data['setno'] - p_data['actno'],
+                                   'actno': None, 'addtime': now_datetime})
                     new_plan = Plan.objects.using(equip_no).create(**p_data)
                     order_by_list.append(1)
-                    plan.stoptime = now_time
+                    plan.stoptime = now_datetime
                     plan.state = '完成'
                     plan.save()
-                    processing_plan.append(plan)
                     handle_plan_data['stop'] = plan
-                    handle_plan_data['issue'] = new_plan
+                    handle_plan_data['issue'] = [new_plan]
                     continue
                 replace_order_by = max(order_by_list) + 1
                 plan.grouptime = next_classes
                 plan.order_by = replace_order_by
                 plan.oper = self.request.user.username
-                plan.date_time = date_time if now_classes != '夜班' else y_date_time
+                plan.date_time = now_date
                 plan.save()
                 order_by_list.append(replace_order_by)
                 if plan.state == '运行中':
                     handle_plan_data['issue'] = handle_plan_data['issue'] + [plan] if 'issue' in handle_plan_data else [plan]
             try:
+                client = CLSystem(equip_no)
                 stop_plan = handle_plan_data.get('stop')
                 issue_plan = handle_plan_data.get('issue')
                 if stop_plan:
@@ -1712,9 +1716,8 @@ class XLPlanVIewSet(ModelViewSet):
                         # 下达新计划
                         client.issue_plan(single_plan.planid, single_plan.recipe, single_plan.setno)
             except Exception as e:
-                raise ValidationError(e.args[0])
-
-        return Response('切换班次计划成功')
+                return e.args[0]
+            return ''
 
 
 @method_decorator([api_recorder], name="dispatch")
