@@ -81,6 +81,7 @@ class LoadMaterialLog(models.Model):
     weight_time = models.DateTimeField(help_text='上料时间', null=True)
     status = models.PositiveIntegerField(help_text='状态', choices=STATUS_CHOICE, blank=True, null=True)
     created_username = models.CharField(max_length=8, help_text='投入人', null=True, blank=True)
+    display_name = models.CharField(max_length=64, help_text='履历展示名称', null=True, blank=True)
 
     class Meta:
         db_table = 'load_material_log'

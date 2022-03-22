@@ -182,12 +182,12 @@ class ProductBatching(AbstractEntity):
             # 查看是否存在对搭设置
             mixed = self.product_batching_mixed.all()
             if mixed:
-                material_name_weight = list(sfj_details.exclude(material__material_name__in=list(mixed.values_list('f_feed_name', 's_feed_name'))).values('material__material_name', 'actual_weight'))
+                material_name_weight = list(sfj_details.exclude(material__material_name__in=list(mixed.values_list('f_feed_name', 's_feed_name'))).values('material__material_name', 'actual_weight', 'standard_error'))
                 l_mixed = mixed.last()
                 material_name_weight += [{'material__material_name': l_mixed.f_feed_name, 'actual_weight': l_mixed.f_weight},
                                          {'material__material_name': l_mixed.s_feed_name, 'actual_weight': l_mixed.s_weight}]
             else:
-                material_name_weight = list(sfj_details.values('material__material_name', 'actual_weight'))
+                material_name_weight = list(sfj_details.values('material__material_name', 'actual_weight', 'standard_error'))
             from terminal.models import OtherMaterialLog
             common_scan = OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, other_type='通用料包', status=1)
             if not common_scan:  # 扫的通用料包码则过滤掉细料

@@ -501,7 +501,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                     res_attrs['tank_data'].update({'material_name': k, 'material_no': k, 'scan_material': k})
                     res_attrs.update({'material_name': k, 'material_no': k})
                     details.append(res_attrs)
-        attrs = {'attrs': details, 'created_username': self.context['request'].user.username}
+        attrs = {'attrs': details, 'created_username': self.context['request'].user.username, 'scan_material_type': scan_material_type}
         if send_flag:
             try:
                 resp = requests.post(url=settings.AUXILIARY_URL + 'api/v1/production/current_weigh/', json=attrs, timeout=5)
@@ -514,6 +514,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             msg = i['tank_data'].pop('msg')
             if msg:
                 raise serializers.ValidationError(msg)
+        del_scan_material_type = attrs.pop('scan_material_type')
         return attrs
 
     def material_pass(self, plan_classes_uid, scan_material, reason_type='物料名不一致', material_type='机配'):
@@ -899,13 +900,15 @@ class WeightPackageLogCreateSerializer(serializers.ModelSerializer):
         bra_code = prefix + '%04d' % incr_num
         attrs.update({'bra_code': bra_code, 'begin_trains': print_begin_trains, 'material_no': product_no,
                       'material_name': product_no, 'noprint_count': package_fufil - package_count, 'expire_days': days,
-                      'end_trains': print_begin_trains + package_count - 1, 'print_flag': 1,
+                      'end_trains': print_begin_trains + package_count - 1, 'print_flag': 1, 'already_print': already_print,
                       'batch_time': str(batch_time), 'ip_address': self.context['request'].META.get('REMOTE_ADDR')})
         return attrs
 
     @atomic
     def create(self, validated_data):
         manual_infos = validated_data.pop('manual_infos')
+        already_print = validated_data.pop('already_print')
+        plan_weight_uid = validated_data['plan_weight_uid']
         machine_package_count = validated_data['package_count']
         split_count = validated_data['split_count']
         instance = WeightPackageLog.objects.create(**validated_data)
@@ -939,6 +942,9 @@ class WeightPackageLogCreateSerializer(serializers.ModelSerializer):
                 # 归零和减重(最新一条减重,其余的归零)
                 db_name.objects.filter(id=i['manual_id']).update(**update_kwargs)
                 MachineManualRelation.objects.create(**create_data)
+        # 更新未打印数量
+        noprint_count = validated_data['package_fufil'] - (already_print + machine_package_count)
+        WeightPackageLog.objects.filter(plan_weight_uid=plan_weight_uid).update(noprint_count=noprint_count)
         return instance
 
     class Meta:

@@ -1189,14 +1189,14 @@ class BatchChargeLogListViewSet(ListAPIView):
     filter_backends = [DjangoFilterBackend]
 
     def get_queryset(self):
-        queryset = LoadMaterialLog.objects.using('SFJ').all().order_by('-id')
+        queryset = LoadMaterialLog.objects.using('SFJ').filter(status=1).order_by('-id')
         mixing_finished = self.request.query_params.get('mixing_finished', None)
         plan_classes_uid = self.request.query_params.get('plan_classes_uid')
         production_factory_date = self.request.query_params.get('production_factory_date')
         equip_no = self.request.query_params.get('equip_no')
         trains = self.request.query_params.get('trains')
         production_classes = self.request.query_params.get('production_classes')
-        material_no = self.request.query_params.get('material_no')
+        display_name = self.request.query_params.get('display_name')
         bra_code = self.request.query_params.get('bra_code')
         created_username = self.request.query_params.get('created_username')
         if plan_classes_uid:
@@ -1207,8 +1207,8 @@ class BatchChargeLogListViewSet(ListAPIView):
             queryset = queryset.filter(feed_log__equip_no=equip_no)
         if production_classes:
             queryset = queryset.filter(feed_log__production_classes=production_classes)
-        if material_no:
-            queryset = queryset.filter(material_no__icontains=material_no)
+        if display_name:
+            queryset = queryset.filter(material_no__icontains=display_name)
         if mixing_finished:
             if mixing_finished == "终炼":
                 queryset = queryset.filter(feed_log__product_no__icontains="FM").all()
@@ -1224,14 +1224,52 @@ class BatchChargeLogListViewSet(ListAPIView):
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
-
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
+        bra_code = self.request.query_params.get('bra_code')
+        opera_type = self.request.query_params.get('opera_type')
+        plan_classes_uid = self.request.query_params.get('plan_classes_uid')
+        data = []
+        if opera_type == '1':  # 物料投入条码信息
+            serializer = self.get_serializer(queryset, many=True)
+            classes_plan = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid).first()
+            material_name_weight, cnt_type_details = classes_plan.product_batching.get_product_batch(classes_plan)
+            standard_data = {i['material__material_name']: i for i in material_name_weight + cnt_type_details}
+            split_count = 0
+            for i in serializer.data:
+                single_data = standard_data.get(i['material_name'])
+                if i['bra_code'][0] in ['F', 'S'] or i['bra_code'][:2] in ['MM', 'MC']:
+                    if split_count == 0:
+                        record = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code).last()
+                        split_count = record.single_need
+                        i['split_count'] = split_count
+                    i.update({'split_count': split_count, 'standard_weight': single_data['actual_weight'], 'standard_error': single_data['standard_error']})
+                else:
+                    i.update({'split_count': split_count, 'standard_weight': i['actual_weight'], 'standard_error': single_data['standard_error']})
+                data.append(i)
+        elif opera_type == '2':  # 原材料信息
+            try:
+                res = material_out_barcode(bra_code)
+            except Exception as e:
+                raise ValidationError(e.args[0])
+            if res:
+                data.append(res)
+        else:
+            repeat_bra_code = []
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                for i in serializer.data:
+                    repeat_keyword = {i['bra_code'], i['trains']}
+                    if repeat_keyword not in repeat_bra_code:
+                        data.append(i)
+                        repeat_bra_code.append(repeat_keyword)
+                return self.get_paginated_response(data)
+            serializer = self.get_serializer(queryset, many=True)
+            for i in serializer.data:
+                repeat_keyword = {i['bra_code'], i['trains']}
+                if repeat_keyword not in repeat_bra_code:
+                    data.append(i)
+                    repeat_bra_code.append(repeat_keyword)
+        return Response(data)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -1248,12 +1286,12 @@ class WeightBatchingLogListViewSet(ListAPIView):
         opera_type = self.request.query_params.get('opera_type')
         bra_code = self.request.query_params.get('bra_code')
         queryset = self.filter_queryset(self.get_queryset())
+        data = []
         if opera_type == '1':
             try:
                 res = material_out_barcode(bra_code)
             except Exception as e:
                 raise ValidationError(e.args[0])
-            data = []
             if res:
                 data.append(res)
         elif opera_type == '2':
@@ -1262,7 +1300,6 @@ class WeightBatchingLogListViewSet(ListAPIView):
         else:
             # 按条码分组
             group_data = queryset.filter(status=1).values('bra_code').annotate(max_id=Max('id'), total_num=Count('id')).order_by('-max_id')
-            data = []
             for i in group_data:
                 total_num = i['total_num'] if i['total_num'] else 0
                 display_record = dict(queryset.filter(id=i['max_id']).annotate(created_username=F('created_user__username')).values()[0])
