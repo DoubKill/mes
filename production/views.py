@@ -2643,7 +2643,17 @@ class PerformanceSummaryView(APIView):
         for item in product_qty:
             equip_no = item['equip_no']
             equip_type = Equip.objects.filter(equip_no=equip_no).values('category__category_no')[0]['category__category_no']
-            state = item['product_no'].split('-')[1]
+            try:
+                state = item['product_no'].split('-')[1]
+                if state in ['XCJ', 'DJXCJ']:
+                    if item['product_no'].split('-')[0] == 'FM':
+                        state = 'RFM'
+                    elif item['product_no'].split('-')[0] == 'WL':
+                        state = 'RMB'
+                    else:
+                        continue
+            except:
+                continue
             price_obj = PerformanceUnitPrice.objects.filter(equip_type=equip_type, state=state).first()
             if not price_obj:
                 PerformanceUnitPrice.objects.create(state=state, equip_type=equip_type, dj=1.2, pt=1.1)
