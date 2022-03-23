@@ -154,6 +154,8 @@ class WmsInventoryStock(models.Model):
     tunnel = models.CharField(max_length=32, db_column="tunnelId")  # 巷道
     # shelf = models.CharField(max_length=32, db_column="shelfId", help_text="列号")  # 列号
     # layer = models.CharField(max_length=32, db_column="layerId", help_text="层号")  # 层号
+    sl = models.DecimalField(max_digits=18, decimal_places=4, db_column='SL')
+    zl = models.DecimalField(max_digits=18, decimal_places=4, db_column='ZL')
 
     def unit_weight(self):
         return self.total_weight / self.qty
