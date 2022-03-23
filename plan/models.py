@@ -392,7 +392,7 @@ class SchedulingEquipShutDownPlan(AbstractEntity):
     down_type = models.CharField(max_length=64, help_text='停机类型')
     begin_time = models.DateTimeField(help_text='开始停机时间')
     duration = models.FloatField(help_text='停机时长（小时）')
-    desc = models.CharField(max_length=64, help_text='备注', null=True)
+    desc = models.CharField(max_length=64, help_text='备注', null=True, blank=True)
 
     class Meta:
         db_table = 'aps_equip_shutdown_plan'
