@@ -14,10 +14,11 @@ import django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()
 
-from django.db.models import Sum, Max
+from django.db.models import Sum, Count
 
 from plan.models import ProductClassesPlan
 from production.models import TrainsFeedbacks
+from basics.models import Equip
 
 
 def product_day_message():
@@ -27,28 +28,23 @@ def product_day_message():
     time_str_start = " 08:00:00"
     time_str_end = " 07:59:59"
 
-    plan_set = ProductClassesPlan.objects.filter(
+    plan_data = dict(ProductClassesPlan.objects.filter(
         work_schedule_plan__plan_schedule__day_time=factory_date,
-        delete_flag=False)
-    plan_data = plan_set.values('equip__equip_no').annotate(plan_num=Sum('plan_trains'))
-    plan_uid = plan_set.values_list("plan_classes_uid", flat=True)
-    max_ids = TrainsFeedbacks.objects.filter(plan_classes_uid__in=plan_uid) \
-        .values('plan_classes_uid').annotate(max_id=Max('id')).values_list('max_id', flat=True)
-    temp_set = TrainsFeedbacks.objects.filter(id__in=max_ids).values("equip_no"). \
-        annotate(plan_sum=Sum('plan_trains'), actual_sum=Sum('actual_trains')).order_by("equip_no")
-    ret_set = temp_set.values("equip_no", "plan_sum", "actual_sum")
-    equip_list = []
+        delete_flag=False).values('equip__equip_no').annotate(plan_num=Sum('plan_trains')).values_list('equip__equip_no', 'plan_num'))
+    actual_data = dict(TrainsFeedbacks.objects.filter(
+        factory_date=factory_date).values('equip_no').annotate(actual_sum=Count('id')).values_list('equip_no', 'actual_sum'))
+
+    equip_list = list(Equip.objects.filter(category__equip_type__global_name="密炼设备").values_list("equip_no", flat=True))
     plan_list = []
     actual_list = []
-    for _ in ret_set:
-        equip_list.append(_.get('equip_no'))
-        plan_list.append(_.get('plan_sum'))
-        actual_list.append(_.get('actual_sum'))
+    mk_str = f"统计时间: {factory_date.strftime('%Y-%m-%d') + time_str_start} -> {end_date.strftime('%Y-%m-%d') + time_str_end}\n - 计划车数/实际车数"
+
+    for equip_no in equip_list:
+        plan_list.append(plan_data.get(equip_no, 0))
+        actual_list.append(actual_data.get(equip_no, 0))
+        mk_str += f"""\n - {equip_no}:\t{plan_data.get(equip_no, 0)}/{actual_data.get(equip_no, 0)}"""
     plan_all = sum(plan_list)
     actual_all = sum(actual_list)
-    mk_str = f"统计时间: {factory_date.strftime('%Y-%m-%d') + time_str_start} -> {end_date.strftime('%Y-%m-%d') + time_str_end}\n - 计划车数/实际车数"
-    for temp in ret_set:
-        mk_str += f"""\n - {temp.get('equip_no')}:\t{temp.get('plan_sum')}/{temp.get('actual_sum')}"""
     mk_str += f"\n - 日计划量/生产量: {plan_all}/{actual_all} \n"
     now_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     # data = "\n - Z01:\t100/99\n - Z02:\t100/99\n - Z03:\t100/99\n - Z04:\t100/99\n - Z05:\t100/99\n\n"
