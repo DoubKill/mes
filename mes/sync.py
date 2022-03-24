@@ -92,16 +92,14 @@ class ProductBatchingSyncInterface(serializers.ModelSerializer, BaseInterface):
         batching_equip_infos = ProductBatchingEquip.objects.filter(product_batching=obj, is_used=True)
         for equip_no in enable_equip:
             # P
-            feed_p_info = batching_equip_infos.filter(equip_no=equip_no, feeding_mode__startswith='P')\
-                .annotate(material_name=F('material__material_name'), sn=F('batching_detail_equip__sn'),
-                          actual_weight=F('batching_detail_equip__actual_weight'),
-                          standard_error=F('batching_detail_equip__standard_error'))\
-                .values('material_name', 'actual_weight', 'standard_error', 'type', 'sn')
+            feed_p_info = []
+            feed_p_infos = batching_equip_infos.filter(equip_no=equip_no, feeding_mode__startswith='P')
             # 炭黑油料投料方式为P需要转换类型, 并且重编sn
-            for index, i in enumerate(feed_p_info):
-                i['sn'] = index + 1
-                if i['type'] != 1:
-                    i['type'] = 1
+            for index, i in enumerate(feed_p_infos):
+                add_data = {'material_name': i.material.material_name, 'type': 1, 'sn': index + 1,
+                            'actual_weight': i.batching_detail_equip.actual_weight if i.batching_detail_equip else i.cnt_type_detail_equip.standard_weight,
+                            'standard_error': i.batching_detail_equip.standard_error if i.batching_detail_equip else i.cnt_type_detail_equip.standard_error}
+                feed_p_info.append(add_data)
             # C
             feed_c_info = batching_equip_infos.filter(equip_no=equip_no, feeding_mode__startswith='C', type=2) \
                 .annotate(material_name=F('material__material_name'), sn=F('batching_detail_equip__sn'),
