@@ -655,24 +655,54 @@ class SchedulingParamsSettingSerializer(serializers.ModelSerializer):
 
 
 class SchedulingRecipeMachineSettingSerializer(BaseModelSerializer):
-    mixing_vice_machine = serializers.ListField(write_only=True, required=False, allow_empty=True)
-    final_vice_machine = serializers.ListField(write_only=True, required=False, allow_empty=True)
+    vice_machine_HMB = serializers.ListField(write_only=True, required=False, allow_empty=True)
+    vice_machine_CMB = serializers.ListField(write_only=True, required=False, allow_empty=True)
+    vice_machine_1MB = serializers.ListField(write_only=True, required=False, allow_empty=True)
+    vice_machine_2MB = serializers.ListField(write_only=True, required=False, allow_empty=True)
+    vice_machine_3MB = serializers.ListField(write_only=True, required=False, allow_empty=True)
+    vice_machine_FM = serializers.ListField(write_only=True, required=False, allow_empty=True)
+    stages = serializers.ListField(write_only=True, required=False, allow_empty=True)
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
-        if instance.mixing_vice_machine:
-            data['mixing_vice_machine'] = instance.mixing_vice_machine.split('/')
+        if instance.vice_machine_HMB:
+            data['vice_machine_HMB'] = instance.vice_machine_HMB.split('/')
         else:
-            data['mixing_vice_machine'] = []
-        if instance.final_vice_machine:
-            data['final_vice_machine'] = instance.final_vice_machine.split('/')
+            data['vice_machine_HMB'] = []
+        if instance.vice_machine_CMB:
+            data['vice_machine_CMB'] = instance.vice_machine_CMB.split('/')
         else:
-            data['final_vice_machine'] = []
+            data['vice_machine_CMB'] = []
+        if instance.vice_machine_1MB:
+            data['vice_machine_1MB'] = instance.vice_machine_1MB.split('/')
+        else:
+            data['vice_machine_1MB'] = []
+        if instance.vice_machine_2MB:
+            data['vice_machine_2MB'] = instance.vice_machine_2MB.split('/')
+        else:
+            data['vice_machine_2MB'] = []
+        if instance.vice_machine_3MB:
+            data['vice_machine_3MB'] = instance.vice_machine_3MB.split('/')
+        else:
+            data['vice_machine_3MB'] = []
+        if instance.vice_machine_FM:
+            data['vice_machine_FM'] = instance.vice_machine_FM.split('/')
+        else:
+            data['vice_machine_FM'] = []
+        if instance.stages:
+            data['stages'] = instance.stages.split('/')
+        else:
+            data['stages'] = []
         return data
 
     def validate(self, attrs):
-        attrs['mixing_vice_machine'] = '/'.join(attrs.get('mixing_vice_machine', ''))
-        attrs['final_vice_machine'] = '/'.join(attrs.get('final_vice_machine', ''))
+        attrs['vice_machine_HMB'] = '/'.join(attrs.get('vice_machine_HMB', ''))
+        attrs['vice_machine_CMB'] = '/'.join(attrs.get('vice_machine_CMB', ''))
+        attrs['vice_machine_1MB'] = '/'.join(attrs.get('vice_machine_1MB', ''))
+        attrs['vice_machine_2MB'] = '/'.join(attrs.get('vice_machine_2MB', ''))
+        attrs['vice_machine_3MB'] = '/'.join(attrs.get('vice_machine_3MB', ''))
+        attrs['vice_machine_FM'] = '/'.join(attrs.get('vice_machine_FM', ''))
+        attrs['stages'] = '/'.join(attrs.get('stages', ''))
         return attrs
 
     class Meta:
@@ -681,7 +711,7 @@ class SchedulingRecipeMachineSettingSerializer(BaseModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
         validators = [UniqueTogetherValidator(
             queryset=SchedulingRecipeMachineSetting.objects.filter(delete_flag=False).all(),
-            fields=('rubber_type', 'product_no', 'stage'), message='该数据已存在')]
+            fields=('rubber_type', 'product_no', 'version'), message='该规格定级表数据已存在！')]
 
 
 class RecipeMachineWeightSerializer(serializers.ModelSerializer):

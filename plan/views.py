@@ -3,8 +3,9 @@ import json
 import re
 
 import requests
+import xlrd
 from django.db import connection, IntegrityError
-from django.db.models import Sum, Max
+from django.db.models import Sum, Max, Q
 from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
@@ -50,6 +51,7 @@ from production.models import PlanStatus, TrainsFeedbacks, MaterialTankStatus
 from quality.utils import get_cur_sheet, get_sheet_data
 from recipe.models import ProductBatching, ProductBatchingDetail, Material, MaterialAttribute
 from system.serializers import PlanReceiveSerializer
+from terminal.utils import get_current_factory_date
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -500,7 +502,7 @@ class SchedulingParamsSettingView(ModelViewSet):
 
 @method_decorator([api_recorder], name="dispatch")
 class SchedulingRecipeMachineSettingView(ModelViewSet):
-    queryset = SchedulingRecipeMachineSetting.objects.order_by('rubber_type', 'stage', 'product_no')
+    queryset = SchedulingRecipeMachineSetting.objects.order_by('rubber_type', 'product_no', 'version')
     serializer_class = SchedulingRecipeMachineSettingSerializer
     pagination_class = None
     # permission_classes = (IsAuthenticated,)
@@ -513,19 +515,29 @@ class SchedulingRecipeMachineSettingView(ModelViewSet):
         if not excel_file:
             raise ValidationError('文件不可为空！')
         cur_sheet = get_cur_sheet(excel_file)
-        # if cur_sheet.ncols != 7:
-        #     raise ValidationError('导入文件数据错误！')
-        data = get_sheet_data(cur_sheet, start_row=3)
+        if cur_sheet.ncols != 16:
+            raise ValidationError('导入文件数据错误！')
+        data = get_sheet_data(cur_sheet, start_row=2)
         for item in data:
-            if not all([item[0], item[1], item[2], item[3], item[5]]):
+            if not all([item[0], item[1], item[2], item[3]]):
                 raise ValidationError('必填数据缺失')
             try:
                 SchedulingRecipeMachineSetting.objects.update_or_create(
-                    defaults={"mixing_main_machine": item[3],
-                              "mixing_vice_machine": item[4],
-                              "final_main_machine": item[5],
-                              "final_vice_machine": item[6]},
-                    **{"rubber_type": item[0], "product_no": item[2], "stage": item[1]}
+                    defaults={"stages": item[3],
+                              "main_machine_HMB": item[4],
+                              "vice_machine_HMB": item[5],
+                              "main_machine_CMB": item[6],
+                              "vice_machine_CMB": item[7],
+                              "main_machine_1MB": item[8],
+                              "vice_machine_1MB": item[9],
+                              "main_machine_2MB": item[10],
+                              "vice_machine_2MB": item[11],
+                              "main_machine_3MB": item[12],
+                              "vice_machine_3MB": item[13],
+                              "main_machine_FM": item[14],
+                              "vice_machine_FM": item[15],
+                              },
+                    **{"rubber_type": item[0], "product_no": item[1], "version": item[2]}
                 )
             except Exception:
                 raise
@@ -733,36 +745,58 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
     @action(methods=['post'], detail=False, permission_classes=[], url_path='import_xlsx',
             url_name='import_xlsx')
     def import_xlx(self, request):
+        factory_date = self.request.data.get('factory_date', datetime.datetime.now().strftime('%Y-%m-%d'))
+        date_splits = factory_date.split('-')
+        m = date_splits[1] if not date_splits[1].startswith('0') else date_splits[1].lstrip('0')
+        d = date_splits[2]
         excel_file = request.FILES.get('file', None)
-        factory_date = self.request.data.get('factory_date', datetime.datetime.now().date())
         if not excel_file:
             raise ValidationError('文件不可为空！')
-        cur_sheet = get_cur_sheet(excel_file)
-        if cur_sheet.ncols != 5:
-            raise ValidationError('导入文件数据错误！')
-        data = get_sheet_data(cur_sheet, start_row=1)
+        if not excel_file.name.split('.')[-1] in ['xls', 'xlsx', 'xlsm']:
+            raise ValidationError('文件格式错误,仅支持 xls、xlsx、xlsm文件')
+        try:
+            data = xlrd.open_workbook(filename=None, file_contents=excel_file.read())
+            cur_sheet = data.sheet_by_name(sheet_name='{}.{}'.format(m, d))
+        except Exception:
+            raise ValidationError('未找到{}.{}库存excel文档！'.format(m, d))
+        data = get_sheet_data(cur_sheet, start_row=5)
+
         area_list = []
         c = SchedulingProductDemandedDeclareSummary.objects.filter(
             factory_date=factory_date).count()
         sn = c + 1
-        for item in data:
-            if not item[0] or not item[1]:
-                continue
-            area_list.append({'factory_date': factory_date,
-                              'sn': sn,
-                              'product_no': item[0],
-                              'plan_weight': item[1] if item[1] else 0,
-                              'workshop_weight': item[2] if item[2] else 0,
-                              'current_stock': item[3] if item[3] else 0,
-                              'desc': item[4],
-                              # 'target_stock': float(item[1]) * 1.5,
-                              # 'demanded_weight': float(item[1]) * 1.5 - float(item[2]) - float(item[3])
-                              })
+        for idx, item in enumerate(data):
+            try:
+                product_no = re.sub(r'[\u4e00-\u9fa5]+', '', item[1])
+                if not product_no or not item[2]:
+                    continue
+                area_list.append({'factory_date': factory_date,
+                                  'sn': sn,
+                                  'product_no': product_no,
+                                  'plan_weight': item[2] if item[2] else 0,
+                                  'workshop_weight': round(item[11], 1) if item[11] else 0,
+                                  'current_stock': round(item[13], 1) if item[13] else 0,
+                                  'desc': '',
+                                  # 'target_stock': float(item[1]) * 1.5,
+                                  # 'demanded_weight': float(item[1]) * 1.5 - float(item[2]) - float(item[3])
+                                  })
+            except Exception:
+                raise ValidationError('第{}行数据有错，请检查后重试!'.format(6+idx))
             sn += 1
         s = self.serializer_class(data=area_list, many=True)
-        s.is_valid(raise_exception=True)
-        min_stock_day = SchedulingParamsSetting.objects.first().min_stock_trains
+        if not s.is_valid():
+            raise ValidationError('导入数据有误，请检查后重试!')
+        ps = SchedulingParamsSetting.objects.first()
+        small_ton_stock_days = ps.small_ton_stock_days
+        middle_ton_stock_days = ps.middle_ton_stock_days
+        big_ton_stock_days = ps.big_ton_stock_days
         for item in s.validated_data:
+            if item['plan_weight'] < 5:
+                min_stock_day = float(small_ton_stock_days)
+            elif 5 <= item['plan_weight'] <= 10:
+                min_stock_day = float(middle_ton_stock_days)
+            else:
+                min_stock_day = float(big_ton_stock_days)
             item['target_stock'] = round(item['plan_weight'] * min_stock_day, 1)
             demanded_weight = round(item['plan_weight'] * min_stock_day - item['workshop_weight'] - item['current_stock'], 1)
             item['demanded_weight'] = demanded_weight if demanded_weight >= 0 else 0
@@ -808,7 +842,7 @@ class SchedulingResultViewSet(ModelViewSet):
         query_set = SchedulingResult.objects.all()
         if factory_date:
             query_set = query_set.filter(factory_date=factory_date)
-        return Response(set(query_set.values_list('schedule_no', flat=True)))
+        return Response(sorted(list(set(query_set.values_list('schedule_no', flat=True)))))
 
     def list(self, request, *args, **kwargs):
         schedule_no = self.request.query_params.get('schedule_no')
@@ -827,59 +861,59 @@ class SchedulingResultViewSet(ModelViewSet):
     @action(methods=['post'], detail=False)
     def import_xlx(self, request):
         factory_date = self.request.data.get('factory_date')
+        date_splits = factory_date.split('-')
+        m = date_splits[1] if not date_splits[1].startswith('0') else date_splits[1].lstrip('0')
+        d = date_splits[2]
         schedule_no = 'APS1{}'.format(datetime.datetime.now().strftime('%Y%m%d%H%M%S'))
         excel_file = request.FILES.get('file', None)
         if not excel_file:
             raise ValidationError('文件不可为空！')
-        current_sheet = get_cur_sheet(excel_file)
-        for j in range(2):
-            i = 0
-            while 1:
-                col_index = i * 4 + 1
-                if col_index >= 61:
-                    break
+        if not excel_file.name.split('.')[-1] in ['xls', 'xlsx', 'xlsm']:
+            raise ValidationError('文件格式错误,仅支持 xls、xlsx、xlsm文件')
+        try:
+            data = xlrd.open_workbook(filename=None, file_contents=excel_file.read())
+            cur_sheet = data.sheet_by_name(sheet_name='{}.{}'.format(m, d))
+        except Exception:
+            raise ValidationError('未找到{}.{}日排程结果excel文档！'.format(m, d))
+        data = get_sheet_data(cur_sheet, start_row=3)
+        i = 0
+        ret = []
+        for idx, item in enumerate(data):
+            if idx < 20:
+                equip_nos = ['Z01', 'Z02', 'Z03', 'Z04', 'Z05', 'Z06', 'Z07', 'Z08']
+            elif 22 < idx < 43:
+                equip_nos = ['Z09', 'Z10', 'Z11', 'Z12', 'Z13', 'Z14', 'Z15']
+            else:
+                continue
+            for j, equip_no in enumerate(equip_nos):
                 try:
-                    equip_data = current_sheet.cell(0, col_index).value.strip()
-                    if not equip_data:
-                        break
-                    ret = re.search(r'Z\d+', equip_data)
-                    equip_no = ret.group()
-                    if len(equip_no) < 3:
-                        equip_no = 'Z' + '0{}'.format(equip_no[-1])
-                except IndexError:
-                    break
-                except Exception:
-                    raise ValidationError('机台格式错误')
-                for rowNum in range(j * 25 + 2, 25 * (j + 1)):
-                    try:
-                        value = current_sheet.row_values(rowNum)[i * 4 + 1:(i + 1) * 4 + 1]
-                    except IndexError:
+                    product_no = item[j * 4 + 1]
+                    if not product_no:
                         continue
-                    product_no = value[0].strip()
-                    plan_trains = value[1]
-                    if not all([product_no, plan_trains]):
-                        continue
-                    note = value[3].strip()
                     try:
-                        plan_trains = int(plan_trains)
-                    except ValueError:
-                        raise ValidationError('机台：{}， 胶料规格:{}，车次信息错误，请修改后重试！'.format(equip_no, value[0]))
-                    pb = ProductBatching.objects.exclude(used_type__in=[6, 7]).filter(stage_product_batch_no__icontains='-{}'.format(product_no)).first()
+                        plan_trains = int(item[j * 4 + 2])
+                    except Exception:
+                        continue
+                    try:
+                        time_consume = round(item[j * 4 + 3], 1)
+                    except Exception:
+                        time_consume = 0
+                    pb = ProductBatching.objects.exclude(used_type__in=[6, 7]).filter(
+                        stage_product_batch_no__icontains='-{}'.format(product_no)).first()
                     if pb:
                         product_no = pb.stage_product_batch_no
-                    train_time_consume = calculate_equip_recipe_avg_mixin_time(equip_no, product_no)
-                    SchedulingResult.objects.create(
-                        factory_date=factory_date,
-                        schedule_no=schedule_no,
-                        equip_no=equip_no,
-                        sn=1,
-                        recipe_name=product_no,
-                        time_consume=round(train_time_consume*plan_trains/3600, 1),
-                        plan_trains=plan_trains,
-                        desc=note
-                    )
-                i += 1
-            j += 1
+                    ret.append(SchedulingResult(**{'factory_date': factory_date,
+                                                    'schedule_no': schedule_no,
+                                                    'equip_no': equip_no,
+                                                    'sn': + 1,
+                                                    'recipe_name': product_no,
+                                                    'plan_trains': plan_trains,
+                                                    'time_consume': time_consume,
+                                                    'desc': item[j * 4 + 4]}))
+                except Exception:
+                    raise ValidationError('导入数据有误，请检查后重试!')
+            i += 1
+        SchedulingResult.objects.bulk_create(ret)
         return Response('ok')
 
 
@@ -900,6 +934,7 @@ class SchedulingEquipShutDownPlanViewSet(ModelViewSet):
 
 @method_decorator([api_recorder], name="dispatch")
 class SchedulingProceduresView(APIView):
+    permission_classes = (IsAuthenticated,)
 
     @atomic()
     def post(self, request):
@@ -972,7 +1007,171 @@ class SchedulingStockSummary(ModelViewSet):
         for item in data:
             if item['product_no'] not in ret:
                 ret[item['product_no']] = {'product_no': item['product_no'],
-                                           item['stage']: item['stock_weight']}
+                                           'stock_weight_{}'.format(item['stage']): item['stock_weight'],
+                                           'area_weight_{}'.format(item['stage']): item['area_weight']}
             else:
-                ret[item['product_no']][item['stage']] = item['stock_weight']
+                ret[item['product_no']]['stock_weight_{}'.format(item['stage'])] = item['stock_weight']
+                ret[item['product_no']]['area_weight_{}'.format(item['stage'])] = item['area_weight']
         return Response(ret.values())
+
+    def create(self, request, *args, **kwargs):
+        data = self.request.data
+        factory_date = data.get('factory_date')
+        stock_data = data.get('stock_data')
+        if not isinstance(stock_data, list):
+            raise ValidationError('data error!')
+        for stock in stock_data:
+            product_no = stock.pop('product_no')
+            if ProductStockDailySummary.objects.filter(factory_date=factory_date, product_no=product_no).exists():
+                raise ValidationError('该规格库存数据已存在，请勿重复添加！')
+            s_data = {'factory_date': factory_date, 'product_no': product_no}
+            for key, value in stock.items():
+                dt = dict()
+                split_data = key.split('_')
+                s_data['stage'] = split_data[2]
+                dt['_'.join([split_data[0], split_data[1]])] = value
+                ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
+        return Response('ok')
+
+    @action(methods=['post'], detail=False)
+    def confirm(self, request):
+        data = self.request.data
+        factory_date = data.get('factory_date')
+        stock_data = data.get('stock_data')
+        if not isinstance(stock_data, list):
+            raise ValidationError('data error!')
+        ProductStockDailySummary.objects.filter(factory_date=factory_date).delete()
+        for stock in stock_data:
+            product_no = stock.pop('product_no')
+            s_data = {'factory_date': factory_date, 'product_no': product_no}
+            for key, value in stock.items():
+                dt = dict()
+                split_data = key.split('_')
+                s_data['stage'] = split_data[2]
+                dt['_'.join([split_data[0], split_data[1]])] = value
+                ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
+        return Response('ok')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class SchedulingMaterialDemanded(APIView):
+
+    def get(self, request):
+        interval_type = self.request.query_params.get('interval_type', '1')
+        filter_material_type = self.request.query_params.get('material_type')
+        filter_material_name = self.request.query_params.get('material_name')
+
+        if datetime.datetime.now().hour < 8:
+            now_time_str = datetime.datetime.now().strftime('%Y-%m-%d 08:00:00')
+            now_time = datetime.datetime.strptime(now_time_str, "%Y-%m-%d %H:%M:%S")
+        else:
+            now_time = datetime.datetime.now()
+
+        if interval_type == '1':
+            st = now_time
+            et = (now_time + datetime.timedelta(hours=4))
+        elif interval_type == '2':
+            st = (now_time + datetime.timedelta(hours=4))
+            et = (now_time + datetime.timedelta(hours=8))
+        else:
+            st = (now_time + datetime.timedelta(hours=8))
+            et = (now_time + datetime.timedelta(hours=12))
+
+        factory_date = get_current_factory_date().get('factory_date', datetime.datetime.now().date())
+        if not factory_date:
+            raise ValidationError('参数缺失！')
+        last_aps_result = SchedulingResult.objects.filter(factory_date=factory_date).order_by('id').last()
+        if not last_aps_result:
+            return Response([])
+
+        else:
+            plan_data = []
+            for equip_no in Equip.objects.filter(
+                    category__equip_type__global_name='密炼设备'
+            ).values_list('equip_no', flat=True).order_by('equip_no'):
+                scheduling_plans = SchedulingResult.objects.filter(schedule_no=last_aps_result.schedule_no,
+                                                                   equip_no=equip_no).order_by('sn')
+                plan_start_time = datetime.datetime.strptime(datetime.datetime.now().strftime('%Y-%m-%d 08:00:00'),
+                                                                     "%Y-%m-%d %H:%M:%S")
+                for plan in scheduling_plans:
+                    previous_plan_time_consume = SchedulingResult.objects.filter(
+                        schedule_no=last_aps_result.schedule_no,
+                        equip_no=equip_no,
+                        sn__lt=plan.sn).aggregate(s=Sum('time_consume'))['s']
+                    previous_plan_time_consume = previous_plan_time_consume if previous_plan_time_consume else 0
+                    current_plan_start_time = plan_start_time + datetime.timedelta(hours=previous_plan_time_consume)
+                    current_plan_finish_time = plan_start_time + datetime.timedelta(hours=previous_plan_time_consume + plan.time_consume)
+                    if current_plan_finish_time <= st:
+                        continue
+                    if current_plan_start_time <= st < current_plan_finish_time <= et:
+                        trains = (plan.time_consume - (st - current_plan_start_time).total_seconds()/3600)/plan.time_consume * plan.plan_trains
+                        plan_data.append({'equip_no': equip_no, 'recipe_name': plan.recipe_name, 'plan_trains': int(trains)})
+                    elif current_plan_start_time >= st and current_plan_finish_time <= et:
+                        plan_data.append({'equip_no': equip_no, 'recipe_name': plan.recipe_name, 'plan_trains': plan.plan_trains})
+                    elif st <= current_plan_start_time <= et < current_plan_finish_time:
+                        trains = (plan.time_consume - (current_plan_finish_time - et).total_seconds() / 3600) / plan.time_consume * plan.plan_trains
+                        plan_data.append(
+                            {'equip_no': equip_no, 'recipe_name': plan.recipe_name, 'plan_trains': int(trains)})
+                    elif st >= current_plan_start_time and et <= current_plan_finish_time:
+                        plan_data.append({'equip_no': equip_no, 'recipe_name': plan.recipe_name, 'plan_trains': plan.plan_trains})
+            ret = {}
+            stages = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True,
+                                               global_type__type_name="胶料段次").values_list("global_name", flat=True)
+
+            for instance in plan_data:
+                if instance['equip_no'] == 'Z04':
+                    equip_type = Equip.objects.filter(equip_no=instance['equip_no']).first().category
+                    pb = ProductBatching.objects.exclude(used_type=6).filter(batching_type=2,
+                                                                             stage_product_batch_no=instance['recipe_name'],
+                                                                             dev_type=equip_type).first()
+                else:
+                    pb = ProductBatching.objects.using('SFJ').exclude(used_type=6).filter(
+                        batching_type=1,
+                        stage_product_batch_no=instance['recipe_name'],
+                        equip__equip_no=instance['equip_no']).first()
+                if not pb:
+                    continue
+                details = pb.batching_details.filter(
+                    type=1, delete_flag=False).exclude(
+                    Q(material__material_name__in=('细料', '硫磺')) | Q(material__material_type__global_name__in=stages)
+                ).values('material__material_name', 'material__material_type__global_name', 'actual_weight')
+                for item in details:
+                    material_name = item['material__material_name'].rstrip('-C').rstrip('-X')
+                    weight = item['actual_weight'] * instance['plan_trains']
+                    material_type = item['material__material_type__global_name']
+                    if material_name not in ret:
+                        ret[material_name] = {
+                            'material_type': material_type,
+                            'material_name': material_name,
+                            instance['equip_no']: weight,
+                            'total_weight': weight
+                        }
+                    else:
+                        if instance['equip_no'] in ret[material_name]:
+                            ret[material_name][instance['equip_no']] += weight
+                        else:
+                            ret[material_name][instance['equip_no']] = weight
+                        ret[material_name]['total_weight'] += weight
+            data = ret.values()
+            if filter_material_type:
+                data = filter(lambda x: filter_material_type in x['material_type'], data)
+            if filter_material_name:
+                data = filter(lambda x: filter_material_name in x['material_name'], data)
+            return Response({'st': st.strftime('%H: %M'), 'et': et.strftime('%H: %M'), 'data': data})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class RecipeStages(APIView):
+
+    def get(self, request):
+        product_no = self.request.query_params.get('product_no')
+        version = self.request.query_params.get('version')
+        if not all([product_no, version]):
+            raise ValidationError('bad request')
+        pbs = ProductBatching.objects.using('SFJ').exclude(used_type=6).filter(
+            stage_product_batch_no__icontains='-{}-{}'.format(product_no, version),
+            stage__global_name__in=('HMB', 'CMB', '1MB', '2MB', '3MB', 'FM')
+        ).values_list('stage__global_name', flat=True)
+        idx_keys = {'HMB': 1, 'CMB': 2, '1MB': 3, '2MB': 4, '3MB': 5, 'FM': 6}
+        pbs = sorted(list(set(pbs)), key=lambda d: idx_keys[d])
+        return Response(pbs)
