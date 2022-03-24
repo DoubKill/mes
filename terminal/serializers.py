@@ -176,7 +176,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 if wms_xl_material:
                     raise serializers.ValidationError('已经扫入原材料小料，不可再扫该物料人工单配')
                 # 查询配方中对应名称[扫码:环保型塑解剂, 群控: 环保型塑解剂-C]
-                mes_recipe = {i[:-2]: i for i in materials if i.endwith('-C') or i.endwith('-X')}
+                mes_recipe = {i[:-2]: i for i in materials if i.endswith('-C') or i.endswith('-X')}
                 material_name = mes_recipe[single.material_name] if single.material_name in mes_recipe else single.material_name
                 material_no = material_name
                 total_weight = single.package_count * single.split_num if single.batching_type == '配方' else single.package_count

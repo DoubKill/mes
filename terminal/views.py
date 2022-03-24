@@ -133,7 +133,8 @@ class BatchProductionInfoView(APIView):
                 'actual_trains': actual_trains,
                 'plan_classes_uid': plan.plan_classes_uid,
                 'status': plan_status,
-                'classes': plan.work_schedule_plan.classes.global_name
+                'classes': plan.work_schedule_plan.classes.global_name,
+                'feed_trains': 0
             }
             if plan_status == '运行中':
                 max_trains = TrainsFeedbacks.objects.filter(plan_classes_uid=plan.plan_classes_uid).aggregate(max_trains=Max('actual_trains'))['max_trains']
@@ -1208,7 +1209,7 @@ class BatchChargeLogListViewSet(ListAPIView):
         if production_classes:
             queryset = queryset.filter(feed_log__production_classes=production_classes)
         if display_name:
-            queryset = queryset.filter(material_no__icontains=display_name)
+            queryset = queryset.filter(display_name__icontains=display_name)
         if mixing_finished:
             if mixing_finished == "终炼":
                 queryset = queryset.filter(feed_log__product_no__icontains="FM").all()
@@ -1254,21 +1255,16 @@ class BatchChargeLogListViewSet(ListAPIView):
                 data.append(res)
         else:
             repeat_bra_code = []
-            page = self.paginate_queryset(queryset)
-            if page is not None:
-                serializer = self.get_serializer(page, many=True)
-                for i in serializer.data:
-                    repeat_keyword = {i['bra_code'], i['trains']}
-                    if repeat_keyword not in repeat_bra_code:
-                        data.append(i)
-                        repeat_bra_code.append(repeat_keyword)
-                return self.get_paginated_response(data)
             serializer = self.get_serializer(queryset, many=True)
+            # 处理同条码数据
             for i in serializer.data:
-                repeat_keyword = {i['bra_code'], i['trains']}
+                repeat_keyword = {i['plan_classes_uid'], i['bra_code'], i['trains']}
                 if repeat_keyword not in repeat_bra_code:
                     data.append(i)
                     repeat_bra_code.append(repeat_keyword)
+            page = self.paginate_queryset(data)
+            if page is not None:
+                return self.get_paginated_response(page)
         return Response(data)
 
 
