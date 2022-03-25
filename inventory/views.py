@@ -3192,7 +3192,7 @@ class WMSTunnelView(APIView):
     permission_classes = (IsAuthenticated, )
 
     def get(self, request):
-        sql = 'select TunnelName, TunnelCode from t_inventory_tunnel;'
+        sql = 'select TunnelName, TunnelCode from t_inventory_tunnel order by TunnelCode;'
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)
         temp = sc.all()
         result = []
