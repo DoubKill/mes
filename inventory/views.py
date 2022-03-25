@@ -5620,8 +5620,8 @@ class HFStockDetailView(APIView):
                 ProductName,
                 ProductNo,
                 RFID,
-                OastStartTime,
-                OastEntTime
+                OastInTime,
+                OastOutTime
             from dsp_OastTask {} order by OastNo OFFSET {} ROWS FETCH FIRST {} ROWS ONLY
             """.format(extra_where_str, (page-1)*page_size, page_size)
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)
