@@ -3006,7 +3006,7 @@ class FormulaPreparationView(APIView):
             machine_info += f_info
             other_manual += f_manual
         if s_material:
-            s_info, s_manual = self.handle_xl_info(product_no, db_config, f_material, keyword='S')
+            s_info, s_manual = self.handle_xl_info(product_no, db_config, s_material, keyword='S')
             machine_info += s_info
             other_manual += s_manual
         return machine_info + other_manual
