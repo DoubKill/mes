@@ -2987,7 +2987,12 @@ class FormulaPreparationView(APIView):
                     s_material = xl_feeds.filter(feeding_mode__startswith='S')
                     if f_material or s_material:
                         machine_manual_info = self.get_xl_info(xl_name, db_config, f_material, s_material)
-                        response_data['results'] += machine_manual_info
+                        if not machine_manual_info:  # 未找到机配、人工配信息
+                            response_data['results'] += [{'material__material_name': xl.last().material.material_name,
+                                                          'actual_weight': xl.last().actual_weight,
+                                                          'standard_error': xl.last().standard_error}]
+                        else:
+                            response_data['results'] += machine_manual_info
                     # 添加投料方式是R的单配
                     r_and_m = xl_feeds.filter(Q(feeding_mode__startswith='R') | Q(is_manual=True))
                     for j in r_and_m:
