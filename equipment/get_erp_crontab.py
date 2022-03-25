@@ -99,6 +99,8 @@ class GetSpareOrder(APIView):
         lst = data.get('obj')
         for dic in lst:
             order = dic.get('lld')
+            if order.get('llDeptname') != '中策安吉炼胶分厂':
+                continue
             order_detail = dic.get('lldmx')  # list
             if EquipWarehouseOrder.objects.filter(barcode=order.get('djbh')):
                 continue

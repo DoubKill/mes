@@ -34,7 +34,7 @@ def product_day_message():
     actual_data = dict(TrainsFeedbacks.objects.filter(
         factory_date=factory_date).values('equip_no').annotate(actual_sum=Count('id')).values_list('equip_no', 'actual_sum'))
 
-    equip_list = list(Equip.objects.filter(category__equip_type__global_name="密炼设备").values_list("equip_no", flat=True))
+    equip_list = list(Equip.objects.filter(category__equip_type__global_name="密炼设备").order_by('equip_no').values_list("equip_no", flat=True))
     plan_list = []
     actual_list = []
     mk_str = f"统计时间: {factory_date.strftime('%Y-%m-%d') + time_str_start} -> {end_date.strftime('%Y-%m-%d') + time_str_end}\n - 计划车数/实际车数"

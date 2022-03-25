@@ -79,10 +79,13 @@ class WeightBatchingLogListFilter(django_filters.rest_framework.FilterSet):
     tank_no = django_filters.CharFilter(field_name='tank_no', help_text='罐号')
     equip_no = django_filters.CharFilter(field_name='equip_no', help_text='投入设备')
     batch_classes = django_filters.CharFilter(field_name='batch_classes', help_text='投入班次', lookup_expr='icontains')
+    bra_code = django_filters.CharFilter(field_name='bra_code', help_text='条码', lookup_expr='icontains')
+    material_name = django_filters.CharFilter(field_name='material_name', help_text='物料名', lookup_expr='icontains')
+    created_username = django_filters.CharFilter(field_name='created_user__username', help_text='操作人', lookup_expr='icontains')
 
     class Meta:
         model = WeightBatchingLog
-        fields = ('equip_no', 'batch_classes', 'tank_no', 'batch_time')
+        fields = ('equip_no', 'batch_classes', 'tank_no', 'batch_time', 'material_name', 'bra_code', 'created_username')
 
 
 class CarbonTankSetFilter(django_filters.rest_framework.FilterSet):

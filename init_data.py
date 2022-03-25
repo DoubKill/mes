@@ -948,7 +948,10 @@ permission_data = [
     {'id': 965, 'code': 'view_addrubber_print', 'name': '查看', 'parent_id': 964},
     {'id': 966, 'code': 'print_addrubber_print', 'name': '打印', 'parent_id': 964},
 
-    # 下一个 967 开始
+    {'id': 967, 'code': 'formula_preparation', 'name': '生产投料配方查询', 'parent_id': None},
+    {'id': 968, 'code': 'view_formula_preparation', 'name': '查看', 'parent_id': 967},
+
+    # 下一个 969 开始
 ]
 
 

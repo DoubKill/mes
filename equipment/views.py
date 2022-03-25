@@ -2432,7 +2432,7 @@ class EquipWarehouseLocationViewSet(ModelViewSet):
 
 @method_decorator([api_recorder], name='dispatch')
 class EquipWarehouseOrderViewSet(ModelViewSet):
-    queryset = EquipWarehouseOrder.objects.filter(delete_flag=False).order_by('-created_date')
+    queryset = EquipWarehouseOrder.objects.filter(delete_flag=False).order_by('-order_id')
     serializer_class = EquipWarehouseOrderSerializer
     permission_classes = (IsAuthenticated,)
     filter_class = EquipWarehouseOrderFilter
@@ -4536,6 +4536,8 @@ class GetSpareOrder(APIView):
         lst = data.get('obj')
         for dic in lst:
             order = dic.get('lld')
+            if order.get('llDeptname') != '中策安吉炼胶分厂':
+                continue
             order_detail = dic.get('lldmx')  # list
             if EquipWarehouseOrder.objects.filter(barcode=order.get('djbh')):
                 continue
