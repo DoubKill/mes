@@ -2611,6 +2611,7 @@ class WmsStorageView(ListAPIView):
         container_no = self.request.query_params.get('pallet_no')
         material_name = self.request.query_params.get('material_name')
         material_no = self.request.query_params.get('material_no')
+        material_nos = self.request.query_params.get('material_nos')
         supplier_name = self.request.query_params.get('supplier_name')
         l_batch_no = self.request.query_params.get('l_batch_no')
         # 等于查询
@@ -2626,6 +2627,8 @@ class WmsStorageView(ListAPIView):
         export = self.request.query_params.get('export')  # 1：当前页面  2：所有
         if material_no:
             filter_kwargs['material_no__icontains'] = material_no
+        if material_nos:
+            filter_kwargs['material_no__in'] = material_nos.split(',')
         if material_name:
             filter_kwargs['material_name__icontains'] = material_name
         if container_no:
