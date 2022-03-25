@@ -5411,6 +5411,8 @@ class HFStockView(APIView):
         material_no = self.request.query_params.get('material_no')
         material_name = self.request.query_params.get('material_name')
         extra_where_str = ""
+        extra_where_str2 = "where OastInTime is not null"
+        extra_where_str3 = "where OastOutTime is not null"
         if material_name:
             extra_where_str += "where ProductName like N'%{}%'".format(material_name)
         if material_no:
@@ -5423,11 +5425,15 @@ class HFStockView(APIView):
                 extra_where_str += " and TaskStartTime >= '{}'".format(st)
             else:
                 extra_where_str += "where TaskStartTime >= '{}'".format(st)
+            extra_where_str2 += " and OastInTime >= '{}'".format(st)
+            extra_where_str3 += " and OastOutTime >= '{}'".format(st)
         if et:
             if extra_where_str:
                 extra_where_str += " and TaskStartTime <= '{}'".format(et)
             else:
                 extra_where_str += "where TaskStartTime <= '{}'".format(et)
+            extra_where_str2 += " and OastInTime <= '{}'".format(et)
+            extra_where_str3 += " and OastOutTime <= '{}'".format(et)
         sql = """select
                    ProductNo,
                    ProductName,
@@ -5487,16 +5493,37 @@ class HFStockView(APIView):
                 elif task_state == 6:  # 已出库
                     result[item[0]]['outbound_qty'] += qty
         sc.close()
+        material_nos = list(result.keys())
+
+        r_sql = """select
+                   ProductNo,
+                   count(*)
+            from dsp_OastTask
+            {}
+            group by ProductNo;""".format(extra_where_str2)
+        sc = SqlClient(sql=r_sql, **self.DATABASE_CONF)
+        temp2 = sc.all()
+        temp2_data = {i[0]: i[1] for i in temp2}
+
+        c_sql = """select
+                   ProductNo,
+                   count(*)
+            from dsp_OastTask
+            {}
+            group by ProductNo;""".format(extra_where_str3)
+        sc = SqlClient(sql=c_sql, **self.DATABASE_CONF)
+        temp2 = sc.all()
+        temp3_data = {i[0]: i[1] for i in temp2}
 
         # 补充立体库库内库存数量
-        material_nos = list(result.keys())
         stock_data = dict(WmsInventoryStock.objects.using('wms').filter(
             material_no__in=material_nos,
             container_no__startswith='5'
         ).values('material_no').annotate(c=Count('material_no')).values_list('material_no', 'c'))
         for key, value in result.items():
             value['stock_qty'] = stock_data.get(key)
-
+            value['in_qty'] = temp2_data.get(key)
+            value['out_qty'] = temp3_data.get(key)
         return Response(result.values())
 
 
@@ -5512,33 +5539,89 @@ class HFStockDetailView(APIView):
         data_type = self.request.query_params.get('data_type')  # 3：输送途中 4：正在烘  5：已经烘完 6：烘房小计 7：已出库 8:等待烘烤
         page = int(self.request.query_params.get('page', 1))
         page_size = int(self.request.query_params.get('page_size', 10))
-        if not all([material_no, data_type]):
+        if not data_type:
             raise ValidationError('参数缺失！')
-        extra_where_str = "where ProductNo = '{}'".format(material_no)
+        extra_where_str = ""
+        if material_no:
+            extra_where_str += "where ProductNo = '{}'".format(material_no)
+        if data_type == '1':
+            if extra_where_str:
+                extra_where_str += ' and OastInTime is not null'
+            else:
+                extra_where_str += 'where OastInTime is not null'
+        if data_type == '2':
+            if extra_where_str:
+                extra_where_str += ' and OastOutTime is not null'
+            else:
+                extra_where_str += 'where OastOutTime is not null'
         if data_type == '3':  # 输送途中
-            extra_where_str += " and TaskState=1"
-        if data_type == '8':  # 等待烘烤
-            extra_where_str += " and TaskState=4"
+            if extra_where_str:
+                extra_where_str += ' and TaskState=1'
+            else:
+                extra_where_str += 'where TaskState=1'
         if data_type == '4':  # 正在烘
-            extra_where_str += " and TaskState=2"
+            if extra_where_str:
+                extra_where_str += ' and TaskState=2'
+            else:
+                extra_where_str += 'where TaskState=2'
         if data_type == '5':  # 已经烘完
-            extra_where_str += " and TaskState=5"
+            if extra_where_str:
+                extra_where_str += ' and TaskState=5'
+            else:
+                extra_where_str += 'where TaskState=5'
         if data_type == '6':  # 烘房小计
-            extra_where_str += " and TaskState in (2, 4, 5)"
+            if extra_where_str:
+                extra_where_str += ' and TaskState in (2, 4, 5)'
+            else:
+                extra_where_str += 'where TaskState in (2, 4, 5)'
         if data_type == '7':  # 已出库
-            extra_where_str += " and TaskState in (3, 6)"
+            if extra_where_str:
+                extra_where_str += ' and TaskState in (3, 6)'
+            else:
+                extra_where_str += 'where TaskState in (3, 6)'
+        if data_type == '8':  # 等待烘烤
+            if extra_where_str:
+                extra_where_str += ' and TaskState=4'
+            else:
+                extra_where_str += 'where TaskState=4'
         if st:
-            extra_where_str += " and TaskStartTime >= '{}'".format(st)
+            if extra_where_str:
+                extra_where_str += " and TaskStartTime >= '{}'".format(st)
+            else:
+                extra_where_str += "where TaskStartTime >= '{}'".format(st)
+            if data_type == '1':  # 入箱托数
+                if extra_where_str:
+                    extra_where_str += " and OastInTime >= '{}'".format(st)
+                else:
+                    extra_where_str += "where OastInTime >= '{}'".format(st)
+            elif data_type == '2':  # 出箱托数
+                if extra_where_str:
+                    extra_where_str += " and OastOutTime >= '{}'".format(st)
+                else:
+                    extra_where_str += "where OastOutTime >= '{}'".format(st)
         if et:
-            extra_where_str += " and TaskStartTime <= '{}'".format(et)
+            if extra_where_str:
+                extra_where_str += " and TaskStartTime <= '{}'".format(et)
+            else:
+                extra_where_str += "where TaskStartTime <= '{}'".format(et)
+            if data_type == '1':  # 入箱托数
+                if extra_where_str:
+                    extra_where_str += " and OastInTime <= '{}'".format(et)
+                else:
+                    extra_where_str += "where OastInTime <= '{}'".format(et)
+            elif data_type == '2':  # 出箱托数
+                if extra_where_str:
+                    extra_where_str += " and OastOutTime <= '{}'".format(et)
+                else:
+                    extra_where_str += "where OastOutTime <= '{}'".format(et)
         sql = """select
                 OastNo,
                 TaskState,
                 ProductName,
                 ProductNo,
                 RFID,
-                OastStartTime,
-                OastEntTime
+                OastInTime,
+                OastOutTime
             from dsp_OastTask {} order by OastNo OFFSET {} ROWS FETCH FIRST {} ROWS ONLY
             """.format(extra_where_str, (page-1)*page_size, page_size)
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)
