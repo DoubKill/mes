@@ -202,7 +202,16 @@ class BatchProductBatchingVIew(APIView):
                         detail = []
                         for i in xl:
                             if i['bra_code'] not in xl_bra:
-                                xl_material_name = f"{i['scan_material_type']}({i['material_name']}...)"
+                                # 查询重量
+                                if i['scan_material_type'] == '人工配':
+                                    xl_instance = WeightPackageManual.objects.filter(bra_code=i['bra_code']).last()
+                                    xl_weight = xl_instance.total_manual_weight
+                                elif i['scan_material_type'] == '机配':
+                                    xl_instance = WeightPackageLog.objects.filter(bra_code=i['bra_code']).last()
+                                    xl_weight = xl_instance.plan_weight if xl_instance else 0
+                                else:
+                                    xl_weight = 0
+                                xl_material_name = f"{i['scan_material_type']}({i['material_name']}...[{xl_weight}])"
                                 xl_data = {'bra_code': i['bra_code'], 'init_weight': i['init_weight'],
                                            'used_weight': i['actual_weight'], 'single_need': i['single_need'],
                                            'scan_material': xl_material_name, 'unit': i['unit'],
