@@ -3208,6 +3208,25 @@ class WMSTunnelView(APIView):
 
 
 @method_decorator([api_recorder], name="dispatch")
+class WMSMaterialsView(APIView):
+    """获取所有原材料名称列表"""
+    DATABASE_CONF = WMS_CONF
+    permission_classes = (IsAuthenticated, )
+
+    def get(self, request):
+        sql = 'select Name, MaterialCode from t_inventory_material order by Name;'
+        sc = SqlClient(sql=sql, **self.DATABASE_CONF)
+        temp = sc.all()
+        result = []
+        for item in temp:
+            result.append(
+                {'name': item[0],
+                 'code': item[1]})
+        sc.close()
+        return Response(result)
+
+
+@method_decorator([api_recorder], name="dispatch")
 class WMSInventoryView(APIView):
     """原材料库存信息，material_name=原材料名称&material_no=原材料编号&material_group_name=物料组名称&tunnel_name=巷道名称&page=页数&page_size=每页数量"""
     DATABASE_CONF = WMS_CONF
@@ -3416,6 +3435,12 @@ class THMaterialGroupNameView(WMSMaterialGroupNameView):
 @method_decorator([api_recorder], name="dispatch")
 class THTunnelView(WMSTunnelView):
     """获取炭黑库所有巷道名称"""
+    DATABASE_CONF = TH_CONF
+
+
+@method_decorator([api_recorder], name="dispatch")
+class THMaterialsView(WMSMaterialsView):
+    """获取所有原材料名称列表"""
     DATABASE_CONF = TH_CONF
 
 
