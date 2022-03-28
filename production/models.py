@@ -391,7 +391,7 @@ class EmployeeAttendanceRecords(models.Model):
     actual_time = models.FloatField(help_text='承认工作时间', null=True, blank=True, default=12)
     classes = models.CharField(help_text='班次', max_length=12, null=True, blank=True)
     group = models.CharField(help_text='班组', max_length=12, null=True, blank=True)
-    equip = models.CharField(help_text='机台', max_length=12)
+    equip = models.CharField(help_text='机台', max_length=12, null=True, blank=True)
     status = models.CharField(max_length=12, help_text='上岗/换岗/加班', null=True, blank=True)
     is_use = models.CharField(max_length=12, help_text='确认/添加/废弃', null=True, blank=True)
 
@@ -526,7 +526,7 @@ class AttendanceGroupSetup(models.Model):
     attendance_type = models.PositiveIntegerField(choices=ATTENDANCE_TYPE, help_text='考勤类型', default=1)
     attendance_st = models.TimeField(help_text='考勤开始时间')
     attendance_et = models.TimeField(help_text='考勤结束时间')
-    principal = models.CharField(max_length=12, help_text='考勤负责人')
+    principal = models.CharField(max_length=64, help_text='考勤负责人')
     range_time = models.IntegerField(help_text='上班多久后可打下班卡', null=True, blank=True)
     lead_time = models.IntegerField(help_text='提前几分钟可打工卡', null=True, blank=True)
     type = models.CharField(help_text='类别', max_length=64, null=True, blank=True)
@@ -535,3 +535,12 @@ class AttendanceGroupSetup(models.Model):
         db_table = 'attendance_group_setup'
         verbose_name_plural = verbose_name = '绩效管理考勤组'
 
+
+class EquipMaxValueCache(models.Model):
+    equip_no = models.CharField(max_length=12, help_text='机台')
+    date_time = models.DateField(help_text='缓存截止时间')
+    value = models.IntegerField(default=0, help_text='机台最高产量')
+
+    class Meta:
+        db_table ='equip_max_value_cache'
+        verbose_name_plural = verbose_name = '机台最高产量缓存'
