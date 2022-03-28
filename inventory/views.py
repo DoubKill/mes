@@ -541,9 +541,9 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         elif store_name in ("原材料库", '炭黑库'):
             database = 'wms' if store_name == '原材料库' else 'cb'
             if order_type == "出库":
-                queryset = MaterialOutHistory.objects.using(database).select_related('task')
+                queryset = MaterialOutHistory.objects.using(database)
             else:
-                queryset = MaterialInHistory.objects.using(database).select_related('task')
+                queryset = MaterialInHistory.objects.using(database)
             if start_time:
                 filter_dict.update(task__start_time__gte=start_time)
             if end_time:
@@ -2611,6 +2611,7 @@ class WmsStorageView(ListAPIView):
         container_no = self.request.query_params.get('pallet_no')
         material_name = self.request.query_params.get('material_name')
         material_no = self.request.query_params.get('material_no')
+        material_nos = self.request.query_params.get('material_nos')
         supplier_name = self.request.query_params.get('supplier_name')
         l_batch_no = self.request.query_params.get('l_batch_no')
         # 等于查询
@@ -2626,6 +2627,8 @@ class WmsStorageView(ListAPIView):
         export = self.request.query_params.get('export')  # 1：当前页面  2：所有
         if material_no:
             filter_kwargs['material_no__icontains'] = material_no
+        if material_nos:
+            filter_kwargs['material_no__in'] = material_nos.split(',')
         if material_name:
             filter_kwargs['material_name__icontains'] = material_name
         if container_no:
@@ -5254,7 +5257,7 @@ class WMSOutTaskDetailView(ListAPIView):
         if entrance_name:
             entrance_data = dict(MaterialEntrance.objects.using(self.DB).values_list('name', 'code'))
             filter_kwargs['entrance'] = entrance_data.get(entrance_name)
-        return MaterialOutHistory.objects.using(self.DB).filter(**filter_kwargs).select_related('task').order_by('-task')
+        return MaterialOutHistory.objects.using(self.DB).filter(**filter_kwargs).order_by('-task')
 
     def get_serializer_context(self):
         """
