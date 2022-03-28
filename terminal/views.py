@@ -202,7 +202,16 @@ class BatchProductBatchingVIew(APIView):
                         detail = []
                         for i in xl:
                             if i['bra_code'] not in xl_bra:
-                                xl_material_name = f"{i['scan_material_type']}({i['material_name']}...)"
+                                # 查询重量
+                                if i['scan_material_type'] == '人工配':
+                                    xl_instance = WeightPackageManual.objects.filter(bra_code=i['bra_code']).last()
+                                    xl_weight = xl_instance.total_manual_weight
+                                elif i['scan_material_type'] == '机配':
+                                    xl_instance = WeightPackageLog.objects.filter(bra_code=i['bra_code']).last()
+                                    xl_weight = xl_instance.plan_weight if xl_instance else 0
+                                else:
+                                    xl_weight = 0
+                                xl_material_name = f"{i['scan_material_type']}({i['material_name']}...[{xl_weight}])"
                                 xl_data = {'bra_code': i['bra_code'], 'init_weight': i['init_weight'],
                                            'used_weight': i['actual_weight'], 'single_need': i['single_need'],
                                            'scan_material': xl_material_name, 'unit': i['unit'],
@@ -2987,7 +2996,12 @@ class FormulaPreparationView(APIView):
                     s_material = xl_feeds.filter(feeding_mode__startswith='S')
                     if f_material or s_material:
                         machine_manual_info = self.get_xl_info(xl_name, db_config, f_material, s_material)
-                        response_data['results'] += machine_manual_info
+                        if not machine_manual_info:  # 未找到机配、人工配信息
+                            response_data['results'] += [{'material__material_name': xl.last().material.material_name,
+                                                          'actual_weight': xl.last().actual_weight,
+                                                          'standard_error': xl.last().standard_error}]
+                        else:
+                            response_data['results'] += machine_manual_info
                     # 添加投料方式是R的单配
                     r_and_m = xl_feeds.filter(Q(feeding_mode__startswith='R') | Q(is_manual=True))
                     for j in r_and_m:
@@ -3006,7 +3020,7 @@ class FormulaPreparationView(APIView):
             machine_info += f_info
             other_manual += f_manual
         if s_material:
-            s_info, s_manual = self.handle_xl_info(product_no, db_config, f_material, keyword='S')
+            s_info, s_manual = self.handle_xl_info(product_no, db_config, s_material, keyword='S')
             machine_info += s_info
             other_manual += s_manual
         return machine_info + other_manual

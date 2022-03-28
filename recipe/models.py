@@ -184,8 +184,8 @@ class ProductBatching(AbstractEntity):
             if mixed:
                 material_name_weight = list(sfj_details.exclude(material__material_name__in=list(mixed.values_list('f_feed_name', 's_feed_name'))).values('material__material_name', 'actual_weight', 'standard_error'))
                 l_mixed = mixed.last()
-                material_name_weight += [{'material__material_name': l_mixed.f_feed_name, 'actual_weight': l_mixed.f_weight},
-                                         {'material__material_name': l_mixed.s_feed_name, 'actual_weight': l_mixed.s_weight}]
+                material_name_weight += [{'material__material_name': l_mixed.f_feed_name, 'actual_weight': l_mixed.f_weight, 'standard_error': 0},
+                                         {'material__material_name': l_mixed.s_feed_name, 'actual_weight': l_mixed.s_weight, 'standard_error': 0}]
             else:
                 material_name_weight = list(sfj_details.values('material__material_name', 'actual_weight', 'standard_error'))
             from terminal.models import OtherMaterialLog

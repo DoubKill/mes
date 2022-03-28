@@ -1,6 +1,8 @@
 import datetime
 
 import math
+
+from django.db.models import Q
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
@@ -245,6 +247,20 @@ class TrainsFeedbacksSerializer2(BaseModelSerializer):
     """车次产出反馈"""
     actual_weight = serializers.SerializerMethodField(read_only=True)
     mixer_time = serializers.SerializerMethodField(read_only=True)
+    ai_value = serializers.SerializerMethodField(read_only=True)
+
+    def get_ai_value(self, obj):
+        irm_queryset = ProcessFeedback.objects.filter(
+            Q(plan_classes_uid=obj.plan_classes_uid,
+              equip_no=obj.equip_no,
+              product_no=obj.product_no,
+              current_trains=obj.actual_trains)
+            &
+            ~Q(Q(condition='') | Q(condition__isnull=True))
+        ).order_by('-sn').first()
+        if irm_queryset:
+            return irm_queryset.power
+        return None
 
     def to_representation(self, instance):
         data = super(TrainsFeedbacksSerializer2, self).to_representation(instance)

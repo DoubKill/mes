@@ -591,7 +591,7 @@ def get_current_factory_date():
         end_time__gte=now,
         plan_schedule__work_schedule__work_procedure__global_name='密炼'
     ).first()
-    res = {'factory_date': current_work_schedule_plan.plan_schedule.day_time, 'classes': current_work_schedule_plan.classes.global_name} if current_work_schedule_plan else {}
+    res = {'factory_date': current_work_schedule_plan.plan_schedule.day_time, 'classes': current_work_schedule_plan.classes.global_name} if current_work_schedule_plan else {'factory_date': datetime.now().date()}
     return res
 
 

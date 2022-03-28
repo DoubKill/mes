@@ -873,6 +873,7 @@ class TrainsFeedbacksAPIView(mixins.ListModelMixin,
         '设定车次': 'plan_trains',
         '实际车次': 'actual_trains',
         '本/远控': 'control_mode',
+        'AI值': 'ai_value',
         '手/自动': 'operating_type',
         '总重量(kg)': 'actual_weight',
         '排胶时间(s)': 'evacuation_time',
@@ -1771,7 +1772,9 @@ class ProductPlanRealView(ListAPIView):
 
     def list(self, request, *args, **kwargs):
         ret = {}
+        day_time = self.request.query_params.get('day_time', datetime.datetime.now().date())
         queryset = self.filter_queryset(self.get_queryset())
+        queryset = queryset.filter(work_schedule_plan__plan_schedule__day_time=day_time)
         for classes in ['早班', '中班', '夜班']:
             page = queryset.filter(work_schedule_plan__classes__global_name=classes)
             data = self.get_serializer(page, many=True).data
