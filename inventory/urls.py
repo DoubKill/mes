@@ -145,6 +145,7 @@ urlpatterns = [
     path('wms-entrance/', InventoryEntranceView.as_view()),  # 出库口列表
     path('wms-tunnels/', WMSTunnelView.as_view()),  # 巷道列表
     path('wms-material-groups/', WMSMaterialGroupNameView.as_view()),  # 物料组列表
+    path('wms-materials/', WMSMaterialsView.as_view()),  # 原材料列表
     path('wms-inventory/', WMSInventoryView.as_view()),  # 按物料、批次、航道统计原材料库存
     path('wms-instock/', WmsInStockView.as_view()),  # 根据当前货物外伸位地址获取内伸位数据
     path('wms-release/', WMSRelease.as_view()),  # 原材料库质量放行处理
@@ -166,6 +167,7 @@ urlpatterns = [
     path('th-entrance/', THInventoryEntranceView.as_view()),  # 炭黑出库口列表
     path('th-tunnels/', THTunnelView.as_view()),  # 巷道列表
     path('th-material-groups/', THMaterialGroupNameView.as_view()),  # 物料组列表
+    path('th-materials/', THMaterialsView.as_view()),  # 原材料列表
     path('th-inventory/', THInventoryView.as_view()),  # 按物料、批次、航道统计炭黑库存
     path('th-instock/', THInStockView.as_view()),  # 根据当前货物外伸位地址获取内伸位数据
     path('th-release/', THRelease.as_view()),  # 炭黑库质量放行处理
