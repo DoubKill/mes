@@ -183,8 +183,9 @@ def get_maintenance_status(ding_api, equip_no, maintenance_type):
                 staff_dict['optional'] = True
             else:
                 records = ding_api.get_user_attendance([ding_uid])
-                if records and not len([i for i in records if i['checkType'] != 'OnDuty']):
+                if records and len([i for i in records if i['checkType'] != 'OnDuty']) == 0:
                     staff_dict['optional'] = True
+                staff_dict['records'] = records
         result.append(staff_dict)
     return result
 

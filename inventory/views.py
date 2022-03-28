@@ -452,6 +452,7 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         batch_no = self.request.query_params.get("batch_no")
         l_batch_no = self.request.query_params.get("l_batch_no")
         is_entering = self.request.query_params.get("is_entering")
+        tunnel = self.request.query_params.get("tunnel")
         if location:
             filter_dict.update(location__icontains=location)
         if material_no:
@@ -469,6 +470,8 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
                 filter_dict.update(start_time__gte=start_time)
             if end_time:
                 filter_dict.update(start_time__lte=end_time)
+            if tunnel:
+                filter_dict.update(location__startswith='{}-'.format(tunnel))
             if order_type == "出库":
                 if self.request.query_params.get("type") == "正常出库":
                     actual_type = "生产出库"
@@ -491,6 +494,8 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
                 filter_dict.update(start_time__gte=start_time)
             if end_time:
                 filter_dict.update(start_time__lte=end_time)
+            if tunnel:
+                filter_dict.update(location__startswith='{}-'.format(tunnel))
             if order_type == "出库":
                 if self.request.query_params.get("type") == "正常出库":
                     actual_type = "生产出库"
@@ -536,9 +541,9 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         elif store_name in ("原材料库", '炭黑库'):
             database = 'wms' if store_name == '原材料库' else 'cb'
             if order_type == "出库":
-                queryset = MaterialOutHistory.objects.using(database).select_related('task')
+                queryset = MaterialOutHistory.objects.using(database)
             else:
-                queryset = MaterialInHistory.objects.using(database).select_related('task')
+                queryset = MaterialInHistory.objects.using(database)
             if start_time:
                 filter_dict.update(task__start_time__gte=start_time)
             if end_time:
@@ -549,6 +554,8 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
                 filter_dict.update(batch_no=batch_no)
             if l_batch_no:
                 filter_dict.update(batch_no__icontains=l_batch_no)
+            if tunnel:
+                filter_dict['location__startswith'] = 'ZCM-{}'.format(tunnel)
             if is_entering:
                 if is_entering == 'Y':
                     queryset = queryset.filter(pallet_no__startswith=5)
@@ -636,7 +643,8 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         style = xlwt.XFStyle()
         style.alignment.wrap = 1
 
-        columns = ['No', '类型', '出入库单号', '质检条码', '批次号', '是否进烘房', '托盘号', '物料编码', '出入库数', '单位', '重量', '发起人', '发起时间', '完成时间']
+        columns = ['No', '类型', '出入库单号', '质检条码', '巷道', '批次号', '托盘号', '是否进烘房', '供应商',
+                   '物料编码', '物料名称', '出入库数', '重量', '发起人', '发起时间', '完成时间']
         # 写入文件标题
         for col_num in range(len(columns)):
             sheet.write(0, col_num, columns[col_num])
@@ -647,16 +655,18 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
             sheet.write(data_row, 1, i['order_type'])
             sheet.write(data_row, 2, i['order_no'])
             sheet.write(data_row, 3, i['lot_no'])
-            sheet.write(data_row, 4, i['batch_no'])
-            sheet.write(data_row, 5, 'Y' if i['pallet_no'].startswith('5') else 'N')
+            sheet.write(data_row, 4, i['location'][4])
+            sheet.write(data_row, 5, i['batch_no'])
             sheet.write(data_row, 6, i['pallet_no'])
-            sheet.write(data_row, 7, i['material_no'])
-            sheet.write(data_row, 8, i['qty'])
-            sheet.write(data_row, 9, i['unit'])
-            sheet.write(data_row, 10, i['weight'])
-            sheet.write(data_row, 11, i['initiator'])
-            sheet.write(data_row, 12, i['start_time'])
-            sheet.write(data_row, 13, i['fin_time'])
+            sheet.write(data_row, 7, i['is_entering'])
+            sheet.write(data_row, 8, '')
+            sheet.write(data_row, 9, i['material_no'])
+            sheet.write(data_row, 10, i['material_name'])
+            sheet.write(data_row, 11, i['qty'])
+            sheet.write(data_row, 12, i['weight'])
+            sheet.write(data_row, 13, i['initiator'])
+            sheet.write(data_row, 14, i['start_time'])
+            sheet.write(data_row, 15, i['fin_time'])
             data_row = data_row + 1
         # 写出到IO
         output = BytesIO()
@@ -828,7 +838,7 @@ class MaterialCount(APIView):
         elif store_name == "原材料库":
             status_map = {"合格": 1, "不合格": 2}
             try:
-                ret = WmsInventoryStock.objects.using('wms').filter(quality_status=status_map.get(status, 1)).values(
+                ret = WmsInventoryStock.objects.using('wms').values(
                     'material_no', 'material_name').annotate(
                     all_weight=Sum('total_weight')).values('material_no', 'material_name', 'all_weight')
             except:
@@ -836,7 +846,7 @@ class MaterialCount(APIView):
         elif store_name == "炭黑库":
             status_map = {"合格": 1, "不合格": 2}
             try:
-                ret = WmsInventoryStock.objects.using('cb').filter(quality_status=status_map.get(status, 1)).values(
+                ret = WmsInventoryStock.objects.using('cb').values(
                     'material_no', 'material_name').annotate(
                     all_weight=Sum('total_weight')).values('material_no', 'material_name', 'all_weight')
             except:
@@ -2592,7 +2602,8 @@ class WmsStorageView(ListAPIView):
                           "批次号": "batch_no", "是否进烘房": "is_entering", "供应商": "supplier_name",
                           "托盘号": "container_no", "库位地址": "location", "单位": "unit",
                           "单位重量": "unit_weight", "总重量": "total_weight",
-                          "核酸管控": "in_charged_tag", "品质状态": "quality_status"}
+                          "核酸管控": "in_charged_tag", "品质状态": "quality_status",
+                          '件数': 'sl', '唛头重量': 'zl'}
 
     def list(self, request, *args, **kwargs):
         filter_kwargs = {}
@@ -2600,10 +2611,12 @@ class WmsStorageView(ListAPIView):
         container_no = self.request.query_params.get('pallet_no')
         material_name = self.request.query_params.get('material_name')
         material_no = self.request.query_params.get('material_no')
+        material_nos = self.request.query_params.get('material_nos')
         supplier_name = self.request.query_params.get('supplier_name')
         l_batch_no = self.request.query_params.get('l_batch_no')
         # 等于查询
         e_material_no = self.request.query_params.get('e_material_no')
+        e_material_name = self.request.query_params.get('e_material_name')
         unit = self.request.query_params.get('unit')
         batch_no = self.request.query_params.get('batch_no')
         is_entering = self.request.query_params.get('is_entering')
@@ -2614,6 +2627,8 @@ class WmsStorageView(ListAPIView):
         export = self.request.query_params.get('export')  # 1：当前页面  2：所有
         if material_no:
             filter_kwargs['material_no__icontains'] = material_no
+        if material_nos:
+            filter_kwargs['material_no__in'] = material_nos.split(',')
         if material_name:
             filter_kwargs['material_name__icontains'] = material_name
         if container_no:
@@ -2624,6 +2639,8 @@ class WmsStorageView(ListAPIView):
             filter_kwargs['batch_no__icontains'] = l_batch_no
         if e_material_no:
             filter_kwargs['material_no'] = e_material_no
+        if e_material_name:
+            filter_kwargs['material_name'] = e_material_name
         if unit:
             filter_kwargs['unit'] = unit
         if batch_no:
@@ -3178,7 +3195,26 @@ class WMSTunnelView(APIView):
     permission_classes = (IsAuthenticated, )
 
     def get(self, request):
-        sql = 'select TunnelName, TunnelCode from t_inventory_tunnel;'
+        sql = 'select TunnelName, TunnelCode from t_inventory_tunnel order by TunnelCode;'
+        sc = SqlClient(sql=sql, **self.DATABASE_CONF)
+        temp = sc.all()
+        result = []
+        for item in temp:
+            result.append(
+                {'name': item[0],
+                 'code': item[1]})
+        sc.close()
+        return Response(result)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class WMSMaterialsView(APIView):
+    """获取所有原材料名称列表"""
+    DATABASE_CONF = WMS_CONF
+    permission_classes = (IsAuthenticated, )
+
+    def get(self, request):
+        sql = 'select Name, MaterialCode from t_inventory_material order by Name;'
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)
         temp = sc.all()
         result = []
@@ -3399,6 +3435,12 @@ class THMaterialGroupNameView(WMSMaterialGroupNameView):
 @method_decorator([api_recorder], name="dispatch")
 class THTunnelView(WMSTunnelView):
     """获取炭黑库所有巷道名称"""
+    DATABASE_CONF = TH_CONF
+
+
+@method_decorator([api_recorder], name="dispatch")
+class THMaterialsView(WMSMaterialsView):
+    """获取所有原材料名称列表"""
     DATABASE_CONF = TH_CONF
 
 
@@ -3971,6 +4013,7 @@ class BzMixingRubberInventory(ListAPIView):
 @method_decorator([api_recorder], name="dispatch")
 class BzMixingRubberInventorySummary(APIView):
     """根据出库口获取混炼胶库存统计列表。参数：quality_status=品质状态&station=出库口名称&location_status=货位状态&lot_existed="""
+    permission_classes = (IsAuthenticated, )
 
     def get(self, request):
         params = request.query_params
@@ -4175,6 +4218,7 @@ class BzFinalRubberInventory(ListAPIView):
 @method_decorator([api_recorder], name="dispatch")
 class BzFinalRubberInventorySummary(APIView):
     """终炼胶库存、帘布库库存统计列表。参数：quality_status=品质状态&location_status=货位状态&store_name=炼胶库/帘布库&lot_existed=有无收皮条码"""
+    permission_classes = (IsAuthenticated, )
 
     def get(self, request):
         params = request.query_params
@@ -4255,6 +4299,7 @@ class OutBoundTasksListView(ListAPIView):
         根据出库口过滤混炼、终炼出库任务列表，参数：warehouse_name=混炼胶库/终炼胶库&station_id=出库口id
     """
     serializer_class = OutBoundTasksSerializer
+    permission_classes = (IsAuthenticated, )
 
     def get_queryset(self):
         warehouse_name = self.request.query_params.get('warehouse_name')  # 库存名称
@@ -4718,10 +4763,10 @@ class LIBRARYINVENTORYView(ListAPIView):
             return self.export_xls(result)
 
         if warehouse_name == '终炼胶库':
-            total_goods_num = 1428
+            total_goods_num = 1952
             used_goods_num = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(store_name='炼胶库').count()
         elif warehouse_name == '混炼胶库':
-            total_goods_num = 1952
+            total_goods_num = 1428
             used_goods_num = BzFinalMixingRubberInventory.objects.using('bz').all().count()
         else:
             total_goods_num = 1428 + 1952
@@ -4752,6 +4797,7 @@ class OutBoundDeliveryOrderViewSet(ModelViewSet):
     serializer_class = OutBoundDeliveryOrderSerializer
     filter_backends = (DjangoFilterBackend,)
     filter_class = OutBoundDeliveryOrderFilter
+    permission_classes = (IsAuthenticated, )
 
     @action(methods=['get'], detail=False, permission_classes=[], url_path='export',
             url_name='export')
@@ -4803,6 +4849,7 @@ class OutBoundDeliveryOrderDetailViewSet(ModelViewSet):
     serializer_class = OutBoundDeliveryOrderDetailSerializer
     filter_backends = (DjangoFilterBackend,)
     filter_class = OutBoundDeliveryOrderDetailFilter
+    permission_classes = (IsAuthenticated, )
 
     def get_queryset(self):
         queryset = self.queryset
@@ -4966,9 +5013,11 @@ class WMSStockSummaryView(APIView):
         style.alignment.wrap = 1
 
         columns = ['No', '物料名称', '物料编码', '中策物料编码', '数单位量', 'PDM', '物料组',
-                   '有效库存数量', '有效库存重量（kg）', '合格品数量', '合格品重量（kg）',
-                   '待检品数量', '待检品重量（kg）', '不合格品数量', '不合格品重量（kg）', '总数量', '总重量（kg）', ]
-
+                   '有效库存数量', '有效库存重量（kg）',
+                   '合格品数量', '合格品重量（kg）',
+                   '待检品数量', '待检品重量（kg）',
+                   '不合格品数量', '不合格品重量（kg）',
+                   '总数量', '总重量（kg）', '总件数', '总唛头重量（kg）', ]
         for col_num in range(len(columns)):
             sheet.write(1, col_num, columns[col_num])
             # 写入数据
@@ -4991,6 +5040,8 @@ class WMSStockSummaryView(APIView):
             sheet.write(data_row, 14, i['weight_3'])
             sheet.write(data_row, 15, i['total_quantity'])
             sheet.write(data_row, 16, i['total_weight'])
+            sheet.write(data_row, 17, i['total_sl'])
+            sheet.write(data_row, 18, i['total_zl'])
             data_row = data_row + 1
         # 写出到IO
         output = BytesIO()
@@ -5034,14 +5085,18 @@ class WMSStockSummaryView(APIView):
             m.MaterialGroupName,
             temp.quantity,
             temp.WeightOfActual,
-            temp.StockDetailState
+            temp.StockDetailState,
+            temp.sl,
+            temp.zl
         from (
             select
                 a.MaterialCode,
                 a.MaterialName,
                 a.StockDetailState,
                 SUM(a.WeightOfActual) AS WeightOfActual,
-                SUM(a.Quantity ) AS quantity
+                SUM(a.Quantity ) AS quantity,
+                SUM(a.SL ) AS sl,
+                SUM(a.ZL ) AS zl
             from t_inventory_stock AS a
             group by
                  a.MaterialCode,
@@ -5062,29 +5117,17 @@ class WMSStockSummaryView(APIView):
             if quality_status == 2:
                 quality_status = 5
             if item[1] not in data_dict:
-                data = {'name': item[0],
-                        'code': item[1],
-                        'zc_material_code': item[2],
-                        'unit': item[3],
-                        'pdm': item[4],
-                        'group_name': item[5],
-                        'total_quantity': item[6],
-                        'total_weight': item[7],
-                        'quantity_1': 0,
-                        'weight_1': 0,
-                        'quantity_3': 0,
-                        'weight_3': 0,
-                        'quantity_4': 0,
-                        'weight_4': 0,
-                        'quantity_5': 0,
-                        'weight_5': 0
-                        }
-                data['quantity_{}'.format(quality_status)] = item[6]
-                data['weight_{}'.format(quality_status)] = item[7]
+                data = {'name': item[0], 'code': item[1], 'zc_material_code': item[2], 'unit': item[3], 'pdm': item[4],
+                        'group_name': item[5], 'total_quantity': item[6], 'total_weight': item[7], 'total_sl': item[9],
+                        'total_zl': item[10], 'quantity_1': 0, 'weight_1': 0, 'quantity_3': 0, 'weight_3': 0,
+                        'quantity_4': 0, 'weight_4': 0, 'quantity_5': 0, 'weight_5': 0,
+                        'quantity_{}'.format(quality_status): item[6], 'weight_{}'.format(quality_status): item[7]}
                 data_dict[item[1]] = data
             else:
                 data_dict[item[1]]['total_quantity'] += item[6]
                 data_dict[item[1]]['total_weight'] += item[7]
+                data_dict[item[1]]['total_sl'] += item[9]
+                data_dict[item[1]]['total_zl'] += item[10]
                 data_dict[item[1]]['quantity_{}'.format(quality_status)] = item[6]
                 data_dict[item[1]]['weight_{}'.format(quality_status)] = item[7]
         result = []
@@ -5103,6 +5146,8 @@ class WMSStockSummaryView(APIView):
             result = list(filter(lambda x: x['flag'] == 'L', result))
         total_quantity = sum([item['total_quantity'] for item in result])
         total_weight = sum([item['total_weight'] for item in result])
+        total_sl = sum([item['total_sl'] for item in result])
+        total_zl = sum([item['total_zl'] for item in result])
         total_quantity1 = sum([item['quantity_1'] for item in result])
         total_weight1 = sum([item['weight_1'] for item in result])
         total_quantity3 = sum([item['quantity_3'] for item in result])
@@ -5119,7 +5164,7 @@ class WMSStockSummaryView(APIView):
             return self.export_xls(data)
         return Response(
             {'results': ret, "count": count,
-             'total_quantity': total_quantity, 'total_weight': total_weight,
+             'total_quantity': total_quantity, 'total_weight': total_weight, 'total_sl': total_sl, 'total_zl': total_zl,
              'total_quantity1': total_quantity1, 'total_weight1': total_weight1,
              'total_quantity3': total_quantity3, 'total_weight3': total_weight3,
              'total_quantity5': total_quantity5, 'total_weight5': total_weight5
@@ -5237,7 +5282,7 @@ class WMSOutTaskDetailView(ListAPIView):
         if entrance_name:
             entrance_data = dict(MaterialEntrance.objects.using(self.DB).values_list('name', 'code'))
             filter_kwargs['entrance'] = entrance_data.get(entrance_name)
-        return MaterialOutHistory.objects.using(self.DB).filter(**filter_kwargs).select_related('task').order_by('-task')
+        return MaterialOutHistory.objects.using(self.DB).filter(**filter_kwargs).order_by('-task')
 
     def get_serializer_context(self):
         """
@@ -5394,6 +5439,8 @@ class HFStockView(APIView):
         material_no = self.request.query_params.get('material_no')
         material_name = self.request.query_params.get('material_name')
         extra_where_str = ""
+        extra_where_str2 = "where OastInTime is not null"
+        extra_where_str3 = "where OastOutTime is not null"
         if material_name:
             extra_where_str += "where ProductName like N'%{}%'".format(material_name)
         if material_no:
@@ -5406,11 +5453,15 @@ class HFStockView(APIView):
                 extra_where_str += " and TaskStartTime >= '{}'".format(st)
             else:
                 extra_where_str += "where TaskStartTime >= '{}'".format(st)
+            extra_where_str2 += " and OastInTime >= '{}'".format(st)
+            extra_where_str3 += " and OastOutTime >= '{}'".format(st)
         if et:
             if extra_where_str:
                 extra_where_str += " and TaskStartTime <= '{}'".format(et)
             else:
                 extra_where_str += "where TaskStartTime <= '{}'".format(et)
+            extra_where_str2 += " and OastInTime <= '{}'".format(et)
+            extra_where_str3 += " and OastOutTime <= '{}'".format(et)
         sql = """select
                    ProductNo,
                    ProductName,
@@ -5470,16 +5521,37 @@ class HFStockView(APIView):
                 elif task_state == 6:  # 已出库
                     result[item[0]]['outbound_qty'] += qty
         sc.close()
+        material_nos = list(result.keys())
+
+        r_sql = """select
+                   ProductNo,
+                   count(*)
+            from dsp_OastTask
+            {}
+            group by ProductNo;""".format(extra_where_str2)
+        sc = SqlClient(sql=r_sql, **self.DATABASE_CONF)
+        temp2 = sc.all()
+        temp2_data = {i[0]: i[1] for i in temp2}
+
+        c_sql = """select
+                   ProductNo,
+                   count(*)
+            from dsp_OastTask
+            {}
+            group by ProductNo;""".format(extra_where_str3)
+        sc = SqlClient(sql=c_sql, **self.DATABASE_CONF)
+        temp2 = sc.all()
+        temp3_data = {i[0]: i[1] for i in temp2}
 
         # 补充立体库库内库存数量
-        material_nos = list(result.keys())
         stock_data = dict(WmsInventoryStock.objects.using('wms').filter(
             material_no__in=material_nos,
             container_no__startswith='5'
         ).values('material_no').annotate(c=Count('material_no')).values_list('material_no', 'c'))
         for key, value in result.items():
             value['stock_qty'] = stock_data.get(key)
-
+            value['in_qty'] = temp2_data.get(key)
+            value['out_qty'] = temp3_data.get(key)
         return Response(result.values())
 
 
@@ -5495,33 +5567,89 @@ class HFStockDetailView(APIView):
         data_type = self.request.query_params.get('data_type')  # 3：输送途中 4：正在烘  5：已经烘完 6：烘房小计 7：已出库 8:等待烘烤
         page = int(self.request.query_params.get('page', 1))
         page_size = int(self.request.query_params.get('page_size', 10))
-        if not all([material_no, data_type]):
+        if not data_type:
             raise ValidationError('参数缺失！')
-        extra_where_str = "where ProductNo = '{}'".format(material_no)
+        extra_where_str = ""
+        if material_no:
+            extra_where_str += "where ProductNo = '{}'".format(material_no)
+        if data_type == '1':
+            if extra_where_str:
+                extra_where_str += ' and OastInTime is not null'
+            else:
+                extra_where_str += 'where OastInTime is not null'
+        if data_type == '2':
+            if extra_where_str:
+                extra_where_str += ' and OastOutTime is not null'
+            else:
+                extra_where_str += 'where OastOutTime is not null'
         if data_type == '3':  # 输送途中
-            extra_where_str += " and TaskState=1"
-        if data_type == '8':  # 等待烘烤
-            extra_where_str += " and TaskState=4"
+            if extra_where_str:
+                extra_where_str += ' and TaskState=1'
+            else:
+                extra_where_str += 'where TaskState=1'
         if data_type == '4':  # 正在烘
-            extra_where_str += " and TaskState=2"
+            if extra_where_str:
+                extra_where_str += ' and TaskState=2'
+            else:
+                extra_where_str += 'where TaskState=2'
         if data_type == '5':  # 已经烘完
-            extra_where_str += " and TaskState=5"
+            if extra_where_str:
+                extra_where_str += ' and TaskState=5'
+            else:
+                extra_where_str += 'where TaskState=5'
         if data_type == '6':  # 烘房小计
-            extra_where_str += " and TaskState in (2, 4, 5)"
+            if extra_where_str:
+                extra_where_str += ' and TaskState in (2, 4, 5)'
+            else:
+                extra_where_str += 'where TaskState in (2, 4, 5)'
         if data_type == '7':  # 已出库
-            extra_where_str += " and TaskState in (3, 6)"
+            if extra_where_str:
+                extra_where_str += ' and TaskState in (3, 6)'
+            else:
+                extra_where_str += 'where TaskState in (3, 6)'
+        if data_type == '8':  # 等待烘烤
+            if extra_where_str:
+                extra_where_str += ' and TaskState=4'
+            else:
+                extra_where_str += 'where TaskState=4'
         if st:
-            extra_where_str += " and TaskStartTime >= '{}'".format(st)
+            if extra_where_str:
+                extra_where_str += " and TaskStartTime >= '{}'".format(st)
+            else:
+                extra_where_str += "where TaskStartTime >= '{}'".format(st)
+            if data_type == '1':  # 入箱托数
+                if extra_where_str:
+                    extra_where_str += " and OastInTime >= '{}'".format(st)
+                else:
+                    extra_where_str += "where OastInTime >= '{}'".format(st)
+            elif data_type == '2':  # 出箱托数
+                if extra_where_str:
+                    extra_where_str += " and OastOutTime >= '{}'".format(st)
+                else:
+                    extra_where_str += "where OastOutTime >= '{}'".format(st)
         if et:
-            extra_where_str += " and TaskStartTime <= '{}'".format(et)
+            if extra_where_str:
+                extra_where_str += " and TaskStartTime <= '{}'".format(et)
+            else:
+                extra_where_str += "where TaskStartTime <= '{}'".format(et)
+            if data_type == '1':  # 入箱托数
+                if extra_where_str:
+                    extra_where_str += " and OastInTime <= '{}'".format(et)
+                else:
+                    extra_where_str += "where OastInTime <= '{}'".format(et)
+            elif data_type == '2':  # 出箱托数
+                if extra_where_str:
+                    extra_where_str += " and OastOutTime <= '{}'".format(et)
+                else:
+                    extra_where_str += "where OastOutTime <= '{}'".format(et)
         sql = """select
                 OastNo,
                 TaskState,
                 ProductName,
                 ProductNo,
                 RFID,
-                OastStartTime,
-                OastEntTime
+                OastInTime,
+                OastOutTime
             from dsp_OastTask {} order by OastNo OFFSET {} ROWS FETCH FIRST {} ROWS ONLY
             """.format(extra_where_str, (page-1)*page_size, page_size)
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)

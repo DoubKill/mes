@@ -30,7 +30,7 @@ from recipe.serializers import MaterialSerializer, ProductInfoSerializer, \
     ERPMaterialUpdateSerializer, ZCMaterialSerializer, ProductBatchingDetailRetrieveSerializer
 from recipe.models import Material, ProductInfo, ProductBatching, MaterialAttribute, \
     ProductBatchingDetail, MaterialSupplier, WeighCntType, WeighBatchingDetail, ZCMaterial, ERPMESMaterialRelation, \
-    ProductBatchingEquip
+    ProductBatchingEquip, ProductBatchingMixed
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -76,7 +76,7 @@ class MaterialViewSet(CommonDeleteMixin, ModelViewSet):
             else:
                 queryset = queryset.filter(use_flag=1)
                 if mc_code:
-                    queryset = queryset.filter(~Q(Q(material_name__endswith='-C') | Q(material_name__endswith='-X')), use_flag=True)
+                    queryset = queryset.filter(~Q(Q(material_name__endswith='-C') | Q(material_name__endswith='-X')))
             data = queryset.values('id', 'material_no', 'material_name',
                                    'material_type__global_name', 'material_type', 'for_short',
                                    'package_unit', 'package_unit__global_name', 'use_flag')
@@ -357,8 +357,7 @@ class RecipeNoticeAPiView(APIView):
             # NEW配方下传成功：1、废弃旧配方；2、修改配方名称；
             if 'NEW' in product_no:
                 # 废弃原配方
-                old_mes_recipe = ProductBatching.objects.filter(stage_product_batch_no=real_product_no,
-                                                                batching_type=2,
+                old_mes_recipe = ProductBatching.objects.filter(stage_product_batch_no=real_product_no, batching_type=2,
                                                                 dev_type=product_batching.dev_type)
                 old_mes_recipe.update(used_type=6)
                 # 清除机台配方
@@ -366,6 +365,11 @@ class RecipeNoticeAPiView(APIView):
                 # 去除配方里的_NEW
                 product_batching.stage_product_batch_no = real_product_no
                 product_batching.save()
+                # 更新对搭表
+                mixed = ProductBatchingMixed.objects.filter(product_batching=product_batching)
+                if mixed:
+                    f_feed_name, s_feed_name = mixed.last().f_feed_name.split('_NEW')[0], mixed.last().s_feed_name.split('_NEW')[0]
+                    mixed.update(**{'f_feed_name': f_feed_name, 's_feed_name': s_feed_name})
             ProductBatchingEquip.objects.filter(product_batching_id=product_batching_id, equip_no__in=send_equip).update(send_recipe_flag=True)
             receive_msg += f"{'、'.join(send_equip)}: 配方下发成功 "
         return Response(data={'auxiliary_url': settings.AUXILIARY_URL, 'send_recipe_msg': receive_msg}, status=status.HTTP_200_OK)
