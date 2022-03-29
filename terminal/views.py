@@ -887,7 +887,7 @@ class WeightPackageManualViewSet(ModelViewSet):
         print_flag = self.request.query_params.get('print_flag')  # 2 失效 3 过期
         if history:
             res = {}
-            last_instance = self.get_queryset().filter(product_no=product_no).last()
+            last_instance = self.get_queryset().filter(product_no=product_no).first()
             if last_instance:
                 res.update({'batching_equip': last_instance.batching_equip, 'split_num': last_instance.split_num,
                             'package_count': last_instance.package_count, 'print_count': last_instance.print_count})
@@ -948,7 +948,7 @@ class WeightPackageSingleViewSet(ModelViewSet):
         if history:
             res = {}
             if not material_name:  # 配方历史数据
-                last_instance = self.get_queryset().filter(product_no=product_no, batching_type='配方').last()
+                last_instance = self.get_queryset().filter(product_no=product_no, batching_type='配方').first()
                 if not last_instance:
                     return Response(res)
                 recipe_manual = ProductBatchingEquip.objects.filter(Q(feeding_mode__startswith='R') | Q(is_manual=True) | Q(~Q(type=1), feeding_mode__startswith='P'),
@@ -960,7 +960,7 @@ class WeightPackageSingleViewSet(ModelViewSet):
                             'single_weight': last_instance.single_weight.split('±')[0], 'split_num': last_instance.split_num,
                             'expire_day': last_instance.expire_day, 'print_count': last_instance.print_count})
             else:  # 通用历史数据
-                last_instance = self.get_queryset().filter(batching_type='通用', material_name=material_name).last()
+                last_instance = self.get_queryset().filter(batching_type='通用', material_name=material_name).first()
                 if not last_instance:
                     return Response(res)
                 res.update({'package_count': last_instance.package_count,
@@ -1788,6 +1788,7 @@ class XLPlanVIewSet(ModelViewSet):
                     plan.state = '完成'
                     plan.save()
                     handle_plan_data['stop'] = plan
+                    handle_plan_data['add'] = [new_plan]
                     handle_plan_data['issue'] = [new_plan]
                     continue
                 replace_order_by = max(order_by_list) + 1
@@ -1802,10 +1803,14 @@ class XLPlanVIewSet(ModelViewSet):
             try:
                 client = CLSystem(equip_no)
                 stop_plan = handle_plan_data.get('stop')
+                add = handle_plan_data.get('add')
                 issue_plan = handle_plan_data.get('issue')
                 if stop_plan:
                     # 终止运行中计划(下位机)
                     client.stop(stop_plan.planid)
+                if add:
+                    # 新增计划
+                    client.add_plan(add.planid)
                 if issue_plan:
                     for single_plan in issue_plan:
                         # 下达新计划
