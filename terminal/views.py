@@ -3049,14 +3049,14 @@ class FormulaPreparationView(APIView):
             if xl_materials - set(mes_xl_materials.values_list('handle_material_name', flat=True)):  # 线体物料比配方多则pass
                 continue
             xl_recipe = RecipePre.objects.using(xl_equip).filter(name=product_no, use_not=0).last()
-            if not xl_recipe.time or xl_recipe.time in machine_dict:
+            if not xl_recipe or not xl_recipe.time or xl_recipe.time in machine_dict:
                 continue
             manual = mes_xl_materials.exclude(handle_material_name__in=xl_materials)\
                 .annotate(material__material_name=F('handle_material_name'),
                           actual_weight=F('cnt_type_detail_equip__standard_weight'),
                           standard_error=F('cnt_type_detail_equip__standard_error'))\
                 .values('material__material_name', 'actual_weight', 'standard_error')
-            machine_dict['time'] = {"machine": f"机配料包({list(xl_materials)[0]})", "weight": xl_recipe.weight,
+            machine_dict['time'] = {"machine": f"机配料包({list(xl_materials)[0]}...)", "weight": xl_recipe.weight,
                                     "error": xl_recipe.error, "manual": list(manual)}
         if machine_dict:
             res = machine_dict[max(machine_dict)]
