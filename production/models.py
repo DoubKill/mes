@@ -473,3 +473,13 @@ class IndependentPostTemplate(models.Model):
     class Meta:
         db_table = 'independent_post_template'
         verbose_name_plural = verbose_name = '是否独立上岗'
+
+
+class EquipMaxValueCache(models.Model):
+    equip_no = models.CharField(max_length=12, help_text='机台')
+    date_time = models.DateField(help_text='缓存截止时间')
+    value = models.IntegerField(default=0, help_text='机台最高产量')
+
+    class Meta:
+        db_table ='equip_max_value_cache'
+        verbose_name_plural = verbose_name = '机台最高产量缓存'

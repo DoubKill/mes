@@ -48,7 +48,7 @@ from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, Qua
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, OperationLog, \
     QualityControl, ProcessFeedback, AlarmLog, MaterialTankStatus, ProductionDailyRecords, ProductionPersonnelRecords, \
     RubberCannotPutinReason, MachineTargetYieldSettings, EmployeeAttendanceRecords, PerformanceJobLadder, \
-    PerformanceUnitPrice, ProductInfoDingJi, SetThePrice, SubsidyInfo, IndependentPostTemplate
+    PerformanceUnitPrice, ProductInfoDingJi, SetThePrice, SubsidyInfo, IndependentPostTemplate, EquipMaxValueCache
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, CollectTrainsFeedbacksSerializer, \
@@ -1979,6 +1979,35 @@ class MonthlyOutputStatisticsReport(APIView):
     queryset = TrainsFeedbacks.objects.all()
     permission_classes = (IsAuthenticated,)
 
+    def get_equip_max_value(self):
+        max_value = {}
+        now_date = datetime.date.today() - datetime.timedelta(days=1)
+        equip_value_cache = EquipMaxValueCache.objects.all()
+        if equip_value_cache.exists():
+            date = equip_value_cache.last().date_time
+            query = equip_value_cache.values('equip_no', 'value')
+            for item in query:
+                max_value[item['equip_no']] = item['value']
+            equip_max_value = TrainsFeedbacks.objects.filter(factory_date__gte=date, factory_date__lte=now_date
+                                                             ).values('equip_no', 'factory_date', 'classes').annotate(
+                qty=Count('id')).order_by('-qty')
+        else:
+            equip_max_value = TrainsFeedbacks.objects.values('equip_no', 'factory_date', 'classes').annotate(
+                qty=Count('id')).order_by('-qty')
+
+        for item in equip_max_value:
+            if not max_value.get(f"{item['equip_no']}"):
+                max_value[item['equip_no']] = item['qty']
+            else:
+                if max_value[item['equip_no']] < item['qty']:
+                    max_value[item['equip_no']] = item['qty']
+        for key, value in max_value.items():
+            EquipMaxValueCache.objects.update_or_create(defaults={'equip_no': key,
+                                                                  'value': value,
+                                                                  'date_time': now_date
+                                                                  }, equip_no=key)
+        return max_value
+
     def my_order(self, result, order):
         lst = []
         for dic in result:
@@ -2005,30 +2034,21 @@ class MonthlyOutputStatisticsReport(APIView):
                 space_equip = f"{item['product_no'].split('-')[2]}-{item['equip_no']}-{datetime.datetime.strftime(item['factory_date'], '%Y%m%d')}"
                 if dic.get(space_equip):
                     dic[space_equip]['value'] += item['value']
-                    dic[space_equip]['weight'] += round(item['weight'] / 1000, 2)
+                    dic[space_equip]['weight'] += round(item['weight'] / 100000, 2)
                     dic[space_equip]['ratio'] += round(item['weight'] / spare_weight, 2)
                 else:
                     dic[space_equip] = {'space': item['product_no'].split('-')[2],
                                         'equip_no': item['equip_no'],
                                         'time': datetime.datetime.strftime(item['factory_date'], '%m/%d'),
                                         'value': item['value'],
-                                        'weight': round(item['weight'] / 1000, 2),
+                                        'weight': round(item['weight'] / 100000, 2),
                                         'ratio': f"{round(item['weight'] / spare_weight, 2)}%"
                                         }
             result = sorted(dic.values(), key=lambda x: (x['space'], x['equip_no'], x['time']))
             return Response({'result': result})
         else:
             # 取每个机台的历史最大值
-            # equip_max_value = self.queryset.values('factory_date__year', 'factory_date__month',
-            #                                           'equip_no').annotate(value=Count('id')).order_by('equip_no', 'value')
-            # dic = {}
-            # [dic.update({item['equip_no']: item['value']}) for item in equip_max_value]
-            dic = {}
-            equip_max_value = TrainsFeedbacks.objects.values('equip_no', 'factory_date').annotate(
-            qty=Count('id')).order_by('-qty')
-            for item in equip_max_value:
-                if not dic.get(f"{item['equip_no']}"):
-                    dic[f"{item['equip_no']}"] = item['qty']
+            max_value = self.get_equip_max_value()
             # 取每个机台设定的目标值
             settings_value = MachineTargetYieldSettings.objects.order_by('id').last()
             # 获取起止时间内总重量和总数量
@@ -2036,8 +2056,8 @@ class MonthlyOutputStatisticsReport(APIView):
                                                                  weight=Sum('actual_weight'))
 
             for item in result:
-                item['weight'] = round(item['weight'] / 1000, 2)
-                item['max_value'] = dic[item['equip_no']] if dic.get(item['equip_no']) else None
+                item['weight'] = round(item['weight'] / 100000, 2)
+                item['max_value'] = max_value[item['equip_no']] if max_value.get(item['equip_no']) else None
                 if settings_value:
                     item['settings_value'] = settings_value.__dict__.get('E190') if item['equip_no'] == '190E' else\
                         settings_value.__dict__.get(item['equip_no'])
@@ -2051,16 +2071,16 @@ class MonthlyOutputStatisticsReport(APIView):
             for item in state_value:
                 if item['product_no'].split('-')[1] in ['RE', 'FM', 'RFM']:
                     if jl.get(item['product_no'].split('-')[1]):
-                        jl[item['product_no'].split('-')[1]] += round(item['weight'] / 1000, 2)
+                        jl[item['product_no'].split('-')[1]] += round(item['weight'] / 100000, 2)
                     else:
-                        jl[item['product_no'].split('-')[1]] = round(item['weight'] / 1000, 2)
-                    jl['jl'] += round(item['weight'] / 1000, 2)
+                        jl[item['product_no'].split('-')[1]] = round(item['weight'] / 100000, 2)
+                    jl['jl'] += round(item['weight'] / 100000, 2)
                 else:
                     if wl.get(item['product_no'].split('-')[1]):
-                        wl[item['product_no'].split('-')[1]] += round(item['weight'] / 1000, 2)
+                        wl[item['product_no'].split('-')[1]] += round(item['weight'] / 100000, 2)
                     else:
-                        wl[item['product_no'].split('-')[1]] = round(item['weight'] / 1000, 2)
-                    wl['wl'] += round(item['weight'] / 1000, 2)
+                        wl[item['product_no'].split('-')[1]] = round(item['weight'] / 100000, 2)
+                    wl['wl'] += round(item['weight'] / 100000, 2)
 
             jl = [{'name': key, 'value': value} for key, value in jl.items()]
             wl = [{'name': key, 'value': value} for key, value in wl.items()]
