@@ -40,7 +40,7 @@ from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
 from mes.permissions import PermissionClass
 from plan.filters import ProductClassesPlanFilter
-from plan.models import ProductClassesPlan
+from plan.models import ProductClassesPlan, SchedulingEquipShutDownPlan
 from basics.models import Equip
 from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, QualityControlFilter, EquipStatusFilter, \
     PlanStatusFilter, ExpendMaterialFilter, CollectTrainsFeedbacksFilter, UnReachedCapacityCause, \
@@ -2545,7 +2545,7 @@ class EmployeeAttendanceRecordsExport(ViewSet):
 
 @method_decorator([api_recorder], name="dispatch")
 class PerformanceJobLadderViewSet(ModelViewSet):
-    queryset = PerformanceJobLadder.objects.filter(delete_flag=False)
+    queryset = PerformanceJobLadder.objects.filter(delete_flag=False).order_by('code')
     serializer_class = PerformanceJobLadderSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -2560,7 +2560,7 @@ class PerformanceUnitPriceView(APIView):
         results = {}
         state_lst = GlobalCode.objects.filter(global_type__type_name='胶料段次').values('global_name')
         # category_lst = EquipCategoryAttribute.objects.filter(delete_flag=False).values('category_no')
-        category_lst = ['E580', 'F370', 'GK320', 'GK255', 'GK400']
+        category_lst = ['E580', 'F370', 'GK320', 'GK255', 'GK400', 'fz']
 
         for state in state_lst:
             state = state['global_name']
@@ -2579,20 +2579,16 @@ class PerformanceUnitPriceView(APIView):
     @atomic
     def post(self, request):
         data = self.request.data  # list
-        unit_list = []
-        category_lst = ['E580', 'F370', 'GK320', 'GK255', 'GK400']
-        obj = PerformanceUnitPrice.objects
+        category_lst = ['E580', 'F370', 'GK320', 'GK255', 'GK400', 'fz']
         for item in data:
             for category in category_lst:
-                pt = item.get(f"{category}_pt", None)
-                dj = item.get(f"{category}_dj", None)
-                if pt or dj:
-                    if obj.filter(state=item['state'], equip_type=category):
-                        obj.filter(state=item['state'], equip_type=category).update(
-                            pt=item[f"{category}_pt"], dj=item[f"{category}_dj"])
-                    unit_list.append(PerformanceUnitPrice(
-                        state=item['state'], equip_type=category, pt=item[f"{category}_pt"], dj=item[f"{category}_dj"]))
-        obj.bulk_create(unit_list)
+                pt = item[f"{category}_pt"]
+                dj = item[f"{category}_dj"]
+                PerformanceUnitPrice.objects.update_or_create(defaults={'state': item['state'],
+                                                                        'equip_type': category,
+                                                                        'pt': pt,
+                                                                        'dj': dj}, state=item['state'], equip_type=category)
+
         return Response('添加成功')
 
 
@@ -2692,9 +2688,20 @@ class PerformanceSummaryView(APIView):
                                                              )
         queryset = user_query.values_list('user__username', 'section', 'factory_date__day', 'group', 'equip', 'actual_time', 'classes')
         user_dic = {}
+        equip_shut_down_dic = {}
+        equip_shut_down = SchedulingEquipShutDownPlan.objects.filter(begin_time__year=year, begin_time__month=month).values(
+            'begin_time__day', 'equip_no')
+        for item in equip_shut_down:
+            if equip_shut_down_dic.get(item['begin_time__day']):
+                equip_shut_down_dic[item['begin_time__day']].append(item['equip_no'])
+            else:
+                equip_shut_down_dic[item['begin_time__day']] = [item['equip_no']]
         for item in queryset:
-            if not item[4]:  # 机台为空，按照15个机台的平均值计算
+            if not item[4]:  # 机台为空，按照15个机台的平均值计算， 去除故障停机的机台
                 e_list = Equip.objects.filter(category__equip_type__global_name='密炼设备').values_list('equip_no', flat=True)
+                move_equip = equip_shut_down_dic.get(int(item[2]), [])
+                if move_equip and len(e_list) > len(move_equip):
+                    e_list = list(set(e_list).difference(set(move_equip)))
             else:
                 e_list = [item[4]]
             for equip in e_list:
@@ -2740,13 +2747,19 @@ class PerformanceSummaryView(APIView):
                     if item['product_no'] in dj_list:
                         # 根据工作时长求机台的产量
                         work_time = user_dic[key]['actual_time']
-                        unit = price_dic.get(f"{equip_type}_{state}").get('dj')
+                        if '叉车' in section:
+                            unit = price_dic.get(f"fz_{state}").get('dj')
+                        else:
+                            unit = price_dic.get(f"{equip_type}_{state}").get('dj')
                         user_dic[key][f"{state}_dj_qty"] = user_dic[key].get(f"{state}_dj_qty", 0) + int(
                             item['qty'] / 12 * work_time)
                         user_dic[key][f"{state}_dj_unit"] = unit
                     else:
                         work_time = user_dic[key]['actual_time']
-                        unit = price_dic.get(f"{equip_type}_{state}").get('pt')
+                        if '叉车' in section:
+                            unit = price_dic.get(f"fz_{state}").get('dj')
+                        else:
+                            unit = price_dic.get(f"{equip_type}_{state}").get('dj')
                         user_dic[key][f"{state}_pt_qty"] = user_dic[key].get(f"{state}_pt_qty", 0) + int(
                             item['qty'] / 12 * work_time)
                         user_dic[key][f"{state}_pt_unit"] = unit
@@ -2765,7 +2778,7 @@ class PerformanceSummaryView(APIView):
             settings_value = MachineTargetYieldSettings.objects.last()
         # 计算薪资
         section_info = {}
-        for item in PerformanceJobLadder.objects.values('name', 'coefficient', 'post_standard', 'post_coefficient', 'type'):
+        for item in PerformanceJobLadder.objects.filter(type='密炼').values('name', 'coefficient', 'post_standard', 'post_coefficient', 'type'):
             section_info[item['name']] = {'coefficient': item['coefficient'],
                                           'post_standard': item['post_standard'],
                                           'post_coefficient': item['post_coefficient'],
