@@ -1136,7 +1136,7 @@ class WeightPackageManualSerializer(BaseModelSerializer):
         res = super().to_representation(instance)
         # 获取有效期
         expire_datetime = '9999-09-09 00:00:00'
-        expire_record = PackageExpire.objects.filter(product_no=f"{instance.product_no}({instance.dev_type})").first()
+        expire_record = PackageExpire.objects.filter(product_no=f"{instance.product_no}").first()
         if expire_record:
             expire_day = expire_record.package_fine_usefullife if 'F' in instance.batching_equip else expire_record.package_sulfur_usefullife
             expire_datetime = expire_datetime if expire_day == 0 else str(instance.created_date + timedelta(days=expire_day))

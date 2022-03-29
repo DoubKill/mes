@@ -892,18 +892,17 @@ class WeightPackageManualViewSet(ModelViewSet):
                 res.update({'batching_equip': last_instance.batching_equip, 'split_num': last_instance.split_num,
                             'package_count': last_instance.package_count, 'print_count': last_instance.print_count})
             return Response(res)
-        queryset = self.filter_queryset(self.get_queryset())
         if print_flag == '2':
             bra_codes = list(LoadTankMaterialLog.objects.filter(bra_code__startswith='MM').values_list('bra_code', flat=True).distinct())
-            queryset = queryset.filter(bra_code__in=bra_codes)
+            queryset = self.get_queryset().filter(bra_code__in=bra_codes)
         elif print_flag == '3':
             now_time = datetime.datetime.now()
-            queryset = queryset.filter(Q(Q(product_no__icontains='FM') | Q(product_no__icontains='RFM') |
+            queryset = self.get_queryset().filter(Q(Q(product_no__icontains='FM') | Q(product_no__icontains='RFM') |
                                          Q(product_no__icontains='RE'), created_date__lt=now_time - timedelta(days=5)) |
                                        Q(~Q(Q(product_no__icontains='FM') | Q(product_no__icontains='RFM') |
                                             Q(product_no__icontains='RE')), created_date__lt=now_time - timedelta(days=7)))
         else:
-            queryset = queryset
+            queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
@@ -945,40 +944,47 @@ class WeightPackageSingleViewSet(ModelViewSet):
         product_no = self.request.query_params.get('product_no')
         print_flag = self.request.query_params.get('print_flag')  # 2 失效 3 过期
         material_name = self.request.query_params.get('material_name')
+        weight = self.request.query_params.get('weight')
         if history:
             res = {}
-            last_instance = self.get_queryset().filter(product_no=product_no, batching_type='配方').last()
-            if not last_instance:
-                return Response(res)
-            recipe_manual = ProductBatchingEquip.objects.filter(Q(feeding_mode__startswith='R') | Q(is_manual=True) | Q(~Q(type=1), feeding_mode__startswith='P'),
-                                                                product_batching_id=product_batching_id,
-                                                                material__material_name=last_instance.material_name)
-            if not recipe_manual:
-                return Response(res)
-            res.update({'material_name': last_instance.material_name, 'package_count': last_instance.package_count,
-                        'single_weight': last_instance.single_weight.split('±')[0], 'split_num': last_instance.split_num,
-                        'expire_day': last_instance.expire_day, 'print_count': last_instance.print_count})
+            if not material_name:  # 配方历史数据
+                last_instance = self.get_queryset().filter(product_no=product_no, batching_type='配方').last()
+                if not last_instance:
+                    return Response(res)
+                recipe_manual = ProductBatchingEquip.objects.filter(Q(feeding_mode__startswith='R') | Q(is_manual=True) | Q(~Q(type=1), feeding_mode__startswith='P'),
+                                                                    product_batching_id=product_batching_id,
+                                                                    material__material_name=last_instance.material_name)
+                if not recipe_manual:
+                    return Response(res)
+                res.update({'material_name': last_instance.material_name, 'package_count': last_instance.package_count,
+                            'single_weight': last_instance.single_weight.split('±')[0], 'split_num': last_instance.split_num,
+                            'expire_day': last_instance.expire_day, 'print_count': last_instance.print_count})
+            else:  # 通用历史数据
+                last_instance = self.get_queryset().filter(batching_type='通用', material_name=material_name).last()
+                if not last_instance:
+                    return Response(res)
+                res.update({'package_count': last_instance.package_count,
+                            'single_weight': last_instance.single_weight.split('±')[0],
+                            'expire_day': last_instance.expire_day, 'print_count': last_instance.print_count})
             return Response(res)
-        if material_name:
+        if weight:
             instance = self.get_queryset().filter(batching_type='通用', material_name=material_name).first()
             history_weight = '' if not instance else instance.single_weight.split('±')[0]
             return Response(history_weight)
         else:
-            queryset = self.filter_queryset(self.get_queryset())
             if print_flag == '2':
                 bra_codes = list(LoadTankMaterialLog.objects.filter(bra_code__startswith='MC').values_list('bra_code', flat=True).distinct())
-                queryset = queryset.filter(bra_code__in=bra_codes)
+                queryset = self.get_queryset().filter(bra_code__in=bra_codes)
             elif print_flag == '3':
                 now_time = datetime.datetime.now()
-                queryset = queryset.filter(Q(Q(product_no__icontains='FM') | Q(product_no__icontains='RFM') |
+                queryset = self.get_queryset().filter(Q(Q(product_no__icontains='FM') | Q(product_no__icontains='RFM') |
                                              Q(product_no__icontains='RE'),
                                              created_date__lt=now_time - timedelta(days=5)) |
                                            Q(~Q(Q(product_no__icontains='FM') | Q(product_no__icontains='RFM') |
                                                 Q(product_no__icontains='RE')),
                                              created_date__lt=now_time - timedelta(days=7)))
             else:
-                queryset = queryset
-
+                queryset = self.filter_queryset(self.get_queryset())
             page = self.paginate_queryset(queryset)
             if page is not None:
                 serializer = self.get_serializer(page, many=True)
