@@ -568,12 +568,25 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 attrs['status'] = 1
             # 同物料扫码
             else:
-                last_same_material = add_materials.first()
-                weight = total_weight + last_same_material.real_weight
-                attrs['tank_data'].update({'actual_weight': 0, 'adjust_left_weight': weight, 'real_weight': weight,
-                                           'init_weight': weight, 'single_need': single_material_weight,
-                                           'pre_material_id': last_same_material.id})
-                attrs['status'] = 1
+                n_scan_material_type = attrs['tank_data'].get('scan_material_type')
+                check_flag = True
+                # 胶块4分钟内不超过3框, 胶皮10分钟内不超过4架
+                limit_data = {"胶块": [4, 3], "胶皮": [10, 4]}
+                if n_scan_material_type in ['胶块', '胶皮']:
+                    limit_minutes, limit_nums = limit_data[n_scan_material_type]
+                    limit_time = datetime.now() - timedelta(minutes=limit_minutes)
+                    num = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, material_name=material_name, scan_time__gte=limit_time).count()
+                    if num >= limit_nums:
+                        check_flag = False
+                        attrs['tank_data'].update({'msg': '扫码过快: 胶皮10分钟不超过4架/胶块4分钟3框'})
+                        attrs['status'] = 2
+                if check_flag:
+                    last_same_material = add_materials.first()
+                    weight = total_weight + last_same_material.real_weight
+                    attrs['tank_data'].update({'actual_weight': 0, 'adjust_left_weight': weight, 'real_weight': weight,
+                                               'init_weight': weight, 'single_need': single_material_weight,
+                                               'pre_material_id': last_same_material.id})
+                    attrs['status'] = 1
         return attrs
 
     def create(self, validated_data):
