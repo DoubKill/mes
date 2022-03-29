@@ -2042,7 +2042,7 @@ class MonthlyOutputStatisticsReport(APIView):
                                         'time': datetime.datetime.strftime(item['factory_date'], '%m/%d'),
                                         'value': item['value'],
                                         'weight': round(item['weight'] / 100000, 2),
-                                        'ratio': f"{round(item['weight'] / spare_weight, 2)}%"
+                                        'ratio': round(item['weight'] / spare_weight, 2)
                                         }
             result = sorted(dic.values(), key=lambda x: (x['space'], x['equip_no'], x['time']))
             return Response({'result': result})
