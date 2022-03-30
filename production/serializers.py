@@ -11,7 +11,7 @@ from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, QualityControl, \
     OperationLog, UnReachedCapacityCause, ProcessFeedback, AlarmLog, RubberCannotPutinReason, PerformanceJobLadder, \
-    ProductInfoDingJi, SetThePrice, SubsidyInfo
+    ProductInfoDingJi, SetThePrice, SubsidyInfo, Equip190EWeight, OuterMaterial, Equip190E
 
 
 class EquipStatusSerializer(BaseModelSerializer):
@@ -433,4 +433,34 @@ class SubsidyInfoSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SubsidyInfo
+        fields = '__all__'
+
+
+class Equip190EWeightSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Equip190EWeight
+        fields = '__all__'
+
+    def create(self, validated_data):
+        factory_date = self.context.get('factory_date')
+        classes = self.context.get('classes')
+        if not factory_date or not classes:
+            raise serializers.ValidationError('参数缺失')
+        validated_data['factory_date'] = factory_date
+        validated_data['classes'] = classes
+        instance = super().create(validated_data)
+        return instance
+
+
+class OuterMaterialSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = OuterMaterial
+        fields = '__all__'
+
+
+class Equip190ESerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Equip190E
         fields = '__all__'

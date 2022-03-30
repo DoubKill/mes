@@ -483,3 +483,32 @@ class EquipMaxValueCache(models.Model):
     class Meta:
         db_table ='equip_max_value_cache'
         verbose_name_plural = verbose_name = '机台最高产量缓存'
+
+
+class OuterMaterial(models.Model):
+    factory_date = models.DateField(help_text='工厂时间')
+    weight = models.DecimalField(max_length=8, decimal_places=2, help_text='吨')
+
+    class Meta:
+        db_table = 'outer_material'
+        verbose_name_plural = verbose_name = '外发无硫料'
+
+
+class Equip190E(models.Model):
+    specification = models.CharField(max_length=12, help_text='规格')
+    state = models.CharField(max_lenght=12, help_text='段次')
+    weight = models.DecimalField(max_length=8, decimal_places=2, help_text='kg')
+
+    class Meta:
+        db_table = 'equip_190e'
+        verbose_name_plural = verbose_name = '190E机台规格信息设定'
+
+
+class Equip190EWeight(Equip190E):
+    factory_date = models.DateField(help_text='工厂时间', null=True, blank=True)
+    classes = models.CharField(help_text='班次', max_length=12, null=True, blank=True)
+    qty = models.IntegerField(help_text='车数', null=True, blank=True)
+
+    class Meta:
+        db_table = 'equip_190e_weight'
+        verbose_name_plural = verbose_name = '190E机台产量信息'
