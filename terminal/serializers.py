@@ -641,7 +641,7 @@ class ReturnRubberSerializer(BaseModelSerializer):
         batch_class = '早班' if '08:00:00' < str(now_date)[-8:] < '20:00:00' else '夜班'
         record = WorkSchedulePlan.objects.filter(plan_schedule__day_time=str(now_date)[:10], classes__global_name=batch_class,
                                                  plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
-        batch_group = record.group.global_name
+        batch_group = record.group.global_name if record else ''
         # 生成条码
         prefix_code = f"AAJ1Z20{now_date.date().strftime('%Y%m%d')}{classes_dict[batch_class]}"
         max_code = ReturnRubber.objects.filter(bra_code__startswith=prefix_code).aggregate(max_code=Max('bra_code'))['max_code']
@@ -1235,7 +1235,7 @@ class WeightPackageSingleSerializer(BaseModelSerializer):
         record = WorkSchedulePlan.objects.filter(plan_schedule__day_time=str(now_date.date()),
                                                  classes__global_name=batch_class,
                                                  plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
-        batch_group = record.group.global_name
+        batch_group = record.group.global_name if record else ''
         # 条码
         if feeding_mode.startswith('R'):
             bra_code = ''
