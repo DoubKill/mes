@@ -2614,6 +2614,7 @@ class WmsStorageView(ListAPIView):
         material_nos = self.request.query_params.get('material_nos')
         supplier_name = self.request.query_params.get('supplier_name')
         l_batch_no = self.request.query_params.get('l_batch_no')
+        tunnel = self.request.query_params.get('tunnel')
         # 等于查询
         e_material_no = self.request.query_params.get('e_material_no')
         e_material_name = self.request.query_params.get('e_material_name')
@@ -2651,6 +2652,8 @@ class WmsStorageView(ListAPIView):
             filter_kwargs['in_storage_time__gte'] = st
         if et:
             filter_kwargs['in_storage_time__lte'] = et
+        if tunnel:
+            filter_kwargs['location__startswith'] = 'ZCM-{}'.format(tunnel)
         queryset = WmsInventoryStock.objects.using(self.DATABASE_CONF).filter(**filter_kwargs).order_by('in_storage_time')
         if is_entering:
             if is_entering == 'Y':
