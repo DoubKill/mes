@@ -487,7 +487,7 @@ class EquipMaxValueCache(models.Model):
 
 class OuterMaterial(models.Model):
     factory_date = models.DateField(help_text='工厂时间')
-    weight = models.DecimalField(max_length=8, decimal_places=2, help_text='吨')
+    weight = models.DecimalField(max_digits=8, decimal_places=2, help_text='吨')
 
     class Meta:
         db_table = 'outer_material'
@@ -497,7 +497,7 @@ class OuterMaterial(models.Model):
 class Equip190E(models.Model):
     specification = models.CharField(max_length=12, help_text='规格')
     state = models.CharField(max_lenght=12, help_text='段次')
-    weight = models.DecimalField(max_length=8, decimal_places=2, help_text='kg')
+    weight = models.DecimalField(max_digits=8, decimal_places=2, help_text='kg')
 
     class Meta:
         db_table = 'equip_190e'
