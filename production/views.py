@@ -2264,7 +2264,11 @@ class Equip190EViewSet(ModelViewSet):
         if s.is_valid(raise_exception=False):
             if len(s.validated_data) < 1:
                 raise ValidationError('没有可导入的数据')
-            s.save()
+            data = s.validated_data
+            for item in data:
+                Equip190E.objects.update_or_create(defaults=item,
+                                                   specification=item['specification'],
+                                                   state=item['state'])
         else:
             raise ValidationError('导入的数据类型有误')
         return Response(f'成功导入{len(s.validated_data)}条数据')
