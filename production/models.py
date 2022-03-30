@@ -504,7 +504,8 @@ class Equip190E(models.Model):
         verbose_name_plural = verbose_name = '190E机台规格信息设定'
 
 
-class Equip190EWeight(Equip190E):
+class Equip190EWeight(models.Model):
+    setup = models.ForeignKey(Equip190E, on_delete=models.CASCADE)
     factory_date = models.DateField(help_text='工厂时间', null=True, blank=True)
     classes = models.CharField(help_text='班次', max_length=12, null=True, blank=True)
     qty = models.IntegerField(help_text='车数', null=True, blank=True)

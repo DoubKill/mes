@@ -2142,7 +2142,7 @@ class DailyProductionCompletionReport(APIView):
                                                 Q(product_no__icontains='-FM-'))
         fin_queryset = queryset2.values('factory_date__day').annotate(weight=Sum('actual_weight'))
         equip_190e_weight = Equip190EWeight.objects.filter(factory_date__year=year, factory_date__month=month).\
-            values('factory_date__day').annotate(weight=Sum('weight'))
+            values('factory_date__day').annotate(weight=Sum('setup__weight'))
         for item in mix_queryset:
             results['name_1']['weight'] += round(item['weight'] / 100000, 2)
             results['name_1'][f"{item['factory_date__day']}日"] = round(item['weight'] / 100000, 2)
@@ -2219,8 +2219,15 @@ class DailyProductionCompletionReport(APIView):
         data = self.request.data.get('data', [])
         outer_data = self.request.data.get('outer_data', [])  # 外发无硫料
         if data:
-            serializer = Equip190EWeightSerializer(data=data, many=True, context={'factory_date': factory_date, 'classes': classes})
+            serializer = Equip190EWeightSerializer(data=data, many=True)
             serializer.is_valid(raise_exception=True)
+            for item in serializer.validated_data:
+                Equip190EWeight.objects.update_or_create(
+                    defaults={'setup': item['setup'],
+                              'factory_date': factory_date,
+                              'classes': classes,
+                              'qty': item['qty']},
+                    factory_date=factory_date, classes=classes, setup=item['setup'])
             return Response('ok')
         if outer_data:
             serializer = OuterMaterialSerializer(data=data, many=True)
@@ -2235,6 +2242,11 @@ class Equip190EViewSet(ModelViewSet):
     serializer_class = Equip190ESerializer
     filter_backends = (DjangoFilterBackend,)
     filter_class = Equip190EFilter
+
+    def list(self, request, *args, **kwargs):
+        if self.request.query_params.get('search'):
+            return Response({'results': list(set(self.queryset.values_list('specification', flat=True)))})
+        return super().list(request, *args, **kwargs)
 
     @action(methods=['post'], detail=False, permission_classes=[], url_path='import_xlsx',
             url_name='import_xlsx')

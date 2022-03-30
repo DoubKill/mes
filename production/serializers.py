@@ -437,20 +437,13 @@ class SubsidyInfoSerializer(serializers.ModelSerializer):
 
 
 class Equip190EWeightSerializer(serializers.ModelSerializer):
+    specification = serializers.ReadOnlyField(source='setup__specification')
+    state = serializers.ReadOnlyField(source='setup__state')
+    weight = serializers.ReadOnlyField(source='setup__weight')
 
     class Meta:
         model = Equip190EWeight
         fields = '__all__'
-
-    def create(self, validated_data):
-        factory_date = self.context.get('factory_date')
-        classes = self.context.get('classes')
-        if not factory_date or not classes:
-            raise serializers.ValidationError('参数缺失')
-        validated_data['factory_date'] = factory_date
-        validated_data['classes'] = classes
-        instance = super().create(validated_data)
-        return instance
 
 
 class OuterMaterialSerializer(serializers.ModelSerializer):
@@ -464,3 +457,10 @@ class Equip190ESerializer(serializers.ModelSerializer):
     class Meta:
         model = Equip190E
         fields = '__all__'
+
+    def create(self, validated_data):
+        specification = validated_data['specification']
+        state = validated_data['state']
+        if Equip190E.objects.filter(specification=specification, state=state).exists():
+            raise serializers.ValidationError(f"{specification}  {state}已存在")
+        return super().create(validated_data)
