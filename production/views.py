@@ -2246,6 +2246,12 @@ class Equip190EViewSet(ModelViewSet):
     def list(self, request, *args, **kwargs):
         if self.request.query_params.get('search'):
             return Response({'results': list(set(self.queryset.values_list('specification', flat=True)))})
+        if self.request.query_params.get('detail'):
+            factory_date = self.request.query_params.get('factory_date')
+            classes = self.request.query_params.get('classes')
+            instance = Equip190EWeight.objects.filter(factory_date=factory_date, classes=factory_date)
+            serializer = Equip190EWeightSerializer(instance=instance)
+            return Response({'results': serializer.data})
         return super().list(request, *args, **kwargs)
 
     @action(methods=['post'], detail=False, permission_classes=[], url_path='import_xlsx',
