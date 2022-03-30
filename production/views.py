@@ -44,7 +44,7 @@ from plan.models import ProductClassesPlan, SchedulingEquipShutDownPlan
 from basics.models import Equip
 from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, QualityControlFilter, EquipStatusFilter, \
     PlanStatusFilter, ExpendMaterialFilter, CollectTrainsFeedbacksFilter, UnReachedCapacityCause, \
-    ProductInfoDingJiFilter, SubsidyInfoFilter, PerformanceJobLadderFilter
+    ProductInfoDingJiFilter, SubsidyInfoFilter, PerformanceJobLadderFilter, Equip190EFilter
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, OperationLog, \
     QualityControl, ProcessFeedback, AlarmLog, MaterialTankStatus, ProductionDailyRecords, ProductionPersonnelRecords, \
     RubberCannotPutinReason, MachineTargetYieldSettings, EmployeeAttendanceRecords, PerformanceJobLadder, \
@@ -2233,6 +2233,9 @@ class DailyProductionCompletionReport(APIView):
 class Equip190EViewSet(ModelViewSet):
     queryset = Equip190E.objects.order_by('id')
     serializer_class = Equip190ESerializer
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = Equip190EFilter
+
 
     @action(methods=['post'], detail=False, permission_classes=[], url_path='import_xlsx',
             url_name='import_xlsx')
