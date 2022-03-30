@@ -122,3 +122,12 @@ class AttendanceGroupSetupFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = AttendanceGroupSetup
         fields = ('attendance_group', 'principal', 'attendance_users')
+
+
+class Equip190EFilter(django_filters.rest_framework.FilterSet):
+    specification = django_filters.CharFilter(field_name='specification', lookup_expr='icontains')
+    state = django_filters.CharFilter(field_name='state', lookup_expr='icontains')
+
+    class Meta:
+        model = Equip190E
+        fields = ('specification', 'state')

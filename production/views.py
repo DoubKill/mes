@@ -44,12 +44,12 @@ from plan.models import ProductClassesPlan, SchedulingEquipShutDownPlan
 from basics.models import Equip
 from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, QualityControlFilter, EquipStatusFilter, \
     PlanStatusFilter, ExpendMaterialFilter, CollectTrainsFeedbacksFilter, UnReachedCapacityCause, \
-    ProductInfoDingJiFilter, SubsidyInfoFilter, PerformanceJobLadderFilter, AttendanceGroupSetupFilter
+    ProductInfoDingJiFilter, SubsidyInfoFilter, PerformanceJobLadderFilter, AttendanceGroupSetupFilter, Equip190EFilter
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, OperationLog, \
     QualityControl, ProcessFeedback, AlarmLog, MaterialTankStatus, ProductionDailyRecords, ProductionPersonnelRecords, \
     RubberCannotPutinReason, MachineTargetYieldSettings, EmployeeAttendanceRecords, PerformanceJobLadder, \
     PerformanceUnitPrice, ProductInfoDingJi, SetThePrice, SubsidyInfo, IndependentPostTemplate, AttendanceGroupSetup, \
-    FillCardApply, ApplyForExtraWork, EquipMaxValueCache
+    FillCardApply, ApplyForExtraWork, EquipMaxValueCache, Equip190EWeight, OuterMaterial, Equip190E
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, CollectTrainsFeedbacksSerializer, \
@@ -58,7 +58,8 @@ from production.serializers import QualityControlSerializer, OperationLogSeriali
     ProcessFeedbackSerializer, TrainsFixSerializer, PalletFeedbacksBatchModifySerializer, ProductPlanRealViewSerializer, \
     RubberCannotPutinReasonSerializer, PerformanceJobLadderSerializer, ProductInfoDingJiSerializer, \
     SetThePriceSerializer, SubsidyInfoSerializer, AttendanceGroupSetupSerializer, EmployeeAttendanceRecordsSerializer, \
-    FillCardApplySerializer, ApplyForExtraWorkSerializer
+    FillCardApplySerializer, ApplyForExtraWorkSerializer, Equip190EWeightSerializer, OuterMaterialSerializer, \
+    Equip190ESerializer
 from rest_framework.generics import ListAPIView, GenericAPIView, ListCreateAPIView, CreateAPIView, UpdateAPIView, \
     get_object_or_404
 from datetime import timedelta
@@ -1982,6 +1983,35 @@ class MonthlyOutputStatisticsReport(APIView):
     queryset = TrainsFeedbacks.objects.all()
     permission_classes = (IsAuthenticated,)
 
+    def get_equip_max_value(self):
+        max_value = {}
+        now_date = datetime.date.today() - datetime.timedelta(days=1)
+        equip_value_cache = EquipMaxValueCache.objects.all()
+        if equip_value_cache.exists():
+            date = equip_value_cache.last().date_time
+            query = equip_value_cache.values('equip_no', 'value')
+            for item in query:
+                max_value[item['equip_no']] = item['value']
+            equip_max_value = TrainsFeedbacks.objects.filter(factory_date__gte=date, factory_date__lte=now_date
+                                                             ).values('equip_no', 'factory_date', 'classes').annotate(
+                qty=Count('id')).order_by('-qty')
+        else:
+            equip_max_value = TrainsFeedbacks.objects.values('equip_no', 'factory_date', 'classes').annotate(
+                qty=Count('id')).order_by('-qty')
+
+        for item in equip_max_value:
+            if not max_value.get(f"{item['equip_no']}"):
+                max_value[item['equip_no']] = item['qty']
+            else:
+                if max_value[item['equip_no']] < item['qty']:
+                    max_value[item['equip_no']] = item['qty']
+        for key, value in max_value.items():
+            EquipMaxValueCache.objects.update_or_create(defaults={'equip_no': key,
+                                                                  'value': value,
+                                                                  'date_time': now_date
+                                                                  }, equip_no=key)
+        return max_value
+
     def my_order(self, result, order):
         lst = []
         for dic in result:
@@ -2008,30 +2038,21 @@ class MonthlyOutputStatisticsReport(APIView):
                 space_equip = f"{item['product_no'].split('-')[2]}-{item['equip_no']}-{datetime.datetime.strftime(item['factory_date'], '%Y%m%d')}"
                 if dic.get(space_equip):
                     dic[space_equip]['value'] += item['value']
-                    dic[space_equip]['weight'] += round(item['weight'] / 1000, 2)
+                    dic[space_equip]['weight'] += round(item['weight'] / 100000, 2)
                     dic[space_equip]['ratio'] += round(item['weight'] / spare_weight, 2)
                 else:
                     dic[space_equip] = {'space': item['product_no'].split('-')[2],
                                         'equip_no': item['equip_no'],
                                         'time': datetime.datetime.strftime(item['factory_date'], '%m/%d'),
                                         'value': item['value'],
-                                        'weight': round(item['weight'] / 1000, 2),
-                                        'ratio': f"{round(item['weight'] / spare_weight, 2)}%"
+                                        'weight': round(item['weight'] / 100000, 2),
+                                        'ratio': round(item['weight'] / spare_weight, 2)
                                         }
             result = sorted(dic.values(), key=lambda x: (x['space'], x['equip_no'], x['time']))
             return Response({'result': result})
         else:
             # 取每个机台的历史最大值
-            # equip_max_value = self.queryset.values('factory_date__year', 'factory_date__month',
-            #                                           'equip_no').annotate(value=Count('id')).order_by('equip_no', 'value')
-            # dic = {}
-            # [dic.update({item['equip_no']: item['value']}) for item in equip_max_value]
-            dic = {}
-            equip_max_value = TrainsFeedbacks.objects.values('equip_no', 'factory_date').annotate(
-            qty=Count('id')).order_by('-qty')
-            for item in equip_max_value:
-                if not dic.get(f"{item['equip_no']}"):
-                    dic[f"{item['equip_no']}"] = item['qty']
+            max_value = self.get_equip_max_value()
             # 取每个机台设定的目标值
             settings_value = MachineTargetYieldSettings.objects.order_by('id').last()
             # 获取起止时间内总重量和总数量
@@ -2039,8 +2060,8 @@ class MonthlyOutputStatisticsReport(APIView):
                                                                  weight=Sum('actual_weight'))
 
             for item in result:
-                item['weight'] = round(item['weight'] / 1000, 2)
-                item['max_value'] = dic[item['equip_no']] if dic.get(item['equip_no']) else None
+                item['weight'] = round(item['weight'] / 100000, 2)
+                item['max_value'] = max_value[item['equip_no']] if max_value.get(item['equip_no']) else None
                 if settings_value:
                     item['settings_value'] = settings_value.__dict__.get('E190') if item['equip_no'] == '190E' else\
                         settings_value.__dict__.get(item['equip_no'])
@@ -2054,16 +2075,16 @@ class MonthlyOutputStatisticsReport(APIView):
             for item in state_value:
                 if item['product_no'].split('-')[1] in ['RE', 'FM', 'RFM']:
                     if jl.get(item['product_no'].split('-')[1]):
-                        jl[item['product_no'].split('-')[1]] += round(item['weight'] / 1000, 2)
+                        jl[item['product_no'].split('-')[1]] += round(item['weight'] / 100000, 2)
                     else:
-                        jl[item['product_no'].split('-')[1]] = round(item['weight'] / 1000, 2)
-                    jl['jl'] += round(item['weight'] / 1000, 2)
+                        jl[item['product_no'].split('-')[1]] = round(item['weight'] / 100000, 2)
+                    jl['jl'] += round(item['weight'] / 100000, 2)
                 else:
                     if wl.get(item['product_no'].split('-')[1]):
-                        wl[item['product_no'].split('-')[1]] += round(item['weight'] / 1000, 2)
+                        wl[item['product_no'].split('-')[1]] += round(item['weight'] / 100000, 2)
                     else:
-                        wl[item['product_no'].split('-')[1]] = round(item['weight'] / 1000, 2)
-                    wl['wl'] += round(item['weight'] / 1000, 2)
+                        wl[item['product_no'].split('-')[1]] = round(item['weight'] / 100000, 2)
+                    wl['wl'] += round(item['weight'] / 100000, 2)
 
             jl = [{'name': key, 'value': value} for key, value in jl.items()]
             wl = [{'name': key, 'value': value} for key, value in wl.items()]
@@ -2100,8 +2121,8 @@ class DailyProductionCompletionReport(APIView):
         else:
             this_month_end = datetime.datetime(year, month + 1, 1) - timedelta(days=1)
         results = {
-            'name_1': {'name': '计划目标', 'weight': 0},
-            'name_2': {'name': '终炼实际完成(吨)', 'weight': 0},
+            'name_1': {'name': '混炼胶实际完成(吨)', 'weight': 0},
+            'name_2': {'name': '终炼胶实际完成(吨)', 'weight': 0},
             'name_3': {'name': '外发无硫料(吨)', 'weight': 0},
             'name_4': {'name': '实际完成数-1(吨)', 'weight': 0},
             'name_5': {'name': '实际完成数-2(吨)', 'weight': 0},
@@ -2109,55 +2130,168 @@ class DailyProductionCompletionReport(APIView):
             'name_7': {'name': '日均完成率1', 'weight': None},
             'name_8': {'name': '日均完成率2', 'weight': None},
         }
-        # 终炼实际完成（吨）  FM , RFM , RE
-        queryset = TrainsFeedbacks.objects.filter(Q(factory_date__year=year, factory_date__month=month) &
-                                                Q(Q(product_no__icontains='-FM-') |
-                                                  Q(product_no__icontains='-RFM-') |
-                                                  Q(product_no__icontains='-RE-')))
-        fin_queryset = queryset.values('factory_date__day').annotate(weight=Sum('actual_weight'))
-
-        for item in fin_queryset:
+        # 混炼实际完成吨  CMB HMB 1MB~4MB
+        queryset1 = TrainsFeedbacks.objects.filter(Q(factory_date__year=year, factory_date__month=month) &
+                                                  Q(Q(product_no__icontains='-CMB-') |
+                                                    Q(product_no__icontains='-HMB-') |
+                                                    Q(product_no__icontains='-1MB-') |
+                                                    Q(product_no__icontains='-2MB-') |
+                                                    Q(product_no__icontains='-3MB-') |
+                                                    Q(product_no__icontains='-4MB-')))
+        mix_queryset = queryset1.values('factory_date__day').annotate(weight=Sum('actual_weight'))
+        # 终炼实际完成（吨）  FM
+        queryset2 = TrainsFeedbacks.objects.filter(Q(factory_date__year=year, factory_date__month=month) &
+                                                Q(product_no__icontains='-FM-'))
+        fin_queryset = queryset2.values('factory_date__day').annotate(weight=Sum('actual_weight'))
+        equip_190e_weight = Equip190EWeight.objects.filter(factory_date__year=year, factory_date__month=month).\
+            values('factory_date__day').annotate(weight=Sum('setup__weight'))
+        for item in mix_queryset:
+            results['name_1']['weight'] += round(item['weight'] / 100000, 2)
+            results['name_1'][f"{item['factory_date__day']}日"] = round(item['weight'] / 100000, 2)
+        for item in equip_190e_weight:
             results['name_2']['weight'] += round(item['weight'] / 1000, 2)
-            results['name_4']['weight'] += round(item['weight'] / 1000, 2)
-            results['name_5']['weight'] += round(item['weight'] / 1000, 2)
             results['name_2'][f"{item['factory_date__day']}日"] = round(item['weight'] / 1000, 2)
-            results['name_4'][f"{item['factory_date__day']}日"] = round(item['weight'] / 1000, 2)
-            results['name_5'][f"{item['factory_date__day']}日"] = round(item['weight'] / 1000, 2)
-
+        for item in fin_queryset:
+            results['name_2']['weight'] += round(item['weight'] / 100000, 2)
+            results['name_4']['weight'] += round(item['weight'] / 100000, 2)
+            results['name_5']['weight'] += round(item['weight'] / 100000, 2)
+            results['name_2'][f"{item['factory_date__day']}日"] = round(item['weight'] / 100000, 2)
+            results['name_4'][f"{item['factory_date__day']}日"] = round(item['weight'] / 100000, 2)
+            results['name_5'][f"{item['factory_date__day']}日"] = round(item['weight'] / 100000, 2)
         # 外发无硫料（吨）
-        out_queryset = FinalGumOutInventoryLog.objects.using('lb').filter(inout_num_type__icontains='出库',
-                                                           material_no__icontains="M",
-                                                           start_time__gte=this_month_start,
-                                                           start_time__lte=this_month_end).values('start_time__day').annotate(weight=Sum('weight'))
-
+        out_queryset = OuterMaterial.objects.filter(factory_date__year=year,
+                                                    factory_date__month=month).values('factory_date__day', 'weight')
         for item in out_queryset:
-            results['name_3']['weight'] += round(item['weight'] / 1000, 2)
-            results['name_4']['weight'] += round((item['weight'] / 1000) * decimal.Decimal(0.7), 2)
-            results['name_5']['weight'] += round(item['weight'] / 1000, 2)
-            results['name_3'][f"{item['start_time__day']}日"] = round(item['weight'] / 1000, 2)
-            if results['name_2'].get(f"{item['start_time__day']}日"):
-                results['name_4'][f"{item['start_time__day']}日"] += round((item['weight'] / 1000) * decimal.Decimal(0.7), 2)
-                results['name_5'][f"{item['start_time__day']}日"] += round(item['weight'] / 1000, 2)
+            results['name_3']['weight'] += round(item['weight'], 2)
+            results['name_4']['weight'] += round((item['weight']) * decimal.Decimal(0.7), 2)
+            results['name_5']['weight'] += round(item['weight'], 2)
+            results['name_3'][f"{item['factory_date__day']}日"] = round(item['weight'], 2)
+            if results['name_2'].get(f"{item['factory_date__day']}日"):
+                results['name_4'][f"{item['factory_date__day']}日"] += round((item['weight']) * decimal.Decimal(0.7), 2)
+                results['name_5'][f"{item['factory_date__day']}日"] += round(item['weight'], 2)
             else:
-                results['name_4'][f"{item['start_time__day']}日"] = round((item['weight'] / 1000) * decimal.Decimal(0.7), 2)
-                results['name_5'][f"{item['start_time__day']}日"] = round(item['weight'] / 1000, 2)
-
+                results['name_4'][f"{item['factory_date__day']}日"] = round((item['weight']) * decimal.Decimal(0.7), 2)
+                results['name_5'][f"{item['factory_date__day']}日"] = round(item['weight'], 2)
+        shot_down_dic = {}
+        shot_down = SchedulingEquipShutDownPlan.objects.filter(begin_time__year=year, begin_time__month=month).\
+            values('begin_time__day', 'equip_no', 'duration')
+        for item in shot_down:
+            if shot_down_dic.get(item['begin_time__day']):
+                if shot_down_dic[item['begin_time__day']].get(item['equip_no']):
+                    shot_down_dic[item['begin_time__day']][item['equip_no']] += item['duration']
+                else:
+                    shot_down_dic[item['begin_time__day']][item['equip_no']] = item['duration']
+            else:
+                shot_down_dic[item['begin_time__day']] = {item['equip_no']: item['duration']}
         # 开机机台
-        equip_queryset = list(queryset.values('equip_no', 'factory_date__day').distinct())
-        #  [{'equip_no': 'Z03', 'factory_date__day': 7}, {'equip_no': 'Z03', 'factory_date__day': 8}, {'equip_no': 'Z02', 'factory_date__day': 8}]
-
+        equip_queryset1 = queryset1.values('equip_no', 'factory_date__day').annotate(a=Count('id')).values('equip_no', 'factory_date__day')
+        equip_queryset2 = queryset2.values('equip_no', 'factory_date__day').annotate(a=Count('id')).values_list('equip_no', 'factory_date__day')
+        equip_queryset = equip_queryset1 | equip_queryset2
+        equip_dic = {
+            #  day: []
+        }
         for item in equip_queryset:
-            if results['name_6'].get(f"{item['factory_date__day']}日"):
-                results['name_6'][f"{item['factory_date__day']}日"] += round(24 / 24, 2)  # 24h
+            day = int(item['factory_date__day'])
+            equip_no = item['equip_no']
+            if equip_dic.get(day):
+                if equip_no not in equip_dic[day]:
+                    equip_dic[day].append(equip_no)
             else:
-                results['name_6'][f"{item['factory_date__day']}日"] = round(24 / 24, 2)
-            results['name_6']['weight'] += round(24 / 24, 2)
+                equip_dic[day] = [equip_no]
+        for day, lst in equip_dic.items():
+            equip_lst = shot_down_dic.get(day)
+            # 相交的为发生故障的机台
+            down_equip = list(set(lst).intersection(set(equip_lst))) if equip_lst else []
+            down_time = sum([shot_down_dic[day].get(e, 0) for e in down_equip]) if shot_down_dic.get(day) else 0
+            results['name_6'][f"{day}日"] = round(((24 * len(equip_dic.get(day))) - down_time) / (24 * len(equip_dic.get(day))), 2)
+        results['name_6']['weight'] = round(sum([v for k, v in results['name_6'].items() if k[0].isdigit()]) / (len(results['name_6']) - 2), 2)
+
         for key, value in results['name_4'].items():
             if key[0].isdigit():
                 results['name_7'][key] = round(results['name_4'][key] / decimal.Decimal(results['name_6'][key]), 2)
                 results['name_8'][key] = round(results['name_5'][key] / decimal.Decimal(results['name_6'][key]), 2)
-
+        results['name_7']['weight'] = round(results['name_4']['weight'] / decimal.Decimal(results['name_6']['weight']), 2)
+        results['name_8']['weight'] = round(results['name_5']['weight'] / decimal.Decimal(results['name_6']['weight']), 2)
         return Response({'results': results.values()})
+
+    def post(self):
+        # 190E机台产量录入
+        factory_date = self.request.data.get('factory_date', None)
+        classes = self.request.data.get('factory_date', None)
+        data = self.request.data.get('data', [])
+        outer_data = self.request.data.get('outer_data', [])  # 外发无硫料
+        if data:
+            serializer = Equip190EWeightSerializer(data=data, many=True)
+            serializer.is_valid(raise_exception=True)
+            for item in serializer.validated_data:
+                Equip190EWeight.objects.update_or_create(
+                    defaults={'setup': item['setup'],
+                              'factory_date': factory_date,
+                              'classes': classes,
+                              'qty': item['qty']},
+                    factory_date=factory_date, classes=classes, setup=item['setup'])
+            return Response('ok')
+        if outer_data:
+            serializer = OuterMaterialSerializer(data=data, many=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response('ok')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class Equip190EViewSet(ModelViewSet):
+    queryset = Equip190E.objects.order_by('id')
+    serializer_class = Equip190ESerializer
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = Equip190EFilter
+
+    def list(self, request, *args, **kwargs):
+        if self.request.query_params.get('search'):
+            return Response({'results': list(set(self.queryset.values_list('specification', flat=True)))})
+        if self.request.query_params.get('detail'):
+            factory_date = self.request.query_params.get('factory_date')
+            classes = self.request.query_params.get('classes')
+            instance = Equip190EWeight.objects.filter(factory_date=factory_date, classes=factory_date)
+            serializer = Equip190EWeightSerializer(instance=instance)
+            return Response({'results': serializer.data})
+        return super().list(request, *args, **kwargs)
+
+    @action(methods=['post'], detail=False, permission_classes=[], url_path='import_xlsx',
+            url_name='import_xlsx')
+    def import_xlsx(self, request):
+        excel_file = request.FILES.get('file', None)
+        if not excel_file:
+            raise ValidationError('文件不可为空！')
+        cur_sheet = get_cur_sheet(excel_file)
+        if cur_sheet.ncols != 3:
+            raise ValidationError('导入文件数据错误！')
+        data = get_sheet_data(cur_sheet)
+        parts_list = []
+        for item in data:
+            if not item[0]:
+                raise ValidationError('规格不可为空')
+            if not item[1]:
+                raise ValidationError('段数不可为空')
+            if not item[2]:
+                raise ValidationError('重量不可为空')
+            parts_list.append({
+                'specification': item[0],
+                'state': item[1],
+                'weight': item[2]
+            })
+
+        s = Equip190ESerializer(data=parts_list, many=True, context={'request': request})
+        if s.is_valid(raise_exception=False):
+            if len(s.validated_data) < 1:
+                raise ValidationError('没有可导入的数据')
+            data = s.validated_data
+            for item in data:
+                Equip190E.objects.update_or_create(defaults=item,
+                                                   specification=item['specification'],
+                                                   state=item['state'])
+        else:
+            raise ValidationError('导入的数据类型有误')
+        return Response(f'成功导入{len(s.validated_data)}条数据')
 
 
 @method_decorator([api_recorder], name="dispatch")

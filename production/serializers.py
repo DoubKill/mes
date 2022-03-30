@@ -12,7 +12,7 @@ from plan.models import ProductClassesPlan
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, QualityControl, \
     OperationLog, UnReachedCapacityCause, ProcessFeedback, AlarmLog, RubberCannotPutinReason, PerformanceJobLadder, \
     ProductInfoDingJi, SetThePrice, SubsidyInfo, AttendanceGroupSetup, EmployeeAttendanceRecords, FillCardApply, \
-    ApplyForExtraWork
+    ApplyForExtraWork, Equip190EWeight, OuterMaterial, Equip190E
 from system.models import User
 
 
@@ -480,3 +480,33 @@ class ApplyForExtraWorkSerializer(serializers.ModelSerializer):
 
     def get_id_card_num(self, obj):
         return obj.user.id_card_num
+
+
+class Equip190EWeightSerializer(serializers.ModelSerializer):
+    specification = serializers.ReadOnlyField(source='setup__specification')
+    state = serializers.ReadOnlyField(source='setup__state')
+    weight = serializers.ReadOnlyField(source='setup__weight')
+
+    class Meta:
+        model = Equip190EWeight
+        fields = '__all__'
+
+
+class OuterMaterialSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = OuterMaterial
+        fields = '__all__'
+
+
+class Equip190ESerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Equip190E
+        fields = '__all__'
+
+    def create(self, validated_data):
+        specification = validated_data['specification']
+        state = validated_data['state']
+        if Equip190E.objects.filter(specification=specification, state=state).exists():
+            raise serializers.ValidationError(f"{specification}  {state}已存在")
+        return super().create(validated_data)
