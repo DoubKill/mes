@@ -2236,7 +2236,6 @@ class Equip190EViewSet(ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filter_class = Equip190EFilter
 
-
     @action(methods=['post'], detail=False, permission_classes=[], url_path='import_xlsx',
             url_name='import_xlsx')
     def import_xlsx(self, request):
