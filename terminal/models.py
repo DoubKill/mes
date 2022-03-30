@@ -672,6 +672,8 @@ class WeightPackageManual(AbstractEntity):
     print_flag = models.IntegerField(help_text='打印状态', default=False)
     real_count = models.IntegerField(help_text='配置数量', null=True, blank=True)
     ip_address = models.CharField(max_length=64, help_text='下发打印任务的ip地址', null=True, blank=True)
+    expire_day = models.IntegerField(help_text='有效期', null=True, blank=True)
+    expire_datetime = models.DateTimeField(help_text='过期时间', null=True, blank=True)
 
     @property
     def manual_weight_names(self):
@@ -726,6 +728,7 @@ class WeightPackageSingle(AbstractEntity):
     begin_trains = models.IntegerField(help_text='起始车次')
     end_trains = models.IntegerField(help_text='结束车次', null=True, blank=True)
     expire_day = models.IntegerField(help_text='有效期')
+    expire_datetime = models.DateTimeField(help_text='过期时间', null=True, blank=True)
     package_count = models.IntegerField(help_text='配置数量')
     print_count = models.IntegerField(help_text='打印张数', null=True, blank=True)
     print_flag = models.IntegerField(help_text='打印状态', default=False)

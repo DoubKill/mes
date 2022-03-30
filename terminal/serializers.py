@@ -1134,12 +1134,6 @@ class WeightPackageManualSerializer(BaseModelSerializer):
 
     def to_representation(self, instance):
         res = super().to_representation(instance)
-        # 获取有效期
-        expire_datetime = '9999-09-09 00:00:00'
-        expire_record = PackageExpire.objects.filter(product_no=f"{instance.product_no}").first()
-        if expire_record:
-            expire_day = expire_record.package_fine_usefullife if 'F' in instance.batching_equip else expire_record.package_sulfur_usefullife
-            expire_datetime = expire_datetime if expire_day == 0 else (instance.created_date + timedelta(days=expire_day)).strftime('%Y-%m-%d %H:%M:%S')
         manual_details = []
         r_client = self.context.get('request')
         client = r_client.query_params.get('client') if r_client else None
@@ -1151,7 +1145,7 @@ class WeightPackageManualSerializer(BaseModelSerializer):
                     'material_name': material_name, 'standard_weight': i.standard_weight, 'batch_type': i.batch_type,
                     'tolerance': i.tolerance}
             manual_details.append(item)
-        res.update({'manual_details': manual_details, 'expire_datetime': expire_datetime, 'package_count': instance.real_count})
+        res.update({'manual_details': manual_details, 'package_count': instance.real_count})
         return res
 
     @atomic
@@ -1160,6 +1154,7 @@ class WeightPackageManualSerializer(BaseModelSerializer):
         now_date = datetime.now().replace(microsecond=0)
         batching_equip = validated_data.get('batching_equip')
         package_count = validated_data.get('package_count')
+        product_no = validated_data.get('product_no')
         manual_details = validated_data.pop('manual_details', [])
         # 班次, 班组
         batch_class = '早班' if '08:00:00' <= str(now_date)[-8:] < '20:00:00' else '夜班'
@@ -1180,10 +1175,18 @@ class WeightPackageManualSerializer(BaseModelSerializer):
                                             small_num__lt=total_weight, big_num__gte=total_weight, use_flag=True).first()
         tolerance = f"{rule.handle.keyword_name}{rule.standard_error}{rule.unit}" if rule else ""
         single_weight = f"{str(total_weight)}{tolerance}"
+        # 增加有效期
+        expire_day, expire_datetime = 0, '9999-09-09 00:00:00'
+        expire_record = PackageExpire.objects.filter(product_no=f"{product_no}").first()
+        if expire_record:
+            expire_day = expire_record.package_fine_usefullife if 'F' in batching_equip else expire_record.package_sulfur_usefullife
+            expire_datetime = expire_datetime if expire_day == 0 else (now_date + timedelta(days=expire_day)).strftime('%Y-%m-%d %H:%M:%S')
         validated_data.update({'created_user': self.context['request'].user, 'batch_class': batch_class, 'real_count': package_count,
                                'batch_group': batch_group, 'bra_code': bra_code, 'single_weight': single_weight,
                                'end_trains': validated_data['begin_trains'] + validated_data['package_count'] - 1,
-                               'print_flag': True, 'print_datetime': now_date, 'ip_address': self.context['request'].META.get('REMOTE_ADDR')})
+                               'print_flag': True, 'print_datetime': now_date, 'expire_day': expire_day,
+                               'expire_datetime': expire_datetime,
+                               'ip_address': self.context['request'].META.get('REMOTE_ADDR')})
         instance = super().create(validated_data)
         # 添加单配物料详情
         for item in manual_details:
@@ -1213,13 +1216,13 @@ class WeightPackageSingleSerializer(BaseModelSerializer):
 
     def to_representation(self, instance):
         res = super().to_representation(instance)
-        res.update({'batch_type': '人工配', 'expire_datetime': (instance.created_date + timedelta(days=instance.expire_day)).strftime('%Y-%m-%d %H:%M:%S'),
-                    'batch_time': res['created_date'][:10]})
+        res.update({'batch_type': '人工配', 'batch_time': res['created_date'][:10]})
         return res
 
     @atomic
     def create(self, validated_data):
         feeding_mode = validated_data.pop('feeding_mode')
+        expire_day = validated_data.get('expire_day')
         map_list = {"早班": '1', "中班": '2', "夜班": '3'}
         now_date = datetime.now().replace(microsecond=0)
         material_name, single_weight, split_num = validated_data.get('material_name'), validated_data.get('single_weight'), validated_data.get('split_num')
@@ -1250,7 +1253,9 @@ class WeightPackageSingleSerializer(BaseModelSerializer):
         validated_data.update({'created_user': self.context['request'].user, 'batch_class': batch_class,
                                'batch_group': batch_group, 'bra_code': bra_code, 'single_weight': single_weight,
                                'end_trains': validated_data['begin_trains'] + validated_data['package_count'] - 1,
-                               'print_flag': True, 'print_datetime': now_date, 'ip_address': self.context['request'].META.get('REMOTE_ADDR')})
+                               'print_flag': True, 'print_datetime': now_date,
+                               'expire_datetime': now_date + timedelta(days=expire_day),
+                               'ip_address': self.context['request'].META.get('REMOTE_ADDR')})
         return super().create(validated_data)
 
     def update(self, instance, validated_data):

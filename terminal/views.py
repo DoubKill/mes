@@ -9,10 +9,9 @@ from django.db.transaction import atomic
 from django.db.utils import ConnectionDoesNotExist
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
-from django.views.generic import detail
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
-from rest_framework.decorators import action, permission_classes
+from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import CreateAPIView, ListAPIView
 from rest_framework.mixins import CreateModelMixin, ListModelMixin, UpdateModelMixin
@@ -22,7 +21,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from basics.models import WorkSchedulePlan, Equip, GlobalCode
-from equipment.models import EquipMachineHaltType, EquipPlan, EquipApplyOrder, EquipApplyRepair
+from equipment.models import EquipMachineHaltType
 from equipment.serializers import EquipApplyRepairSerializer
 from inventory.models import MaterialOutHistory
 from mes.common_code import CommonDeleteMixin, TerminalCreateAPIView, response, SqlClient
@@ -35,8 +34,7 @@ from recipe.models import ProductBatchingDetail, ProductBatching, ERPMESMaterial
     WeighBatchingDetail, ProductBatchingEquip
 from terminal.filters import FeedingLogFilter, WeightTankStatusFilter, WeightBatchingLogListFilter, \
     BatchingClassesEquipPlanFilter, CarbonTankSetFilter, \
-    FeedingOperationLogFilter, ReplaceMaterialFilter, ReturnRubberFilter, WeightPackageManualFilter, \
-    WeightPackageSingleFilter
+    FeedingOperationLogFilter, ReplaceMaterialFilter, ReturnRubberFilter
 from terminal.models import TerminalLocation, EquipOperationLog, WeightBatchingLog, FeedingLog, \
     WeightTankStatus, WeightPackageLog, Version, FeedingMaterialLog, LoadMaterialLog, MaterialInfo, Bin, RecipePre, \
     RecipeMaterial, ReportBasic, ReportWeight, Plan, LoadTankMaterialLog, PackageExpire, MaterialChangeLog, \
@@ -57,7 +55,7 @@ from terminal.serializers import LoadMaterialLogCreateSerializer, \
     ReplaceMaterialSerializer, ReturnRubberSerializer, ToleranceRuleSerializer, WeightPackageManualSerializer, \
     WeightPackageSingleSerializer, WeightPackageLogCUpdateSerializer
 from terminal.utils import TankStatusSync, CarbonDeliverySystem, out_task_carbon, get_tolerance, material_out_barcode, \
-    get_manual_materials, get_current_factory_date, CLSystem, get_common_equip, JZTankStatusSync
+    get_manual_materials, CLSystem, get_common_equip
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -873,13 +871,37 @@ class WeightPackageManualViewSet(ModelViewSet):
     serializer_class = WeightPackageManualSerializer
     permission_classes = ()
     filter_backends = [DjangoFilterBackend]
-    filter_class = WeightPackageManualFilter
 
     def get_permissions(self):
         if self.request.query_params.get('client'):
             return ()
         else:
             return (IsAuthenticated(),)
+
+    def get_queryset(self):
+        query_set = self.queryset
+        product_no = self.request.query_params.get('product_no')
+        bra_code = self.request.query_params.get('bra_code')
+        batching_equip = self.request.query_params.get('batching_equip')
+        print_flag = self.request.query_params.get('print_flag')
+        filter_kwargs = {}
+        if product_no:
+            filter_kwargs['product_no__icontains'] = product_no
+        if bra_code:
+            filter_kwargs['bra_code__icontains'] = bra_code
+        if batching_equip:
+            filter_kwargs['batching_equip'] = batching_equip
+        if print_flag:
+            if print_flag in ['0', '1']:  # 打印、未打印
+                filter_kwargs['print_flag'] = print_flag
+            elif print_flag == '2':  # 失效
+                bra_codes = list(LoadTankMaterialLog.objects.filter(bra_code__startswith='MM').values_list('bra_code', flat=True).distinct())
+                filter_kwargs['bra_code__in'] = bra_codes
+            else:  # 过期
+                now_date = datetime.datetime.now().replace(microsecond=0)
+                filter_kwargs['expire_datetime__lt'] = now_date
+        query_set = query_set.filter(**filter_kwargs)
+        return query_set
 
     def list(self, request, *args, **kwargs):
         history = self.request.query_params.get('history')
@@ -892,23 +914,12 @@ class WeightPackageManualViewSet(ModelViewSet):
                 res.update({'batching_equip': last_instance.batching_equip, 'split_num': last_instance.split_num,
                             'package_count': last_instance.package_count, 'print_count': last_instance.print_count})
             return Response(res)
-        if print_flag == '2':
-            bra_codes = list(LoadTankMaterialLog.objects.filter(bra_code__startswith='MM').values_list('bra_code', flat=True).distinct())
-            queryset = self.get_queryset().filter(bra_code__in=bra_codes)
-        elif print_flag == '3':
-            now_time = datetime.datetime.now()
-            queryset = self.get_queryset().filter(Q(Q(product_no__icontains='FM') | Q(product_no__icontains='RFM') |
-                                         Q(product_no__icontains='RE'), created_date__lt=now_time - timedelta(days=5)) |
-                                       Q(~Q(Q(product_no__icontains='FM') | Q(product_no__icontains='RFM') |
-                                            Q(product_no__icontains='RE')), created_date__lt=now_time - timedelta(days=7)))
-        else:
-            queryset = self.filter_queryset(self.get_queryset())
-        page = self.paginate_queryset(queryset)
+        page = self.paginate_queryset(self.get_queryset())
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             return self.get_paginated_response(serializer.data)
 
-        serializer = self.get_serializer(queryset, many=True)
+        serializer = self.get_serializer(self.get_queryset(), many=True)
         return Response(serializer.data)
 
     @action(methods=['put'], detail=False, url_path='update_print_flag', url_name='update_print_flag')
@@ -930,7 +941,6 @@ class WeightPackageSingleViewSet(ModelViewSet):
     serializer_class = WeightPackageSingleSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = [DjangoFilterBackend]
-    filter_class = WeightPackageSingleFilter
 
     def get_permissions(self):
         if self.request.query_params.get('client'):
@@ -938,11 +948,41 @@ class WeightPackageSingleViewSet(ModelViewSet):
         else:
             return (IsAuthenticated(),)
 
+    def get_queryset(self):
+        query_set = self.queryset
+        product_no = self.request.query_params.get('product_no')
+        material_name = self.request.query_params.get('material_name')
+        bra_code = self.request.query_params.get('bra_code')
+        dev_type = self.request.query_params.get('dev_type')
+        batching_type = self.request.query_params.get('batching_type')
+        print_flag = self.request.query_params.get('print_flag')
+        filter_kwargs = {}
+        if product_no:
+            filter_kwargs['product_no__icontains'] = product_no
+        if material_name:
+            filter_kwargs['material_name__icontains'] = material_name
+        if bra_code:
+            filter_kwargs['bra_code__icontains'] = bra_code
+        if dev_type:
+            filter_kwargs['dev_type__id'] = dev_type
+        if batching_type:
+            filter_kwargs['batching_type'] = batching_type
+        if print_flag:
+            if print_flag in ['0', '1']:  # 打印、未打印
+                filter_kwargs['print_flag'] = print_flag
+            elif print_flag == '2':  # 失效
+                bra_codes = list(LoadTankMaterialLog.objects.filter(bra_code__startswith='MC').values_list('bra_code', flat=True).distinct())
+                filter_kwargs['bra_code__in'] = bra_codes
+            else:  # 过期
+                now_date = datetime.datetime.now().replace(microsecond=0)
+                filter_kwargs['expire_datetime__lt'] = now_date
+        query_set = query_set.filter(**filter_kwargs)
+        return query_set
+
     def list(self, request, *args, **kwargs):
         history = self.request.query_params.get('history')
         product_batching_id = self.request.query_params.get('product_batching')
         product_no = self.request.query_params.get('product_no')
-        print_flag = self.request.query_params.get('print_flag')  # 2 失效 3 过期
         material_name = self.request.query_params.get('material_name')
         weight = self.request.query_params.get('weight')
         if history:
@@ -972,25 +1012,12 @@ class WeightPackageSingleViewSet(ModelViewSet):
             history_weight = '' if not instance else instance.single_weight.split('±')[0]
             return Response(history_weight)
         else:
-            if print_flag == '2':
-                bra_codes = list(LoadTankMaterialLog.objects.filter(bra_code__startswith='MC').values_list('bra_code', flat=True).distinct())
-                queryset = self.get_queryset().filter(bra_code__in=bra_codes)
-            elif print_flag == '3':
-                now_time = datetime.datetime.now()
-                queryset = self.get_queryset().filter(Q(Q(product_no__icontains='FM') | Q(product_no__icontains='RFM') |
-                                             Q(product_no__icontains='RE'),
-                                             created_date__lt=now_time - timedelta(days=5)) |
-                                           Q(~Q(Q(product_no__icontains='FM') | Q(product_no__icontains='RFM') |
-                                                Q(product_no__icontains='RE')),
-                                             created_date__lt=now_time - timedelta(days=7)))
-            else:
-                queryset = self.filter_queryset(self.get_queryset())
-            page = self.paginate_queryset(queryset)
+            page = self.paginate_queryset(self.get_queryset())
             if page is not None:
                 serializer = self.get_serializer(page, many=True)
                 return self.get_paginated_response(serializer.data)
 
-            serializer = self.get_serializer(queryset, many=True)
+            serializer = self.get_serializer(self.get_queryset(), many=True)
             return Response(serializer.data)
 
     @action(methods=['put'], detail=False, url_path='update_print_flag', url_name='update_print_flag')
@@ -2950,14 +2977,14 @@ class ApplyHaltEquipView(APIView):
             serializer = EquipApplyRepairSerializer(data=created_data, context={'request': request})
             serializer.is_valid(raise_exception=True)
             serializer.save()
-            return Response('报修成功')
+            return response(success=True, message='报修成功')
         else:
             halt_type = self.request.data.get('halt_type')
             halt_reason = self.request.data.get('halt_reason')
             halt_desc = self.request.data.get('halt_desc', None)
             create_data = {'halt_type': halt_type, 'halt_reason': halt_reason, 'halt_desc': halt_desc, 'created_user': self.request.user}
             instance = EquipHaltReason.objects.create(**create_data)
-            return Response('停机原因已记录')
+            return response(success=True, message='停机原因已记录')
 
 
 @method_decorator([api_recorder], name='dispatch')
