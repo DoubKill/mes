@@ -318,13 +318,12 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                         flag, send_flag = False, False
                     # 通配条码(MC开头)需要判别有效期
                     if flag and bra_code.startswith('MC'):
-                        expire_datetime = single.created_date + timedelta(days=single.expire_day)
-                        if now_date > expire_datetime:
+                        if now_date > single.expire_datetime:
                             res = self.material_pass(plan_classes_uid, scan_material, reason_type='超过有效期', material_type=scan_material_type)
                             if not res[0]:
                                 scan_material_msg = '通用配方包已过期, 请工艺确认'
                                 if not ReplaceMaterial.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code, reason_type='超过有效期'):
-                                    replace_material_data.update({'reason_type': '超过有效期', 'expire_datetime': expire_datetime})
+                                    replace_material_data.update({'reason_type': '超过有效期', 'expire_datetime': single.expire_datetime})
                                     ReplaceMaterial.objects.create(**replace_material_data)
                                 record_data.update({'other_type': scan_material_type})
                                 OtherMaterialLog.objects.create(**record_data)
@@ -430,8 +429,6 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                             raise serializers.ValidationError('扫码合包配置冲突')
                         replace_material_data.update({'material_type': '人工配'})
                         product_no_dev = re.split(r'\(|\（|\[', manual.product_no)[0]
-                        package_expire = PackageExpire.objects.filter(product_no__startswith=manual.product_no).first()
-                        expire_days = 0 if not package_expire else (package_expire.package_fine_usefullife if 'F' in manual.batching_equip else package_expire.package_sulfur_usefullife)
                         if manual.dev_type != classes_plan.equip.category.category_name:
                             raise serializers.ValidationError('投料与生产机型不一致, 无法投料')
                         if product_no_dev != classes_plan.product_batching.stage_product_batch_no:
@@ -441,7 +438,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                 if not ReplaceMaterial.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code):
                                     ReplaceMaterial.objects.create(**replace_material_data)
                                 flag, send_flag = False, False
-                        if flag and expire_days != 0 and now_date - manual.created_date > timedelta(days=expire_days):
+                        if flag and manual.expire_day != 0 and now_date > manual.expire_datetime:
                             res = self.material_pass(plan_classes_uid, scan_material, reason_type='超过有效期', material_type=scan_material_type)
                             if not res[0]:
                                 scan_material_msg = '料包已过期, 请工艺确认'
