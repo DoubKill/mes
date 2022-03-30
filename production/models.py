@@ -496,7 +496,7 @@ class OuterMaterial(models.Model):
 
 class Equip190E(models.Model):
     specification = models.CharField(max_length=12, help_text='规格')
-    state = models.CharField(max_lenght=12, help_text='段次')
+    state = models.CharField(max_length=12, help_text='段次')
     weight = models.DecimalField(max_digits=8, decimal_places=2, help_text='kg')
 
     class Meta:
