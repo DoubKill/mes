@@ -1905,12 +1905,15 @@ class UpdateFlagCountView(APIView):
         merge_flag = self.request.data.get('merge_flag')
         split_count = self.request.data.get('split_count')
         use_not = self.request.data.get('use_not', '')
+        delete_flag = self.request.data.get('delete_flag')
+        now_date = datetime.datetime.now().date() - timedelta(days=1)
+        pre_fix = now_date.strftime('%Y%m%d')[2:]
         if isinstance(use_not, int):
             recipe_instance = RecipePre.objects.using(equip_no).filter(id=rid)
+            if not recipe_instance:
+                raise ValidationError('数据发生变化，刷新后重试')
             recipe_name = recipe_instance.first().name
             if use_not == 1:  # 停用配方
-                now_date = datetime.datetime.now().date() - timedelta(days=1)
-                pre_fix = now_date.strftime('%Y%m%d')[2:]
                 processing_plan = Plan.objects.using(equip_no).filter(state='运行中', actno__gte=1).last()
                 if not processing_plan:
                     plan_recipes = Plan.objects.using(equip_no).filter(planid__gte=pre_fix, state=['运行中', '等待'], recipe=recipe_name).last()
@@ -1923,6 +1926,23 @@ class UpdateFlagCountView(APIView):
                     raise ValidationError('存在同名已经启用的配方')
             recipe_instance.update(use_not=use_not)
             return Response(f"{'停用' if use_not == 1 else '启用'}配方成功")
+        if delete_flag:
+            recipe_instance = RecipePre.objects.using(equip_no).filter(id=rid).last()
+            if not recipe_instance:
+                raise ValidationError('数据发生变化，刷新后重试')
+            # 运行中或者等待的配方不能删除
+            processing_plan = Plan.objects.using(equip_no).filter(state='运行中', actno__gte=1).last()
+            if not processing_plan:
+                plan_recipes = Plan.objects.using(equip_no).filter(planid__gte=pre_fix, state=['运行中', '等待'],
+                                                                   recipe=recipe_instance.name).last()
+            else:
+                plan_recipes = Plan.objects.using(equip_no).filter(id__gte=processing_plan.id, state__in=['运行中', '等待'],
+                                                                   recipe=recipe_instance.name).last()
+            if plan_recipes:
+                raise ValidationError(f'该配方存在状态为{plan_recipes.state}计划, 无法删除')
+            RecipeMaterial.objects.using(equip_no).filter(recipe_name=recipe_instance.name).delete()
+            recipe_instance.delete()
+            return Response("删除配方成功")
         filter_kwargs = {}
         if merge_flag is not None:
             filter_kwargs['merge_flag'] = merge_flag
