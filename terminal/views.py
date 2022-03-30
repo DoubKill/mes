@@ -2967,11 +2967,13 @@ class ApplyHaltEquipView(APIView):
         opera_type = self.request.data.get('opera_type')
         if opera_type == 'repair':
             equip_no = self.request.data.get('equip_no')
-            equip_part_new = self.request.data.get('equip_part_new', None)
-            result_fault_desc = self.request.data.get('result_fault_desc')
+            equip_part_new = self.request.data.get('equip_part_new')
+            result_fault_desc = self.request.data.get('result_fault_desc', '')
             equip_condition = self.request.data.get('equip_condition', '不停机')
             created_data = {'equip_no': equip_no, 'plan_department': '生产部', 'fault_datetime': datetime.datetime.now(),
-                            'equip_part_new': equip_part_new, 'equip_condition': equip_condition}
+                            'equip_condition': equip_condition}
+            if equip_part_new != 0:
+                created_data['equip_part_new'] = equip_part_new
             if result_fault_desc:
                 created_data['result_fault_desc'] = result_fault_desc
             serializer = EquipApplyRepairSerializer(data=created_data, context={'request': request})
