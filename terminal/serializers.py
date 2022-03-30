@@ -1139,7 +1139,7 @@ class WeightPackageManualSerializer(BaseModelSerializer):
         expire_record = PackageExpire.objects.filter(product_no=f"{instance.product_no}").first()
         if expire_record:
             expire_day = expire_record.package_fine_usefullife if 'F' in instance.batching_equip else expire_record.package_sulfur_usefullife
-            expire_datetime = expire_datetime if expire_day == 0 else str(instance.created_date + timedelta(days=expire_day))
+            expire_datetime = expire_datetime if expire_day == 0 else (instance.created_date + timedelta(days=expire_day)).strftime('%Y-%m-%d %H:%M:%S')
         manual_details = []
         r_client = self.context.get('request')
         client = r_client.query_params.get('client') if r_client else None
@@ -1213,7 +1213,7 @@ class WeightPackageSingleSerializer(BaseModelSerializer):
 
     def to_representation(self, instance):
         res = super().to_representation(instance)
-        res.update({'batch_type': '人工配', 'expire_datetime': str(instance.created_date + timedelta(days=instance.expire_day)),
+        res.update({'batch_type': '人工配', 'expire_datetime': (instance.created_date + timedelta(days=instance.expire_day)).strftime('%Y-%m-%d %H:%M:%S'),
                     'batch_time': res['created_date'][:10]})
         return res
 
