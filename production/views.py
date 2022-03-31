@@ -2231,9 +2231,9 @@ class DailyProductionCompletionReport(APIView):
                     factory_date=factory_date, classes=classes, setup=item['setup'])
             return Response('ok')
         if outer_data:
-            serializer = OuterMaterialSerializer(data=outer_data, many=True)
-            serializer.is_valid(raise_exception=True)
-            serializer.save()
+            for item in outer_data:
+                OuterMaterial.objects.update_or_create(defaults=item,
+                                                       factory_date=item['factory_date'])
             return Response('ok')
 
 
