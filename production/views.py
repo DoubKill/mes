@@ -2234,7 +2234,7 @@ class DailyProductionCompletionReport(APIView):
             for item in outer_data:
                 OuterMaterial.objects.create(factory_date=item['factory_date'],
                                              weight=item['weight'])
-            return Response('ok')
+        return Response('ok')
 
 
 @method_decorator([api_recorder], name="dispatch")
