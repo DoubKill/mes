@@ -2228,12 +2228,12 @@ class DailyProductionCompletionReport(APIView):
                     factory_date=factory_date, classes=classes, setup=item['setup'])
             return Response('ok')
         if outer_data:
-            date = outer_data[0]['factory_date'] if outer_data else None
-            if date:
-                OuterMaterial.objects.filter(factory_date=date).delete()
-                for item in outer_data:
-                    OuterMaterial.objects.create(factory_date=item['factory_date'],
-                                                 weight=item['weight'])
+            date = self.request.query_params.get('date')
+            year, month = int(date.split('-')[0]), int(date.split('-')[1])
+            OuterMaterial.objects.filter(factory_date__year=year, factory_date__month=month).delete()
+            for item in outer_data:
+                OuterMaterial.objects.create(factory_date=item['factory_date'],
+                                             weight=item['weight'])
             return Response('ok')
 
 
