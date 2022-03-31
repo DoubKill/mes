@@ -309,6 +309,7 @@ permission_data = [
     # {'id': 436, 'code': 'add_xl_recipe', 'name': '新增', 'parent_id': 434},
     # {'id': 437, 'code': 'change_xl_recipe', 'name': '修改', 'parent_id': 434},
     {'id': 438, 'code': 'upload_xl_recipe', 'name': '上传', 'parent_id': 434},
+    {'id': 800, 'code': 'del_xl_recipe', 'name': '删除', 'parent_id': 434},
     {'id': 802, 'code': 'merge_xl_recipe', 'name': '是否合包', 'parent_id': 434},
 
 
