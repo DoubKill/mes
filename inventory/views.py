@@ -2614,6 +2614,7 @@ class WmsStorageView(ListAPIView):
         material_nos = self.request.query_params.get('material_nos')
         supplier_name = self.request.query_params.get('supplier_name')
         l_batch_no = self.request.query_params.get('l_batch_no')
+        tunnel = self.request.query_params.get('tunnel')
         # 等于查询
         e_material_no = self.request.query_params.get('e_material_no')
         e_material_name = self.request.query_params.get('e_material_name')
@@ -2651,6 +2652,8 @@ class WmsStorageView(ListAPIView):
             filter_kwargs['in_storage_time__gte'] = st
         if et:
             filter_kwargs['in_storage_time__lte'] = et
+        if tunnel:
+            filter_kwargs['location__startswith'] = 'ZCM-{}'.format(tunnel)
         queryset = WmsInventoryStock.objects.using(self.DATABASE_CONF).filter(**filter_kwargs).order_by('in_storage_time')
         if is_entering:
             if is_entering == 'Y':
@@ -5613,10 +5616,6 @@ class HFStockDetailView(APIView):
             else:
                 extra_where_str += 'where TaskState=4'
         if st:
-            if extra_where_str:
-                extra_where_str += " and TaskStartTime >= '{}'".format(st)
-            else:
-                extra_where_str += "where TaskStartTime >= '{}'".format(st)
             if data_type == '1':  # 入箱托数
                 if extra_where_str:
                     extra_where_str += " and OastInTime >= '{}'".format(st)
@@ -5627,11 +5626,12 @@ class HFStockDetailView(APIView):
                     extra_where_str += " and OastOutTime >= '{}'".format(st)
                 else:
                     extra_where_str += "where OastOutTime >= '{}'".format(st)
-        if et:
-            if extra_where_str:
-                extra_where_str += " and TaskStartTime <= '{}'".format(et)
             else:
-                extra_where_str += "where TaskStartTime <= '{}'".format(et)
+                if extra_where_str:
+                    extra_where_str += " and TaskStartTime >= '{}'".format(st)
+                else:
+                    extra_where_str += "where TaskStartTime >= '{}'".format(st)
+        if et:
             if data_type == '1':  # 入箱托数
                 if extra_where_str:
                     extra_where_str += " and OastInTime <= '{}'".format(et)
@@ -5642,6 +5642,12 @@ class HFStockDetailView(APIView):
                     extra_where_str += " and OastOutTime <= '{}'".format(et)
                 else:
                     extra_where_str += "where OastOutTime <= '{}'".format(et)
+            else:
+                if extra_where_str:
+                    extra_where_str += " and TaskStartTime <= '{}'".format(et)
+                else:
+                    extra_where_str += "where TaskStartTime <= '{}'".format(et)
+
         sql = """select
                 OastNo,
                 TaskState,
