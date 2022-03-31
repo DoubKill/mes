@@ -2202,8 +2202,9 @@ class DailyProductionCompletionReport(APIView):
 
         for key, value in results['name_4'].items():
             if key[0].isdigit():
-                results['name_7'][key] = round(results['name_4'][key] / decimal.Decimal(results['name_6'][key]), 2)
-                results['name_8'][key] = round(results['name_5'][key] / decimal.Decimal(results['name_6'][key]), 2)
+                if results['name_6'].get(key):
+                    results['name_7'][key] = round(results['name_4'][key] / decimal.Decimal(results['name_6'][key]), 2)
+                    results['name_8'][key] = round(results['name_5'][key] / decimal.Decimal(results['name_6'][key]), 2)
         results['name_7']['weight'] = round(results['name_4']['weight'] / decimal.Decimal(results['name_6']['weight']), 2)
         results['name_8']['weight'] = round(results['name_5']['weight'] / decimal.Decimal(results['name_6']['weight']), 2)
         return Response({'results': results.values()})
