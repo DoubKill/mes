@@ -721,7 +721,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         new_record = WeightPackageWms.objects.create(**{'bra_code': scan_bra_code, 'material_name': comm_material[0],
                                                                         'single_weight': single_weight, 'split_num': machine_split_count,
                                                                         'package_count': machine_package_count,
-                                                                        'batch_time': res.get('SM_CREATE'), 'standard_weight_old': record.standard_weight_old,
+                                                                        'batch_time': res.get('SM_CREATE'), 'standard_weight_old': standard_weight,
                                                                         'real_count': machine_package_count, 'now_package': record.now_package})
                         record.now_package = 0
                         record.save()
