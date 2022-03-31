@@ -2212,7 +2212,7 @@ class DailyProductionCompletionReport(APIView):
         results['name_8']['weight'] = round(results['name_5']['weight'] / decimal.Decimal(results['name_6']['weight']), 2)
         return Response({'results': results.values()})
 
-    def post(self):
+    def post(self, request):
         # 190E机台产量录入
         factory_date = self.request.data.get('factory_date', None)
         classes = self.request.data.get('factory_date', None)
