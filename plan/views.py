@@ -872,6 +872,9 @@ class SchedulingResultViewSet(ModelViewSet):
             raise ValidationError('文件格式错误,仅支持 xls、xlsx、xlsm文件')
         try:
             data = xlrd.open_workbook(filename=None, file_contents=excel_file.read())
+        except Exception as e:
+            raise ValidationError('打开文件失败，请用文档另存为xlsx文件后导入！'.format(e))
+        try:
             cur_sheet = data.sheet_by_name(sheet_name='{}.{}'.format(m, d))
         except Exception:
             raise ValidationError('未找到{}.{}日排程结果excel文档！'.format(m, d))
