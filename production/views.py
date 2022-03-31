@@ -2456,7 +2456,7 @@ class SummaryOfWeighingOutput(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class EmployeeAttendanceRecordsView(APIView):
-    permission_classes = (IsAuthenticated,)
+    # permission_classes = (IsAuthenticated,)
 
     def get(self, request):
         date = self.request.query_params.get('date')
@@ -2476,14 +2476,17 @@ class EmployeeAttendanceRecordsView(APIView):
             group_list.append([item['group__global_name'] for item in group])
 
         results = {}
-        data = EmployeeAttendanceRecords.objects.filter(factory_date__year=year, factory_date__month=month, user__username__icontains=name).values(
-            'equip', 'section', 'group', 'factory_date__day', 'user__username')
+        data = EmployeeAttendanceRecords.objects.filter(factory_date__year=year,
+                                                        factory_date__month=month,
+                                                        user__username__icontains=name,
+                                                        actual_time__isnull=False).values(
+            'equip', 'section', 'group', 'factory_date__day', 'user__username', 'actual_time')
         for item in data:
             equip = item['equip']
             section = item['section']
             if not results.get(f'{equip}_{section}'):
                 results[f'{equip}_{section}'] = {'equip': equip, 'section': section}
-            results[f'{equip}_{section}'][f"{item['factory_date__day']}{item['group']}"] = item['user__username']
+            results[f'{equip}_{section}'][f"{item['factory_date__day']}{item['group']}"] = '%s(%.1f)' % (item['user__username'], item['actual_time'])
         res = list(results.values())
         for item in res:
             item['equip'] = '' if not item.get('equip') else item['equip']
@@ -2500,6 +2503,8 @@ class EmployeeAttendanceRecordsView(APIView):
             raise ValidationError('文件不可为空！')
         cur_sheet = get_cur_sheet(excel_file)
         rows = cur_sheet.nrows
+        if cur_sheet.row_values(0)[1] != '日期' or cur_sheet.row_values(1)[1] != '班次' or cur_sheet.row_values(2)[1] != '班别':
+            raise ValidationError("导入的格式有误")
         # 获取班组
         year = int(date.split('-')[0])
         month = int(date.split('-')[1])
@@ -2524,28 +2529,21 @@ class EmployeeAttendanceRecordsView(APIView):
             else:
                 classes_dic[day] = [item['classes__global_name']]
         group_list, classes_list = list(group_dic.values()), list(classes_dic.values())
-        # group = WorkSchedulePlan.objects.filter(start_time__date__gte=this_month_start,
-        #                                         start_time__date__lte=this_month_end).values('group__global_name', 'start_time__date').order_by('start_time')
-
-
-        # group_list = []
-        # for key, group in groupby(list(group), key=lambda x: x['start_time__date']):
-        #     group_list.append([item['group__global_name'] for item in group])
-
+        start_row = 3
         equip_list = []
-        for i in range(4, rows):
-            equip_list.append(cur_sheet.cell(i, 0).value[0:3])
+        for i in range(start_row, rows):
+            equip_list.append(cur_sheet.cell(i, 0).value)
         for i in equip_list:
             index = equip_list.index(i)
             if not equip_list[index]:
                 equip_list[index] = equip_list[index - 1]
+        print(equip_list)
         section_list = []
-        for i in range(4, rows):
+        for i in range(start_row, rows):
             section_list.append(cur_sheet.cell(i, 1).value)
-        start_row = 4
         rows_num = cur_sheet.nrows  # sheet行数
         if rows_num <= start_row:
-            return []
+            return Response({'results': [], 'message': '没有可导入的数据'})
         ret = [None] * (rows_num - start_row)
         for i in range(start_row, rows_num):
             ret[i - start_row] = cur_sheet.row_values(i)[2:]
@@ -2567,18 +2565,24 @@ class EmployeeAttendanceRecordsView(APIView):
                     group = group_list[day - 1][i % 2]
                     classes = classes_list[day - 1][i % 2]
                     equip = equip_list[index]
-                    dic = {'user': user, 'section': section, 'factory_date': date_, 'group': group, 'classes': classes,  'equip': equip, 'work_time': 12, 'actual_time': 12}
-                    dic2 = dic.copy()
-                    dic2.pop('user')
-                    if dic in records:
-                        continue
-                    if EmployeeAttendanceRecords.objects.filter(**dic2).exists():
-                        EmployeeAttendanceRecords.objects.filter(**dic2).update(user=user)
-                        continue
-                    records_obj = EmployeeAttendanceRecords(**dic)
-                    records_lst.append(records_obj)
+                    if equip in ['辅助', '班长']:
+                        equips = [None]
+                    elif ',' in equip:
+                        equips = equip.split(',')
+                    else:
+                        equips = [equip]
+                    for equip in equips:
+                        dic = {'user': user, 'section': section, 'factory_date': date_, 'group': group, 'classes': classes, 'equip': equip, 'work_time': 12, 'actual_time': 12}
+                        dic2 = dic.copy()
+                        dic2.pop('user')
+                        if dic in records:
+                            continue
+                        if EmployeeAttendanceRecords.objects.filter(**dic2).exists():
+                            EmployeeAttendanceRecords.objects.filter(**dic2).update(user=user)
+                            continue
+                        records_obj = EmployeeAttendanceRecords(**dic)
+                        records_lst.append(records_obj)
         EmployeeAttendanceRecords.objects.bulk_create(records_lst)
-        # except: raise ValidationError('')
         return Response(f'导入成功')
 
 
