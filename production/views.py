@@ -2502,6 +2502,8 @@ class EmployeeAttendanceRecordsView(APIView):
             raise ValidationError('文件不可为空！')
         cur_sheet = get_cur_sheet(excel_file)
         rows = cur_sheet.nrows
+        if cur_sheet.row_values(0)[1] != '日期' or cur_sheet.row_values(1)[1] != '班次' or cur_sheet.row_values(2)[1] != '班次':
+            raise ValidationError("导入的格式有误")
         # 获取班组
         year = int(date.split('-')[0])
         month = int(date.split('-')[1])
