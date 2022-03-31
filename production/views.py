@@ -2814,8 +2814,8 @@ class PerformanceSummaryView(APIView):
             'factory_date__month': month,
         }
         if name_d:
-            user = User.objects.filter(username=name_d).first()
-            kwargs['user'] = user
+            # user = User.objects.filter(username=name_d).first()
+            kwargs['user__username__icontains'] = name_d
         if day_d:
             kwargs['factory_date__day'] = day_d
             kwargs2['factory_date__day'] = day_d
