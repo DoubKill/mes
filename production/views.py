@@ -2215,7 +2215,7 @@ class DailyProductionCompletionReport(APIView):
     def post(self, request):
         # 190E机台产量录入
         factory_date = self.request.data.get('factory_date', None)
-        classes = self.request.data.get('factory_date', None)
+        classes = self.request.data.get('classes', None)
         data = self.request.data.get('data', [])
         outer_data = self.request.data.get('outer_data', [])  # 外发无硫料
         if data:
