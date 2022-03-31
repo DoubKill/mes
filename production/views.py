@@ -2214,6 +2214,7 @@ class DailyProductionCompletionReport(APIView):
         factory_date = self.request.data.get('factory_date', None)
         classes = self.request.data.get('classes', None)
         data = self.request.data.get('data', [])
+        date = self.request.data.get('date')
         outer_data = self.request.data.get('outer_data', [])  # 外发无硫料
         if data:
             serializer = Equip190EWeightSerializer(data=data, many=True)
@@ -2226,9 +2227,7 @@ class DailyProductionCompletionReport(APIView):
                               'classes': classes,
                               'qty': item['qty']},
                     factory_date=factory_date, classes=classes, setup=item['setup'])
-            return Response('ok')
-        if outer_data:
-            date = self.request.data.get('date')
+        if date:
             year, month = int(date.split('-')[0]), int(date.split('-')[1])
             OuterMaterial.objects.filter(factory_date__year=year, factory_date__month=month).delete()
             for item in outer_data:
