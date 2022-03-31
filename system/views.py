@@ -304,6 +304,8 @@ class LoginView(ObtainJSONWebToken):
             user = serializer.object.get('user') or request.user
             token = serializer.object.get('token')
             return Response({"permissions": user.permissions_list,
+                             'section': user.section.name if user.section else None,
+                             'id_card_num': user.id_card_num,
                              "username": user.username,
                              'id': user.id,
                              "token": token,
