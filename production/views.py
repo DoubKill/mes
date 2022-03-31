@@ -2160,16 +2160,12 @@ class DailyProductionCompletionReport(APIView):
         out_queryset = OuterMaterial.objects.filter(factory_date__year=year,
                                                     factory_date__month=month).values('factory_date__day', 'weight')
         for item in out_queryset:
+            results['name_3'][f"{item['factory_date__day']}日"] = round(item['weight'], 2)
+            results['name_4'][f"{item['factory_date__day']}日"] = round((item['weight']) * decimal.Decimal(0.7), 2)
+            results['name_5'][f"{item['factory_date__day']}日"] = round(item['weight'], 2)
             results['name_3']['weight'] += round(item['weight'], 2)
             results['name_4']['weight'] += round((item['weight']) * decimal.Decimal(0.7), 2)
             results['name_5']['weight'] += round(item['weight'], 2)
-            results['name_3'][f"{item['factory_date__day']}日"] = round(item['weight'], 2)
-            if results['name_2'].get(f"{item['factory_date__day']}日"):
-                results['name_4'][f"{item['factory_date__day']}日"] += round((item['weight']) * decimal.Decimal(0.7), 2)
-                results['name_5'][f"{item['factory_date__day']}日"] += round(item['weight'], 2)
-            else:
-                results['name_4'][f"{item['factory_date__day']}日"] = round((item['weight']) * decimal.Decimal(0.7), 2)
-                results['name_5'][f"{item['factory_date__day']}日"] = round(item['weight'], 2)
         shot_down_dic = {}
         shot_down = SchedulingEquipShutDownPlan.objects.filter(begin_time__year=year, begin_time__month=month).\
             values('begin_time__day', 'equip_no', 'duration')
