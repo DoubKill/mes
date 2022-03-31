@@ -218,7 +218,7 @@ permission_data = [
     {'id': 183, 'code': 'view_check_unqualified_order', 'name': '查看', 'parent_id': 182},
     {'id': 184, 'code': 'add_check_unqualified_order', 'name': '检查科不合格处理', 'parent_id': 182},
 
-    {'id': 185, 'code': 'location', 'name': '基础信息-库存位管理', 'parent_id': None},
+    {'id': 185, 'code': 'location', 'name': '基础信息-位置点管理', 'parent_id': None},
     {'id': 186, 'code': 'view_location', 'name': '查看', 'parent_id': 185},
     {'id': 187, 'code': 'add_location', 'name': '新增', 'parent_id': 185},
     {'id': 188, 'code': 'change_location', 'name': '修改', 'parent_id': 185},
@@ -309,6 +309,7 @@ permission_data = [
     # {'id': 436, 'code': 'add_xl_recipe', 'name': '新增', 'parent_id': 434},
     # {'id': 437, 'code': 'change_xl_recipe', 'name': '修改', 'parent_id': 434},
     {'id': 438, 'code': 'upload_xl_recipe', 'name': '上传', 'parent_id': 434},
+    {'id': 800, 'code': 'del_xl_recipe', 'name': '删除', 'parent_id': 434},
     {'id': 802, 'code': 'merge_xl_recipe', 'name': '是否合包', 'parent_id': 434},
 
 
@@ -743,15 +744,12 @@ permission_data = [
     {'id': 792, 'code': 'add_return_rubber', 'name': '新建', 'parent_id': 790},
     {'id': 793, 'code': 'print_return_rubber', 'name': '打印', 'parent_id': 790},
 
-    {'id': 794, 'code': 'weighting_package_manual', 'name': '单配(合包)化工流转卡', 'parent_id': None},
+    {'id': 794, 'code': 'weighting_package_manual', 'name': '人工单配卡片打印', 'parent_id': None},
     {'id': 795, 'code': 'view_weighting_package_manual', 'name': '查看', 'parent_id': 794},
-    {'id': 796, 'code': 'add_weighting_package_manual', 'name': '新建', 'parent_id': 794},
-    {'id': 797, 'code': 'print_weighting_package_manual', 'name': '打印', 'parent_id': 794},
-
-    {'id': 798, 'code': 'weighting_package_single', 'name': '单配(配方/通用)化工流转卡', 'parent_id': None},
-    {'id': 799, 'code': 'view_weighting_package_single', 'name': '查看', 'parent_id': 798},
-    {'id': 800, 'code': 'add_weighting_package_single', 'name': '新建', 'parent_id': 798},
-    {'id': 801, 'code': 'print_weighting_package_single', 'name': '打印', 'parent_id': 798},
+    {'id': 796, 'code': 'add_weighting_package_manual', 'name': '细料硫磺单配新建', 'parent_id': 794},
+    {'id': 797, 'code': 'print_weighting_package_manual', 'name': '细料硫磺单配打印', 'parent_id': 794},
+    {'id': 798, 'code': 'add2_weighting_package_manual', 'name': '配方(通用)新建', 'parent_id': 794},
+    {'id': 799, 'code': 'print2_weighting_package_manual', 'name': '配方(通用)打印', 'parent_id': 794},
 
     {'id': 804, 'code': 'durate_putin_reason', 'name': '不合格品原因统计', 'parent_id': None},
     {'id': 805, 'code': 'view_durate_putin_reason', 'name': '查看', 'parent_id': 804},
