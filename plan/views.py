@@ -46,7 +46,7 @@ from plan.serializers import ProductDayPlanSerializer, ProductClassesPlanManyCre
     SchedulingProductDemandedDeclareSummarySerializer, SchedulingProductSafetyParamsSerializer, \
     SchedulingResultSerializer, SchedulingEquipShutDownPlanSerializer, ProductStockDailySummarySerializer
 from plan.utils import calculate_product_plan_trains, extend_last_aps_result, APSLink, \
-    calculate_equip_recipe_avg_mixin_time
+    calculate_equip_recipe_avg_mixin_time, plan_sort
 from production.models import PlanStatus, TrainsFeedbacks, MaterialTankStatus
 from quality.utils import get_cur_sheet, get_sheet_data
 from recipe.models import ProductBatching, ProductBatchingDetail, Material, MaterialAttribute
@@ -842,7 +842,7 @@ class SchedulingResultViewSet(ModelViewSet):
         query_set = SchedulingResult.objects.all()
         if factory_date:
             query_set = query_set.filter(factory_date=factory_date)
-        return Response(sorted(list(set(query_set.values_list('schedule_no', flat=True)))))
+        return Response(sorted(list(set(query_set.values_list('schedule_no', flat=True))), reverse=True))
 
     def list(self, request, *args, **kwargs):
         schedule_no = self.request.query_params.get('schedule_no')
@@ -861,6 +861,8 @@ class SchedulingResultViewSet(ModelViewSet):
     @action(methods=['post'], detail=False)
     def import_xlx(self, request):
         factory_date = self.request.data.get('factory_date')
+        if not factory_date:
+            raise ValidationError('请选择日期！')
         date_splits = factory_date.split('-')
         m = date_splits[1] if not date_splits[1].startswith('0') else date_splits[1].lstrip('0')
         d = date_splits[2]
@@ -901,7 +903,7 @@ class SchedulingResultViewSet(ModelViewSet):
                         time_consume = round(item[j * 4 + 3], 1)
                     except Exception:
                         time_consume = 0
-                    pb = ProductBatching.objects.exclude(used_type__in=[6, 7]).filter(
+                    pb = ProductBatching.objects.using('SFJ').exclude(used_type=6).filter(
                         stage_product_batch_no__icontains='-{}'.format(product_no)).first()
                     if pb:
                         product_no = pb.stage_product_batch_no
@@ -954,12 +956,13 @@ class SchedulingProceduresView(APIView):
                 break
 
         # 继承前一天排程未完成的计划
-        extend_last_aps_result(factory_date, schedule_no)
+        equip_tree_data = extend_last_aps_result(factory_date, schedule_no)
 
-        equip_nos = Equip.objects.filter(category__equip_type__global_name='密炼设备').values_list('equip_no', flat=True).order_by('equip_no')
-        links = [APSLink(equip_no, schedule_no) for equip_no in range(len(equip_nos))]
-        link_dict = {equip_no: links[idx] for idx, equip_no in enumerate(equip_nos)}
+        # equip_nos = Equip.objects.filter(category__equip_type__global_name='密炼设备').values_list('equip_no', flat=True).order_by('equip_no')
+        # links = [APSLink(equip_no, schedule_no) for equip_no in range(len(equip_nos))]
+        # link_dict = {equip_no: links[idx] for idx, equip_no in enumerate(equip_nos)}
 
+        product_demanded_rains = {}
         for dec in SchedulingProductDemandedDeclareSummary.objects.filter(
                 factory_date=factory_date, demanded_weight__gt=0).order_by('available_time'):
             try:
@@ -968,29 +971,45 @@ class SchedulingProceduresView(APIView):
                                                      dec.demanded_weight)
             except Exception as e:
                 raise ValidationError(e)
-            for item in data:
-                instance = link_dict[item['equip_no']]
-                instance.append(item)
-        for i in links:
-            ret = i.travel()
-            for item in ret:
-                # SchedulingRecipeMachineRelationHistory.objects.create(
-                #     schedule_no=schedule_no,
-                #     equip_no=item['equip_no'],
-                #     recipe_name=item['product_no'],
-                #     batching_weight=item['batching_weight'],
-                #     devoted_weight=item['devoted_weight'],
-                #     dev_type=item['dev_type'],
-                # )
-                SchedulingResult.objects.create(
-                    sn=1,
-                    factory_date=factory_date,
-                    schedule_no=schedule_no,
-                    equip_no=item['equip_no'],
-                    recipe_name=item['product_no'],
-                    time_consume=item['consume_time'],
-                    plan_trains=item['plan_trains']
-                )
+            product_demanded_rains[dec.product_no] = data
+        equip_tree = plan_sort(product_demanded_rains, equip_tree_data)
+        for equip, items in equip_tree.items():
+            i = 1
+            for item in items:
+                if not item['plan_trains'] > 0:
+                    continue
+                SchedulingResult.objects.create(factory_date=factory_date,
+                                                schedule_no=schedule_no,
+                                                equip_no=equip,
+                                                sn=i,
+                                                recipe_name=item['recipe_name'],
+                                                time_consume=item['time_consume'],
+                                                plan_trains=item['plan_trains'],
+                                                desc=item.get('desc'))
+                i += 1
+        #     for item in data:
+        #         instance = link_dict[item['equip_no']]
+        #         instance.append(item)
+        # for i in links:
+        #     ret = i.travel()
+        #     for item in ret:
+        #         # SchedulingRecipeMachineRelationHistory.objects.create(
+        #         #     schedule_no=schedule_no,
+        #         #     equip_no=item['equip_no'],
+        #         #     recipe_name=item['product_no'],
+        #         #     batching_weight=item['batching_weight'],
+        #         #     devoted_weight=item['devoted_weight'],
+        #         #     dev_type=item['dev_type'],
+        #         # )
+        #         SchedulingResult.objects.create(
+        #             sn=1,
+        #             factory_date=factory_date,
+        #             schedule_no=schedule_no,
+        #             equip_no=item['equip_no'],
+        #             recipe_name=item['product_no'],
+        #             time_consume=item['consume_time'],
+        #             plan_trains=item['plan_trains']
+        #         )
         return Response('ok')
 
 
