@@ -2222,6 +2222,7 @@ class DailyProductionCompletionReport(APIView):
             serializer = Equip190EWeightSerializer(data=data, many=True)
             serializer.is_valid(raise_exception=True)
             for item in serializer.validated_data:
+                Equip190EWeight.objects.filter(factory_date=factory_date, classes=classes).delete()
                 Equip190EWeight.objects.update_or_create(
                     defaults={'setup': item['setup'],
                               'factory_date': factory_date,
@@ -2230,7 +2231,7 @@ class DailyProductionCompletionReport(APIView):
                     factory_date=factory_date, classes=classes, setup=item['setup'])
             return Response('ok')
         if outer_data:
-            serializer = OuterMaterialSerializer(data=data, many=True)
+            serializer = OuterMaterialSerializer(data=outer_data, many=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
             return Response('ok')
