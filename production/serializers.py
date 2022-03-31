@@ -437,9 +437,9 @@ class SubsidyInfoSerializer(serializers.ModelSerializer):
 
 
 class Equip190EWeightSerializer(serializers.ModelSerializer):
-    specification = serializers.ReadOnlyField(source='setup__specification')
-    state = serializers.ReadOnlyField(source='setup__state')
-    weight = serializers.ReadOnlyField(source='setup__weight')
+    specification = serializers.CharField(source='setup__specification', read_only=True)
+    state = serializers.CharField(source='setup__state', read_only=True)
+    weight = serializers.CharField(source='setup__weight', read_only=True)
 
     class Meta:
         model = Equip190EWeight
