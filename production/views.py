@@ -2365,13 +2365,20 @@ class SummaryOfWeighingOutput(APIView):
         result1 = {}
         group_dic = {}
         users = {}  # {'1-早班'： '张三'}
+        work_times = {}
         user_result = {}
         group = WorkSchedulePlan.objects.filter(start_time__year=year,
                                                 start_time__month=month).values_list('group__global_name', 'classes__global_name', 'start_time__day')
         for item in group:
             group_dic[f'{item[2]}-{item[0]}'] = item[1]
         # 查询称量分类下当前月上班的所有员工
-        user_list = EmployeeAttendanceRecords.objects.filter(factory_date__year=year, factory_date__month=month, equip__in=equip_list).values('user__username', 'factory_date__day', 'group', 'section', 'equip')
+        user_list = EmployeeAttendanceRecords.objects.filter(Q(factory_date__year=year,
+                                                             factory_date__month=month,
+                                                             equip__in=equip_list) &
+                                                             Q(Q(end_date__isnull=False) | ~Q(is_use='废弃'))
+                                                             ).values('user__username', 'factory_date__day', 'group', 'section', 'equip')
+
+        # user_list = EmployeeAttendanceRecords.objects.filter(factory_date__year=year, factory_date__month=month, equip__in=equip_list).values('user__username', 'factory_date__day', 'group', 'section', 'equip')
         # 岗位系数
         section_dic = {}
         section_info = PerformanceJobLadder.objects.filter(delete_flag=False, type__in=['细料称量', '硫磺称量']).values('type', 'name', 'coefficient', 'post_standard', 'post_coefficient')
@@ -2382,8 +2389,10 @@ class SummaryOfWeighingOutput(APIView):
             classes = group_dic.get(f"{item['factory_date__day']}-{item['group']}")
             key = f"{item['factory_date__day']}-{classes}-{item['equip']}"
             if users.get(key):
+                work_times[key][item['user__username']] = item['actual_time']
                 users[key][item['user__username']] = item['section']
             else:
+                work_times[key] = {item['user__username']: item['actual_time']}
                 users[key] = {item['user__username']: item['section']}
 
         # 机台产量统计
@@ -2405,10 +2414,13 @@ class SummaryOfWeighingOutput(APIView):
                 if names:
                     for name, section in names.items():
                         key = f"{name}_{day}_{classes}_{section}"
+                        work_time = work_times.get(f'{day}-{classes}-{equip_no}').get(name)
                         if user_result.get(key):
-                            user_result[key][equip_no] = item['count']
+                            # user_result[key][equip_no] = item['count']
+                            user_result[key][equip_no] = int(item['count'] / 12 * work_time)
                         else:
-                            user_result[key] = {equip_no: item['count']}
+                            # user_result[key] = {equip_no: item['count']}
+                            user_result[key] = {equip_no: int(item['count'] / 12 * work_time)}
             result.append(dic)
         for key, value in user_result.items():  # value {'F03': 109, 'F02': 100,},
             name, day, classes, section = key.split('_')
@@ -2472,7 +2484,11 @@ class EmployeeAttendanceRecordsView(APIView):
             if not results.get(f'{equip}_{section}'):
                 results[f'{equip}_{section}'] = {'equip': equip, 'section': section}
             results[f'{equip}_{section}'][f"{item['factory_date__day']}{item['group']}"] = item['user__username']
-        results_sort = sorted(results.values(), key=lambda x: x['equip'])
+        res = list(results.values())
+        for item in res:
+            item['equip'] = '' if not item.get('equip') else item['equip']
+            item['sort'] = 2 if not item.get('sort') else 1
+        results_sort = sorted(list(results.values()), key=lambda x: (x['sort'], item['equip']))
         return Response({'results': results_sort, 'group_list': group_list})
 
     # 导入出勤记录
@@ -2492,25 +2508,41 @@ class EmployeeAttendanceRecordsView(APIView):
             this_month_end = datetime.datetime(year + 1, 1, 1) - timedelta(days=1)
         else:
             this_month_end = datetime.datetime(year, month + 1, 1) - timedelta(days=1)
+
         group = WorkSchedulePlan.objects.filter(start_time__date__gte=this_month_start,
-                                                start_time__date__lte=this_month_end).values('group__global_name', 'start_time__date').order_by('start_time')
-        group_list = []
-        for key, group in groupby(list(group), key=lambda x: x['start_time__date']):
-            group_list.append([item['group__global_name'] for item in group])
-        if cur_sheet.cell(0, 0).value != '机台/时间':
-            raise ValidationError('导入文件有误')
-        # try:
+                                                start_time__date__lte=this_month_end).values('group__global_name', 'classes__global_name', 'start_time__day').order_by('start_time')
+        group_dic = {}
+        classes_dic = {}
+        for item in group:
+            day = item['start_time__day']
+            if group_dic.get(day):
+                group_dic[day].append(item['group__global_name'])
+            else:
+                group_dic[day] = [item['group__global_name']]
+            if classes_dic.get(day):
+                classes_dic[day].append(item['classes__global_name'])
+            else:
+                classes_dic[day] = [item['classes__global_name']]
+        group_list, classes_list = list(group_dic.values()), list(classes_dic.values())
+        # group = WorkSchedulePlan.objects.filter(start_time__date__gte=this_month_start,
+        #                                         start_time__date__lte=this_month_end).values('group__global_name', 'start_time__date').order_by('start_time')
+
+
+        # group_list = []
+        # for key, group in groupby(list(group), key=lambda x: x['start_time__date']):
+        #     group_list.append([item['group__global_name'] for item in group])
+
         equip_list = []
-        for i in range(2, rows):
+        for i in range(4, rows):
             equip_list.append(cur_sheet.cell(i, 0).value[0:3])
         for i in equip_list:
             index = equip_list.index(i)
             if not equip_list[index]:
                 equip_list[index] = equip_list[index - 1]
         section_list = []
-        for i in range(2, rows):
+        for i in range(4, rows):
             section_list.append(cur_sheet.cell(i, 1).value)
-        start_row = 2
+        start_row = 4
         rows_num = cur_sheet.nrows  # sheet行数
         if rows_num <= start_row:
             return []
@@ -2530,11 +2562,12 @@ class EmployeeAttendanceRecordsView(APIView):
                     date_ = f'{date}-{day}'
                     user = User.objects.filter(username=name).first()
                     if not user:
-                        raise ValidationError('系统中不存在当前用户')
+                        raise ValidationError(f'系统中不存在{name}用户')
                     section = section_list[index]
                     group = group_list[day - 1][i % 2]
+                    classes = classes_list[day - 1][i % 2]
                     equip = equip_list[index]
-                    dic = {'user': user, 'section': section, 'factory_date': date_, 'group': group, 'equip': equip}
+                    dic = {'user': user, 'section': section, 'factory_date': date_, 'group': group, 'classes': classes,  'equip': equip, 'work_time': 12, 'actual_time': 12}
                     dic2 = dic.copy()
                     dic2.pop('user')
                     if dic in records:
@@ -2580,48 +2613,35 @@ class EmployeeAttendanceRecordsExport(ViewSet):
             this_month_end = datetime.datetime(year, month + 1, 1) - timedelta(days=1)
         # 获取班组
         group = WorkSchedulePlan.objects.filter(start_time__date__gte=this_month_start,
-                                                start_time__date__lte=this_month_end).values('group__global_name', 'start_time__date').order_by('start_time')
-        group_list = []
-        for key, group in groupby(list(group), key=lambda x: x['start_time__date']):
-            group_list.append([item['group__global_name'] for item in group])
+                                                start_time__date__lte=this_month_end).values('group__global_name', 'classes__global_name', 'start_time__day').order_by('start_time')
+        group_dic = {}
+        classes_dic = {}
+        for item in group:
+            day = item['start_time__day']
+            if group_dic.get(day):
+                group_dic[day].append(item['group__global_name'])
+            else:
+                group_dic[day] = [item['group__global_name']]
+            if classes_dic.get(day):
+                classes_dic[day].append(item['classes__global_name'])
+            else:
+                classes_dic[day] = [item['classes__global_name']]
+        group_list, classes_list = list(group_dic.values()), list(classes_dic.values())
 
-        # 获取设备对应的机型
-        equip_list = Equip.objects.filter(category__equip_type__global_name__in=['密炼设备', '称量设备']).order_by('equip_no').values('equip_no', 'category__category_name')
-        # dic = {item['equip_no']: item['category__category_name'] for item in equip_list}
-        # 获取设备对应的岗位
-        section_list = PerformanceJobLadder.objects.filter(delete_flag=False).values('type', 'name')
 
         # 添加标题
         # sheet.write_merge(开始行, 结束行, 开始列, 结束列, 'My merge', style)
-        sheet.write_merge(0, 1, 0, 0, '机台/时间', style)
-        sheet.write_merge(0, 1, 1, 1, '岗位', style)
+        sheet.write_merge(0, 2, 0, 0, '机台', style)
+        sheet.write_merge(0, 0, 1, 1, '日期', style)
+        sheet.write_merge(1, 1, 1, 1, '班次', style)
+        sheet.write_merge(2, 2, 1, 1, '班别', style)
         for i in range(len(group_list)):
-            group_list[i][0]
             sheet.write_merge(0, 0, 2 * (i + 1), 2 * (i + 1) + 1, f'{i+1}日', style)
             sheet.write_merge(1, 1, 2 * (i + 1), 2 * (i + 1), group_list[i][0], style)
             sheet.write_merge(1, 1, 2 * (i + 1) + 1, 2 * (i + 1) + 1, group_list[i][1], style)
-        index = 2
-        for i in equip_list:
-            sheet.write_merge(index, index, 0, 0, i['equip_no'], style)
-            for section in section_list:
-                if i['equip_no'].startswith('Z') and section['type'] == '密炼':
-                    sheet.write_merge(index, index, 1, 1, section['name'], style)
-                    index += 1
-                if i['equip_no'].startswith('S') and section['type'] == '硫磺称量':
-                    sheet.write_merge(index, index, 1, 1, section['name'], style)
-                    index += 1
-                if i['equip_no'].startswith('F') and section['type'] == '细料称量':
-                    sheet.write_merge(index, index, 1, 1, section['name'], style)
-                    index += 1
 
-                # 从几个开始 （）
-            # index = (list(equip_list).index(i) + 1) * 4      :  4,  8, 12
-            # sheet.write_merge(index - 2, index - 2, 0, 0, i['equip_no'] + f"({dic.get(i['equip_no'], '')})", style)
-            # sheet.write_merge(index - 2, index - 2, 0, 0, i['equip_no'], style)
-            # sheet.write_merge(index - 2, index - 2, 1, 1, '主投', style)
-            # sheet.write_merge(index - 1, index - 1, 1, 1, '辅投', style)
-            # sheet.write_merge(index, index, 1, 1, '挤出', style)
-            # sheet.write_merge(index + 1, index + 1, 1, 1, '收皮', style)
+            sheet.write_merge(2, 2, 2 * (i + 1), 2 * (i + 1), classes_list[i][0], style)
+            sheet.write_merge(2, 2, 2 * (i + 1) + 1, 2 * (i + 1) + 1, classes_list[i][1], style)
 
         # 写出到IO
         output = BytesIO()
@@ -2634,7 +2654,7 @@ class EmployeeAttendanceRecordsExport(ViewSet):
 
 @method_decorator([api_recorder], name="dispatch")
 class PerformanceJobLadderViewSet(ModelViewSet):
-    queryset = PerformanceJobLadder.objects.filter(delete_flag=False)
+    queryset = PerformanceJobLadder.objects.filter(delete_flag=False).order_by('code')
     serializer_class = PerformanceJobLadderSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -2649,7 +2669,7 @@ class PerformanceUnitPriceView(APIView):
         results = {}
         state_lst = GlobalCode.objects.filter(global_type__type_name='胶料段次').values('global_name')
         # category_lst = EquipCategoryAttribute.objects.filter(delete_flag=False).values('category_no')
-        category_lst = ['E580', 'F370', 'GK320', 'GK255', 'GK400']
+        category_lst = ['E580', 'F370', 'GK320', 'GK255', 'GK400', 'fz']
 
         for state in state_lst:
             state = state['global_name']
@@ -2668,20 +2688,16 @@ class PerformanceUnitPriceView(APIView):
     @atomic
     def post(self, request):
         data = self.request.data  # list
-        unit_list = []
-        category_lst = ['E580', 'F370', 'GK320', 'GK255', 'GK400']
-        obj = PerformanceUnitPrice.objects
+        category_lst = ['E580', 'F370', 'GK320', 'GK255', 'GK400', 'fz']
         for item in data:
             for category in category_lst:
-                pt = item.get(f"{category}_pt", None)
-                dj = item.get(f"{category}_dj", None)
-                if pt or dj:
-                    if obj.filter(state=item['state'], equip_type=category):
-                        obj.filter(state=item['state'], equip_type=category).update(
-                            pt=item[f"{category}_pt"], dj=item[f"{category}_dj"])
-                    unit_list.append(PerformanceUnitPrice(
-                        state=item['state'], equip_type=category, pt=item[f"{category}_pt"], dj=item[f"{category}_dj"]))
-        obj.bulk_create(unit_list)
+                pt = item[f"{category}_pt"]
+                dj = item[f"{category}_dj"]
+                PerformanceUnitPrice.objects.update_or_create(defaults={'state': item['state'],
+                                                                        'equip_type': category,
+                                                                        'pt': pt,
+                                                                        'dj': dj}, state=item['state'], equip_type=category)
+
         return Response('添加成功')
 
 
@@ -2713,6 +2729,35 @@ class SetThePriceViewSet(ModelViewSet):
 class PerformanceSummaryView(APIView):
     permission_classes = (IsAuthenticated,)
 
+    def get_equip_max_value(self):
+        max_value = {}
+        now_date = datetime.date.today() - datetime.timedelta(days=1)
+        equip_value_cache = EquipMaxValueCache.objects.all()
+        if equip_value_cache.exists():
+            date = equip_value_cache.last().date_time
+            query = equip_value_cache.values('equip_no', 'value')
+            for item in query:
+                max_value[item['equip_no']] = item['value']
+            equip_max_value = TrainsFeedbacks.objects.filter(factory_date__gte=date, factory_date__lte=now_date
+                                                             ).values('equip_no', 'factory_date', 'classes').annotate(
+                qty=Count('id')).order_by('-qty')
+        else:
+            equip_max_value = TrainsFeedbacks.objects.values('equip_no', 'factory_date', 'classes').annotate(
+                qty=Count('id')).order_by('-qty')
+
+        for item in equip_max_value:
+            if not max_value.get(f"{item['equip_no']}"):
+                max_value[item['equip_no']] = item['qty']
+            else:
+                if max_value[item['equip_no']] < item['qty']:
+                    max_value[item['equip_no']] = item['qty']
+        for key, value in max_value.items():
+            EquipMaxValueCache.objects.update_or_create(defaults={'equip_no': key,
+                                                                  'value': value,
+                                                                  'date_time': now_date
+                                                                  }, equip_no=key)
+        return max_value
+
     def get(self, request):
         date = self.request.query_params.get('date')
         name_d = self.request.query_params.get('name_d')
@@ -2732,78 +2777,109 @@ class PerformanceSummaryView(APIView):
             raise ValidationError('请先去添加独立上岗或超产奖励系数')
         # 员工考勤记录 (考勤记录)
         section_list = PerformanceJobLadder.objects.filter(delete_flag=False, type='密炼').values_list('name', flat=True)
-        user_query = EmployeeAttendanceRecords.objects.filter(factory_date__year=year, factory_date__month=month, section__in=section_list)
-        queryset = user_query.values_list('user__username', 'section', 'factory_date__day', 'group', 'equip')
+        kwargs = {
+            'factory_date__year': year,
+            'factory_date__month': month,
+            'section__in': section_list
+        }
+        kwargs2 = {
+            'factory_date__year': year,
+            'factory_date__month': month,
+        }
+        if name_d:
+            user = User.objects.filter(username=name_d).first()
+            kwargs['user'] = user
+        if day_d:
+            kwargs['factory_date__day'] = day_d
+            kwargs2['factory_date__day'] = day_d
+        user_query = EmployeeAttendanceRecords.objects.filter(Q(**kwargs) &
+                                                             Q(Q(end_date__isnull=False) | ~Q(is_use='废弃'))
+                                                             )
+        queryset = user_query.values_list('user__username', 'section', 'factory_date__day', 'group', 'equip', 'actual_time', 'classes')
         user_dic = {}
+        equip_shut_down_dic = {}
+        equip_shut_down = SchedulingEquipShutDownPlan.objects.filter(begin_time__year=year, begin_time__month=month).values(
+            'begin_time__day', 'equip_no')
+        for item in equip_shut_down:
+            if equip_shut_down_dic.get(item['begin_time__day']):
+                equip_shut_down_dic[item['begin_time__day']].append(item['equip_no'])
+            else:
+                equip_shut_down_dic[item['begin_time__day']] = [item['equip_no']]
         for item in queryset:
-            key = f"{item[2]}_{item[3]}_{item[1]}_{item[4]}"
-            user_dic[key] = {'name': item[0], 'section': item[1], 'day': item[2], 'group': item[3], 'equip': item[4]}
-
-        # user_dic 中添加classes属性
+            if not item[4]:  # 机台为空，按照15个机台的平均值计算， 去除故障停机的机台
+                e_list = Equip.objects.filter(category__equip_type__global_name='密炼设备').values_list('equip_no', flat=True)
+                move_equip = equip_shut_down_dic.get(int(item[2]), [])
+                if move_equip and len(e_list) > len(move_equip):
+                    e_list = list(set(e_list).difference(set(move_equip)))
+            else:
+                e_list = [item[4]]
+            for equip in e_list:
+                key = f"{item[2]}_{item[3]}_{item[1]}_{equip}_{item[6]}"  # 1_A班_挤出_Z01_早班
+                user_dic[key] = {'name': item[0], 'section': item[1], 'day': item[2], 'group': item[3], 'equip': equip, 'actual_time': item[5], 'classes': item[6]}
         group = WorkSchedulePlan.objects.filter(start_time__year=year,
-                                                start_time__month=month).values_list('group__global_name', 'classes__global_name', 'start_time__day')
+                                                start_time__month=month).values_list('group__global_name', 'classes__global_name', 'start_time__day').order_by('start_time')
         group_list = []
         for key, g in groupby(list(group), key=lambda x: x[2]):
             group_list.append([item[0] for item in g])
 
-        for key in list(user_dic.keys()):
-            for item in list(group):
-                if str(item[2]) == key.split('_')[0] and item[0] == key.split('_')[1]:
-                    user_dic[f"{key}_{item[1]}"] = user_dic[key]
-                    user_dic[f"{key}_{item[1]}"]['classes'] = item[1]
-                    user_dic.pop(key, None)
-
-        # user_dic  {1_a班_投料_Z02_早班：{'name: '张三', 'section': '挤出', 'equip_no': Z01, 'classes': '早班'}}
-
         # 密炼的产量
-        product_qty = TrainsFeedbacks.objects.values('classes', 'equip_no', 'factory_date__day', 'product_no').\
+        product_qty = TrainsFeedbacks.objects.filter(**kwargs2
+                                                     ).values('classes', 'equip_no', 'factory_date__day', 'product_no').\
             annotate(qty=Count('id')).values('qty', 'classes', 'equip_no', 'factory_date__day', 'product_no')
-        for item in product_qty:
-            equip_no = item['equip_no']
-            equip_type = Equip.objects.filter(equip_no=equip_no).values('category__category_no')[0]['category__category_no']
-            try:
-                state = item['product_no'].split('-')[1]
-                if state in ['XCJ', 'DJXCJ']:
-                    if item['product_no'].split('-')[0] == 'FM':
-                        state = 'RFM'
-                    elif item['product_no'].split('-')[0] == 'WL':
-                        state = 'RMB'
+        price_dic = {}
+        price_list = PerformanceUnitPrice.objects.values('equip_type', 'state', 'pt', 'dj')
+        for item in price_list:
+            price_dic[f"{item['equip_type']}_{item['state']}"] = {'pt': item['pt'], 'dj': item['dj']}
+        equip_dic = {}
+        equip_list = Equip.objects.filter(category__equip_type__global_name='密炼设备').values('category__category_no', 'equip_no')
+        for item in equip_list:
+            equip_dic[item['equip_no']] = item['category__category_no']
+        dj_list = ProductInfoDingJi.objects.filter(is_use=True).values_list('product_name', flat=True)
+        for key in user_dic.keys():
+            day, group, section, equip, classes = key.split('_')
+            for item in product_qty:
+                if item['equip_no'] == equip and str(item['factory_date__day']) == day and classes == item['classes']:
+                    equip_type = equip_dic.get(equip)
+                    try:
+                        state = item['product_no'].split('-')[1]
+                        if state in ['XCJ', 'DJXCJ']:
+                            if item['product_no'].split('-')[0] == 'FM':
+                                state = 'RFM'
+                            elif item['product_no'].split('-')[0] == 'WL':
+                                state = 'RMB'
+                            else: continue
+                    except: continue
+                    if not price_dic.get(f"{equip_type}_{state}"):
+                        PerformanceUnitPrice.objects.create(state=state, equip_type=equip_type, dj=1.2, pt=1.1)
+                        price_dic[f"{equip_type}_{state}"] = {'pt': 1.2, 'dj': 1.1}
+                    # 判断是否是丁基胶
+                    if item['product_no'] in dj_list:
+                        # 根据工作时长求机台的产量
+                        work_time = user_dic[key]['actual_time']
+                        if '叉车' in section:
+                            unit = price_dic.get(f"fz_{state}").get('dj')
+                        else:
+                            unit = price_dic.get(f"{equip_type}_{state}").get('dj')
+                        user_dic[key][f"{state}_dj_qty"] = user_dic[key].get(f"{state}_dj_qty", 0) + int(
+                            item['qty'] / 12 * work_time)
+                        user_dic[key][f"{state}_dj_unit"] = unit
                     else:
-                        continue
-            except:
-                continue
-            price_obj = PerformanceUnitPrice.objects.filter(equip_type=equip_type, state=state).first()
-            if not price_obj:
-                PerformanceUnitPrice.objects.create(state=state, equip_type=equip_type, dj=1.2, pt=1.1)
-            # 判断是否是丁基胶
-            if ProductInfoDingJi.objects.filter(is_use=True, product_no=item['product_no']).exists():
-                for key in user_dic.keys():
-                    if key.split('_')[0] == str(item['factory_date__day']) and key.split('_')[4] == item['classes']:
-                        user_dic[key][f"{state}_dj_qty"] = user_dic[key].get(f"{state}_dj_qty", 0) + item['qty']
-                        user_dic[key][f"{state}_dj_unit"] = price_obj.pt
-            else:
-                for key in user_dic.keys():
-                    if key.split('_')[0] == str(item['factory_date__day']) and key.split('_')[4] == item['classes']:
-                        user_dic[key][f"{state}_pt_qty"] = user_dic[key].get(f"{state}_pt_qty", 0) + item['qty']
-                        user_dic[key][f"{state}_pt_unit"] = price_obj.dj
-        results = {}
+                        work_time = user_dic[key]['actual_time']
+                        if '叉车' in section:
+                            unit = price_dic.get(f"fz_{state}").get('dj')
+                        else:
+                            unit = price_dic.get(f"{equip_type}_{state}").get('dj')
+                        user_dic[key][f"{state}_pt_qty"] = user_dic[key].get(f"{state}_pt_qty", 0) + int(
+                            item['qty'] / 12 * work_time)
+                        user_dic[key][f"{state}_pt_unit"] = unit
         results1 = {}
-        results2 = {}
-        results3 = {}
-        results4 = {}
         # 是否独立上岗
         independent = {}
         independent_lst = IndependentPostTemplate.objects.filter(date_time=date).values_list('name', 'status')
         for item in independent_lst:
             independent[item[0]] = item[1]
-
         # 取机台历史最大值
-        max_value = {}
-        equip_max_value = TrainsFeedbacks.objects.values('equip_no', 'factory_date').annotate(
-            qty=Count('id')).order_by('-qty')
-        for item in equip_max_value:
-            if not max_value.get(f"{item['equip_no']}"):
-                max_value[f"{item['equip_no']}"] = item['qty']
+        max_value = self.get_equip_max_value()
         # 取每个机台设定的目标值
         settings_value = MachineTargetYieldSettings.objects.filter(input_datetime__year=year,
                                                                    input_datetime__month=month).last()
@@ -2811,12 +2887,11 @@ class PerformanceSummaryView(APIView):
             settings_value = MachineTargetYieldSettings.objects.last()
         # 计算薪资
         section_info = {}
-        for item in PerformanceJobLadder.objects.values('name', 'coefficient', 'post_standard', 'post_coefficient', 'type'):
+        for item in PerformanceJobLadder.objects.filter(type='密炼').values('name', 'coefficient', 'post_standard', 'post_coefficient', 'type'):
             section_info[item['name']] = {'coefficient': item['coefficient'],
                                           'post_standard': item['post_standard'],
                                           'post_coefficient': item['post_coefficient'],
                                           'type': item['type']}
-
         for k, v in user_dic.items():
             name, day, group, section = v['name'], v['day'], v['group'], v['section']
             key = f"{name}_{day}_{group}_{section}"  # 合并岗位
@@ -2824,179 +2899,196 @@ class PerformanceSummaryView(APIView):
                 results1[key].append(v)
             else:
                 results1[key] = [v]
-
-        if day_d and group_d:  # 计算详情
+        # 绩效详情
+        if day_d and group_d:
             start_with = f"{name_d}_{day_d}_{group_d}"
             results1 = {k: v for k, v in results1.items() if k.startswith(start_with)}
-
-        for k, v in results1.items():
-            section, name, day, group = k.split('_')[-1], k.split('_')[0], k.split('_')[1], k.split('_')[2]
+            section = EmployeeAttendanceRecords.objects.filter(user__username=name_d).first().section
             coefficient = section_info[section]['coefficient'] / 100
             post_coefficient = section_info[section]['post_coefficient'] / 100
             post_standard = section_info[section]['post_standard']  # 1最大值 2 平均值
-            if len(v) > 1:
-                dic = results1[k][0]
-                dic['price'] = 0
-                for item in v[1:]:
-                    if post_standard == 1:  # 最大值
-                        for key in item.keys():
-                            if key.split('_')[0] in state_list:
-                                if dic.get(key) and dic.get(key) < item[key]:
-                                    dic[key] = item[key]
-                    else:  # 平均值
-                        for key in item.keys():
-                            if dic.get(key) and key.split('_')[0] in state_list:
-                                dic[key] += item[key]
-                            else:
-                                dic[key] = item[key]
-                if post_standard == 2:
-                    for key in dic.keys():
-                        if key.split('_')[0] in state_list:
-                            dic[key] = dic[key] / len(v)
-                results1[k] = dic
-            else:
-                results1[k] = results1[k][0]
-                results1[k]['price'] = 0
-            # 计算价格
-            for key in list(results1[k].keys()):
-                key_qty = key.split('_')[-1]
-                if key_qty == 'qty':
-                    key_state = key.split('_')[0]  # 1MB
-                    if not results1[k].get(key_state):  # 计算state价格
-                        results1[k][key_state] = 0
-                    key_unit = '_'.join(key.split('_')[0:-1]) + '_unit'
-                    price = round(results1[k][key] * results1[k][key_unit] * coefficient * post_coefficient, 2)
-                    results1[k][key_state] += price
-                    results1[k]['price'] += price
-
-                    # 添加到results2
-                    k1 = f"{name}_{day}_{group}"
-                    if results2.get(k1):
-                        results2[k1][key_state] = results2[k1].get(key_state, 0) + results1[k][key_state]
-                        results2[k1]['price'] += price
-                    else:
-                        results2[k1] = {key_state: results1[k][key_state], 'price': price}
-
-                    # 计算机台的产量
-                    equip_no = results1[k]['equip']
-                    day = results1[k]['day']
-                    if results3.get(f'{name}_{day}'):
-                        results3[f'{name}_{day}'][equip_no] = results3[f'{name}_{day}'].get(equip_no, 0) + results1[k][key]
-                    else:
-                        results3[f'{name}_{day}'] = {equip_no: results1[k][key]}
-
-        # 详情页面
-        if day_d and group_d:
-            detail = {}
-            hj = {'name': '产量工资合计'}
-            # 添加定岗系数
-            a = float(coefficient_dic.get('是'))
-            if independent.get(name_d, 1) == False:  # 非定岗
-                a = float(coefficient_dic.get('否'))
-            all_price = results2.get(f"{name}_{day_d}_{group_d}")
-            for k, v in all_price.items():
-                hj[k] = round(v * a, 2)
-            for dic in results1.values():
-                equip = dic['equip']
-                section = dic['section']
-                for k, v in dic.items():
+            ccjl_dic = {}
+            results = {}
+            results_sort = {}
+            equip_qty = {}
+            equip_price = {}
+            hj = {'name': '产量工资合计', 'price': 0}
+            for item in list(results1.values())[0]:
+                section, name, day, group, equip = item.get('section'), item.get('name'), item.get('day'), item.get( 'group'), item.get('equip')
+                for k in item.keys():
                     if k.split('_')[-1] == 'qty':
                         state = k.split('_')[0]  # 1MB
-                        type = '普通' if k.split('_')[1] == 'pt' else '丁基'
-                        key = f"{equip}{type}-车数"
-                        key_unit = '_'.join(k.split('_')[0:-1]) + '_unit'
-                        if detail.get(key):
-                            detail[f"{equip}{type}-车数"][state] = v
-                            detail[f"{equip}{type}-单价"][state] = dic[key_unit]
-                            detail[f"{equip}{type}-岗位"][state] = section
+                        type1 = k.split('_')[1]
+                        qty = item.get(f"{state}_{type1}_qty")  # 数量
+                        unit = item.get(f"{state}_{type1}_unit")  # 单价
+                        equip_qty[equip] = equip_qty.get(equip, 0) + qty
+                        equip_price[equip] = equip_price.get(equip, 0) + round(qty * unit, 2)
+                        hj[state] = round(hj.get(state, 0) + qty * unit, 2)
+                        hj['price'] += round(qty * unit, 2)
+                        type2 = '普通' if type1 == 'pt' else '丁基'
+                        if results.get(f"{equip}_{type2}_1"):  # Z01_普通_1
+                            results[f"{equip}_{type2}_1"].update(state=item[k])
+                            results[f"{equip}_{type2}_2"].update(state=item[f"{state}_{type1}_unit"])
+                            results[f"{equip}_{type2}_3"].update(state=section)
                         else:
-                            detail.update({
-                                f"{equip}{type}-车数": {'name': f"{equip}{type}-车数", state: v},
-                                f"{equip}{type}-单价": {'name': f"{equip}{type}-单价", state: dic[key_unit]},
-                                f"{equip}{type}-岗位": {'name': f"{equip}{type}-岗位", state: section}}
-                            )
-            # 计算超产奖励
-            res = {'超产奖励': 0}
-            ccjl = results3.get(f'{name}_{day_d}')  # {'Z01': 21, 'Z02': 20, 'F01': 10}
-            equip_count = len(ccjl)
-            for equip, count in ccjl.items():
-                price = 0
-                if max_value.get(equip) and settings_value.__dict__.get(
-                        equip):  # 超产奖励 = (机台最大值-机台目标值)*5 + (实际产量-机台最大值)*15
-                    m = max_value.get(equip)
-                    s = settings_value.__dict__.get(equip)
-                    if count < s:
-                        price = 0
-                    elif count > m:
-                        price = (m - s) * float(coefficient1_dic.get('超过目标产量部分')) + (count - m) * float(coefficient1_dic.get('超过最高值部分'))
-                    elif count < m and count > s:
-                        price = (count - s) * float(coefficient1_dic.get('超过目标产量部分'))
-                res['超产奖励'] += price
-            res['超产奖励'] = round(res.get('超产奖励', 0) / equip_count, 2)
-            return Response({'results': detail.values(), 'hj': hj, 'all_price': round(all_price['price'] * a, 2), '超产奖励': res['超产奖励'], 'group_list': group_list})
-
-        for key in list(results2.keys()):
-            name = key.split('_')[0]
-            day = key.split('_')[1]
-            group = key.split('_')[2]
-            # 添加定岗系数
+                            results[f"{equip}_{type2}_1"] = {'name': f"{equip}{type2}-车数", state: item[k]}
+                            results[f"{equip}_{type2}_2"] = {'name': f"{equip}{type2}-单价",
+                                                             state: item[f"{state}_{type1}_unit"]}
+                            results[f"{equip}_{type2}_3"] = {'name': f"{equip}{type2}-岗位", state: section}
+            for i in sorted(results):
+                results_sort[i] = results.pop(i)
             a = float(coefficient_dic.get('是'))
-            if independent.get(name, 1) == False:
+            if independent.get(name_d, 1) == False:
                 a = float(coefficient_dic.get('否'))
-            price = round(results2[key]['price'] * a, 2)
-            if results.get(name):
-                results[name][f"{day}_{group}"] = price
-                results[name]['hj'] += price
-            else:
-                results[name] = {'name': name, f"{day}_{group}": price, 'hj': price}
-            results[name]['hj'] = round(results[name]['hj'], 2)
-        # 统计其他补贴
-        query = SubsidyInfo.objects.filter(date__year=year, date__month=month).values('name', 'type').annotate(
-            sum=Sum('price'))
-        for item in query:
-            if results.get(item['name']):
-                if item['type'] == 1:
-                    results[item['name']]['其他奖惩'] = item['sum']
-                else:
-                    results[item['name']]['生产补贴'] = item['sum']
-                results[item['name']]['all'] = results[item['name']].get('all', 0) + round(item['sum'], 2)
-
-        # 计算超产奖励
-        for k, v in results3.items():
-            name = k.split('_')[0]
-            day = k.split('_')[1]
-            equip_count = len(v)
-            for equip, count in v.items():  # {'Z01': 21, 'Z02': 20, 'F01': 10}
+            # 计算超产奖励
+            equip_qty.get(equip)  # 超产奖励
+            for equip, qty in equip_qty.items():
                 price = 0
-                if max_value.get(equip) and settings_value.__dict__.get(equip):  # 超产奖励 = (机台最大值-机台目标值)*5 + (实际产量-机台最大值)*15
+                if max_value.get(equip) and settings_value.__dict__.get(equip):
                     m = max_value.get(equip)
                     s = settings_value.__dict__.get(equip)
-                    if count < s:
+                    if qty < s:
                         price = 0
-                    elif count > m:
-                        price = (m - s) * float(coefficient1_dic.get('超过目标产量部分')) + (count - m) * float(coefficient1_dic.get('超过最高值部分'))
-                    elif count < m and count > s:
-                        price = (count - s) * float(coefficient1_dic.get('超过目标产量部分'))
-                results[name]['超产奖励'] = results[name].get('超产奖励', 0) + price
-                date = f"{year}-{month}-{day}"
-                if results4.get(name):
-                    results4[name][date] = results4[name].get(date, 0) + price
-                else:
-                    results4[name] = {date: price}
-            results4[name][date] = round(results4[name][date] / equip_count, 2)
-            results[name]['超产奖励'] = round(results[name]['超产奖励'] / equip_count, 2)
+                    elif qty > m:
+                        price = (m - s) * float(coefficient1_dic.get('超过目标产量部分')) + (qty - m) * float(
+                            coefficient1_dic.get('超过最高值部分'))
+                    elif qty < m and qty > s:
+                        price = (qty - s) * float(coefficient1_dic.get('超过目标产量部分'))
+                    ccjl_dic[equip] = price
+            post_coefficient = post_coefficient if len(list(results1.values())[0]) > 1 else 1
+            if post_standard == 1:  # 最大值
+                hj['ccjl'] = round(max(ccjl_dic.values()), 2)
+                hj['price'] = round(int(max(equip_price.values())) * post_coefficient * coefficient * a, 2)
+            else:
+                hj['ccjl'] = round(sum(ccjl_dic.values()) / (len(results_sort) // 3), 2)
+                hj['price'] = round(hj['price'] / (len(results_sort) // 3) * post_coefficient * coefficient * a, 2)
+            return Response({'results': results_sort.values(), 'hj': hj, 'all_price': hj['price'], '超产奖励': hj['ccjl'], 'group_list': group_list})
 
-        for name, dic in results.items():
-            results[name]['是否定岗'] = independent.get(name, None)
-            results[name]['all'] = round(results[name].get('all', 0) + results[name]['hj'] + results[name]['超产奖励'], 2)
+        results = {}
+        ccjl_dic = {}
+        equip_qty = {}
+        equip_price = {}
+        for item in list(results1.values()):
+            if len(item) > 1:
+                section, name = item[0].get('section'), item[0].get('name')
+                a = float(coefficient_dic.get('是'))
+                aa = '是'
+                if independent.get(name, 1) == False:
+                    a = float(coefficient_dic.get('否'))
+                    aa = '否'
+                coefficient = section_info[section]['coefficient'] / 100
+                post_coefficient = section_info[section]['post_coefficient'] / 100
+                post_standard = section_info[section]['post_standard']  # 1最大值 2 平均值
+                for dic in item:
+                    section, name, day, group, equip = dic.get('section'), dic.get('name'), dic.get('day'), dic.get(
+                        'group'), dic.get('equip')
+                    for k in dic.keys():
+                        if k.split('_')[-1] == 'qty':
+                            state = k.split('_')[0]
+                            type1 = k.split('_')[1]
+                            qty = dic.get(f"{state}_{type1}_qty")  # 数量
+                            unit = dic.get(f"{state}_{type1}_unit")  # 单价
+                            # 统计车数
+                            key = f"{name}_{day}"
+                            if equip_qty.get(key):
+                                equip_qty[key][equip] = equip_qty[key].get(equip, 0) + qty
+                            else:
+                                equip_qty[key] = {equip: qty}
+                            if equip_price.get(key):
+                                equip_price[key][equip] = equip_price[key].get(equip, 0) + qty * unit
+                            else:
+                                equip_price[key] = {equip: qty * unit}
+                # 计算薪资
+                if not equip_price.get(f"{name}_{day}"):
+                    price = 0
+                else:
+                    if post_standard == 1:  # 最大值
+                        price = max(equip_price.get(f"{name}_{day}").values())
+                    else:  # 平均值
+                        price = round(
+                            sum(equip_price.get(f"{name}_{day}").values()) / len(equip_price.get(f"{name}_{day}")), 2)
+                    price = round(price * coefficient * a * post_coefficient, 2)
+                if results.get(name):
+                    results[name][f"{day}_{group}"] = results[name].get(f"{day}_{group}", 0) + price
+                    results[name]['hj'] += price
+                    results[name]['all'] += price
+                else:
+                    results[name] = {'name': name, '超产奖励': 0, '是否定岗': aa, 'hj': price, 'all': price,
+                                     f"{day}_{group}": price}
+            else:
+                dic = item[0]
+                section, name, day, group, equip = dic.get('section'), dic.get('name'), dic.get('day'), dic.get(
+                    'group'), dic.get('equip')
+                coefficient = section_info[section]['coefficient'] / 100
+                post_coefficient = 1
+                a = float(coefficient_dic.get('是'))
+                aa = '是'
+                if independent.get(name, 1) == False:
+                    a = float(coefficient_dic.get('否'))
+                    aa = '否'
+                for k in dic.keys():
+                    if k.split('_')[-1] == 'qty':
+                        state = k.split('_')[0]
+                        type1 = k.split('_')[1]
+                        qty = dic.get(f"{state}_{type1}_qty")  # 数量
+                        unit = dic.get(f"{state}_{type1}_unit")  # 单价
+                        # 统计车数
+                        key = f"{name}_{day}"
+                        if equip_qty.get(key):
+                            equip_qty[key][equip] = equip_qty[key].get(equip, 0) + qty
+                        else:
+                            equip_qty[key] = {equip: qty}
+                        if equip_price.get(key):
+                            equip_price[key][equip] = equip_price[key].get(equip, 0) + qty * unit
+                        else:
+                            equip_price[key] = {equip: qty * unit}
+                # 计算薪资
+                if equip_price.get(f"{name}_{day}"):
+                    price = max(equip_price.get(f"{name}_{day}").values())
+                    price = round(price * coefficient * a * post_coefficient, 2)
+                else:
+                    price = 0
+                if results.get(name):
+                    results[name][f"{day}_{group}"] = round(results[name].get(f"{day}_{group}", 0) + price, 2)
+                    results[name]['hj'] = round(results[name]['hj'] + price, 2)
+                    results[name]['all'] = round(results[name]['all'] + price, 2)
+                else:
+                    results[name] = {'name': name, '超产奖励': 0, '是否定岗': aa, 'hj': price, 'all': price,
+                                     f"{day}_{group}": price}
+        # 计算超产奖励
+        for key, dic in equip_qty.items():
+            price = 0
+            name, day = key.split('_')
+            post_standard = section_info[section]['post_standard']
+            p_dic = {}
+            for equip, qty in dic.items():
+                if max_value.get(equip) and settings_value.__dict__.get(equip):
+                    m = max_value.get(equip)
+                    s = settings_value.__dict__.get(equip)
+                    if qty < s:
+                        price = 0
+                    elif qty > m:
+                        price = (m - s) * float(coefficient1_dic.get('超过目标产量部分')) + (qty - m) * float(
+                            coefficient1_dic.get('超过最高值部分'))
+                    elif qty < m and qty > s:
+                        price = (qty - s) * float(coefficient1_dic.get('超过目标产量部分'))
+                    p_dic[equip] = price
+            if len(dic.values()) > 1:
+                if post_standard == 1:
+                    p = max(p_dic.values())
+                else:
+                    p = round(sum(p_dic.values()) / len(dic.values()), 2)
+            else:
+                p = max(p_dic.values())
+            results[name]['超产奖励'] += p
+            results[name]['all'] = round(results[name]['all'] + p, 2)
+            if p > 0:
+                if ccjl_dic.get(name):
+                    ccjl_dic[name].append({'date': f"{year}-{month}-{day}", 'price': p})
+                else:
+                    ccjl_dic[name] = [{'date': f"{year}-{month}-{day}", 'price': p}]
         if ccjl:  # 超产奖励详情
-            if results4.get(name_d):
-                data = results4.get(name_d)
-                res = [{'date': k, 'price': v} for k, v in data.items() if data[k]]
-                return Response({'results': sorted(res, key=lambda x: x['date'])})
-            return Response({'results': None})
-        if name_d:  # 名字过滤
-            return Response({'results': [results.get(key) for key in results.keys() if key.startswith(name_d)], 'group_list': group_list})
+            return Response({'results': ccjl_dic.get(name_d, None)})
         return Response({'results': results.values(), 'group_list': group_list})
 
 
