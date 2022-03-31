@@ -2249,7 +2249,7 @@ class Equip190EViewSet(ModelViewSet):
         if self.request.query_params.get('detail'):
             factory_date = self.request.query_params.get('factory_date')
             classes = self.request.query_params.get('classes')
-            instance = Equip190EWeight.objects.filter(factory_date=factory_date, classes=factory_date)
+            instance = Equip190EWeight.objects.filter(factory_date=factory_date, classes=classes)
             serializer = Equip190EWeightSerializer(instance=instance)
             return Response({'results': serializer.data})
         return super().list(request, *args, **kwargs)
