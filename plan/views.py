@@ -775,7 +775,7 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
                                   'product_no': product_no,
                                   'plan_weight': item[2] if item[2] else 0,
                                   'workshop_weight': round(item[11], 1) if item[11] else 0,
-                                  'current_stock': round(item[13], 1) if item[13] else 0,
+                                  'current_stock': round(item[12], 1) if item[12] else 0,
                                   'desc': '',
                                   # 'target_stock': float(item[1]) * 1.5,
                                   # 'demanded_weight': float(item[1]) * 1.5 - float(item[2]) - float(item[3])
@@ -905,7 +905,7 @@ class SchedulingResultViewSet(ModelViewSet):
                     ret.append(SchedulingResult(**{'factory_date': factory_date,
                                                     'schedule_no': schedule_no,
                                                     'equip_no': equip_no,
-                                                    'sn': + 1,
+                                                    'sn': i + 1,
                                                     'recipe_name': product_no,
                                                     'plan_trains': plan_trains,
                                                     'time_consume': time_consume,
@@ -1091,8 +1091,7 @@ class SchedulingMaterialDemanded(APIView):
             ).values_list('equip_no', flat=True).order_by('equip_no'):
                 scheduling_plans = SchedulingResult.objects.filter(schedule_no=last_aps_result.schedule_no,
                                                                    equip_no=equip_no).order_by('sn')
-                plan_start_time = datetime.datetime.strptime(datetime.datetime.now().strftime('%Y-%m-%d 08:00:00'),
-                                                                     "%Y-%m-%d %H:%M:%S")
+                plan_start_time = last_aps_result.created_time
                 for plan in scheduling_plans:
                     previous_plan_time_consume = SchedulingResult.objects.filter(
                         schedule_no=last_aps_result.schedule_no,
