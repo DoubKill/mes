@@ -899,21 +899,18 @@ class SchedulingResultViewSet(ModelViewSet):
                         plan_trains = int(item[j * 4 + 2])
                     except Exception:
                         continue
-                    try:
-                        time_consume = round(item[j * 4 + 3], 1)
-                    except Exception:
-                        time_consume = 0
                     pb = ProductBatching.objects.using('SFJ').exclude(used_type=6).filter(
                         stage_product_batch_no__icontains='-{}'.format(product_no)).first()
                     if pb:
                         product_no = pb.stage_product_batch_no
+                    train_time_consume = calculate_equip_recipe_avg_mixin_time(equip_no, product_no)
                     ret.append(SchedulingResult(**{'factory_date': factory_date,
                                                     'schedule_no': schedule_no,
                                                     'equip_no': equip_no,
                                                     'sn': i + 1,
                                                     'recipe_name': product_no,
                                                     'plan_trains': plan_trains,
-                                                    'time_consume': time_consume,
+                                                    'time_consume': round(train_time_consume*plan_trains/3600, 1),
                                                     'desc': item[j * 4 + 4]}))
                 except Exception:
                     raise ValidationError('导入数据有误，请检查后重试!')
