@@ -5797,7 +5797,7 @@ class HFInventoryLogView(APIView):
                     'order_no': ''
                 }
             if out_task:
-                data.update(out_task_dict.get(item[7]))
+                data.update(out_task_dict.get(item[7], {}))
             result.append(data)
         if export:
             return self.export_xls(result)
