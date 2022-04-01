@@ -2161,8 +2161,8 @@ class DailyProductionCompletionReport(APIView):
                                                     factory_date__month=month).values('factory_date__day', 'weight')
         for item in out_queryset:
             results['name_3'][f"{item['factory_date__day']}日"] = round(item['weight'], 2)
-            results['name_4'][f"{item['factory_date__day']}日"] += round((item['weight']) * decimal.Decimal(0.7), 2)
-            results['name_5'][f"{item['factory_date__day']}日"] += round(item['weight'], 2)
+            results['name_4'][f"{item['factory_date__day']}日"] = results['name_4'].get(f"{item['factory_date__day']}日", 0) + round((item['weight']) * decimal.Decimal(0.7), 2)
+            results['name_5'][f"{item['factory_date__day']}日"] = results['name_5'].get(f"{item['factory_date__day']}日", 0) + round(item['weight'], 2)
             results['name_3']['weight'] += round(item['weight'], 2)
             results['name_4']['weight'] += round((item['weight']) * decimal.Decimal(0.7), 2)
             results['name_5']['weight'] += round(item['weight'], 2)
