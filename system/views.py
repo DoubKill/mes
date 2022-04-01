@@ -451,6 +451,8 @@ class IdentityCard(APIView):
         id_card = self.request.data.get('id_card')
         jy = id_card[len(id_card) - 1:len(id_card)]  # 截取校验位
         if len(id_card) == 18:  # 判断输入的身份证号是否为18位
+            if not id_card[0:17].isdigit():
+                raise ValidationError('输入的身份证号有误！')
             x = (7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2)
             s = 0
             for i in range(1, len(id_card)):
