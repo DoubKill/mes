@@ -5434,7 +5434,7 @@ class THCancelTaskView(WwsCancelTaskView):
 @method_decorator([api_recorder], name="dispatch")
 class HFStockView(APIView):
     DATABASE_CONF = HF_CONF
-    permission_classes = (IsAuthenticated, )
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_material_hf_summary'}))
 
     def get(self, request):
         st = self.request.query_params.get('st')
@@ -5561,7 +5561,7 @@ class HFStockView(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class HFStockDetailView(APIView):
     DATABASE_CONF = HF_CONF
-    permission_classes = (IsAuthenticated, )
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_material_hf_summary'}))
 
     def get(self, request):
         st = self.request.query_params.get('st')  # 开始时间
@@ -5684,8 +5684,9 @@ class HFStockDetailView(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class HFInventoryLogView(APIView):
+    # 权限共用烘房统计信息查询
     DATABASE_CONF = HF_CONF
-    permission_classes = (IsAuthenticated, )
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_material_hf_summary'}))
 
     def export_xls(self, result):
         response = HttpResponse(content_type='application/vnd.ms-excel')
@@ -5811,7 +5812,7 @@ class HFInventoryLogView(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class HFRealStatusView(APIView):
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_material_hf_real_data'}))
     DATABASE_CONF = HF_CONF
 
     def get(self, request):
