@@ -234,6 +234,9 @@ class WeightTankStatus(AbstractEntity):
     status = models.PositiveIntegerField(help_text='状态，1：低位  2：高位, 3:正常位', choices=STATUS_CHOICE)
     open_flag = models.BooleanField(help_text='开启与否', default=False)
     equip_no = models.CharField(max_length=64, help_text='机台编号')
+    open_time = models.DateTimeField(help_text='开门时间', null=True, blank=True)
+    close_time = models.DateTimeField(help_text='关门时间', null=True, blank=True)
+    scan_times = models.IntegerField(help_text='扫码次数', default=0)
 
     class Meta:
         db_table = 'weight_tank_status'

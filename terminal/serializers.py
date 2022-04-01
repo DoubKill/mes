@@ -732,29 +732,39 @@ class WeightBatchingLogCreateSerializer(BaseModelSerializer):
 
     def validate(self, attr):
         equip_no = attr['equip_no']
-        dev_type = attr['dev_type']
         bra_code = attr['bra_code']
-        batch_classes = attr['batch_classes']
-        batch_group = attr['batch_group']
-        location_no = attr['location_no']
-        # 查原材料出库履历查到原材料物料编码
-        try:
-            res = material_out_barcode(bra_code)
-        except Exception as e:
-            if settings.DEBUG:
-                res = None
-            else:
-                raise serializers.ValidationError(e)
         material_name = material_no = ''
-        if not res:
-            raise serializers.ValidationError('未找到条码对应信息')
-        attr['scan_material'] = res.get('WLMC')
-        material_name_set = set(ERPMESMaterialRelation.objects.filter(
-            zc_material__wlxxid=res['WLXXID'],
-            use_flag=True
-        ).values_list('material__material_name', flat=True))
-        if not material_name_set:
-            raise serializers.ValidationError('该物料未与MES原材料建立绑定关系！')
+        if bra_code.startswith('MC'):  # 通用原材料卡片条码(mes生成)
+            single = WeightPackageSingle.objects.filter(batching_type='通用', bra_code=bra_code).last()
+            if not single:
+                raise serializers.ValidationError('未找到通用条码信息')
+            init_count = single.package_count
+            scan_material = single.material_name
+            material_name_set = {single.material_name}
+        else:
+            # 查原材料出库履历查到原材料物料编码
+            try:
+                res = material_out_barcode(bra_code)
+            except Exception as e:
+                if settings.DEBUG:
+                    res = None
+                else:
+                    raise serializers.ValidationError(e)
+            if not res:
+                raise serializers.ValidationError('未找到条码对应信息')
+            scan_material = res.get('WLMC')
+            material_name_set = set(ERPMESMaterialRelation.objects.filter(
+                zc_material__wlxxid=res['WLXXID'],
+                use_flag=True
+            ).values_list('material__material_name', flat=True))
+            if not material_name_set:
+                raise serializers.ValidationError('该物料未与MES原材料建立绑定关系！')
+            init_count = res.get('SL', 0)
+            # 查看条码数量是否用完
+        used_num = WeightBatchingLog.objects.filter(bra_code=bra_code, status=1).count()
+        if used_num >= init_count:
+            raise serializers.ValidationError('条码数量已经使用完, 请扫新条码')
+        attr['scan_material'] = scan_material
         # 机台计划配方的所有物料名
         try:
             date_now = datetime.now().date()
@@ -774,8 +784,6 @@ class WeightBatchingLogCreateSerializer(BaseModelSerializer):
         if comm_material:
             material_name = comm_material[0]
             material_no = comm_material[0]
-        # else:
-        #     raise serializers.ValidationError('所扫物料不在机台{}所有配料计划配方中'.format(equip_no))
         attr['batch_time'] = datetime.now()
         # 扫码物料不在当日计划配方对应原材料中
         if not material_name:
