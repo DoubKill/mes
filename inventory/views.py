@@ -5748,9 +5748,9 @@ class HFInventoryLogView(APIView):
         else:
             extra_where_str = 'where OastOutTime is not null'
             if st:
-                extra_where_str += " and OastOuTime >= '{}'".format(st)
+                extra_where_str += " and OastOutTime >= '{}'".format(st)
             if et:
-                extra_where_str += " and OastOuTime <= '{}'".format(et)
+                extra_where_str += " and OastOutTime <= '{}'".format(et)
         if material_name:
             extra_where_str += " and ProductName like N'%{}%'".format(material_name)
         if material_no:
