@@ -2198,15 +2198,15 @@ class DailyProductionCompletionReport(APIView):
             down_equip = list(set(lst).intersection(set(equip_lst))) if equip_lst else []
             down_time = sum([shot_down_dic[day].get(e, 0) for e in down_equip]) if shot_down_dic.get(day) else 0
             results['name_6'][f"{day}日"] = round(((24 * len(equip_dic.get(day))) - down_time) / (24 * len(equip_dic.get(day))), 2)
-        results['name_6']['weight'] = round(sum([v for k, v in results['name_6'].items() if k[0].isdigit()]) / (len(results['name_6']) - 2), 2)
-
-        for key, value in results['name_4'].items():
-            if key[0].isdigit():
-                if results['name_6'].get(key):
-                    results['name_7'][key] = round(results['name_4'][key] / decimal.Decimal(results['name_6'][key]), 2)
-                    results['name_8'][key] = round(results['name_5'][key] / decimal.Decimal(results['name_6'][key]), 2)
-        results['name_7']['weight'] = round(results['name_4']['weight'] / decimal.Decimal(results['name_6']['weight']), 2)
-        results['name_8']['weight'] = round(results['name_5']['weight'] / decimal.Decimal(results['name_6']['weight']), 2)
+        if len(results['name_6']) - 2 != 0:
+            results['name_6']['weight'] = round(sum([v for k, v in results['name_6'].items() if k[0].isdigit()]) / (len(results['name_6']) - 2), 2)
+            for key, value in results['name_4'].items():
+                if key[0].isdigit():
+                    if results['name_6'].get(key):
+                        results['name_7'][key] = round(results['name_4'][key] / decimal.Decimal(results['name_6'][key]), 2)
+                        results['name_8'][key] = round(results['name_5'][key] / decimal.Decimal(results['name_6'][key]), 2)
+            results['name_7']['weight'] = round(results['name_4']['weight'] / decimal.Decimal(results['name_6']['weight']), 2)
+            results['name_8']['weight'] = round(results['name_5']['weight'] / decimal.Decimal(results['name_6']['weight']), 2)
         return Response({'results': results.values()})
 
     def post(self, request):
