@@ -5715,7 +5715,7 @@ class HFInventoryLogView(APIView):
             sheet.write(data_row, 5, i['material_no'])
             sheet.write(data_row, 6, i['batch_no'])
             sheet.write(data_row, 7, i['pallet_no'])
-            sheet.write(data_row, 8, i['baking_start_time'] if i['order_type'] == '入烘箱' else i['baking_end_time'])
+            sheet.write(data_row, 8, i['baking_start_time'] if i['order_type'] == '入烘房' else i['baking_end_time'])
             sheet.write(data_row, 9, i['lot_no'])
             sheet.write(data_row, 10, i['supplier'])
             sheet.write(data_row, 11, i['unit'])
@@ -5737,9 +5737,9 @@ class HFInventoryLogView(APIView):
         material_name = self.request.query_params.get('material_name')  # 物料名称
         page = int(self.request.query_params.get('page', 1))
         page_size = int(self.request.query_params.get('page_size', 10))
-        inventory_type = self.request.query_params.get('inventory_type', '入库')
+        inventory_type = self.request.query_params.get('inventory_type', '入烘房')
         export = self.request.query_params.get('export')
-        if inventory_type == '入库':
+        if inventory_type == '入烘房':
             extra_where_str = 'where OastInTime is not null'
             if st:
                 extra_where_str += " and OastInTime >= '{}'".format(st)
@@ -5780,7 +5780,7 @@ class HFInventoryLogView(APIView):
         out_task_dict = {item['order_no']: item for item in out_task}
         status_dict = {1: '入库中', 2: '烘烤运行中', 3: '出库中', 4: '等待烘烤', 5: '等待出库', 6: '已出库'}
         for item in temp:
-            data = {'order_type': '出烘箱' if inventory_type == '出库' else '入烘箱',
+            data = {'order_type': '出烘房' if inventory_type == '出库' else '入烘房',
                     'oven_no': item[0],
                     'status': status_dict.get(item[1]),
                     'material_name': item[2],
