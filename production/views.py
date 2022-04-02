@@ -1978,9 +1978,7 @@ class MachineTargetValue(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class MonthlyOutputStatisticsReport(APIView):
-    queryset1 = TrainsFeedbacks.objects.exclude(equip_no='Z04')
-    queryset2 = TrainsFeedbacks.objects.filter(equip_no='Z04', operation_user='Mixer1')
-    queryset = queryset1 | queryset2
+    queryset = TrainsFeedbacks.objects.filter(Q(~Q(equip_no='Z04')) | Q(equip_no='Z04', operation_user='Mixer1'))
     permission_classes = (IsAuthenticated,)
 
     def my_order(self, result, order):
@@ -2833,10 +2831,8 @@ class PerformanceSummaryView(APIView):
             group_list.append([item[0] for item in g])
 
         # 密炼的产量
-        queryset1 = TrainsFeedbacks.objects.exclude(equip_no='Z04')
-        queryset2 = TrainsFeedbacks.objects.filter(equip_no='Z04', operation_user='Mixer1')
-        queryset3 = queryset1 | queryset2
-        product_qty = queryset3.filter(**kwargs2
+        queryset = TrainsFeedbacks.objects.filter(Q(~Q(equip_no='Z04')) | Q(equip_no='Z04', operation_user='Mixer1'))
+        product_qty = queryset.filter(**kwargs2
                                                      ).values('classes', 'equip_no', 'factory_date__day', 'product_no').\
             annotate(qty=Count('id')).values('qty', 'classes', 'equip_no', 'factory_date__day', 'product_no')
         price_dic = {}
