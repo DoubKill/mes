@@ -895,7 +895,7 @@ class WarehouseInfoViewSet(ReversalUseFlagMixin, AllMixin, viewsets.ModelViewSet
 class StationInfoViewSet(ReversalUseFlagMixin, AllMixin, viewsets.ModelViewSet):
     queryset = Station.objects.all()
     serializer_class = StationSerializer
-    # permission_classes = (permissions.IsAuthenticated,)
+    # permission_classes = (permissions.IsAuthenticated,)  # 不需要登录，出库看板有使用
     filter_backends = (DjangoFilterBackend,)
     filter_class = StationFilter
 
@@ -4302,7 +4302,7 @@ class OutBoundTasksListView(ListAPIView):
         根据出库口过滤混炼、终炼出库任务列表，参数：warehouse_name=混炼胶库/终炼胶库&station_id=出库口id
     """
     serializer_class = OutBoundTasksSerializer
-    permission_classes = (IsAuthenticated, )
+    # permission_classes = (IsAuthenticated, )  # 出库看板使用，不需要登录
 
     def get_queryset(self):
         warehouse_name = self.request.query_params.get('warehouse_name')  # 库存名称
@@ -4320,6 +4320,7 @@ class OutBoundTasksListView(ListAPIView):
 @method_decorator([api_recorder], name="dispatch")
 class InOutBoundSummaryView(APIView):
     """混炼终炼出库口出入库统计，参数：warehouse_name=混炼胶库/终炼胶库&station_id=出库口id"""
+    # permission_classes = (IsAuthenticated, )  # 出库看板使用，不需要登录
 
     def get(self, request):
         warehouse_name = self.request.query_params.get('warehouse_name')  # 库存名称
