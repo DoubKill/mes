@@ -19,8 +19,6 @@ from equipment.utils import DinDinAPI
 
 logger = logging.getLogger("send_ding_msg")
 
-ding_api = DinDinAPI()
-
 
 def handle(order):
     # 提醒消息里的链接类型 False 非巡检  True 巡检
@@ -221,6 +219,7 @@ def get_ding_uids_by_name(user_name, all_user):
 
 
 if __name__ == "__main__":
+    ding_api = DinDinAPI()
     # 所有维修工单
     repair_orders = list(EquipApplyOrder.objects.filter(~Q(status__in=["已生成", "已验收", "已关闭", "已开始"])))
     # 所有巡检工单

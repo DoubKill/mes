@@ -105,7 +105,6 @@ class SchedulingProductDemandedDeclareFilter(django_filters.rest_framework.Filte
 
 
 class ProductStockDailySummaryFilter(django_filters.rest_framework.FilterSet):
-    product_no = django_filters.CharFilter(field_name='product_no', lookup_expr='icontains')
 
     class Meta:
         model = ProductStockDailySummary

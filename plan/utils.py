@@ -84,8 +84,8 @@ def calculate_product_stock(factory_date, product_no, stage):
     s = ProductStockDailySummary.objects.filter(
         factory_date=factory_date,
         stage=stage,
-        product_no=product_no).aggregate(s=Sum('stock_weight'))['s']
-    return s if s else 0
+        product_no=product_no).first()
+    return s.stock_weight + s.area_weight if s else 0
 
 
 def calculate_equip_recipe_avg_mixin_time(equip_no, recipe_name):
@@ -120,7 +120,7 @@ def calculate_product_plan_trains(factory_date, product_no, need_weight):
         raise ValueError('未找到胶料代码{}定机表数据！'.format(product_no))
     product_batching = ProductBatching.objects.using('SFJ').filter(
         stage_product_batch_no__icontains='-FM-{}'.format(product_no),
-        equip__equip_no=ms.final_main_machine,
+        equip__equip_no=ms.main_machine_FM,
         used_type=4
     ).values('id', 'batching_weight', 'equip__equip_no', 'stage_product_batch_no', 'equip__category__category_name')
 
@@ -141,13 +141,14 @@ def calculate_product_plan_trains(factory_date, product_no, need_weight):
                                                                product_batching['stage_product_batch_no'])
         if c_pb:
             devoted_weight = float(c_pb.actual_weight)
-            ret.append({'product_no': product_batching['stage_product_batch_no'],
+            ret.append({'recipe_name': product_batching['stage_product_batch_no'],
                         'equip_no': product_batching['equip__equip_no'],
                         'batching_weight': batching_weight,
                         'devoted_weight': devoted_weight,
                         'plan_trains': plan_trains,
-                        'consume_time': round(avg_mixin_time * plan_trains / 3600, 2),
-                        'dev_type': product_batching['equip__category__category_name']
+                        'time_consume': round(avg_mixin_time * plan_trains / 3600, 2),
+                        'dev_type': product_batching['equip__category__category_name'],
+                        'stock_weight': stock_weight
                         })
             try:
                 stage = c_pb.material.material_no.split('-')[1]
@@ -158,7 +159,16 @@ def calculate_product_plan_trains(factory_date, product_no, need_weight):
             if not ms:
                 raise ValueError('未找到胶料代码{}定机表数据！'.format(product_no))
             try:
-                mixin_main_equip = ms.mixing_main_machine.split('/')[0]
+                if stage == 'HMB':
+                    mixin_main_equip = ms.main_machine_HMB
+                elif stage == 'CMB':
+                    mixin_main_equip = ms.main_machine_CMB
+                elif stage == '1MB':
+                    mixin_main_equip = ms.main_machine_1MB
+                elif stage == '2MB':
+                    mixin_main_equip = ms.main_machine_2MB
+                else:
+                    mixin_main_equip = ms.main_machine_3MB
             except Exception as e:
                 raise ValueError(e)
             need_weight = float(plan_trains * devoted_weight)
@@ -168,16 +178,17 @@ def calculate_product_plan_trains(factory_date, product_no, need_weight):
                 used_type=4
             ).values('id', 'batching_weight', 'equip__equip_no', 'stage_product_batch_no', 'equip__category__category_name')
         else:
-            ret.append({'product_no': product_batching['stage_product_batch_no'],
+            ret.append({'recipe_name': product_batching['stage_product_batch_no'],
                         'equip_no': product_batching['equip__equip_no'],
                         'batching_weight': batching_weight,
                         'devoted_weight': 0,
                         'plan_trains': plan_trains,
-                        'consume_time': round(avg_mixin_time * plan_trains / 3600, 2),
-                        'dev_type': product_batching['equip__category__category_name']
+                        'time_consume': round(avg_mixin_time * plan_trains / 3600, 2),
+                        'dev_type': product_batching['equip__category__category_name'],
+                        'stock_weight': stock_weight
                         })
             product_batching = None
-    ret = filter(lambda x: x['plan_trains'] >= 0, ret)
+    # ret = filter(lambda x: x['plan_trains'] >= 0, ret)
     return list(ret)[::-1]
 
 
@@ -188,6 +199,24 @@ def extend_last_aps_result(factory_date, schedule_no):
     @param schedule_no: 新的排程单号
     @return:
     """
+    equip_tree_data = {
+        'Z01': [],
+        'Z02': [],
+        'Z03': [],
+        'Z04': [],
+        'Z05': [],
+        'Z06': [],
+        'Z07': [],
+        'Z08': [],
+        'Z09': [],
+        'Z10': [],
+        'Z11': [],
+        'Z12': [],
+        'Z13': [],
+        'Z14': [],
+        'Z15': [],
+    }
+
     yesterday = factory_date - timedelta(1)
     yesterday_last_res = SchedulingResult.objects.filter(factory_date=yesterday).order_by('id').last()
     if yesterday_last_res:
@@ -231,15 +260,26 @@ def extend_last_aps_result(factory_date, schedule_no):
                         else:
                             plan_trains = plan.plan_trains
                             time_consume = plan.time_consume
-                        SchedulingResult.objects.create(factory_date=factory_date,
-                                                        schedule_no=schedule_no,
-                                                        equip_no=equip_no,
-                                                        sn=idx,
-                                                        recipe_name=plan.recipe_name,
-                                                        time_consume=time_consume,
-                                                        plan_trains=plan_trains,
-                                                        desc=plan.desc)
-                        idx += 1
+                        equip_tree_data[equip_no].append({'recipe_name': plan.recipe_name,
+                                                          'equip_no': equip_no,
+                                                          'batching_weight': 0,
+                                                          'devoted_weight': 0,
+                                                          'plan_trains': plan_trains,
+                                                          'time_consume': time_consume,
+                                                          'stock_weight': 0,
+                                                          'extend_flag': True,
+                                                          'desc': '继承前一天计划'
+                                                          })
+                        # SchedulingResult.objects.create(factory_date=factory_date,
+                        #                                 schedule_no=schedule_no,
+                        #                                 equip_no=equip_no,
+                        #                                 sn=idx,
+                        #                                 recipe_name=plan.recipe_name,
+                        #                                 time_consume=time_consume,
+                        #                                 plan_trains=plan_trains,
+                        #                                 desc=plan.desc)
+                        # idx += 1
+    return equip_tree_data
 
 
 # [{'product_no': 'C-FM-J260-01', 'equip_no': 'Z09', 'batching_weight': 462.45, 'devoted_weight': 450.0, 'plan_trains': 25.9, 'consume_time': 3108},
@@ -300,6 +340,172 @@ class APSLink(object):
             ret.append(c_node.value)
             c_node = c_node.next
         return ret
+
+
+def find_wait_time(equip_no, recipe_name, equip_tree):
+    # 获取上段次打完总耗时"
+    wt = 0
+    for e_item in equip_tree[equip_no]:
+        wt += e_item['time_consume']
+        if e_item['recipe_name'] == recipe_name and not e_item.get('extend_flag'):
+            if e_item['time_consume'] <= 1:  # 从配置中获取供料最少时间
+                wt = wt - e_item['time_consume'] + 1
+            break
+    return wt
+
+
+def plan_sort(product_demanded_rains, equip_tree_data):
+    unsorted_plan = []
+
+    unsorted_final_plan = []
+
+    unsorted_final_plan2 = []
+
+    # 先排混炼，最后排终炼
+
+    for idx in range(6):
+        # 排上次剩余的供料不足计划
+        # for p in unsorted_plan:
+        #     if p.get('sorted_flag'):
+        #         continue
+        #     stage = p['stage']
+        #     equip_no = p['equip_no']
+        #     product_no = p['recipe_name'].split('-')[2]
+        #     p_stages = [i['stage'] for i in product_demanded_rains[product_no]]
+        #     previous_plan = product_demanded_rains[product_no][p_stages.index(stage)-1]
+        #     previous_equip = previous_plan['equip_no']
+        #     previous_stage_recipe_name = previous_plan['recipe_name']
+        #     wait_time = find_wait_time(previous_equip, previous_stage_recipe_name)
+        #     t = 0
+        #     for i, tree in enumerate(equip_tree[equip_no]):
+        #         t += tree['time_consume']
+        #         if t > wait_time:
+        #             # 找到供料合理时间点进行插入
+        #             product_nos = list(product_demanded_rains.keys())
+        #             try:
+        #                 next_stage_recipe_name = equip_tree[equip_no][i + 1]['recipe_name']
+        #             except IndexError:
+        #                 next_stage_recipe_name = None
+        #             if next_stage_recipe_name:
+        #                 if product_nos.index(next_stage_recipe_name.split('-')[2]) < product_nos.index(
+        #                         product_no):
+        #                     continue
+        #             equip_tree[equip_no].insert(i + 1, p)
+        #             p['sorted_flag'] = True
+        #             break
+
+        for product_no, t_item in product_demanded_rains.items():
+            try:
+                current_procedure = t_item[idx]
+            except IndexError:
+                continue
+            if current_procedure.get('unsorted_flag') or current_procedure['plan_trains'] == 0:
+                continue
+            stage = current_procedure['recipe_name'].split('-')[1]
+            equip_no = current_procedure['equip_no']
+            if idx == 0:
+                # 混炼第一段直接按顺序排，不需要考虑物料库存量
+                if stage != 'FM':
+                    equip_tree_data[equip_no].append(current_procedure)
+            else:
+                if stage == 'FM':
+                    continue
+                else:
+                    # 混炼非第一段次排程
+                    previous_equip = t_item[idx - 1]['equip_no']
+                    previous_stage_recipe_name = t_item[idx - 1]['recipe_name']
+                    wait_time = find_wait_time(previous_equip, previous_stage_recipe_name, equip_tree_data)
+                    t = 0
+                    for i, tree in enumerate(equip_tree_data[equip_no]):
+                        t += tree['time_consume']
+                        if t >= wait_time:
+                            # 找到供料合理时间点进行插入
+                            product_nos = list(product_demanded_rains.keys())
+                            try:
+                                next_stage_recipe_name = equip_tree_data[equip_no][i + 1]['recipe_name']
+                            except IndexError:
+                                next_stage_recipe_name = None
+                            if next_stage_recipe_name:
+                                if product_nos.index(next_stage_recipe_name.split('-')[2]) < product_nos.index(product_no):
+                                    continue
+                            equip_tree_data[equip_no].insert(i + 1, current_procedure)
+                            break
+                        if i+1 == len(equip_tree_data[equip_no]):
+                            # 防止供料不足情况发生，暂时不排
+                            for n in t_item[idx:-1]:
+                                unsorted_plan.append(n)
+                                n['unsorted_flag'] = True
+
+    for p in unsorted_plan:
+        if p.get('sorted_flag'):
+            continue
+        p['desc'] = '供料不足，需调整！'
+        equip_tree_data[p['equip_no']].append(p)
+
+    # 排终炼计划
+    for product_no, t_item in product_demanded_rains.items():
+        try:
+            current_procedure = t_item[-1]
+        except IndexError:
+            continue
+        try:
+            previous_stage_plan = t_item[-2]
+        except Exception:
+            continue
+        previous_stage_stock = previous_stage_plan.get('stock_weight', 0)
+        if not previous_stage_stock:
+            unsorted_final_plan.append(current_procedure)
+        else:
+            devoted_weight = current_procedure['devoted_weight']
+            trains = int(previous_stage_stock/devoted_weight)
+            equip_tree_data[current_procedure['equip_no']].append({'equip_no': current_procedure['equip_no'],
+                                                              'recipe_name': current_procedure['recipe_name'],
+                                                              'time_consume': round(trains/current_procedure['plan_trains']*current_procedure['time_consume'], 1),
+                                                              'plan_trains': trains,
+                                                              'stage': current_procedure['recipe_name'].split('-')[2],
+                                                              'desc': '消耗库存'})
+            current_procedure['plan_trains'] -= trains
+            if current_procedure['plan_trains'] > 0:
+                unsorted_final_plan.append(current_procedure)
+
+    for final_plan in unsorted_final_plan:
+        equip_no = final_plan['equip_no']
+        product_no = final_plan['recipe_name'].split('-')[2]
+        previous_plan = product_demanded_rains[product_no][-2]
+        previous_equip = previous_plan['equip_no']
+        previous_stage_recipe_name = previous_plan['recipe_name']
+        wait_time = find_wait_time(previous_equip, previous_stage_recipe_name, equip_tree_data)
+        t = 0
+        for i, tree in enumerate(equip_tree_data[equip_no]):
+            t += tree['time_consume']
+            if t >= wait_time:
+                # 找到供料合理时间点进行插入
+                product_nos = list(product_demanded_rains.keys())
+                try:
+                    next_stage_recipe_name = equip_tree_data[equip_no][i + 1]['recipe_name']
+                except IndexError:
+                    next_stage_recipe_name = None
+                if next_stage_recipe_name:
+                    try:
+                        if product_nos.index(next_stage_recipe_name.split('-')[2]) < product_nos.index(product_no):
+                            continue
+                    except Exception:
+                        continue
+                equip_tree_data[equip_no].insert(i + 1, final_plan)
+                break
+            if i + 1 == len(equip_tree_data[equip_no]):
+                # 防止供料不足情况发生，暂时不排
+                unsorted_final_plan2.append(final_plan)
+
+    for final_plan in unsorted_final_plan2:
+        final_plan['desc'] = '供料不足，需调整！'
+        equip_tree_data[final_plan['equip_no']].append(final_plan)
+
+    # print(sum([len(i) for i in equip_tree_data.values()]))
+    # print(len(unsorted_plan))
+    # print(equip_tree_data)
+    # print(unsorted_plan)
+    return equip_tree_data
 
 
 if __name__ == '__main__':
