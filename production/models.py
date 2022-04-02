@@ -388,11 +388,11 @@ class EmployeeAttendanceRecords(models.Model):
     begin_date = models.DateTimeField(help_text='上岗时间', null=True, blank=True)
     end_date = models.DateTimeField(help_text='下岗时间', null=True, blank=True)
     work_time = models.FloatField(help_text='计算工作时间', null=True, blank=True, default=12)
-    actual_time = models.FloatField(help_text='承认工作时间', null=True, blank=True)
+    actual_time = models.FloatField(help_text='承认工作时间', null=True, blank=True, default=12)
     classes = models.CharField(help_text='班次', max_length=12, null=True, blank=True)
     group = models.CharField(help_text='班组', max_length=12, null=True, blank=True)
-    equip = models.CharField(help_text='机台', max_length=12)
-    status = models.CharField(max_length=12, help_text='换岗/加班/补卡', null=True, blank=True)
+    equip = models.CharField(help_text='机台', max_length=12, null=True, blank=True)
+    status = models.CharField(max_length=12, help_text='上岗/换岗/加班', null=True, blank=True)
     is_use = models.CharField(max_length=12, help_text='确认/添加/废弃', null=True, blank=True)
 
     class Meta:
@@ -473,3 +473,43 @@ class IndependentPostTemplate(models.Model):
     class Meta:
         db_table = 'independent_post_template'
         verbose_name_plural = verbose_name = '是否独立上岗'
+
+
+class EquipMaxValueCache(models.Model):
+    equip_no = models.CharField(max_length=12, help_text='机台')
+    date_time = models.DateField(help_text='缓存截止时间')
+    value = models.IntegerField(default=0, help_text='机台最高产量')
+
+    class Meta:
+        db_table ='equip_max_value_cache'
+        verbose_name_plural = verbose_name = '机台最高产量缓存'
+
+
+class OuterMaterial(models.Model):
+    factory_date = models.DateField(help_text='工厂时间')
+    weight = models.DecimalField(max_digits=8, decimal_places=2, help_text='吨')
+
+    class Meta:
+        db_table = 'outer_material'
+        verbose_name_plural = verbose_name = '外发无硫料'
+
+
+class Equip190E(models.Model):
+    specification = models.CharField(max_length=12, help_text='规格')
+    state = models.CharField(max_length=12, help_text='段次')
+    weight = models.DecimalField(max_digits=8, decimal_places=2, help_text='kg')
+
+    class Meta:
+        db_table = 'equip_190e'
+        verbose_name_plural = verbose_name = '190E机台规格信息设定'
+
+
+class Equip190EWeight(models.Model):
+    setup = models.ForeignKey(Equip190E, on_delete=models.CASCADE)
+    factory_date = models.DateField(help_text='工厂时间', null=True, blank=True)
+    classes = models.CharField(help_text='班次', max_length=12, null=True, blank=True)
+    qty = models.IntegerField(help_text='车数', null=True, blank=True)
+
+    class Meta:
+        db_table = 'equip_190e_weight'
+        verbose_name_plural = verbose_name = '190E机台产量信息'
