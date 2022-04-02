@@ -2006,7 +2006,7 @@ class MonthlyOutputStatisticsReport(APIView):
                                                 ).aggregate(spare_weight=Sum('actual_weight'))['spare_weight']
             queryset = self.queryset.filter(**kwargs, factory_date__lte=et, factory_date__gte=st,
                                             ).values('equip_no', 'product_no', 'factory_date')\
-                .annotate(value=Count('id'), weight=Sum('actual_weight')).values('equip_no', 'product_no', 'factory_date')
+                .annotate(value=Count('id'), weight=Sum('actual_weight'))
 
             dic = {}
             for item in queryset:
