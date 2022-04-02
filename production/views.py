@@ -2001,8 +2001,11 @@ class MonthlyOutputStatisticsReport(APIView):
         if state:
             kwargs = {'equip_no': equip, 'product_no__icontains': f"-{state}-{space}"} if equip else \
                 {'product_no__icontains': f"-{state}-{space}"}
-            spare_weight = self.queryset.filter(**kwargs).aggregate(spare_weight=Sum('actual_weight'))['spare_weight']
-            queryset = self.queryset.filter(**kwargs).values('equip_no', 'product_no', 'factory_date')\
+            spare_weight = self.queryset.filter(**kwargs, factory_date__lte=et,
+                                                factory_date__gte=st,
+                                                ).aggregate(spare_weight=Sum('actual_weight'))['spare_weight']
+            queryset = self.queryset.filter(**kwargs, factory_date__lte=et, factory_date__gte=st,
+                                            ).values('equip_no', 'product_no', 'factory_date')\
                 .annotate(value=Count('id'), weight=Sum('actual_weight'))
 
             dic = {}
@@ -2748,7 +2751,7 @@ class PerformanceSummaryView(APIView):
             query = equip_value_cache.values('equip_no', 'value')
             for item in query:
                 max_value[item['equip_no']] = item['value']
-            queryset = TrainsFeedbacks.objects.filter(Q(factory_date__gte=date, factory_date__lte=now_date) &
+            equip_max_value = TrainsFeedbacks.objects.filter(Q(factory_date__gte=date, factory_date__lte=now_date) &
                                                       Q(Q(~Q(equip_no='Z04')) | Q(equip_no='Z04', operation_user='Mixer1'))).\
                 values('equip_no', 'factory_date', 'classes').annotate(qty=Count('id')).order_by('-qty')
         else:
