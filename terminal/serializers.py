@@ -570,7 +570,8 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             else:
                 last_same_material = add_materials.first()
                 weight = total_weight + last_same_material.real_weight
-                attrs['tank_data'].update({'actual_weight': 0, 'adjust_left_weight': weight, 'real_weight': weight,
+                attrs['tank_data'].update({'actual_weight': last_same_material.actual_weight,
+                                           'adjust_left_weight': weight, 'real_weight': weight,
                                            'init_weight': total_weight + last_same_material.init_weight,
                                            'single_need': single_material_weight,
                                            'pre_material_id': last_same_material.id})
