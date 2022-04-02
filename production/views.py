@@ -2002,9 +2002,9 @@ class MonthlyOutputStatisticsReport(APIView):
             kwargs = {'equip_no': equip, 'product_no__icontains': f"-{state}-{space}"} if equip else \
                 {'product_no__icontains': f"-{state}-{space}"}
             spare_weight = self.queryset.filter(**kwargs, factory_date__lte=et,
-                                                factory_date__gte=et,
+                                                factory_date__gte=st,
                                                 ).aggregate(spare_weight=Sum('actual_weight'))['spare_weight']
-            queryset = self.queryset.filter(**kwargs, factory_date__lte=et, factory_date__gte=et,
+            queryset = self.queryset.filter(**kwargs, factory_date__lte=et, factory_date__gte=st,
                                             ).values('equip_no', 'product_no', 'factory_date')\
                 .annotate(value=Count('id'), weight=Sum('actual_weight')).values('equip_no', 'product_no', 'factory_date')
 
