@@ -799,6 +799,8 @@ permission_data = [
     {'id': 840, 'code': 'daily_production_completion_report', 'name': '月产量完成报表', 'parent_id': None},
     {'id': 841, 'code': 'view_daily_production_completion_report', 'name': '查看', 'parent_id': 840},
     {'id': 842, 'code': 'export_daily_production_completion_report', 'name': '导出', 'parent_id': 840},
+    {'id': 970, 'code': 'add_daily_production_completion_report', 'name': '添加', 'parent_id': 840},
+    {'id': 971, 'code': 'save_daily_production_completion_report', 'name': '保存', 'parent_id': 840},
 
     {'id': 843, 'code': 'aps_params_setting', 'name': '排程参数设定', 'parent_id': None},
     {'id': 844, 'code': 'view_aps_params_setting', 'name': '查看', 'parent_id': 843},
@@ -902,6 +904,7 @@ permission_data = [
     {'id': 929, 'code': 'view_performance_summary', 'name': '查看', 'parent_id': 928},
     {'id': 930, 'code': 'import_performance_summary', 'name': '导入', 'parent_id': 928},
     {'id': 931, 'code': 'export_performance_summary', 'name': '导出', 'parent_id': 928},
+    {'id': 969, 'code': 'change_performance_summary', 'name': '确定', 'parent_id': 928},
 
     {'id': 932, 'code': 'performance_job_ladder', 'name': '岗位阶梯表', 'parent_id': None},
     {'id': 933, 'code': 'view_performance_job_ladder', 'name': '查看', 'parent_id': 932},
@@ -949,7 +952,14 @@ permission_data = [
     {'id': 967, 'code': 'formula_preparation', 'name': '生产投料配方查询', 'parent_id': None},
     {'id': 968, 'code': 'view_formula_preparation', 'name': '查看', 'parent_id': 967},
 
-    # 下一个 969 开始
+    {'id': 972, 'code': 'equip_190e', 'name': '190E机台规格信息', 'parent_id': None},
+    {'id': 973, 'code': 'view_equip_190e', 'name': '查看', 'parent_id': 972},
+    {'id': 974, 'code': 'add_equip_190e', 'name': '添加', 'parent_id': 972},
+    {'id': 975, 'code': 'import_equip_190e', 'name': '导入', 'parent_id': 972},
+    {'id': 976, 'code': 'delete_equip_190e', 'name': '删除', 'parent_id': 972},
+    {'id': 977, 'code': 'change_equip_190e', 'name': '修改', 'parent_id': 972},
+
+    # 下一个 978 开始
 ]
 
 
