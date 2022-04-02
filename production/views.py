@@ -2025,7 +2025,9 @@ class MonthlyOutputStatisticsReport(APIView):
         else:
             # 取每个机台的历史最大值
             dic = {}
-            equip_max_value = TrainsFeedbacks.objects.values('equip_no', 'factory_date').annotate(
+            equip_max_value = TrainsFeedbacks.objects.filter(Q(~Q(equip_no='Z04')) |
+                                                             Q(equip_no='Z04', operation_user='Mixer1')).\
+                values('equip_no', 'factory_date').annotate(
                 qty=Count('id')).order_by('-qty')
             for item in equip_max_value:
                 if not dic.get(f"{item['equip_no']}"):
@@ -2746,9 +2748,9 @@ class PerformanceSummaryView(APIView):
             query = equip_value_cache.values('equip_no', 'value')
             for item in query:
                 max_value[item['equip_no']] = item['value']
-            equip_max_value = TrainsFeedbacks.objects.filter(factory_date__gte=date, factory_date__lte=now_date
-                                                             ).values('equip_no', 'factory_date', 'classes').annotate(
-                qty=Count('id')).order_by('-qty')
+            queryset = TrainsFeedbacks.objects.filter(Q(factory_date__gte=date, factory_date__lte=now_date) &
+                                                      Q(Q(~Q(equip_no='Z04')) | Q(equip_no='Z04', operation_user='Mixer1'))).\
+                values('equip_no', 'factory_date', 'classes').annotate(qty=Count('id')).order_by('-qty')
         else:
             equip_max_value = TrainsFeedbacks.objects.values('equip_no', 'factory_date', 'classes').annotate(
                 qty=Count('id')).order_by('-qty')
