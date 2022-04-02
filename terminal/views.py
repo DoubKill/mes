@@ -156,6 +156,10 @@ class BatchProductionInfoView(APIView):
                         trains = max_feed_log.trains + 1
                     else:
                         trains = max_feed_log.trains
+                    # 不是第一车开始投入或者中间关掉重开需要扣重失败时扫码(校正车次)能够调用群控handle_feed
+                    failed_feed = FeedingMaterialLog.objects.using('SFJ').filter(plan_classes_uid=plan.plan_classes_uid, add_feed_result=1).last()
+                    if failed_feed and failed_feed.trains > trains:
+                        trains = failed_feed.trains
                 else:
                     trains = 1
                 current_product_data['product_no'] = plan.product_batching.stage_product_batch_no
