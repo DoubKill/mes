@@ -2882,9 +2882,9 @@ class PerformanceSummaryView(APIView):
                     else:
                         work_time = user_dic[key]['actual_time']
                         if '叉车' in section:
-                            unit = price_dic.get(f"fz_{state}").get('dj')
+                            unit = price_dic.get(f"fz_{state}").get('pt')
                         else:
-                            unit = price_dic.get(f"{equip_type}_{state}").get('dj')
+                            unit = price_dic.get(f"{equip_type}_{state}").get('pt')
                         user_dic[key][f"{state}_pt_qty"] = user_dic[key].get(f"{state}_pt_qty", 0) + int(
                             item['qty'] / 12 * work_time)
                         user_dic[key][f"{state}_pt_unit"] = unit
