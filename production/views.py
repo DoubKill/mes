@@ -2442,7 +2442,7 @@ class SummaryOfWeighingOutput(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class EmployeeAttendanceRecordsView(APIView):
-    # permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated,)
 
     def get(self, request):
         date = self.request.query_params.get('date')
@@ -2472,12 +2472,17 @@ class EmployeeAttendanceRecordsView(APIView):
             section = item['section']
             if not results.get(f'{equip}_{section}'):
                 results[f'{equip}_{section}'] = {'equip': equip, 'section': section}
-            results[f'{equip}_{section}'][f"{item['factory_date__day']}{item['group']}"] = '%s(%.1f)' % (item['user__username'], item['actual_time'])
+            value = item['user__username'] if int(item['actual_time']) == 12 else '%s(%.1f)' % (item['user__username'], item['actual_time'])
+
+            if results[f'{equip}_{section}'].get(f"{item['factory_date__day']}{item['group']}"):
+                results[f'{equip}_{section}'][f"{item['factory_date__day']}{item['group']}"] += f', {value}'
+            else:
+                results[f'{equip}_{section}'][f"{item['factory_date__day']}{item['group']}"] = value
         res = list(results.values())
         for item in res:
             item['equip'] = '' if not item.get('equip') else item['equip']
-            item['sort'] = 2 if not item.get('sort') else 1
-        results_sort = sorted(list(results.values()), key=lambda x: (x['sort'], item['equip']))
+            item['sort'] = 2 if not item.get('equip') else 1
+        results_sort = sorted(list(results.values()), key=lambda x: (x['sort'], x['equip']))
         return Response({'results': results_sort, 'group_list': group_list})
 
     # 导入出勤记录
@@ -2489,11 +2494,14 @@ class EmployeeAttendanceRecordsView(APIView):
             raise ValidationError('文件不可为空！')
         cur_sheet = get_cur_sheet(excel_file)
         rows = cur_sheet.nrows
+        cols = cur_sheet.ncols
         if cur_sheet.row_values(0)[1] != '日期' or cur_sheet.row_values(1)[1] != '班次' or cur_sheet.row_values(2)[1] != '班别':
             raise ValidationError("导入的格式有误")
         # 获取班组
         year = int(date.split('-')[0])
         month = int(date.split('-')[1])
+        if (datetime.date(year, month + 1, 1) - datetime.timedelta(days=1)).day != (cols - 2) / 2:
+            raise ValidationError("导入的格式有误")
         this_month_start = datetime.datetime(year, month, 1)
         if month == 12:
             this_month_end = datetime.datetime(year + 1, 1, 1) - timedelta(days=1)
@@ -2523,13 +2531,12 @@ class EmployeeAttendanceRecordsView(APIView):
             index = equip_list.index(i)
             if not equip_list[index]:
                 equip_list[index] = equip_list[index - 1]
-        print(equip_list)
         section_list = []
         for i in range(start_row, rows):
             section_list.append(cur_sheet.cell(i, 1).value)
         rows_num = cur_sheet.nrows  # sheet行数
         if rows_num <= start_row:
-            return Response({'results': [], 'message': '没有可导入的数据'})
+            raise ValidationError('没有可导入的数据')
         ret = [None] * (rows_num - start_row)
         for i in range(start_row, rows_num):
             ret[i - start_row] = cur_sheet.row_values(i)[2:]
@@ -2559,12 +2566,7 @@ class EmployeeAttendanceRecordsView(APIView):
                         equips = [equip]
                     for equip in equips:
                         dic = {'user': user, 'section': section, 'factory_date': date_, 'group': group, 'classes': classes, 'equip': equip, 'work_time': 12, 'actual_time': 12}
-                        dic2 = dic.copy()
-                        dic2.pop('user')
                         if dic in records:
-                            continue
-                        if EmployeeAttendanceRecords.objects.filter(**dic2).exists():
-                            EmployeeAttendanceRecords.objects.filter(**dic2).update(user=user)
                             continue
                         records_obj = EmployeeAttendanceRecords(**dic)
                         records_lst.append(records_obj)
@@ -2880,9 +2882,9 @@ class PerformanceSummaryView(APIView):
                     else:
                         work_time = user_dic[key]['actual_time']
                         if '叉车' in section:
-                            unit = price_dic.get(f"fz_{state}").get('dj')
+                            unit = price_dic.get(f"fz_{state}").get('pt')
                         else:
-                            unit = price_dic.get(f"{equip_type}_{state}").get('dj')
+                            unit = price_dic.get(f"{equip_type}_{state}").get('pt')
                         user_dic[key][f"{state}_pt_qty"] = user_dic[key].get(f"{state}_pt_qty", 0) + int(
                             item['qty'] / 12 * work_time)
                         user_dic[key][f"{state}_pt_unit"] = unit
@@ -2927,6 +2929,8 @@ class PerformanceSummaryView(APIView):
             equip_qty = {}
             equip_price = {}
             hj = {'name': '产量工资合计', 'price': 0}
+            if len(list(results1.values())[0][0]) == 7:
+                return Response()
             for item in list(results1.values())[0]:
                 section, name, day, group, equip = item.get('section'), item.get('name'), item.get('day'), item.get( 'group'), item.get('equip')
                 for k in item.keys():
@@ -2941,9 +2945,9 @@ class PerformanceSummaryView(APIView):
                         hj['price'] += round(qty * unit, 2)
                         type2 = '普通' if type1 == 'pt' else '丁基'
                         if results.get(f"{equip}_{type2}_1"):  # Z01_普通_1
-                            results[f"{equip}_{type2}_1"].update(state=item[k])
-                            results[f"{equip}_{type2}_2"].update(state=item[f"{state}_{type1}_unit"])
-                            results[f"{equip}_{type2}_3"].update(state=section)
+                            results[f"{equip}_{type2}_1"].update({state: item[k]})
+                            results[f"{equip}_{type2}_2"].update({state: item[f"{state}_{type1}_unit"]})
+                            results[f"{equip}_{type2}_3"].update({state: section})
                         else:
                             results[f"{equip}_{type2}_1"] = {'name': f"{equip}{type2}-车数", state: item[k]}
                             results[f"{equip}_{type2}_2"] = {'name': f"{equip}{type2}-单价",
