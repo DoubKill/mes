@@ -1741,73 +1741,74 @@ class MaterialOutBack(APIView):
         """WMS->MES:任务编号、物料信息ID、物料名称、PDM号（促进剂以外为空）、批号、条码、重量、重量单位、
         生产日期、使用期限、托盘RFID、工位（出库口）、MES->WMS:信息接收成功or失败"""
         # 任务编号
-
-        data = request.data
-        # data = {'order_no':'20201114131845',"pallet_no":'20102494',
-        #         'location':'二层前端','qty':'2','weight':'2.00',
-        #         'quality_status':'合格','lot_no':'122222',
-        #         'inout_num_type':'123456','fin_time':'2020-11-10 15:02:41'
-        #         }
-        data = dict(data)
-        data.pop("status", None)
-        order_no = data.get('order_no')
-        if order_no:
-            temp = MaterialInventoryLog.objects.filter(order_no=order_no).aggregate(all_weight=Sum('weight'))
-            all_weight = temp.get("all_qty")
-            if all_weight:
-                all_weight += float(data.get("qty"))
-            else:
-                all_weight = float(data.get("qty"))
-            order = MaterialOutPlan.objects.filter(order_no=order_no).first()
-            if order:
-                need_weight = order.need_weight
-            else:
-                return Response({"status": 0, "desc": "失败", "message": "该订单非mes下发订单"})
-            if int(all_weight) >= need_weight:  # 若加上当前反馈后出库数量已达到订单需求数量则改为(1:完成)
-                order.status = 1
-                order.finish_time = datetime.datetime.now()
-                order.save()
-            temp_data = {}
-            temp_data['warehouse_no'] = order.warehouse_info.no
-            temp_data['warehouse_name'] = order.warehouse_info.name
-            temp_data['inout_reason'] = order.inventory_reason
-            temp_data['unit'] = order.unit
-            temp_data['initiator'] = order.created_user
-            temp_data['material_no'] = order.material_no
-            temp_data['start_time'] = order.created_date
-            temp_data['order_type'] = order.order_type if order.order_type else "出库"
-            temp_data['station'] = order.station
-            equip_list = list(set(order.equip.all().values_list("equip_no", flat=True)))
-            temp_data["dst_location"] = ",".join(equip_list)
-            material = Material.objects.filter(material_no=order.material_no).first()
-            material_inventory_dict = {
-                "material": material,
-                "container_no": data.get("pallet_no"),
-                "site_id": 15,
-                "qty": data.get("qty"),
-                "unit": order.unit,
-                "unit_weight": float(data.get("weight")) / float(data.get("qty")),
-                "total_weight": data.get("weight"),
-                "quality_status": data.get("quality_status"),
-                "lot_no": data.get("lot_no"),
-                "location": "预留",
-                "warehouse_info": order.warehouse_info,
-            }
-        else:
-            raise ValidationError("订单号不能为空")
-        MaterialInventory.objects.create(**material_inventory_dict)
-        try:
-            MaterialInventoryLog.objects.create(**data, **temp_data)
-        except Exception as e:
-            logger.error(e)
-            result = {"status": 0, "desc": "失败", "message": f"反馈异常{e}"}
-        else:
-            result = {"status": 1, "desc": "成功", "message": "反馈成功"}
-            if data.get("inventory_type"):  # 若加上当前反馈后出库数量已达到订单需求数量则改为(1:完成)
-                order.status = 1
-                order.finish_time = datetime.datetime.now()
-                order.save()
-        return Response(result)
+        return Response({"status": 1, "desc": "成功", "message": "反馈成功"})
+        #
+        # data = request.data
+        # # data = {'order_no':'20201114131845',"pallet_no":'20102494',
+        # #         'location':'二层前端','qty':'2','weight':'2.00',
+        # #         'quality_status':'合格','lot_no':'122222',
+        # #         'inout_num_type':'123456','fin_time':'2020-11-10 15:02:41'
+        # #         }
+        # data = dict(data)
+        # data.pop("status", None)
+        # order_no = data.get('order_no')
+        # if order_no:
+        #     temp = MaterialInventoryLog.objects.filter(order_no=order_no).aggregate(all_weight=Sum('weight'))
+        #     all_weight = temp.get("all_qty")
+        #     if all_weight:
+        #         all_weight += float(data.get("qty"))
+        #     else:
+        #         all_weight = float(data.get("qty"))
+        #     order = MaterialOutPlan.objects.filter(order_no=order_no).first()
+        #     if order:
+        #         need_weight = order.need_weight
+        #     else:
+        #         return Response({"status": 0, "desc": "失败", "message": "该订单非mes下发订单"})
+        #     if int(all_weight) >= need_weight:  # 若加上当前反馈后出库数量已达到订单需求数量则改为(1:完成)
+        #         order.status = 1
+        #         order.finish_time = datetime.datetime.now()
+        #         order.save()
+        #     temp_data = {}
+        #     temp_data['warehouse_no'] = order.warehouse_info.no
+        #     temp_data['warehouse_name'] = order.warehouse_info.name
+        #     temp_data['inout_reason'] = order.inventory_reason
+        #     temp_data['unit'] = order.unit
+        #     temp_data['initiator'] = order.created_user
+        #     temp_data['material_no'] = order.material_no
+        #     temp_data['start_time'] = order.created_date
+        #     temp_data['order_type'] = order.order_type if order.order_type else "出库"
+        #     temp_data['station'] = order.station
+        #     equip_list = list(set(order.equip.all().values_list("equip_no", flat=True)))
+        #     temp_data["dst_location"] = ",".join(equip_list)
+        #     material = Material.objects.filter(material_no=order.material_no).first()
+        #     material_inventory_dict = {
+        #         "material": material,
+        #         "container_no": data.get("pallet_no"),
+        #         "site_id": 15,
+        #         "qty": data.get("qty"),
+        #         "unit": order.unit,
+        #         "unit_weight": float(data.get("weight")) / float(data.get("qty")),
+        #         "total_weight": data.get("weight"),
+        #         "quality_status": data.get("quality_status"),
+        #         "lot_no": data.get("lot_no"),
+        #         "location": "预留",
+        #         "warehouse_info": order.warehouse_info,
+        #     }
+        # else:
+        #     raise ValidationError("订单号不能为空")
+        # MaterialInventory.objects.create(**material_inventory_dict)
+        # try:
+        #     MaterialInventoryLog.objects.create(**data, **temp_data)
+        # except Exception as e:
+        #     logger.error(e)
+        #     result = {"status": 0, "desc": "失败", "message": f"反馈异常{e}"}
+        # else:
+        #     result = {"status": 1, "desc": "成功", "message": "反馈成功"}
+        #     if data.get("inventory_type"):  # 若加上当前反馈后出库数量已达到订单需求数量则改为(1:完成)
+        #         order.status = 1
+        #         order.finish_time = datetime.datetime.now()
+        #         order.save()
+        # return Response(result)
 
 
 # 出库大屏
