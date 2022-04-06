@@ -815,6 +815,8 @@ class InventoryLogSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
     def get_initiator(self, obj):
+        if obj.order_type == '入库':
+            return obj.initiator
         if hasattr(obj, 'initiator'):
             task = OutBoundDeliveryOrderDetail.objects.filter(order_no=obj.order_no).first()
             if task:

@@ -217,7 +217,7 @@ class SchedulingParamsSetting(models.Model):
     scheduling_during_time = models.IntegerField(help_text='自动排程期间（小时）')
     scheduling_interval_trains = models.IntegerField(help_text='前后工序间隔车数（车）')
     scheduling_adaptable_trains = models.IntegerField(help_text='现场可修改计划数量（车）', blank=True, null=True)
-    min_stock_trains = models.FloatField(help_text='确保最低库存量（天）')
+    # min_stock_trains = models.FloatField(help_text='确保最低库存量（天）')
     scheduling_auto_time = models.CharField(max_length=32, help_text='排程参数自动统计时间', blank=True, null=True)
     standing_time = models.IntegerField(help_text='无S打加S放置期时间（小时）', blank=True, null=True)
     pkg_count = models.IntegerField(help_text='小料包一车包数')
@@ -228,6 +228,9 @@ class SchedulingParamsSetting(models.Model):
     mixing_interval_et_time = models.IntegerField(help_text='结束密炼间隔时间统计范围（秒）', blank=True, null=True)
     use_flag = models.BooleanField(help_text='是否考虑物料齐套')
     mixing_place_interval_time = models.FloatField(help_text='混炼各段次之间放置时间（小时）', blank=True, null=True)
+    small_ton_stock_days = models.DecimalField(help_text='小吨位目标库存天数', decimal_places=1, max_digits=8, default=0)
+    middle_ton_stock_days = models.DecimalField(help_text='中吨位目标库存天数', decimal_places=1, max_digits=8, default=0)
+    big_ton_stock_days = models.DecimalField(help_text='大吨位目标库存天数', decimal_places=1, max_digits=8, default=0)
 
     class Meta:
         db_table = 'aps_params_setting'
@@ -237,16 +240,29 @@ class SchedulingParamsSetting(models.Model):
 class SchedulingRecipeMachineSetting(AbstractEntity):
     rubber_type = models.CharField(max_length=32, help_text='胶料类别')
     product_no = models.CharField(max_length=32, help_text='胶料代码')
-    stage = models.CharField(max_length=32, help_text='胶料段次')
-    mixing_main_machine = models.CharField(max_length=128, help_text='混炼主机台')
-    mixing_vice_machine = models.CharField(max_length=128, help_text='混炼辅机台', blank=True, null=True)
-    final_main_machine = models.CharField(max_length=128, help_text='终炼主机台')
-    final_vice_machine = models.CharField(max_length=128, help_text='终炼辅机台', blank=True, null=True)
+    version = models.CharField(max_length=32, help_text='版本号', default='')
+    stages = models.CharField(max_length=32, help_text='胶料段次', default='')
+    # mixing_main_machine = models.CharField(max_length=128, help_text='混炼主机台')
+    # mixing_vice_machine = models.CharField(max_length=128, help_text='混炼辅机台', blank=True, null=True)
+    # final_main_machine = models.CharField(max_length=128, help_text='终炼主机台')
+    # final_vice_machine = models.CharField(max_length=128, help_text='终炼辅机台', blank=True, null=True)
+    main_machine_HMB = models.CharField(max_length=128, help_text='HMB主机台', default='')
+    vice_machine_HMB = models.CharField(max_length=128, help_text='HMB辅机台', default='')
+    main_machine_CMB = models.CharField(max_length=128, help_text='CMB主机台', default='')
+    vice_machine_CMB = models.CharField(max_length=128, help_text='CMB辅机台', default='')
+    main_machine_1MB = models.CharField(max_length=128, help_text='1MB主机台', default='')
+    vice_machine_1MB = models.CharField(max_length=128, help_text='1MB辅机台', default='')
+    main_machine_2MB = models.CharField(max_length=128, help_text='2MB主机台', default='')
+    vice_machine_2MB = models.CharField(max_length=128, help_text='2MB辅机台', default='')
+    main_machine_3MB = models.CharField(max_length=128, help_text='3MB主机台', default='')
+    vice_machine_3MB = models.CharField(max_length=128, help_text='3MB辅机台', default='')
+    main_machine_FM = models.CharField(max_length=128, help_text='FM主机台', default='')
+    vice_machine_FM = models.CharField(max_length=128, help_text='FM辅机台', default='')
 
     class Meta:
         db_table = 'aps_recipe_machine_setting'
         verbose_name_plural = verbose_name = '定机表'
-        unique_together = ('rubber_type', 'product_no', 'stage')
+        # unique_together = ('rubber_type', 'product_no', 'stage')
 
 
 class SchedulingEquipCapacity(AbstractEntity):

@@ -4,7 +4,7 @@ from rest_framework_jwt.views import obtain_jwt_token, refresh_jwt_token
 
 from system.views import UserViewSet, UserGroupsViewSet, GroupExtensionViewSet, SectionViewSet, \
     GroupAddUserViewSet, LoginView, Synchronization, GroupPermissions, PlanReceive, MaterialReceive, ResetPassword, \
-    DelUser
+    DelUser, IdentityCard
 
 # app_name = 'system'
 router = DefaultRouter()
@@ -29,4 +29,5 @@ urlpatterns = [
     path('material-receive/', MaterialReceive.as_view()),  # 接受上辅机同步来原材料的数据
     path('reset-password/', ResetPassword.as_view()),
     path('del-user/<pk>/', DelUser.as_view()),
+    path('identity-card/', IdentityCard.as_view())
 ]
