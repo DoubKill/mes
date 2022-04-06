@@ -321,6 +321,7 @@ permission_data = [
     {'id': 444, 'code': 'issue_xl_plan', 'name': '下达', 'parent_id': 439},
     {'id': 445, 'code': 'reload_xl_plan', 'name': '重传', 'parent_id': 439},
     {'id': 446, 'code': 'stop_xl_plan', 'name': '停止', 'parent_id': 439},
+    {'id': 801, 'code': 'auto_xl_plan', 'name': '手自动切换', 'parent_id': 439},
     {'id': 803, 'code': 'merge_xl_plan', 'name': '是否合包', 'parent_id': 439},
 
     {'id': 447, 'code': 'xl_report_basic', 'name': '小料称量车次报表', 'parent_id': None},

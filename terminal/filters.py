@@ -28,26 +28,6 @@ class FeedingLogFilter(django_filters.rest_framework.FilterSet):
         fields = ("date", "feeding_port")
 
 
-class WeightPackageManualFilter(django_filters.rest_framework.FilterSet):
-    product_no = django_filters.CharFilter(field_name='product_no', help_text='配方名称', lookup_expr='icontains')
-    bra_code = django_filters.CharFilter(field_name='bra_code', help_text='物料条码', lookup_expr='icontains')
-
-    class Meta:
-        model = WeightPackageManual
-        fields = ('bra_code', 'product_no', 'batching_equip', 'print_flag')
-
-
-class WeightPackageSingleFilter(django_filters.rest_framework.FilterSet):
-    product_no = django_filters.CharFilter(field_name='product_no', help_text='配方名称', lookup_expr='icontains')
-    material_name = django_filters.CharFilter(field_name='material_name', help_text='物料名称', lookup_expr='icontains')
-    bra_code = django_filters.CharFilter(field_name='bra_code', help_text='物料条码', lookup_expr='icontains')
-    dev_type = django_filters.CharFilter(field_name='dev_type__id', help_text='机型')
-
-    class Meta:
-        model = WeightPackageSingle
-        fields = ('batching_type', 'bra_code', 'product_no', 'material_name', 'dev_type', 'print_flag')
-
-
 class WeightTankStatusFilter(django_filters.rest_framework.FilterSet):
     tank_no = django_filters.CharFilter(field_name='tank_no', lookup_expr='icontains', help_text='料管编码')
     equip_no = django_filters.CharFilter(field_name='equip_no', lookup_expr='icontains', help_text='设备编码')
