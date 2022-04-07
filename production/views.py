@@ -2124,13 +2124,13 @@ class DailyProductionCompletionReport(APIView):
                                                 Q(product_no__icontains='-FM-'))
         fin_queryset = queryset2.values('factory_date__day').annotate(weight=Sum('actual_weight'))
         equip_190e_weight = Equip190EWeight.objects.filter(factory_date__year=year, factory_date__month=month).\
-            values('factory_date__day').annotate(weight=Sum('setup__weight'))
+            values('factory_date__day').annotate(weight=Sum('setup__weight'), qty=Sum('qty'))
         for item in mix_queryset:
             results['name_1']['weight'] += round(item['weight'] / 100000, 2)
             results['name_1'][f"{item['factory_date__day']}日"] = round(item['weight'] / 100000, 2)
         for item in equip_190e_weight:
-            results['name_2']['weight'] += round(item['weight'] / 1000, 2)
-            results['name_2'][f"{item['factory_date__day']}日"] = round(item['weight'] / 1000, 2)
+            results['name_2']['weight'] += round(item['weight'] / 1000 * item['qty'], 2)
+            results['name_2'][f"{item['factory_date__day']}日"] = round(item['weight'] / 1000 * item['qty'], 2)
         for item in fin_queryset:
             results['name_2']['weight'] += round(item['weight'] / 100000, 2)
             results['name_4']['weight'] += round(item['weight'] / 100000, 2)
@@ -2209,6 +2209,9 @@ class DailyProductionCompletionReport(APIView):
                               'classes': classes,
                               'qty': item['qty']},
                     factory_date=factory_date, classes=classes, setup=item['setup'])
+        elif data is None:
+            Equip190EWeight.objects.filter(factory_date=factory_date, classes=classes).delete()
+
         if date:
             year, month = int(date.split('-')[0]), int(date.split('-')[1])
             OuterMaterial.objects.filter(factory_date__year=year, factory_date__month=month).delete()
@@ -2983,11 +2986,11 @@ class PerformanceSummaryView(APIView):
                     ccjl_dic[equip] = price
             post_coefficient = post_coefficient if len(list(results1.values())[0]) > 1 else 1
             if post_standard == 1:  # 最大值
-                hj['ccjl'] = round(max(ccjl_dic.values()), 2)
-                hj['price'] = round(int(max(equip_price.values())) * post_coefficient * coefficient * a, 2)
+                hj['ccjl'] = round(max(ccjl_dic.values()), 2) if ccjl_dic.values() else 0
+                hj['price'] = round(int(max(equip_price.values())) * post_coefficient * coefficient * a, 2) if equip_price.values() else 0
             else:
-                hj['ccjl'] = round(sum(ccjl_dic.values()) / (len(results_sort) // 3), 2)
-                hj['price'] = round(hj['price'] / (len(results_sort) // 3) * post_coefficient * coefficient * a, 2)
+                hj['ccjl'] = round(sum(ccjl_dic.values()) / (len(results_sort) // 3), 2) if ccjl_dic.values() else 0
+                hj['price'] = round(hj['price'] / (len(results_sort) // 3) * post_coefficient * coefficient * a, 2) if equip_price.values() else 0
 
             return Response({'results': results_sort.values(), 'hj': hj, 'all_price': hj['price'], '超产奖励': hj['ccjl'], 'group_list': group_list})
 
