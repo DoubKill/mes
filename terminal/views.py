@@ -279,15 +279,16 @@ class BatchProductBatchingVIew(APIView):
                 other_xl = ProductBatchingDetail.objects.using('SFJ').filter(product_batching=pcp.product_batching,
                                                                              delete_flag=False, type=1,
                                                                              material__material_name__in=['细料', '硫磺']).last()
-                res.append({
-                    "material__material_name": f"通用料包({other_xl.material.material_name})", "actual_weight": 1, "standard_error": 1, "msg": "",
-                    "detail": [{
-                        "bra_code": common_scan.bra_code, "init_weight": Decimal(9999), "used_weight": Decimal(0),
-                        "single_need": Decimal(1), "scan_material": f"通用料包({other_xl.material.material_name})",
-                        "unit": "包", "msg": "", "id": 0, "scan_material_type": "机配",
-                        "adjust_left_weight": Decimal(9999)
-                    }]
-                })
+                if other_xl:  # 防止配方中没有料包但是扫了通用料包条码
+                    res.append({
+                        "material__material_name": f"通用料包({other_xl.material.material_name})", "actual_weight": 1, "standard_error": 1, "msg": "",
+                        "detail": [{
+                            "bra_code": common_scan.bra_code, "init_weight": Decimal(9999), "used_weight": Decimal(0),
+                            "single_need": Decimal(1), "scan_material": f"通用料包({other_xl.material.material_name})",
+                            "unit": "包", "msg": "", "id": 0, "scan_material_type": "机配",
+                            "adjust_left_weight": Decimal(9999)
+                        }]
+                    })
         return Response(res)
 
 

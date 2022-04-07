@@ -567,8 +567,8 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             else:
                 n_scan_material_type = attrs['tank_data'].get('scan_material_type')
                 check_flag = True
-                # 胶块4分钟内不超过3框, 胶皮10分钟内不超过4架
-                limit_data = {"胶块": [4, 3], "胶皮": [10, 4]}
+                # 胶块4分钟内不超过3框, 胶皮6分钟内不超过4架
+                limit_data = {"胶块": [4, 3], "胶皮": [6, 4]}
                 if n_scan_material_type in ['胶块', '胶皮']:
                     limit_minutes, limit_nums = limit_data[n_scan_material_type]
                     limit_time = datetime.now() - timedelta(minutes=limit_minutes)
