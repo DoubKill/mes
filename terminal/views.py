@@ -9,10 +9,9 @@ from django.db.transaction import atomic
 from django.db.utils import ConnectionDoesNotExist
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
-from django.views.generic import detail
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
-from rest_framework.decorators import action, permission_classes
+from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import CreateAPIView, ListAPIView
 from rest_framework.mixins import CreateModelMixin, ListModelMixin, UpdateModelMixin
@@ -22,7 +21,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from basics.models import WorkSchedulePlan, Equip, GlobalCode
-from equipment.models import EquipMachineHaltType, EquipPlan, EquipApplyOrder, EquipApplyRepair
+from equipment.models import EquipMachineHaltType
 from equipment.serializers import EquipApplyRepairSerializer
 from inventory.models import MaterialOutHistory
 from mes.common_code import CommonDeleteMixin, TerminalCreateAPIView, response, SqlClient
@@ -35,8 +34,7 @@ from recipe.models import ProductBatchingDetail, ProductBatching, ERPMESMaterial
     WeighBatchingDetail, ProductBatchingEquip
 from terminal.filters import FeedingLogFilter, WeightTankStatusFilter, WeightBatchingLogListFilter, \
     BatchingClassesEquipPlanFilter, CarbonTankSetFilter, \
-    FeedingOperationLogFilter, ReplaceMaterialFilter, ReturnRubberFilter, WeightPackageManualFilter, \
-    WeightPackageSingleFilter
+    FeedingOperationLogFilter, ReplaceMaterialFilter, ReturnRubberFilter
 from terminal.models import TerminalLocation, EquipOperationLog, WeightBatchingLog, FeedingLog, \
     WeightTankStatus, WeightPackageLog, Version, FeedingMaterialLog, LoadMaterialLog, MaterialInfo, Bin, RecipePre, \
     RecipeMaterial, ReportBasic, ReportWeight, Plan, LoadTankMaterialLog, PackageExpire, MaterialChangeLog, \
@@ -57,7 +55,7 @@ from terminal.serializers import LoadMaterialLogCreateSerializer, \
     ReplaceMaterialSerializer, ReturnRubberSerializer, ToleranceRuleSerializer, WeightPackageManualSerializer, \
     WeightPackageSingleSerializer, WeightPackageLogCUpdateSerializer
 from terminal.utils import TankStatusSync, CarbonDeliverySystem, out_task_carbon, get_tolerance, material_out_barcode, \
-    get_manual_materials, get_current_factory_date, CLSystem, get_common_equip, JZTankStatusSync
+    get_manual_materials, CLSystem, get_common_equip, xl_c_calculate
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -215,7 +213,7 @@ class BatchProductBatchingVIew(APIView):
                                     xl_weight = xl_instance.plan_weight if xl_instance else 0
                                 else:
                                     xl_weight = 0
-                                xl_material_name = f"{i['scan_material_type']}({i['material_name']}...[{xl_weight}])"
+                                xl_material_name = f"{i['scan_material_type']}({i['material_name']}...)[{xl_weight}]"
                                 xl_data = {'bra_code': i['bra_code'], 'init_weight': i['init_weight'],
                                            'used_weight': i['actual_weight'], 'single_need': i['single_need'],
                                            'scan_material': xl_material_name, 'unit': i['unit'],
@@ -437,7 +435,28 @@ class WeightBatchingLogViewSet(TerminalCreateAPIView, mixins.ListModelMixin, Gen
             tank_status_sync.sync(**kwargs)
         except:
             return response(success=False, message='打开料罐门失败！')
-        # WeightTankStatus.objects.filter(tank_no=instance.tank_no).update(open_flag=1)
+        # 开门成功判断次数并记录时间(公共变量(料罐扫码限制)设定)
+        tank_info = WeightTankStatus.objects.filter(equip_no=equip_no, tank_no=tank_no).last()
+        # 获取扫码限制
+        tank_level = '低料位' if tank_info.status == 1 else '其他料位'
+        global_info = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='料罐扫码限制', global_no=tank_level).last()
+        limit_times = int(global_info.global_name) if global_info else (10 if tank_level == '低料位' else 6)
+        # 本次开门料罐是否和上一次相同，相同则更新次数，不同则刷新数据
+        now_time = datetime.datetime.now()
+        if not tank_info.close_time:
+            # 判断次数
+            if tank_info.scan_times >= limit_times:
+                return response(success=False, message=f'已经扫码次数:{tank_info.scan_times}, 超过限制')
+            tank_info.scan_times += 1
+            tank_info.open_time = now_time
+            tank_info.save()
+        else:
+            tank_info.scan_times += 1
+            tank_info.open_time = now_time
+            tank_info.close_time = None
+            tank_info.save()
+            # 更新其他料罐状态
+            WeightTankStatus.objects.filter(~Q(tank_no=tank_no), equip_no=equip_no).update(close_time=now_time, scan_times=0)
         return response(success=True, data={"tank_no": tank_no}, message='{}号料罐门已打开'.format(tank_no))
 
 
@@ -727,7 +746,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         new_record = WeightPackageWms.objects.create(**{'bra_code': scan_bra_code, 'material_name': comm_material[0],
                                                                         'single_weight': single_weight, 'split_num': machine_split_count,
                                                                         'package_count': machine_package_count,
-                                                                        'batch_time': res.get('SM_CREATE'), 'standard_weight_old': record.standard_weight_old,
+                                                                        'batch_time': res.get('SM_CREATE'), 'standard_weight_old': standard_weight,
                                                                         'real_count': machine_package_count, 'now_package': record.now_package})
                         record.now_package = 0
                         record.save()
@@ -877,7 +896,6 @@ class WeightPackageManualViewSet(ModelViewSet):
     serializer_class = WeightPackageManualSerializer
     permission_classes = ()
     filter_backends = [DjangoFilterBackend]
-    filter_class = WeightPackageManualFilter
 
     def get_permissions(self):
         if self.request.query_params.get('client'):
@@ -885,35 +903,48 @@ class WeightPackageManualViewSet(ModelViewSet):
         else:
             return (IsAuthenticated(),)
 
+    def get_queryset(self):
+        query_set = self.queryset
+        product_no = self.request.query_params.get('product_no')
+        bra_code = self.request.query_params.get('bra_code')
+        batching_equip = self.request.query_params.get('batching_equip')
+        print_flag = self.request.query_params.get('print_flag')
+        filter_kwargs = {}
+        if product_no:
+            filter_kwargs['product_no__icontains'] = product_no
+        if bra_code:
+            filter_kwargs['bra_code__icontains'] = bra_code
+        if batching_equip:
+            filter_kwargs['batching_equip'] = batching_equip
+        if print_flag:
+            if print_flag in ['0', '1']:  # 打印、未打印
+                filter_kwargs['print_flag'] = print_flag
+            elif print_flag == '2':  # 失效
+                bra_codes = list(LoadTankMaterialLog.objects.filter(bra_code__startswith='MM').values_list('bra_code', flat=True).distinct())
+                filter_kwargs['bra_code__in'] = bra_codes
+            else:  # 过期
+                now_date = datetime.datetime.now().replace(microsecond=0)
+                filter_kwargs['expire_datetime__lt'] = now_date
+        query_set = query_set.filter(**filter_kwargs)
+        return query_set
+
     def list(self, request, *args, **kwargs):
         history = self.request.query_params.get('history')
         product_no = self.request.query_params.get('product_no')
         print_flag = self.request.query_params.get('print_flag')  # 2 失效 3 过期
         if history:
             res = {}
-            last_instance = self.get_queryset().filter(product_no=product_no).last()
+            last_instance = self.get_queryset().filter(product_no=product_no).first()
             if last_instance:
                 res.update({'batching_equip': last_instance.batching_equip, 'split_num': last_instance.split_num,
                             'package_count': last_instance.package_count, 'print_count': last_instance.print_count})
             return Response(res)
-        queryset = self.filter_queryset(self.get_queryset())
-        if print_flag == '2':
-            bra_codes = list(LoadTankMaterialLog.objects.filter(bra_code__startswith='MM').values_list('bra_code', flat=True).distinct())
-            queryset = queryset.filter(bra_code__in=bra_codes)
-        elif print_flag == '3':
-            now_time = datetime.datetime.now()
-            queryset = queryset.filter(Q(Q(product_no__icontains='FM') | Q(product_no__icontains='RFM') |
-                                         Q(product_no__icontains='RE'), created_date__lt=now_time - timedelta(days=5)) |
-                                       Q(~Q(Q(product_no__icontains='FM') | Q(product_no__icontains='RFM') |
-                                            Q(product_no__icontains='RE')), created_date__lt=now_time - timedelta(days=7)))
-        else:
-            queryset = queryset
-        page = self.paginate_queryset(queryset)
+        page = self.paginate_queryset(self.get_queryset())
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             return self.get_paginated_response(serializer.data)
 
-        serializer = self.get_serializer(queryset, many=True)
+        serializer = self.get_serializer(self.get_queryset(), many=True)
         return Response(serializer.data)
 
     @action(methods=['put'], detail=False, url_path='update_print_flag', url_name='update_print_flag')
@@ -935,7 +966,6 @@ class WeightPackageSingleViewSet(ModelViewSet):
     serializer_class = WeightPackageSingleSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = [DjangoFilterBackend]
-    filter_class = WeightPackageSingleFilter
 
     def get_permissions(self):
         if self.request.query_params.get('client'):
@@ -943,52 +973,76 @@ class WeightPackageSingleViewSet(ModelViewSet):
         else:
             return (IsAuthenticated(),)
 
+    def get_queryset(self):
+        query_set = self.queryset
+        product_no = self.request.query_params.get('product_no')
+        material_name = self.request.query_params.get('material_name')
+        bra_code = self.request.query_params.get('bra_code')
+        dev_type = self.request.query_params.get('dev_type')
+        batching_type = self.request.query_params.get('batching_type')
+        print_flag = self.request.query_params.get('print_flag')
+        filter_kwargs = {}
+        if product_no:
+            filter_kwargs['product_no__icontains'] = product_no
+        if material_name:
+            filter_kwargs['material_name__icontains'] = material_name
+        if bra_code:
+            filter_kwargs['bra_code__icontains'] = bra_code
+        if dev_type:
+            filter_kwargs['dev_type__id'] = dev_type
+        if batching_type:
+            filter_kwargs['batching_type'] = batching_type
+        if print_flag:
+            if print_flag in ['0', '1']:  # 打印、未打印
+                filter_kwargs['print_flag'] = print_flag
+            elif print_flag == '2':  # 失效
+                bra_codes = list(LoadTankMaterialLog.objects.filter(bra_code__startswith='MC').values_list('bra_code', flat=True).distinct())
+                filter_kwargs['bra_code__in'] = bra_codes
+            else:  # 过期
+                now_date = datetime.datetime.now().replace(microsecond=0)
+                filter_kwargs['expire_datetime__lt'] = now_date
+        query_set = query_set.filter(**filter_kwargs)
+        return query_set
+
     def list(self, request, *args, **kwargs):
         history = self.request.query_params.get('history')
         product_batching_id = self.request.query_params.get('product_batching')
         product_no = self.request.query_params.get('product_no')
-        print_flag = self.request.query_params.get('print_flag')  # 2 失效 3 过期
         material_name = self.request.query_params.get('material_name')
+        weight = self.request.query_params.get('weight')
         if history:
             res = {}
-            last_instance = self.get_queryset().filter(product_no=product_no, batching_type='配方').last()
-            if not last_instance:
-                return Response(res)
-            recipe_manual = ProductBatchingEquip.objects.filter(Q(feeding_mode__startswith='R') | Q(is_manual=True) | Q(~Q(type=1), feeding_mode__startswith='P'),
-                                                                product_batching_id=product_batching_id,
-                                                                material__material_name=last_instance.material_name)
-            if not recipe_manual:
-                return Response(res)
-            res.update({'material_name': last_instance.material_name, 'package_count': last_instance.package_count,
-                        'single_weight': last_instance.single_weight.split('±')[0], 'split_num': last_instance.split_num,
-                        'expire_day': last_instance.expire_day, 'print_count': last_instance.print_count})
+            if not material_name:  # 配方历史数据
+                last_instance = self.get_queryset().filter(product_no=product_no, batching_type='配方').first()
+                if not last_instance:
+                    return Response(res)
+                recipe_manual = ProductBatchingEquip.objects.filter(Q(feeding_mode__startswith='R') | Q(is_manual=True) | Q(~Q(type=1), feeding_mode__startswith='P'),
+                                                                    product_batching_id=product_batching_id,
+                                                                    material__material_name=last_instance.material_name)
+                if not recipe_manual:
+                    return Response(res)
+                res.update({'material_name': last_instance.material_name, 'package_count': last_instance.package_count,
+                            'single_weight': last_instance.single_weight.split('±')[0], 'split_num': last_instance.split_num,
+                            'expire_day': last_instance.expire_day, 'print_count': last_instance.print_count})
+            else:  # 通用历史数据
+                last_instance = self.get_queryset().filter(batching_type='通用', material_name=material_name).first()
+                if not last_instance:
+                    return Response(res)
+                res.update({'package_count': last_instance.package_count,
+                            'single_weight': last_instance.single_weight.split('±')[0],
+                            'expire_day': last_instance.expire_day, 'print_count': last_instance.print_count})
             return Response(res)
-        if material_name:
+        if weight:
             instance = self.get_queryset().filter(batching_type='通用', material_name=material_name).first()
             history_weight = '' if not instance else instance.single_weight.split('±')[0]
             return Response(history_weight)
         else:
-            queryset = self.filter_queryset(self.get_queryset())
-            if print_flag == '2':
-                bra_codes = list(LoadTankMaterialLog.objects.filter(bra_code__startswith='MC').values_list('bra_code', flat=True).distinct())
-                queryset = queryset.filter(bra_code__in=bra_codes)
-            elif print_flag == '3':
-                now_time = datetime.datetime.now()
-                queryset = queryset.filter(Q(Q(product_no__icontains='FM') | Q(product_no__icontains='RFM') |
-                                             Q(product_no__icontains='RE'),
-                                             created_date__lt=now_time - timedelta(days=5)) |
-                                           Q(~Q(Q(product_no__icontains='FM') | Q(product_no__icontains='RFM') |
-                                                Q(product_no__icontains='RE')),
-                                             created_date__lt=now_time - timedelta(days=7)))
-            else:
-                queryset = queryset
-
-            page = self.paginate_queryset(queryset)
+            page = self.paginate_queryset(self.get_queryset())
             if page is not None:
                 serializer = self.get_serializer(page, many=True)
                 return self.get_paginated_response(serializer.data)
 
-            serializer = self.get_serializer(queryset, many=True)
+            serializer = self.get_serializer(self.get_queryset(), many=True)
             return Response(serializer.data)
 
     @action(methods=['put'], detail=False, url_path='update_print_flag', url_name='update_print_flag')
@@ -1736,6 +1790,18 @@ class XLPlanVIewSet(ModelViewSet):
             n_instance.save()
         return Response('移动成功')
 
+    @action(methods=['post'], detail=False, url_path='auto_man', url_name='auto_man')
+    def auto_man(self, request):
+        """称量计划手自动模式切换"""
+        equip_no = self.request.data.get('equip_no')
+        auto = self.request.data.get('auto')  # 1代表切换成自动 0代表切换到手动
+        try:
+            client = CLSystem(equip_no)
+            res = client.auto_man(auto)
+        except:
+            res = '获取手自动模式失败'
+        return Response(res)
+
     @action(methods=['post'], detail=False, url_path='rotate_classes', url_name='rotate_classes')
     def rotate_classes(self, request):
         """称量计划结转班次"""
@@ -1786,6 +1852,7 @@ class XLPlanVIewSet(ModelViewSet):
                     plan.state = '完成'
                     plan.save()
                     handle_plan_data['stop'] = plan
+                    handle_plan_data['add'] = [new_plan]
                     handle_plan_data['issue'] = [new_plan]
                     continue
                 replace_order_by = max(order_by_list) + 1
@@ -1800,10 +1867,14 @@ class XLPlanVIewSet(ModelViewSet):
             try:
                 client = CLSystem(equip_no)
                 stop_plan = handle_plan_data.get('stop')
+                add = handle_plan_data.get('add')
                 issue_plan = handle_plan_data.get('issue')
                 if stop_plan:
                     # 终止运行中计划(下位机)
                     client.stop(stop_plan.planid)
+                if add:
+                    # 新增计划
+                    client.add_plan(add.planid)
                 if issue_plan:
                     for single_plan in issue_plan:
                         # 下达新计划
@@ -1871,12 +1942,15 @@ class UpdateFlagCountView(APIView):
         merge_flag = self.request.data.get('merge_flag')
         split_count = self.request.data.get('split_count')
         use_not = self.request.data.get('use_not', '')
+        delete_flag = self.request.data.get('delete_flag')
+        now_date = datetime.datetime.now().date() - timedelta(days=1)
+        pre_fix = now_date.strftime('%Y%m%d')[2:]
         if isinstance(use_not, int):
             recipe_instance = RecipePre.objects.using(equip_no).filter(id=rid)
+            if not recipe_instance:
+                raise ValidationError('数据发生变化，刷新后重试')
             recipe_name = recipe_instance.first().name
             if use_not == 1:  # 停用配方
-                now_date = datetime.datetime.now().date() - timedelta(days=1)
-                pre_fix = now_date.strftime('%Y%m%d')[2:]
                 processing_plan = Plan.objects.using(equip_no).filter(state='运行中', actno__gte=1).last()
                 if not processing_plan:
                     plan_recipes = Plan.objects.using(equip_no).filter(planid__gte=pre_fix, state=['运行中', '等待'], recipe=recipe_name).last()
@@ -1889,6 +1963,23 @@ class UpdateFlagCountView(APIView):
                     raise ValidationError('存在同名已经启用的配方')
             recipe_instance.update(use_not=use_not)
             return Response(f"{'停用' if use_not == 1 else '启用'}配方成功")
+        if delete_flag:
+            recipe_instance = RecipePre.objects.using(equip_no).filter(id=rid).last()
+            if not recipe_instance:
+                raise ValidationError('数据发生变化，刷新后重试')
+            # 运行中或者等待的配方不能删除
+            processing_plan = Plan.objects.using(equip_no).filter(state='运行中', actno__gte=1).last()
+            if not processing_plan:
+                plan_recipes = Plan.objects.using(equip_no).filter(planid__gte=pre_fix, state=['运行中', '等待'],
+                                                                   recipe=recipe_instance.name).last()
+            else:
+                plan_recipes = Plan.objects.using(equip_no).filter(id__gte=processing_plan.id, state__in=['运行中', '等待'],
+                                                                   recipe=recipe_instance.name).last()
+            if plan_recipes:
+                raise ValidationError(f'该配方存在状态为{plan_recipes.state}计划, 无法删除')
+            RecipeMaterial.objects.using(equip_no).filter(recipe_name=recipe_instance.name).delete()
+            recipe_instance.delete()
+            return Response("删除配方成功")
         filter_kwargs = {}
         if merge_flag is not None:
             filter_kwargs['merge_flag'] = merge_flag
@@ -2002,7 +2093,7 @@ class XLPlanCViewSet(ListModelMixin, GenericViewSet):
         for i in serializer.data:
             recipe_pre = RecipePre.objects.using(equip_no).filter(name=i['recipe'])
             dev_type = recipe_pre.first().ver.upper().strip() if recipe_pre else ''
-            i.update({'dev_type': dev_type})
+            i.update({'dev_type': dev_type, 'planid': i['planid'].strip()})
         return response(success=True, data=serializer.data)
 
 
@@ -2019,42 +2110,9 @@ class XLPromptViewSet(ListModelMixin, GenericViewSet):
     def list(self, request, *args, **kwargs):
         equip_no = self.request.query_params.get('equip_no')
         planid = self.request.query_params.get('planid')
-        if planid:
-            all_recipe = Plan.objects.using(equip_no).filter(planid=planid).values('recipe').annotate(setno_trains=Sum('setno'), actno_trains=Sum('actno'))
-        else:
-            date_now = datetime.datetime.now().date()
-            date_before = date_now - timedelta(days=1)
-            date_now_planid = ''.join(str(date_now).split('-'))[2:]
-            date_before_planid = ''.join(str(date_before).split('-'))[2:]
-            # 从称量系统同步料罐状态到mes表中
-            tank_status_sync = TankStatusSync(equip_no=equip_no)
-            try:
-                tank_status_sync.sync()
-            except:
-                return response(success=False, message='mes同步称量系统料罐状态失败')
-            try:
-                # 当天称量计划的所有配方名称
-                all_recipe = Plan.objects.using(equip_no).filter(
-                    Q(planid__startswith=date_now_planid) | Q(planid__startswith=date_before_planid),
-                    state__in=['运行中', '等待']).values('recipe').annotate(setno_trains=Sum('setno'), actno_trains=Sum('actno'))
-            except:
-                return response(success=False, message='称量机台{}错误'.format(equip_no))
-            if not all_recipe:
-                return response(success=False, message='机台{}无进行中或已完成的配料计划'.format(equip_no))
-        data = {}
-        for single_recipe in all_recipe:
-            need_trains = single_recipe.get('setno_trains') - (single_recipe.get('actno_trains') if single_recipe.get('actno_trains') else 0)
-            material_details = RecipeMaterial.objects.using(equip_no).filter(recipe_name=single_recipe.get('recipe'))
-            name_weight = {i.name: i.weight for i in material_details}
-            same_materials = self.get_queryset().filter(equip_no=equip_no, material_name__in=name_weight.keys()).values('tank_no', 'material_name', 'status')
-            if same_materials:
-                for single_material in same_materials:
-                    material_name = single_material.get('material_name')
-                    weight = name_weight.get(material_name)
-                    if material_name not in data:
-                        data.update({material_name: {'tank_no': single_material.get('tank_no'), 'need_weight': need_trains * weight, 'material_name': material_name, 'status': 0 if single_material.get('status') == 1 else (1 if single_material.get('status') == 3 else 2)}})
-                    else:
-                        data[material_name].update({'need_weight': data[material_name]['need_weight'] + need_trains * weight})
+        data = xl_c_calculate(equip_no, planid, self.get_queryset())
+        if isinstance(data, str):
+            return response(success=False, message=data)
         res = sorted(data.values(), key=lambda x: (x['status'], -x['need_weight']))
         return response(success=True, data=res)
 
@@ -2062,6 +2120,7 @@ class XLPromptViewSet(ListModelMixin, GenericViewSet):
 @method_decorator([api_recorder], name='dispatch')
 class WeightingTankStatus(APIView):
     """C#端获取料罐信息接口"""
+    queryset = WeightTankStatus.objects.filter(use_flag=True)
     permission_classes = (IsAuthenticated,)
 
     def get(self, request, *args, **kwargs):
@@ -2075,6 +2134,24 @@ class WeightingTankStatus(APIView):
         # 获取该机台号下所有料罐信息
         tanks_info = WeightTankStatus.objects.filter(equip_no=equip_no, use_flag=True) \
             .values('id', 'tank_no', 'tank_name', 'status', 'material_name', 'material_no', 'open_flag')
+        # 获取计划号
+        planids = ''
+        processing_plan = Plan.objects.using(equip_no).filter(state='运行中', actno__gte=1).order_by('id').last()
+        if processing_plan:
+            planids = processing_plan.planid.strip()
+            diff_no = processing_plan.setno - processing_plan.actno
+            if diff_no / processing_plan.setno <= 0.2:  # 不足20%查询下一条计划
+                next_plan = Plan.objects.using(equip_no).filter(state__in=['运行中', '等待'], order_by__gte=processing_plan.order_by, id__gt=processing_plan.id).order_by('order_by').first()
+                if next_plan:
+                    planids += f',{next_plan.planid.strip()}'
+            data = xl_c_calculate(equip_no, planids, self.queryset)
+            if isinstance(data, str):
+                data = {}
+        else:
+            data = {}
+        for i in tanks_info:
+            package_count = data.get(i['material_name'])['package_count'] if data.get(i['material_name']) else 0
+            i.update({'package_count': package_count})
         return response(success=True, data=list(tanks_info))
 
 
@@ -2933,24 +3010,26 @@ class ApplyHaltEquipView(APIView):
         opera_type = self.request.data.get('opera_type')
         if opera_type == 'repair':
             equip_no = self.request.data.get('equip_no')
-            equip_part_new = self.request.data.get('equip_part_new', None)
-            result_fault_desc = self.request.data.get('result_fault_desc')
+            equip_part_new = self.request.data.get('equip_part_new')
+            result_fault_desc = self.request.data.get('result_fault_desc', '')
             equip_condition = self.request.data.get('equip_condition', '不停机')
             created_data = {'equip_no': equip_no, 'plan_department': '生产部', 'fault_datetime': datetime.datetime.now(),
-                            'equip_part_new': equip_part_new, 'equip_condition': equip_condition}
+                            'equip_condition': equip_condition}
+            if equip_part_new != 0:
+                created_data['equip_part_new'] = equip_part_new
             if result_fault_desc:
                 created_data['result_fault_desc'] = result_fault_desc
             serializer = EquipApplyRepairSerializer(data=created_data, context={'request': request})
             serializer.is_valid(raise_exception=True)
             serializer.save()
-            return Response('报修成功')
+            return response(success=True, message='报修成功')
         else:
             halt_type = self.request.data.get('halt_type')
             halt_reason = self.request.data.get('halt_reason')
             halt_desc = self.request.data.get('halt_desc', None)
             create_data = {'halt_type': halt_type, 'halt_reason': halt_reason, 'halt_desc': halt_desc, 'created_user': self.request.user}
             instance = EquipHaltReason.objects.create(**create_data)
-            return Response('停机原因已记录')
+            return response(success=True, message='停机原因已记录')
 
 
 @method_decorator([api_recorder], name='dispatch')
@@ -3042,14 +3121,14 @@ class FormulaPreparationView(APIView):
             if xl_materials - set(mes_xl_materials.values_list('handle_material_name', flat=True)):  # 线体物料比配方多则pass
                 continue
             xl_recipe = RecipePre.objects.using(xl_equip).filter(name=product_no, use_not=0).last()
-            if not xl_recipe.time or xl_recipe.time in machine_dict:
+            if not xl_recipe or not xl_recipe.time or xl_recipe.time in machine_dict:
                 continue
             manual = mes_xl_materials.exclude(handle_material_name__in=xl_materials)\
                 .annotate(material__material_name=F('handle_material_name'),
                           actual_weight=F('cnt_type_detail_equip__standard_weight'),
                           standard_error=F('cnt_type_detail_equip__standard_error'))\
                 .values('material__material_name', 'actual_weight', 'standard_error')
-            machine_dict['time'] = {"machine": f"机配料包({list(xl_materials)[0]})", "weight": xl_recipe.weight,
+            machine_dict['time'] = {"machine": f"机配料包({list(xl_materials)[0]}...)", "weight": xl_recipe.weight,
                                     "error": xl_recipe.error, "manual": list(manual)}
         if machine_dict:
             res = machine_dict[max(machine_dict)]

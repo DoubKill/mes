@@ -20,7 +20,7 @@ from equipment.utils import DinDinAPI
 logger = logging.getLogger("send_ding_msg")
 
 
-def handle(order):
+def handle(order, now_date):
     # 提醒消息里的链接类型 False 非巡检  True 巡检
     inspection = False if order.work_type != '巡检' else True
     # 获取规则
@@ -38,7 +38,6 @@ def handle(order):
         start_warning_times = rule.start_warning_times
         accept_interval = rule.accept_interval
         accept_warning_times = rule.accept_warning_times
-    now_date = datetime.now().replace(microsecond=0)
     if order.status == "已指派":
         if not receive_interval or not receive_warning_times:
             logger.info(f"超时提醒: 规则不存在或未设置提醒间隔或次数:设备类型{equip_type},作业类型{order.work_type}-{order.work_order_no}")
@@ -227,5 +226,7 @@ if __name__ == "__main__":
     orders = repair_orders + inspect_orders
     if not orders:
         logger.info("超时提醒: 不存在需要超时提醒的工单")
+    now_date_str = datetime.now().replace(microsecond=0).strftime('%Y-%m-%d %H:%M')
+    now_date = datetime.strptime(now_date_str, '%Y-%m-%d %H:%M')
     for order in orders:
-        res = handle(order)
+        res = handle(order, now_date)

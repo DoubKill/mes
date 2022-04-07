@@ -234,6 +234,9 @@ class WeightTankStatus(AbstractEntity):
     status = models.PositiveIntegerField(help_text='状态，1：低位  2：高位, 3:正常位', choices=STATUS_CHOICE)
     open_flag = models.BooleanField(help_text='开启与否', default=False)
     equip_no = models.CharField(max_length=64, help_text='机台编号')
+    open_time = models.DateTimeField(help_text='开门时间', null=True, blank=True)
+    close_time = models.DateTimeField(help_text='关门时间', null=True, blank=True)
+    scan_times = models.IntegerField(help_text='扫码次数', default=0)
 
     class Meta:
         db_table = 'weight_tank_status'
@@ -672,6 +675,8 @@ class WeightPackageManual(AbstractEntity):
     print_flag = models.IntegerField(help_text='打印状态', default=False)
     real_count = models.IntegerField(help_text='配置数量', null=True, blank=True)
     ip_address = models.CharField(max_length=64, help_text='下发打印任务的ip地址', null=True, blank=True)
+    expire_day = models.IntegerField(help_text='有效期', default=0)
+    expire_datetime = models.DateTimeField(help_text='过期时间', null=True, blank=True)
 
     @property
     def manual_weight_names(self):
@@ -726,6 +731,7 @@ class WeightPackageSingle(AbstractEntity):
     begin_trains = models.IntegerField(help_text='起始车次')
     end_trains = models.IntegerField(help_text='结束车次', null=True, blank=True)
     expire_day = models.IntegerField(help_text='有效期')
+    expire_datetime = models.DateTimeField(help_text='过期时间', null=True, blank=True)
     package_count = models.IntegerField(help_text='配置数量')
     print_count = models.IntegerField(help_text='打印张数', null=True, blank=True)
     print_flag = models.IntegerField(help_text='打印状态', default=False)
