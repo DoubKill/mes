@@ -464,3 +464,12 @@ class Equip190ESerializer(serializers.ModelSerializer):
         if Equip190E.objects.filter(specification=specification, state=state).exists():
             raise serializers.ValidationError(f"{specification}  {state}已存在")
         return super().create(validated_data)
+
+
+class EquipStatusBatchSerializer(BaseModelSerializer):
+    """机台状况反馈"""
+
+    class Meta:
+        model = EquipStatus
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
