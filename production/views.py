@@ -58,7 +58,7 @@ from production.serializers import QualityControlSerializer, OperationLogSeriali
     ProcessFeedbackSerializer, TrainsFixSerializer, PalletFeedbacksBatchModifySerializer, ProductPlanRealViewSerializer, \
     RubberCannotPutinReasonSerializer, PerformanceJobLadderSerializer, ProductInfoDingJiSerializer, \
     SetThePriceSerializer, SubsidyInfoSerializer, Equip190EWeightSerializer, OuterMaterialSerializer, \
-    Equip190ESerializer
+    Equip190ESerializer, EquipStatusBatchSerializer
 from rest_framework.generics import ListAPIView, GenericAPIView, ListCreateAPIView, CreateAPIView, UpdateAPIView, \
     get_object_or_404
 from datetime import timedelta
@@ -570,15 +570,9 @@ class EquipStatusBatch(APIView):
 
     @atomic
     def post(self, request):
-        data_list = request.data
-        instance_list = []
-        for x in data_list:
-            x.pop("created_username")
-            x.pop("delete_user")
-            x.pop("last_updated_user")
-            x.pop("created_user")
-            instance_list.append(EquipStatus(**x))
-        EquipStatus.objects.bulk_create(instance_list)
+        serializer = EquipStatusBatchSerializer(data=request.data, many=True, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
         return Response("sync success", status=201)
 
 
