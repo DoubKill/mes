@@ -3195,6 +3195,12 @@ class AttendanceGroupSetupViewSet(ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filter_class = AttendanceGroupSetupFilter
 
+    @action(methods=['get'], detail=False, permission_classes=[], url_path='in_group', url_name='in_group')
+    def in_group(self, request):  # 判断用户是否在考勤组
+        name = self.request.user.username
+        res = AttendanceGroupSetup.objects.filter(Q(attendance_users__icontains=name) | Q(principal__icontains=name)).exists()
+        return Response({'status': res})
+
 
 @method_decorator([api_recorder], name="dispatch")
 class AttendanceClockViewSet(ModelViewSet):
