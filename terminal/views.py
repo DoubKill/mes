@@ -1828,57 +1828,63 @@ class XLPlanVIewSet(ModelViewSet):
     def handle_trans(self, equip_no, next_classes, now_datetime):
         with atomic(using=equip_no):
             now_date = now_datetime[:10]
-            # 获取最新计划的班次
-            plans = Plan.objects.using(equip_no).filter(state__in=['运行中', '等待'], date_time=now_date).order_by('order_by')
-            if not plans:
+            """
+            获取最新计划的班次[排序规则: -状态、班次、执行顺序]
+            next_classes 早班  grouptime
+            next_classes 中班  -grouptime
+            next_classes 夜班  早班切 -grouptime  中班切 grouptime
+            """
+            filter_date = [now_date] + [(datetime.datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')] if next_classes == '早班' else []
+            plan_list = Plan.objects.using(equip_no).filter(state__in=['运行中', '等待'], date_time__in=filter_date).order_by('-state')
+            if not plan_list:
                 return '未找到运行中或者等待的计划'
-            if plans.first().grouptime == next_classes:
+            now_classes = plan_list.first().grouptime
+            if now_classes == next_classes:
                 return '切换班次失败: 所选切换班次与当前班次一致'
+            classes_rule = '-grouptime' if next_classes == '中班' or (next_classes == '夜班' and now_classes == '早班') else 'grouptime'
+            order_rule = ['-state', classes_rule, 'order_by']
+            plans = plan_list.order_by(*order_rule)
             order_by_list = [0]
             handle_plan_data = {}
             plan_data = plans.values('recipe', 'recipe_id', 'recipe_ver', 'state', 'setno', 'actno', 'date_time', 'merge_flag')
             for index, plan in enumerate(plans):
-                if plan.state == '运行中' and plan.actno:
-                    if 'stop' in handle_plan_data:
-                        return '正在配料计划超过1条'
+                replace_order_by = max(order_by_list) + 1
+                if plan.state == '运行中':
                     first_plan_id = datetime.datetime.now().strftime('%Y%m%d%H%M%S')[2:]
                     p_data = plan_data[index]
+                    setno = p_data['setno'] - (p_data['actno'] if plan.actno else 0)
                     p_data.update({'planid': first_plan_id, 'grouptime': next_classes, 'oper': self.request.user.username,
-                                   'order_by': 1, 'date_time': now_date, 'setno': p_data['setno'] - p_data['actno'],
-                                   'actno': None, 'addtime': now_datetime})
+                                   'order_by': replace_order_by, 'date_time': now_date, 'setno': setno, 'actno': None,
+                                   'addtime': now_datetime})
                     new_plan = Plan.objects.using(equip_no).create(**p_data)
-                    order_by_list.append(1)
-                    plan.stoptime = now_datetime
-                    plan.state = '完成'
-                    plan.save()
-                    handle_plan_data['stop'] = plan
-                    handle_plan_data['add'] = [new_plan]
-                    handle_plan_data['issue'] = [new_plan]
-                    continue
-                replace_order_by = max(order_by_list) + 1
-                plan.grouptime = next_classes
-                plan.order_by = replace_order_by
-                plan.oper = self.request.user.username
-                plan.date_time = now_date
+                    if plan.actno:
+                        plan.stoptime = now_datetime
+                        handle_plan_data['stop'] = [plan] + ([] if not handle_plan_data.get('stop') else handle_plan_data['stop'])
+                        handle_plan_data['issue'] = [new_plan] + ([] if not handle_plan_data.get('issue') else handle_plan_data['issue'])
+                    else:
+                        handle_plan_data['stop'] = ([] if not handle_plan_data.get('stop') else handle_plan_data['stop']) + [plan]
+                        handle_plan_data['issue'] = ([] if not handle_plan_data.get('issue') else handle_plan_data['issue']) + [new_plan]
+                else:
+                    plan.grouptime = next_classes
+                    plan.order_by = replace_order_by
+                    plan.oper = self.request.user.username
+                    plan.date_time = now_date
                 plan.save()
                 order_by_list.append(replace_order_by)
-                if plan.state == '运行中':
-                    handle_plan_data['issue'] = handle_plan_data['issue'] + [plan] if 'issue' in handle_plan_data else [plan]
             try:
                 client = CLSystem(equip_no)
                 stop_plan = handle_plan_data.get('stop')
-                add = handle_plan_data.get('add')
                 issue_plan = handle_plan_data.get('issue')
                 if stop_plan:
                     # 终止运行中计划(下位机)
-                    client.stop(stop_plan.planid)
-                if add:
-                    # 新增计划
-                    client.add_plan(add.planid)
+                    for single_stop_plan in stop_plan:
+                        client.stop(single_stop_plan.planid)
                 if issue_plan:
-                    for single_plan in issue_plan:
+                    for single_issue_plan in issue_plan:
+                        # 通知新增计划
+                        client.add_plan(single_issue_plan.planid)
                         # 下达新计划
-                        client.issue_plan(single_plan.planid, single_plan.recipe, single_plan.setno)
+                        client.issue_plan(single_issue_plan.planid, single_issue_plan.recipe, single_issue_plan.setno)
             except Exception as e:
                 return e.args[0]
             return ''
