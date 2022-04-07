@@ -483,9 +483,9 @@ class ApplyForExtraWorkSerializer(serializers.ModelSerializer):
 
 
 class Equip190EWeightSerializer(serializers.ModelSerializer):
-    specification = serializers.ReadOnlyField(source='setup__specification')
-    state = serializers.ReadOnlyField(source='setup__state')
-    weight = serializers.ReadOnlyField(source='setup__weight')
+    specification = serializers.CharField(source='setup.specification', read_only=True)
+    state = serializers.CharField(source='setup.state', read_only=True)
+    weight = serializers.CharField(source='setup.weight', read_only=True)
 
     class Meta:
         model = Equip190EWeight
@@ -510,3 +510,12 @@ class Equip190ESerializer(serializers.ModelSerializer):
         if Equip190E.objects.filter(specification=specification, state=state).exists():
             raise serializers.ValidationError(f"{specification}  {state}已存在")
         return super().create(validated_data)
+
+
+class EquipStatusBatchSerializer(BaseModelSerializer):
+    """机台状况反馈"""
+
+    class Meta:
+        model = EquipStatus
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS

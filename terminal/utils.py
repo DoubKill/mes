@@ -2,8 +2,9 @@
     小料对接接口封装
 """
 import json
+import math
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 import requests
@@ -529,6 +530,24 @@ class CLSystem(object):
         ret = requests.post(self.url, data=data.encode('utf-8'), headers=headers, timeout=5)
         return ret
 
+    def auto_man(self, auto):
+        headers = {"Content-Type": "text/xml; charset=utf-8",
+                   "SOAPAction": "http://tempuri.org/INXWebService/auto_man"}
+
+        data = """<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
+               <soapenv:Header/>
+               <soapenv:Body>
+                  <tem:auto_man>
+                     <!--Optional:-->
+                     <tem:auto>{}</tem:auto>
+                  </tem:auto_man>
+               </soapenv:Body>
+            </soapenv:Envelope>""".format(auto)
+        auto_info = requests.post(self.url, data=data.encode('utf-8'), headers=headers, timeout=5)
+        res = auto_info.content.decode('utf-8')
+        auto_num = re.findall(r'<auto_manResult>(.*)</auto_manResult>', res)[0]
+        return int(auto_num)
+
 
 def get_tolerance(batching_equip, standard_weight, material_name=None, project_name='单个化工重量', only_num=None):
     if not standard_weight:
@@ -656,4 +675,58 @@ def compare_common_equip(product_no_dev, dev_type, equip_list):
         return False, f"通用配方设置投料方式不一致，无法下发: {','.join(equip_list)}"
     else:
         return True, equip_list
+
+
+def xl_c_calculate(equip_no, planid, queryset):
+    """获取计划物料用量 ex equip_no: F01  planid: 20201114131845,210517091223  queryset(料罐信息表数据)"""
+    if planid:
+        ids = planid.split(',')
+        all_recipe = Plan.objects.using(equip_no).filter(planid__in=ids).values('recipe').annotate(
+            setno_trains=Sum('setno'), actno_trains=Sum('actno'))
+    else:
+        date_now = datetime.now().date()
+        date_before = date_now - timedelta(days=1)
+        date_now_planid = ''.join(str(date_now).split('-'))[2:]
+        date_before_planid = ''.join(str(date_before).split('-'))[2:]
+        # 从称量系统同步料罐状态到mes表中
+        tank_status_sync = TankStatusSync(equip_no=equip_no)
+        try:
+            tank_status_sync.sync()
+        except:
+            return 'mes同步称量系统料罐状态失败'
+        try:
+            # 当天称量计划的所有配方名称
+            all_recipe = Plan.objects.using(equip_no).filter(
+                Q(planid__startswith=date_now_planid) | Q(planid__startswith=date_before_planid),
+                state__in=['运行中', '等待']).values('recipe').annotate(setno_trains=Sum('setno'), actno_trains=Sum('actno'))
+        except:
+            return f'称量机台{equip_no}错误'
+        if not all_recipe:
+            return f'机台{equip_no}无进行中或已完成的配料计划'
+    data = {}
+    for single_recipe in all_recipe:
+        need_trains = single_recipe.get('setno_trains') - (
+            single_recipe.get('actno_trains') if single_recipe.get('actno_trains') else 0)
+        material_details = RecipeMaterial.objects.using(equip_no).filter(recipe_name=single_recipe.get('recipe'))
+        name_weight = {i.name: i.weight for i in material_details}
+        same_materials = queryset.filter(equip_no=equip_no, material_name__in=name_weight.keys()).values(
+            'tank_no', 'material_name', 'status')
+        if same_materials:
+            for single_material in same_materials:
+                material_name = single_material.get('material_name')
+                weight = name_weight.get(material_name)
+                if material_name not in data:
+                    data.update({material_name: {'tank_no': single_material.get('tank_no'),
+                                                 'need_weight': need_trains * weight, 'material_name': material_name,
+                                                 'status': 0 if single_material.get('status') == 1 else (
+                                                     1 if single_material.get('status') == 3 else 2)}})
+                else:
+                    data[material_name].update(
+                        {'need_weight': data[material_name]['need_weight'] + need_trains * weight})
+    # 重量换算成包[通用重量25kg]
+    common_weight = 25
+    for i in data.values():
+        package_count = math.ceil(i['need_weight'] / common_weight)
+        i.update({'package_count': package_count})
+    return data
 

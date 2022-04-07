@@ -218,7 +218,7 @@ permission_data = [
     {'id': 183, 'code': 'view_check_unqualified_order', 'name': '查看', 'parent_id': 182},
     {'id': 184, 'code': 'add_check_unqualified_order', 'name': '检查科不合格处理', 'parent_id': 182},
 
-    {'id': 185, 'code': 'location', 'name': '基础信息-库存位管理', 'parent_id': None},
+    {'id': 185, 'code': 'location', 'name': '基础信息-位置点管理', 'parent_id': None},
     {'id': 186, 'code': 'view_location', 'name': '查看', 'parent_id': 185},
     {'id': 187, 'code': 'add_location', 'name': '新增', 'parent_id': 185},
     {'id': 188, 'code': 'change_location', 'name': '修改', 'parent_id': 185},
@@ -309,6 +309,7 @@ permission_data = [
     # {'id': 436, 'code': 'add_xl_recipe', 'name': '新增', 'parent_id': 434},
     # {'id': 437, 'code': 'change_xl_recipe', 'name': '修改', 'parent_id': 434},
     {'id': 438, 'code': 'upload_xl_recipe', 'name': '上传', 'parent_id': 434},
+    {'id': 800, 'code': 'del_xl_recipe', 'name': '删除', 'parent_id': 434},
     {'id': 802, 'code': 'merge_xl_recipe', 'name': '是否合包', 'parent_id': 434},
 
 
@@ -320,6 +321,7 @@ permission_data = [
     {'id': 444, 'code': 'issue_xl_plan', 'name': '下达', 'parent_id': 439},
     {'id': 445, 'code': 'reload_xl_plan', 'name': '重传', 'parent_id': 439},
     {'id': 446, 'code': 'stop_xl_plan', 'name': '停止', 'parent_id': 439},
+    {'id': 801, 'code': 'auto_xl_plan', 'name': '手自动切换', 'parent_id': 439},
     {'id': 803, 'code': 'merge_xl_plan', 'name': '是否合包', 'parent_id': 439},
 
     {'id': 447, 'code': 'xl_report_basic', 'name': '小料称量车次报表', 'parent_id': None},
@@ -743,15 +745,12 @@ permission_data = [
     {'id': 792, 'code': 'add_return_rubber', 'name': '新建', 'parent_id': 790},
     {'id': 793, 'code': 'print_return_rubber', 'name': '打印', 'parent_id': 790},
 
-    {'id': 794, 'code': 'weighting_package_manual', 'name': '单配(合包)化工流转卡', 'parent_id': None},
+    {'id': 794, 'code': 'weighting_package_manual', 'name': '人工单配卡片打印', 'parent_id': None},
     {'id': 795, 'code': 'view_weighting_package_manual', 'name': '查看', 'parent_id': 794},
-    {'id': 796, 'code': 'add_weighting_package_manual', 'name': '新建', 'parent_id': 794},
-    {'id': 797, 'code': 'print_weighting_package_manual', 'name': '打印', 'parent_id': 794},
-
-    {'id': 798, 'code': 'weighting_package_single', 'name': '单配(配方/通用)化工流转卡', 'parent_id': None},
-    {'id': 799, 'code': 'view_weighting_package_single', 'name': '查看', 'parent_id': 798},
-    {'id': 800, 'code': 'add_weighting_package_single', 'name': '新建', 'parent_id': 798},
-    {'id': 801, 'code': 'print_weighting_package_single', 'name': '打印', 'parent_id': 798},
+    {'id': 796, 'code': 'add_weighting_package_manual', 'name': '细料硫磺单配新建', 'parent_id': 794},
+    {'id': 797, 'code': 'print_weighting_package_manual', 'name': '细料硫磺单配打印', 'parent_id': 794},
+    {'id': 798, 'code': 'add2_weighting_package_manual', 'name': '配方(通用)新建', 'parent_id': 794},
+    {'id': 799, 'code': 'print2_weighting_package_manual', 'name': '配方(通用)打印', 'parent_id': 794},
 
     {'id': 804, 'code': 'durate_putin_reason', 'name': '不合格品原因统计', 'parent_id': None},
     {'id': 805, 'code': 'view_durate_putin_reason', 'name': '查看', 'parent_id': 804},
@@ -801,6 +800,8 @@ permission_data = [
     {'id': 840, 'code': 'daily_production_completion_report', 'name': '月产量完成报表', 'parent_id': None},
     {'id': 841, 'code': 'view_daily_production_completion_report', 'name': '查看', 'parent_id': 840},
     {'id': 842, 'code': 'export_daily_production_completion_report', 'name': '导出', 'parent_id': 840},
+    {'id': 970, 'code': 'add_daily_production_completion_report', 'name': '添加', 'parent_id': 840},
+    {'id': 971, 'code': 'save_daily_production_completion_report', 'name': '保存', 'parent_id': 840},
 
     {'id': 843, 'code': 'aps_params_setting', 'name': '排程参数设定', 'parent_id': None},
     {'id': 844, 'code': 'view_aps_params_setting', 'name': '查看', 'parent_id': 843},
@@ -904,6 +905,7 @@ permission_data = [
     {'id': 929, 'code': 'view_performance_summary', 'name': '查看', 'parent_id': 928},
     {'id': 930, 'code': 'import_performance_summary', 'name': '导入', 'parent_id': 928},
     {'id': 931, 'code': 'export_performance_summary', 'name': '导出', 'parent_id': 928},
+    {'id': 969, 'code': 'change_performance_summary', 'name': '确定', 'parent_id': 928},
 
     {'id': 932, 'code': 'performance_job_ladder', 'name': '岗位阶梯表', 'parent_id': None},
     {'id': 933, 'code': 'view_performance_job_ladder', 'name': '查看', 'parent_id': 932},
@@ -951,7 +953,20 @@ permission_data = [
     {'id': 967, 'code': 'formula_preparation', 'name': '生产投料配方查询', 'parent_id': None},
     {'id': 968, 'code': 'view_formula_preparation', 'name': '查看', 'parent_id': 967},
 
-    # 下一个 969 开始
+    {'id': 972, 'code': 'equip_190e', 'name': '190E机台规格信息', 'parent_id': None},
+    {'id': 973, 'code': 'view_equip_190e', 'name': '查看', 'parent_id': 972},
+    {'id': 974, 'code': 'add_equip_190e', 'name': '添加', 'parent_id': 972},
+    {'id': 975, 'code': 'import_equip_190e', 'name': '导入', 'parent_id': 972},
+    {'id': 976, 'code': 'delete_equip_190e', 'name': '删除', 'parent_id': 972},
+    {'id': 977, 'code': 'change_equip_190e', 'name': '修改', 'parent_id': 972},
+
+    {'id': 978, 'code': 'rubber_out', 'name': 'PDA胶料外发', 'parent_id': None},
+    {'id': 979, 'code': 'view_rubber_out', 'name': '查看', 'parent_id': 978},
+
+    {'id': 980, 'code': 'powder_feed', 'name': 'PDA粉料罐投料', 'parent_id': None},
+    {'id': 981, 'code': 'view_powder_feed', 'name': '查看', 'parent_id': 980},
+
+    # 下一个 982 开始
 ]
 
 

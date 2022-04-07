@@ -318,13 +318,12 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                         flag, send_flag = False, False
                     # 通配条码(MC开头)需要判别有效期
                     if flag and bra_code.startswith('MC'):
-                        expire_datetime = single.created_date + timedelta(days=single.expire_day)
-                        if now_date > expire_datetime:
+                        if now_date > single.expire_datetime:
                             res = self.material_pass(plan_classes_uid, scan_material, reason_type='超过有效期', material_type=scan_material_type)
                             if not res[0]:
                                 scan_material_msg = '通用配方包已过期, 请工艺确认'
                                 if not ReplaceMaterial.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code, reason_type='超过有效期'):
-                                    replace_material_data.update({'reason_type': '超过有效期', 'expire_datetime': expire_datetime})
+                                    replace_material_data.update({'reason_type': '超过有效期', 'expire_datetime': single.expire_datetime})
                                     ReplaceMaterial.objects.create(**replace_material_data)
                                 record_data.update({'other_type': scan_material_type})
                                 OtherMaterialLog.objects.create(**record_data)
@@ -430,8 +429,6 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                             raise serializers.ValidationError('扫码合包配置冲突')
                         replace_material_data.update({'material_type': '人工配'})
                         product_no_dev = re.split(r'\(|\（|\[', manual.product_no)[0]
-                        package_expire = PackageExpire.objects.filter(product_no__startswith=manual.product_no).first()
-                        expire_days = 0 if not package_expire else (package_expire.package_fine_usefullife if 'F' in manual.batching_equip else package_expire.package_sulfur_usefullife)
                         if manual.dev_type != classes_plan.equip.category.category_name:
                             raise serializers.ValidationError('投料与生产机型不一致, 无法投料')
                         if product_no_dev != classes_plan.product_batching.stage_product_batch_no:
@@ -441,7 +438,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                 if not ReplaceMaterial.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code):
                                     ReplaceMaterial.objects.create(**replace_material_data)
                                 flag, send_flag = False, False
-                        if flag and expire_days != 0 and now_date - manual.created_date > timedelta(days=expire_days):
+                        if flag and manual.expire_day != 0 and now_date > manual.expire_datetime:
                             res = self.material_pass(plan_classes_uid, scan_material, reason_type='超过有效期', material_type=scan_material_type)
                             if not res[0]:
                                 scan_material_msg = '料包已过期, 请工艺确认'
@@ -568,12 +565,25 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 attrs['status'] = 1
             # 同物料扫码
             else:
-                last_same_material = add_materials.first()
-                weight = total_weight + last_same_material.real_weight
-                attrs['tank_data'].update({'actual_weight': 0, 'adjust_left_weight': weight, 'real_weight': weight,
-                                           'init_weight': weight, 'single_need': single_material_weight,
-                                           'pre_material_id': last_same_material.id})
-                attrs['status'] = 1
+                n_scan_material_type = attrs['tank_data'].get('scan_material_type')
+                check_flag = True
+                # 胶块4分钟内不超过3框, 胶皮10分钟内不超过4架
+                limit_data = {"胶块": [4, 3], "胶皮": [10, 4]}
+                if n_scan_material_type in ['胶块', '胶皮']:
+                    limit_minutes, limit_nums = limit_data[n_scan_material_type]
+                    limit_time = datetime.now() - timedelta(minutes=limit_minutes)
+                    num = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, material_name=material_name, scan_time__gte=limit_time).count()
+                    if num >= limit_nums:
+                        check_flag = False
+                        attrs['tank_data'].update({'msg': '扫码过快: 胶皮10分钟不超过4架/胶块4分钟3框'})
+                        attrs['status'] = 2
+                if check_flag:
+                    last_same_material = add_materials.first()
+                    weight = total_weight + last_same_material.real_weight
+                    attrs['tank_data'].update({'actual_weight': 0, 'adjust_left_weight': weight, 'real_weight': weight,
+                                               'init_weight': weight, 'single_need': single_material_weight,
+                                               'pre_material_id': last_same_material.id})
+                    attrs['status'] = 1
         return attrs
 
     def create(self, validated_data):
@@ -631,7 +641,7 @@ class ReturnRubberSerializer(BaseModelSerializer):
         batch_class = '早班' if '08:00:00' < str(now_date)[-8:] < '20:00:00' else '夜班'
         record = WorkSchedulePlan.objects.filter(plan_schedule__day_time=str(now_date)[:10], classes__global_name=batch_class,
                                                  plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
-        batch_group = record.group.global_name
+        batch_group = record.group.global_name if record else ''
         # 生成条码
         prefix_code = f"AAJ1Z20{now_date.date().strftime('%Y%m%d')}{classes_dict[batch_class]}"
         max_code = ReturnRubber.objects.filter(bra_code__startswith=prefix_code).aggregate(max_code=Max('bra_code'))['max_code']
@@ -722,29 +732,39 @@ class WeightBatchingLogCreateSerializer(BaseModelSerializer):
 
     def validate(self, attr):
         equip_no = attr['equip_no']
-        dev_type = attr['dev_type']
         bra_code = attr['bra_code']
-        batch_classes = attr['batch_classes']
-        batch_group = attr['batch_group']
-        location_no = attr['location_no']
-        # 查原材料出库履历查到原材料物料编码
-        try:
-            res = material_out_barcode(bra_code)
-        except Exception as e:
-            if settings.DEBUG:
-                res = None
-            else:
-                raise serializers.ValidationError(e)
         material_name = material_no = ''
-        if not res:
-            raise serializers.ValidationError('未找到条码对应信息')
-        attr['scan_material'] = res.get('WLMC')
-        material_name_set = set(ERPMESMaterialRelation.objects.filter(
-            zc_material__wlxxid=res['WLXXID'],
-            use_flag=True
-        ).values_list('material__material_name', flat=True))
-        if not material_name_set:
-            raise serializers.ValidationError('该物料未与MES原材料建立绑定关系！')
+        if bra_code.startswith('MC'):  # 通用原材料卡片条码(mes生成)
+            single = WeightPackageSingle.objects.filter(batching_type='通用', bra_code=bra_code).last()
+            if not single:
+                raise serializers.ValidationError('未找到通用条码信息')
+            init_count = single.package_count
+            scan_material = single.material_name
+            material_name_set = {single.material_name}
+        else:
+            # 查原材料出库履历查到原材料物料编码
+            try:
+                res = material_out_barcode(bra_code)
+            except Exception as e:
+                if settings.DEBUG:
+                    res = None
+                else:
+                    raise serializers.ValidationError(e)
+            if not res:
+                raise serializers.ValidationError('未找到条码对应信息')
+            scan_material = res.get('WLMC')
+            material_name_set = set(ERPMESMaterialRelation.objects.filter(
+                zc_material__wlxxid=res['WLXXID'],
+                use_flag=True
+            ).values_list('material__material_name', flat=True))
+            if not material_name_set:
+                raise serializers.ValidationError('该物料未与MES原材料建立绑定关系！')
+            init_count = res.get('SL', 0)
+            # 查看条码数量是否用完
+        used_num = WeightBatchingLog.objects.filter(bra_code=bra_code, status=1).count()
+        if used_num >= init_count:
+            raise serializers.ValidationError('条码数量已经使用完, 请扫新条码')
+        attr['scan_material'] = scan_material
         # 机台计划配方的所有物料名
         try:
             date_now = datetime.now().date()
@@ -764,8 +784,6 @@ class WeightBatchingLogCreateSerializer(BaseModelSerializer):
         if comm_material:
             material_name = comm_material[0]
             material_no = comm_material[0]
-        # else:
-        #     raise serializers.ValidationError('所扫物料不在机台{}所有配料计划配方中'.format(equip_no))
         attr['batch_time'] = datetime.now()
         # 扫码物料不在当日计划配方对应原材料中
         if not material_name:
@@ -1121,12 +1139,6 @@ class WeightPackageManualSerializer(BaseModelSerializer):
 
     def to_representation(self, instance):
         res = super().to_representation(instance)
-        # 获取有效期
-        expire_datetime = '9999-09-09 00:00:00'
-        expire_record = PackageExpire.objects.filter(product_no=f"{instance.product_no}({instance.dev_type})").first()
-        if expire_record:
-            expire_day = expire_record.package_fine_usefullife if 'F' in instance.batching_equip else expire_record.package_sulfur_usefullife
-            expire_datetime = expire_datetime if expire_day == 0 else str(instance.created_date + timedelta(days=expire_day))
         manual_details = []
         r_client = self.context.get('request')
         client = r_client.query_params.get('client') if r_client else None
@@ -1138,7 +1150,7 @@ class WeightPackageManualSerializer(BaseModelSerializer):
                     'material_name': material_name, 'standard_weight': i.standard_weight, 'batch_type': i.batch_type,
                     'tolerance': i.tolerance}
             manual_details.append(item)
-        res.update({'manual_details': manual_details, 'expire_datetime': expire_datetime, 'package_count': instance.real_count})
+        res.update({'manual_details': manual_details, 'package_count': instance.real_count})
         return res
 
     @atomic
@@ -1147,6 +1159,7 @@ class WeightPackageManualSerializer(BaseModelSerializer):
         now_date = datetime.now().replace(microsecond=0)
         batching_equip = validated_data.get('batching_equip')
         package_count = validated_data.get('package_count')
+        product_no = validated_data.get('product_no')
         manual_details = validated_data.pop('manual_details', [])
         # 班次, 班组
         batch_class = '早班' if '08:00:00' <= str(now_date)[-8:] < '20:00:00' else '夜班'
@@ -1167,10 +1180,18 @@ class WeightPackageManualSerializer(BaseModelSerializer):
                                             small_num__lt=total_weight, big_num__gte=total_weight, use_flag=True).first()
         tolerance = f"{rule.handle.keyword_name}{rule.standard_error}{rule.unit}" if rule else ""
         single_weight = f"{str(total_weight)}{tolerance}"
+        # 增加有效期
+        expire_day, expire_datetime = 0, '9999-09-09 00:00:00'
+        expire_record = PackageExpire.objects.filter(product_no=f"{product_no}").first()
+        if expire_record:
+            expire_day = expire_record.package_fine_usefullife if 'F' in batching_equip else expire_record.package_sulfur_usefullife
+            expire_datetime = expire_datetime if expire_day == 0 else (now_date + timedelta(days=expire_day)).strftime('%Y-%m-%d %H:%M:%S')
         validated_data.update({'created_user': self.context['request'].user, 'batch_class': batch_class, 'real_count': package_count,
                                'batch_group': batch_group, 'bra_code': bra_code, 'single_weight': single_weight,
                                'end_trains': validated_data['begin_trains'] + validated_data['package_count'] - 1,
-                               'print_flag': True, 'print_datetime': now_date, 'ip_address': self.context['request'].META.get('REMOTE_ADDR')})
+                               'print_flag': True, 'print_datetime': now_date, 'expire_day': expire_day,
+                               'expire_datetime': expire_datetime,
+                               'ip_address': self.context['request'].META.get('REMOTE_ADDR')})
         instance = super().create(validated_data)
         # 添加单配物料详情
         for item in manual_details:
@@ -1200,13 +1221,13 @@ class WeightPackageSingleSerializer(BaseModelSerializer):
 
     def to_representation(self, instance):
         res = super().to_representation(instance)
-        res.update({'batch_type': '人工配', 'expire_datetime': str(instance.created_date + timedelta(days=instance.expire_day)),
-                    'batch_time': res['created_date'][:10]})
+        res.update({'batch_type': '人工配', 'batch_time': res['created_date'][:10]})
         return res
 
     @atomic
     def create(self, validated_data):
         feeding_mode = validated_data.pop('feeding_mode')
+        expire_day = validated_data.get('expire_day')
         map_list = {"早班": '1', "中班": '2', "夜班": '3'}
         now_date = datetime.now().replace(microsecond=0)
         material_name, single_weight, split_num = validated_data.get('material_name'), validated_data.get('single_weight'), validated_data.get('split_num')
@@ -1222,7 +1243,7 @@ class WeightPackageSingleSerializer(BaseModelSerializer):
         record = WorkSchedulePlan.objects.filter(plan_schedule__day_time=str(now_date.date()),
                                                  classes__global_name=batch_class,
                                                  plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
-        batch_group = record.group.global_name
+        batch_group = record.group.global_name if record else ''
         # 条码
         if feeding_mode.startswith('R'):
             bra_code = ''
@@ -1237,7 +1258,9 @@ class WeightPackageSingleSerializer(BaseModelSerializer):
         validated_data.update({'created_user': self.context['request'].user, 'batch_class': batch_class,
                                'batch_group': batch_group, 'bra_code': bra_code, 'single_weight': single_weight,
                                'end_trains': validated_data['begin_trains'] + validated_data['package_count'] - 1,
-                               'print_flag': True, 'print_datetime': now_date, 'ip_address': self.context['request'].META.get('REMOTE_ADDR')})
+                               'print_flag': True, 'print_datetime': now_date,
+                               'expire_datetime': now_date + timedelta(days=expire_day),
+                               'ip_address': self.context['request'].META.get('REMOTE_ADDR')})
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
