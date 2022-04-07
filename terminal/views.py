@@ -155,7 +155,7 @@ class BatchProductionInfoView(APIView):
                     else:
                         trains = max_feed_log.trains
                     # 不是第一车开始投入或者中间关掉重开需要扣重失败时扫码(校正车次)能够调用群控handle_feed
-                    failed_feed = FeedingMaterialLog.objects.using('SFJ').filter(plan_classes_uid=plan.plan_classes_uid, add_feed_result=1).last()
+                    failed_feed = FeedingMaterialLog.objects.using('SFJ').filter(plan_classes_uid=plan.plan_classes_uid, add_feed_result=1).order_by('id').last()
                     if failed_feed and failed_feed.trains > trains:
                         trains = failed_feed.trains
                 else:
