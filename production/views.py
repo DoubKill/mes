@@ -2469,9 +2469,9 @@ class EmployeeAttendanceRecordsView(APIView):
             value = item['user__username'] if int(item['actual_time']) == 12 else '%s(%.1f)' % (item['user__username'], item['actual_time'])
 
             if results[f'{equip}_{section}'].get(f"{item['factory_date__day']}{item['group']}"):
-                results[f'{equip}_{section}'][f"{item['factory_date__day']}{item['group']}"] += f', {value}'
+                results[f'{equip}_{section}'][f"{item['factory_date__day']}{item['group']}"].append(value)
             else:
-                results[f'{equip}_{section}'][f"{item['factory_date__day']}{item['group']}"] = value
+                results[f'{equip}_{section}'][f"{item['factory_date__day']}{item['group']}"] = [value]
         res = list(results.values())
         for item in res:
             item['equip'] = '' if not item.get('equip') else item['equip']
@@ -2779,6 +2779,9 @@ class PerformanceSummaryView(APIView):
         # 员工独立上岗系数
         coefficient = GlobalCode.objects.filter(global_type__type_name='是否独立上岗系数').values('global_no', 'global_name')
         coefficient_dic = {dic['global_no']: dic['global_name'] for dic in coefficient}
+        # 员工类别
+        employee_type = GlobalCode.objects.filter(global_type__type_name='员工类别').values('global_no', 'global_name')
+        employee_type_dic = {dic['global_no']: dic['global_name'] for dic in employee_type}
         # 超产奖励系数
         coefficient1 = GlobalCode.objects.filter(global_type__type_name='超产单价').values('global_no', 'global_name')
         coefficient1_dic = {dic['global_no']: dic['global_name'] for dic in coefficient1}
@@ -2885,9 +2888,9 @@ class PerformanceSummaryView(APIView):
         results1 = {}
         # 是否独立上岗
         independent = {}
-        independent_lst = IndependentPostTemplate.objects.filter(date_time=date).values_list('name', 'status')
+        independent_lst = IndependentPostTemplate.objects.filter(date_time=date).values('name', 'status', 'work_type')
         for item in independent_lst:
-            independent[item[0]] = item[1]
+            independent[item['name']] = {'status': item['status'], 'work_type': item['work_type']}
         # 取机台历史最大值
         max_value = self.get_equip_max_value()
         # 取每个机台设定的目标值
@@ -2913,48 +2916,52 @@ class PerformanceSummaryView(APIView):
         if day_d and group_d:
             start_with = f"{name_d}_{day_d}_{group_d}"
             results1 = {k: v for k, v in results1.items() if k.startswith(start_with)}
-            section = EmployeeAttendanceRecords.objects.filter(user__username=name_d).first().section
-            coefficient = section_info[section]['coefficient'] / 100
-            post_coefficient = section_info[section]['post_coefficient'] / 100
-            post_standard = section_info[section]['post_standard']  # 1最大值 2 平均值
             ccjl_dic = {}
             results = {}
             results_sort = {}
             equip_qty = {}
             equip_price = {}
             hj = {'name': '产量工资合计', 'price': 0}
-            if len(list(results1.values())[0][0]) == 7:
-                return Response()
-            for item in list(results1.values())[0]:
-                section, name, day, group, equip = item.get('section'), item.get('name'), item.get('day'), item.get( 'group'), item.get('equip')
-                for k in item.keys():
-                    if k.split('_')[-1] == 'qty':
-                        state = k.split('_')[0]  # 1MB
-                        type1 = k.split('_')[1]
-                        qty = item.get(f"{state}_{type1}_qty")  # 数量
-                        unit = item.get(f"{state}_{type1}_unit")  # 单价
-                        equip_qty[equip] = equip_qty.get(equip, 0) + qty
-                        equip_price[equip] = equip_price.get(equip, 0) + round(qty * unit, 2)
-                        hj[state] = round(hj.get(state, 0) + qty * unit, 2)
-                        hj['price'] += round(qty * unit, 2)
-                        type2 = '普通' if type1 == 'pt' else '丁基'
-                        if results.get(f"{equip}_{type2}_1"):  # Z01_普通_1
-                            results[f"{equip}_{type2}_1"].update({state: item[k]})
-                            results[f"{equip}_{type2}_2"].update({state: item[f"{state}_{type1}_unit"]})
-                            results[f"{equip}_{type2}_3"].update({state: section})
-                        else:
-                            results[f"{equip}_{type2}_1"] = {'name': f"{equip}{type2}-车数", state: item[k]}
-                            results[f"{equip}_{type2}_2"] = {'name': f"{equip}{type2}-单价",
-                                                             state: item[f"{state}_{type1}_unit"]}
-                            results[f"{equip}_{type2}_3"] = {'name': f"{equip}{type2}-岗位", state: section}
+            for item in results1.values():
+                for dic in item:
+                    section, equip = dic['section'], dic['equip']
+                    if len(dic) == 7:
+                        continue
+                    for k in dic.keys():
+                        if k.split('_')[-1] == 'qty':
+                            state = k.split('_')[0]
+                            type1 = k.split('_')[1]
+                            qty = dic.get(f"{state}_{type1}_qty")  # 数量
+                            unit = dic.get(f"{state}_{type1}_unit")  # 单价
+                            equip_qty[f'{equip}_{section}'] = equip_qty.get(f'{equip}_{section}', 0) + qty
+                            equip_price[f'{equip}_{section}'] = equip_price.get(f'{equip}_{section}', 0) + round(qty * unit, 2)
+                            hj[state] = round(hj.get(state, 0) + qty * unit, 2)
+                            hj['price'] += round(qty * unit, 2)
+                            type2 = '普通' if type1 == 'pt' else '丁基'
+                            if results.get(f"{equip}_{type2}_{section}_1"):
+                                results[f"{equip}_{type2}_{section}_1"].update({state: dic[k]})
+                                results[f"{equip}_{type2}_{section}_2"].update({state: dic[f"{state}_{type1}_unit"]})
+                                results[f"{equip}_{type2}_{section}_3"].update({state: section})
+                            else:
+                                results[f"{equip}_{type2}_{section}_1"] = {'name': f"{equip}{type2}-车数", state: dic[k]}
+                                results[f"{equip}_{type2}_{section}_2"] = {'name': f"{equip}{type2}-单价", state: dic[f"{state}_{type1}_unit"]}
+                                results[f"{equip}_{type2}_{section}_3"] = {'name': f"{equip}{type2}-岗位", state: section}
+
             for i in sorted(results):
                 results_sort[i] = results.pop(i)
+            # 是否定岗
             a = float(coefficient_dic.get('是'))
             if independent.get(name_d, 1) == False:
                 a = float(coefficient_dic.get('否'))
+            coefficient = section_info[section]['coefficient'] / 100
+            post_coefficient = section_info[section]['post_coefficient'] / 100
+            post_standard = section_info[section]['post_standard']  # 1最大值 2 平均值
             # 计算超产奖励
-            equip_qty.get(equip)  # 超产奖励
-            for equip, qty in equip_qty.items():
+            for equip_section, qty in equip_qty.items():
+                equip, section = equip_section.split('_')
+                coefficient = section_info[section]['coefficient'] / 100
+                post_coefficient = section_info[section]['post_coefficient'] / 100
+                post_standard = section_info[section]['post_standard']  # 1最大值 2 平均值
                 price = 0
                 if max_value.get(equip) and settings_value.__dict__.get(equip):
                     m = max_value.get(equip)
@@ -2974,6 +2981,7 @@ class PerformanceSummaryView(APIView):
             else:
                 hj['ccjl'] = round(sum(ccjl_dic.values()) / (len(results_sort) // 3), 2)
                 hj['price'] = round(hj['price'] / (len(results_sort) // 3) * post_coefficient * coefficient * a, 2)
+
             return Response({'results': results_sort.values(), 'hj': hj, 'all_price': hj['price'], '超产奖励': hj['ccjl'], 'group_list': group_list})
 
         results = {}
@@ -3101,6 +3109,15 @@ class PerformanceSummaryView(APIView):
                     ccjl_dic[name] = [{'date': f"{year}-{month}-{day}", 'price': p}]
         if ccjl:  # 超产奖励详情
             return Response({'results': ccjl_dic.get(name_d, None)})
+        for item in list(results.values()):
+            if independent.get(item['name']):
+                work_type = independent[item['name']].get('work_type')
+            else:
+                work_type = '正常'
+            v = float(employee_type_dic.get(work_type, 1))
+            item['work_type'] = work_type
+            item['all'] = round(item['all'] * v, 2)
+
         return Response({'results': results.values(), 'group_list': group_list})
 
 
@@ -3141,9 +3158,10 @@ class IndependentPostTemplateView(APIView):
         if export:
             names = EmployeeAttendanceRecords.objects.filter(factory_date__year=year, factory_date__month=month).values_list('user__username', flat=True).distinct()
             if names:
-                data = [{'name': name, 'state': '是'} for name in list(names)]
-                return gen_template_response({'姓名': 'name', '是否独立上岗': 'state'}, data, '是否独立上岗模版')
+                data = [{'name': name, 'work_type': '正常', 'state': '是'} for name in list(names)]
+                return gen_template_response({'姓名': 'name', '员工类别': 'work_type', '是否独立上岗': 'state'}, data, '是否独立上岗模版')
             raise ValidationError('当月没有考勤记录')
+        return Response()
 
     @atomic
     def post(self, request):
@@ -3156,7 +3174,8 @@ class IndependentPostTemplateView(APIView):
         lst = []
         for i in range(1, rows):
             name = cur_sheet.cell(i, 0).value
-            value = cur_sheet.cell(i, 1).value
+            work_type = cur_sheet.cell(i, 1).value
+            value = cur_sheet.cell(i, 2).value
             if value == '是':
                 status = 1
             elif value == '否':
@@ -3165,8 +3184,8 @@ class IndependentPostTemplateView(APIView):
                 raise ValidationError('导入的格式有误')
 
             if IndependentPostTemplate.objects.filter(date_time=date, name=name).exists():
-                IndependentPostTemplate.objects.filter(date_time=date, name=name).update(status=status)
+                IndependentPostTemplate.objects.filter(date_time=date, name=name).update(status=status, work_type=work_type)
             else:
-                lst.append(IndependentPostTemplate(name=name, status=status, date_time=date))
+                lst.append(IndependentPostTemplate(name=name, status=status, date_time=date, work_type=work_type))
         IndependentPostTemplate.objects.bulk_create(lst)
         return Response(f'导入成功')
