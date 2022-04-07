@@ -2976,11 +2976,11 @@ class PerformanceSummaryView(APIView):
                     ccjl_dic[equip] = price
             post_coefficient = post_coefficient if len(list(results1.values())[0]) > 1 else 1
             if post_standard == 1:  # 最大值
-                hj['ccjl'] = round(max(ccjl_dic.values()), 2)
-                hj['price'] = round(int(max(equip_price.values())) * post_coefficient * coefficient * a, 2)
+                hj['ccjl'] = round(max(ccjl_dic.values()), 2) if ccjl_dic.values() else 0
+                hj['price'] = round(int(max(equip_price.values())) * post_coefficient * coefficient * a, 2) if equip_price.values() else 0
             else:
-                hj['ccjl'] = round(sum(ccjl_dic.values()) / (len(results_sort) // 3), 2)
-                hj['price'] = round(hj['price'] / (len(results_sort) // 3) * post_coefficient * coefficient * a, 2)
+                hj['ccjl'] = round(sum(ccjl_dic.values()) / (len(results_sort) // 3), 2) if ccjl_dic.values() else 0
+                hj['price'] = round(hj['price'] / (len(results_sort) // 3) * post_coefficient * coefficient * a, 2) if equip_price.values() else 0
 
             return Response({'results': results_sort.values(), 'hj': hj, 'all_price': hj['price'], '超产奖励': hj['ccjl'], 'group_list': group_list})
 
