@@ -68,7 +68,7 @@ from quality.models import BatchProductNo, BatchDay, Batch, BatchMonth, BatchYea
     MaterialDealResult, MaterialTestResult, MaterialDataPointIndicator
 from quality.serializers import BatchProductNoDateZhPassSerializer, BatchProductNoClassZhPassSerializer
 from quality.utils import get_cur_sheet, get_sheet_data
-from system.models import User
+from system.models import User, Section
 from terminal.models import Plan
 from equipment.utils import DinDinAPI
 
@@ -3204,12 +3204,37 @@ class AttendanceGroupSetupViewSet(ModelViewSet):
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = AttendanceGroupSetupFilter
+    option = True
+
+    def get_section(self, section_name, section_id=None):  # 判断用户是不是设备科或生产科的成员
+        if not self.option:
+            return True
+        if section_id:
+            if Section.objects.filter(pk=section_id, name=section_name).exists():
+                self.option = False
+                return True
+            a = Section.objects.filter(pk=section_id).first()
+            if a:
+                parent_id = a.parent_section_id
+                self.get_section(section_name, parent_id)
+        else:
+            return False
 
     @action(methods=['get'], detail=False, permission_classes=[], url_path='in_group', url_name='in_group')
     def in_group(self, request):  # 判断用户是否在考勤组
         name = self.request.user.username
         res = AttendanceGroupSetup.objects.filter(Q(attendance_users__icontains=name) | Q(principal__icontains=name)).exists()
         return Response({'status': res})
+
+    @action(methods=['get'], detail=False, permission_classes=[], url_path='is_section', url_name='is_section')
+    def is_section(self, request):  # 判断用户是否是设备科门或生产科
+        section_id = self.request.user.section_id
+        for section in ['设备科', '生产科']:
+            self.option = True
+            self.get_section(section, section_id)
+            if not self.option:
+                return Response({'section': section})
+        return Response({'section': None})
 
 
 @method_decorator([api_recorder], name="dispatch")
