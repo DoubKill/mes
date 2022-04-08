@@ -254,7 +254,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 product_recipe = ProductBatchingDetail.objects.using('SFJ').filter(product_batching_id=pcp.product_batching_id, delete_flag=False, type=1)
                 query_set = product_recipe.filter(Q(Q(material__material_name__icontains='掺料') |
                                                   Q(material__material_name__icontains='待处理料')))
-                if query_set:
+                if query_set:  # 此处由工艺确认: 掺料与待处理料不会同时出现在一个配方中
                     recipe_material_name = query_set.first().material.material_name
                     # 炼胶类型判断: 混炼/终炼
                     if re.findall('FM|RFM|RE', classes_plan.product_batching.stage_product_batch_no):
@@ -587,8 +587,10 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 if check_flag:
                     last_same_material = add_materials.first()
                     weight = total_weight + last_same_material.real_weight
-                    attrs['tank_data'].update({'actual_weight': 0, 'adjust_left_weight': weight, 'real_weight': weight,
-                                               'init_weight': weight, 'single_need': single_material_weight,
+                    attrs['tank_data'].update({'actual_weight': last_same_material.actual_weight,
+                                               'adjust_left_weight': weight, 'real_weight': weight,
+                                               'init_weight': total_weight + last_same_material.init_weight,
+                                               'single_need': single_material_weight,
                                                'pre_material_id': last_same_material.id})
                     attrs['status'] = 1
         return attrs
