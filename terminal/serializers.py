@@ -99,17 +99,24 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         detail_infos = {i['material__material_name']: i['actual_weight'] for i in material_name_weight}
         for i in material_name_weight:
             if i['material__material_name'] in ['硫磺', '细料']:
+                if not cnt_type_details:
+                    raise serializers.ValidationError('mes未找到料包配料明细')
                 detail_infos[i['material__material_name']] = sum([i['actual_weight'] for i in cnt_type_details])
             else:
                 detail_infos[i['material__material_name']] = i['actual_weight']
         materials = detail_infos.keys()
         if bra_code.startswith('TYLB'):  # 2号细料与3号硫磺设备对接前扫通用条码
-            common_scan = OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, other_type='通用料包', status=1)
-            if common_scan:
-                raise serializers.ValidationError('已经扫过通用料包条码')
-            OtherMaterialLog.objects.create(**{'plan_classes_uid': plan_classes_uid, 'product_no': classes_plan.product_batching.stage_product_batch_no,
-                                               'material_name': '通用料包', 'bra_code': bra_code, 'status': 1, 'other_type': '通用料包'})
-            raise serializers.ValidationError('通用料包扫码成功')
+            xl_recipe = [i for i in material_name_weight if i['material__material_name'] in ['硫磺', '细料']]
+            if xl_recipe:  # 需要料包
+                OtherMaterialLog.objects.create(**{'plan_classes_uid': plan_classes_uid, 'product_no': classes_plan.product_batching.stage_product_batch_no,
+                                                   'material_name': '通用料包', 'bra_code': bra_code, 'status': 1, 'other_type': '通用料包'})
+                raise serializers.ValidationError('通用料包扫码成功')
+            else:
+                common_scan = OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, other_type='通用料包', status=1)
+                if common_scan:
+                    raise serializers.ValidationError('已经扫过通用料包条码')
+                else:
+                    raise serializers.ValidationError('配方不需要使用料包')
         elif bra_code.startswith('AAJ1Z'):  # 胶皮
             pallet_feedback = PalletFeedbacks.objects.filter(lot_no=bra_code).first()
             if pallet_feedback:
