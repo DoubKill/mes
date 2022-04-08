@@ -2227,6 +2227,7 @@ class Equip190EViewSet(ModelViewSet):
     serializer_class = Equip190ESerializer
     filter_backends = (DjangoFilterBackend,)
     filter_class = Equip190EFilter
+    pagination_class = None
 
     def list(self, request, *args, **kwargs):
         if self.request.query_params.get('search'):
