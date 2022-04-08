@@ -2203,13 +2203,12 @@ class DailyProductionCompletionReport(APIView):
             serializer.is_valid(raise_exception=True)
             Equip190EWeight.objects.filter(factory_date=factory_date, classes=classes).delete()
             for item in serializer.validated_data:
-                Equip190EWeight.objects.update_or_create(
-                    defaults={'setup': item['setup'],
-                              'factory_date': factory_date,
-                              'classes': classes,
-                              'qty': item['qty']},
-                    factory_date=factory_date, classes=classes, setup=item['setup'])
-        elif data is None:
+                Equip190EWeight.objects.create(
+                    **{'setup': item['setup'],
+                       'factory_date': factory_date,
+                        'classes': classes,
+                        'qty': item['qty']})
+        if data == []:
             Equip190EWeight.objects.filter(factory_date=factory_date, classes=classes).delete()
 
         if date:
