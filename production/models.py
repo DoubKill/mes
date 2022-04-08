@@ -468,6 +468,7 @@ class SubsidyInfo(models.Model):
 class IndependentPostTemplate(models.Model):
     name = models.CharField(max_length=64, help_text='姓名')
     status = models.BooleanField(help_text='是否独立上岗', default=1)
+    work_type = models.CharField(max_length=64, help_text='员工类别', default='正常')
     date_time = models.CharField(max_length=12, help_text='日期：2022-3')
 
     class Meta:
