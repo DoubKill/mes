@@ -3209,9 +3209,7 @@ class MaterialExpendSummaryView(APIView):
         diff = e_time - s_time
         if diff.days > 31:
             raise ValidationError('搜索日期跨度不得超过一个月！')
-        queryset = ExpendMaterial.objects.filter(
-            product_time__date__gte=s_time, product_time__date__lte=e_time
-        ).exclude(material_name__in=('细料', '硫磺'))
+        queryset = ExpendMaterial.objects.filter(product_time__date__gte=s_time, product_time__date__lte=e_time)
             # .exclude(Q(material__material_name__in=('细料', '硫磺')) | Q(material__material_type__global_name__in=stages))
         if equip_no:
             queryset = queryset.filter(equip_no=equip_no)
