@@ -960,7 +960,10 @@ permission_data = [
     {'id': 976, 'code': 'delete_equip_190e', 'name': '删除', 'parent_id': 972},
     {'id': 977, 'code': 'change_equip_190e', 'name': '修改', 'parent_id': 972},
 
-    # 下一个 978 开始
+    {'id': 978, 'code': 'material_expend_summary', 'name': '原材料消耗量汇总表', 'parent_id': None},
+    {'id': 979, 'code': 'view_material_expend_summary', 'name': '查看', 'parent_id': 978},
+
+    # 下一个 980 开始
 ]
 
 

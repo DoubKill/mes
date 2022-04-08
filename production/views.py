@@ -3190,6 +3190,7 @@ class IndependentPostTemplateView(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class MaterialExpendSummaryView(APIView):
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_material_expend_summary'}))
 
     def get(self, request):
         start_time = self.request.query_params.get('s_time')
