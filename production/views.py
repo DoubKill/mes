@@ -44,12 +44,14 @@ from plan.models import ProductClassesPlan, SchedulingEquipShutDownPlan
 from basics.models import Equip
 from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, QualityControlFilter, EquipStatusFilter, \
     PlanStatusFilter, ExpendMaterialFilter, CollectTrainsFeedbacksFilter, UnReachedCapacityCause, \
-    ProductInfoDingJiFilter, SubsidyInfoFilter, PerformanceJobLadderFilter, AttendanceGroupSetupFilter, Equip190EFilter
+    ProductInfoDingJiFilter, SubsidyInfoFilter, PerformanceJobLadderFilter, AttendanceGroupSetupFilter, Equip190EFilter, \
+    AttendanceClockDetailFilter
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, OperationLog, \
     QualityControl, ProcessFeedback, AlarmLog, MaterialTankStatus, ProductionDailyRecords, ProductionPersonnelRecords, \
     RubberCannotPutinReason, MachineTargetYieldSettings, EmployeeAttendanceRecords, PerformanceJobLadder, \
     PerformanceUnitPrice, ProductInfoDingJi, SetThePrice, SubsidyInfo, IndependentPostTemplate, AttendanceGroupSetup, \
-    FillCardApply, ApplyForExtraWork, EquipMaxValueCache, Equip190EWeight, OuterMaterial, Equip190E
+    FillCardApply, ApplyForExtraWork, EquipMaxValueCache, Equip190EWeight, OuterMaterial, Equip190E, \
+    AttendanceClockDetail
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, CollectTrainsFeedbacksSerializer, \
@@ -59,7 +61,7 @@ from production.serializers import QualityControlSerializer, OperationLogSeriali
     RubberCannotPutinReasonSerializer, PerformanceJobLadderSerializer, ProductInfoDingJiSerializer, \
     SetThePriceSerializer, SubsidyInfoSerializer, AttendanceGroupSetupSerializer, EmployeeAttendanceRecordsSerializer, \
     FillCardApplySerializer, ApplyForExtraWorkSerializer, Equip190EWeightSerializer, OuterMaterialSerializer, \
-    Equip190ESerializer, EquipStatusBatchSerializer
+    Equip190ESerializer, EquipStatusBatchSerializer, AttendanceClockDetailSerializer
 from rest_framework.generics import ListAPIView, GenericAPIView, ListCreateAPIView, CreateAPIView, UpdateAPIView, \
     get_object_or_404
 from datetime import timedelta
@@ -3247,6 +3249,16 @@ class AttendanceClockViewSet(ModelViewSet):
     serializer_class = EmployeeAttendanceRecordsSerializer
     permission_classes = (IsAuthenticated,)
 
+    def save_attendance_clock_detail(self, name, equip_list, data):
+        AttendanceClockDetail.objects.create(
+            name=name,
+            equip=','.join(equip_list),
+            group=data.get('group'),
+            classes=data.get('classes'),
+            section=data.get('section'),
+            work_type=data.get('status')
+        )
+
     def send_message(self, user, content):
         phone = user.phone_number
         ding_api = DinDinAPI()
@@ -3430,6 +3442,8 @@ class AttendanceClockViewSet(ModelViewSet):
                     **data
                 )
                 results['ids'].append(obj.id)
+        # 记录考勤打卡详情
+        self.save_attendance_clock_detail(user.username, equip_list, data)
         return Response({'results': results})
 
     @action(methods=['post'], detail=False, permission_classes=[], url_path='reissue_card', url_name='reissue_card')
@@ -3606,6 +3620,7 @@ class ReissueCardView(APIView):
         obj.save()
         serializer_data = FillCardApplySerializer(obj).data
         user = obj.user
+        date_time = obj.bk_date
         content = {
             "title": "补卡申请",
             "form": [
@@ -3676,6 +3691,17 @@ class ReissueCardView(APIView):
                 EmployeeAttendanceRecords.objects.filter(**dic).update(end_date=end_date,
                                                                        work_time=work_time,
                                                                        actual_time=work_time)
+            # 记录考勤打卡详情
+            AttendanceClockDetail.objects.create(
+                name=user.username,
+                equip=obj.equip,
+                group=data.get('group'),
+                classes=data.get('classes'),
+                section=data.get('section'),
+                work_type=data.get('status'),
+                date=datetime.date(date_time.year, date_time.month, date_time.day),
+                date_time=date_time
+            )
         return Response({'results': serializer_data})
 
 
@@ -3723,6 +3749,7 @@ class OverTimeView(APIView):
         obj.save()
         serializer_data = ApplyForExtraWorkSerializer(obj).data
         user = obj.user
+        date_time = obj.begin_date
         content = {
             "title": "加班申请",
             "form": [
@@ -3758,7 +3785,17 @@ class OverTimeView(APIView):
                     equip=equip,
                     status='加班'
                 )
-
+            # 记录考勤打卡详情
+            AttendanceClockDetail.objects.create(
+                name=user.username,
+                equip=obj.equip,
+                group=data.get('group'),
+                classes=data.get('classes'),
+                section=data.get('section'),
+                work_type=data.get('status'),
+                date=datetime.date(date_time.year, date_time.month, date_time.day),
+                date_time=date_time
+            )
         return Response({'results': serializer_data})
 
 
@@ -3838,9 +3875,19 @@ class AttendanceRecordSearch(APIView):
         return Response({'results': results})
 
 
+@method_decorator([api_recorder], name="dispatch")
 class AttendanceTimeStatisticsViewSet(ModelViewSet):
     queryset = EmployeeAttendanceRecords.objects.filter(
         Q(end_date__isnull=False) | Q(is_use='添加'))
     serializer_class = EmployeeAttendanceRecordsSerializer
     permission_classes = (IsAuthenticated,)
 
+
+@method_decorator([api_recorder], name="dispatch")
+class AttendanceClockDetailViewSet(ModelViewSet):
+    queryset = AttendanceClockDetail.objects.order_by('id')
+    serializer_class = AttendanceClockDetailSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = AttendanceClockDetailFilter
+    pagination_class = None
+    permission_classes = (IsAuthenticated,)

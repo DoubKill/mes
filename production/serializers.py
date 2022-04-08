@@ -12,7 +12,7 @@ from plan.models import ProductClassesPlan
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, QualityControl, \
     OperationLog, UnReachedCapacityCause, ProcessFeedback, AlarmLog, RubberCannotPutinReason, PerformanceJobLadder, \
     ProductInfoDingJi, SetThePrice, SubsidyInfo, AttendanceGroupSetup, EmployeeAttendanceRecords, FillCardApply, \
-    ApplyForExtraWork, Equip190EWeight, OuterMaterial, Equip190E
+    ApplyForExtraWork, Equip190EWeight, OuterMaterial, Equip190E, AttendanceClockDetail
 from system.models import User
 
 
@@ -519,3 +519,10 @@ class EquipStatusBatchSerializer(BaseModelSerializer):
         model = EquipStatus
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class AttendanceClockDetailSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = AttendanceClockDetail
+        fields = '__all__'

@@ -60,6 +60,8 @@ router.register('performance-subsidy', PerformanceSubsidyViewSet, basename='perf
 router.register('attendance-group-setup', AttendanceGroupSetupViewSet)
 # 用户考勤打卡
 router.register('attendance-clock', AttendanceClockViewSet)
+# 用户打卡明细
+router.register('attendance-clock-detail', AttendanceClockDetailViewSet)
 # 员工出勤工时统计
 router.register('attendance-time-statistics/', AttendanceTimeStatisticsViewSet)
 # 190E机台规格信息维护

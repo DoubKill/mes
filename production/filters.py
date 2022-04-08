@@ -131,3 +131,12 @@ class Equip190EFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = Equip190E
         fields = ('specification', 'state')
+
+
+class AttendanceClockDetailFilter(django_filters.rest_framework.FilterSet):
+    date = django_filters.DateFilter(field_name='date')
+    name = django_filters.DateFilter(field_name='name')
+
+    class Meta:
+        model = AttendanceClockDetail
+        fields = ('name', 'date')

@@ -575,3 +575,18 @@ class Equip190EWeight(models.Model):
     class Meta:
         db_table = 'equip_190e_weight'
         verbose_name_plural = verbose_name = '190E机台产量信息'
+
+
+class AttendanceClockDetail(models.Model):
+    name = models.CharField(max_length=64, help_text='姓名')
+    date = models.DateField(auto_now_add=True, help_text='打卡日期')
+    date_time = models.DateTimeField(auto_now_add=True, help_text='打卡时间')
+    equip = models.CharField(max_length=64, help_text='机台')
+    group = models.CharField(max_length=64, help_text='班组')
+    classes = models.CharField(max_length=64, help_text='班次')
+    section = models.CharField(max_length=64, help_text='岗位')
+    work_type = models.CharField(max_length=64, help_text='打卡类别')
+
+    class Meta:
+        db_table = 'attendance_clock_detail'
+        verbose_name_plural = verbose_name = '用户考勤打卡明细'
