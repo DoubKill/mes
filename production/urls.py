@@ -128,4 +128,7 @@ urlpatterns = [
 
     # 月产量完成报表
     path('daily-production-completion-report/', DailyProductionCompletionReport.as_view()),
+
+    # 物料消耗统计报表
+    path('material-expend-summary/', MaterialExpendSummaryView.as_view())
 ]
