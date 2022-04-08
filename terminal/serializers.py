@@ -256,7 +256,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                             # 加硫磺前后(上面限定了胶皮,这里不会出现小料硫磺xxx-硫磺)
                             s_id = product_recipe.filter(Q(material__material_name__icontains='硫磺')).first()
                             if s_id:
-                                if s_id.id < query_set.id:
+                                if s_id.id < query_set.first().id:
                                     # 硫磺在前, 只能投加硫料
                                     if add_s:
                                         other_type, status, scan_material_msg = f'{scan_material_type}掺料', True, f'物料:{scan_material} 扫码成功'
