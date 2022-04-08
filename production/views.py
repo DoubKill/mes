@@ -2127,13 +2127,13 @@ class DailyProductionCompletionReport(APIView):
                                                 Q(product_no__icontains='-FM-'))
         fin_queryset = queryset2.values('factory_date__day').annotate(weight=Sum('actual_weight'))
         equip_190e_weight = Equip190EWeight.objects.filter(factory_date__year=year, factory_date__month=month).\
-            values('factory_date__day').annotate(weight=Sum('setup__weight'), qty=Sum('qty'))
+            values('factory_date__day', 'setup__weight', 'qty')
         for item in mix_queryset:
             results['name_1']['weight'] += round(item['weight'] / 100000, 2)
             results['name_1'][f"{item['factory_date__day']}日"] = round(item['weight'] / 100000, 2)
         for item in equip_190e_weight:
-            results['name_2']['weight'] += round(item['weight'] / 1000 * item['qty'], 2)
-            results['name_2'][f"{item['factory_date__day']}日"] = round(item['weight'] / 1000 * item['qty'], 2)
+            results['name_2']['weight'] += round(item['setup__weight'] / 1000 * item['qty'], 2)
+            results['name_2'][f"{item['factory_date__day']}日"] = round(item['setup__weight'] / 1000 * item['qty'], 2)
         for item in fin_queryset:
             results['name_2']['weight'] += round(item['weight'] / 100000, 2)
             results['name_4']['weight'] += round(item['weight'] / 100000, 2)
