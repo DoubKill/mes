@@ -2089,6 +2089,7 @@ class MonthlyOutputStatisticsReport(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class DailyProductionCompletionReport(APIView):
     permission_classes = (IsAuthenticated,)
+    pagination_class = None
 
     def get(self, request):
         params = self.request.query_params
