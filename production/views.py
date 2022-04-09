@@ -2462,14 +2462,14 @@ class EmployeeAttendanceRecordsView(APIView):
         data = EmployeeAttendanceRecords.objects.filter(factory_date__year=year,
                                                         factory_date__month=month,
                                                         user__username__icontains=name,
-                                                        actual_time__isnull=False).values(
+                                                        end_date__isnull=False).values(
             'equip', 'section', 'group', 'factory_date__day', 'user__username', 'actual_time')
         for item in data:
             equip = item['equip']
             section = item['section']
             if not results.get(f'{equip}_{section}'):
                 results[f'{equip}_{section}'] = {'equip': equip, 'section': section}
-            value = item['user__username'] if int(item['actual_time']) == 12 else '%s(%.1f)' % (item['user__username'], item['actual_time'])
+            value = item['user__username'] if item['actual_time'] == 12 else '%s(%.1f)' % (item['user__username'], item['actual_time'])
 
             if results[f'{equip}_{section}'].get(f"{item['factory_date__day']}{item['group']}"):
                 results[f'{equip}_{section}'][f"{item['factory_date__day']}{item['group']}"].append(value)
