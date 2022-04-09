@@ -45,13 +45,13 @@ from basics.models import Equip
 from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, QualityControlFilter, EquipStatusFilter, \
     PlanStatusFilter, ExpendMaterialFilter, CollectTrainsFeedbacksFilter, UnReachedCapacityCause, \
     ProductInfoDingJiFilter, SubsidyInfoFilter, PerformanceJobLadderFilter, AttendanceGroupSetupFilter, Equip190EFilter, \
-    AttendanceClockDetailFilter
+    AttendanceClockDetailFilter, MlTrainsInfoFilter
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, OperationLog, \
     QualityControl, ProcessFeedback, AlarmLog, MaterialTankStatus, ProductionDailyRecords, ProductionPersonnelRecords, \
     RubberCannotPutinReason, MachineTargetYieldSettings, EmployeeAttendanceRecords, PerformanceJobLadder, \
     PerformanceUnitPrice, ProductInfoDingJi, SetThePrice, SubsidyInfo, IndependentPostTemplate, AttendanceGroupSetup, \
     FillCardApply, ApplyForExtraWork, EquipMaxValueCache, Equip190EWeight, OuterMaterial, Equip190E, \
-    AttendanceClockDetail
+    AttendanceClockDetail, MlTrainsInfo
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, CollectTrainsFeedbacksSerializer, \
@@ -61,7 +61,7 @@ from production.serializers import QualityControlSerializer, OperationLogSeriali
     RubberCannotPutinReasonSerializer, PerformanceJobLadderSerializer, ProductInfoDingJiSerializer, \
     SetThePriceSerializer, SubsidyInfoSerializer, AttendanceGroupSetupSerializer, EmployeeAttendanceRecordsSerializer, \
     FillCardApplySerializer, ApplyForExtraWorkSerializer, Equip190EWeightSerializer, OuterMaterialSerializer, \
-    Equip190ESerializer, EquipStatusBatchSerializer, AttendanceClockDetailSerializer
+    Equip190ESerializer, EquipStatusBatchSerializer, AttendanceClockDetailSerializer, MlTrainsInfoSerializer
 from rest_framework.generics import ListAPIView, GenericAPIView, ListCreateAPIView, CreateAPIView, UpdateAPIView, \
     get_object_or_404
 from datetime import timedelta
@@ -3900,3 +3900,41 @@ class AttendanceClockDetailViewSet(ModelViewSet):
     filter_class = AttendanceClockDetailFilter
     pagination_class = None
     permission_classes = (IsAuthenticated,)
+
+
+class MlTrainsInfoViewSet(ModelViewSet):
+    queryset = MlTrainsInfo.objects.order_by('factory_date')
+    serializer_class = MlTrainsInfoSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = MlTrainsInfoFilter
+    pagination_class = None
+
+    @action(methods=['post'], detail=False, permission_classes=[], url_path='import_xlsx',
+            url_name='import_xlsx')
+    def import_xlsx(self, request):
+        excel_file = request.FILES.get('file', None)
+        if not excel_file:
+            raise ValidationError('文件不可为空！')
+        cur_sheet = get_cur_sheet(excel_file)
+        data = get_sheet_data(cur_sheet)
+        kwargs = {}
+        for item in data:
+            if not item[0]:
+                raise ValidationError('工厂日期不可为空')
+            if not item[1]:
+                raise ValidationError('班次不可为空')
+            if not item[2]:
+                raise ValidationError('机台不可为空')
+            if not item[3]:
+                raise ValidationError('胶料编码不可为空')
+            if not item[4]:
+                raise ValidationError('车数不可为空')
+        s = MlTrainsInfoSerializer(data=kwargs, context={'request': request})
+        if s.is_valid(raise_exception=False):
+            if len(s.validated_data) < 1:
+                raise ValidationError('没有可导入的数据')
+            s.save()
+        else:
+            raise ValidationError('导入的数据类型有误')
+        return Response(f'成功导入{len(s.validated_data)}条数据')

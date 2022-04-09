@@ -584,3 +584,15 @@ class AttendanceClockDetail(models.Model):
     class Meta:
         db_table = 'attendance_clock_detail'
         verbose_name_plural = verbose_name = '用户考勤打卡明细'
+
+
+class MlTrainsInfo(AbstractEntity):
+    factory_date = models.DateField(help_text='工厂时间')
+    classes = models.CharField(help_text='班次', max_length=12)
+    equip_no = models.CharField(max_length=12, help_text='机台')
+    product_no = models.CharField(max_length=64, help_text='胶料编码')
+    trains = models.IntegerField(help_text='车数', default=0)
+
+    class Meta:
+        db_table = 'ml_trains_info'
+        verbose_name_plural = verbose_name = '录入人工密炼车次信息'
