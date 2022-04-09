@@ -603,14 +603,12 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             plan_classes_uid = i.get('plan_classes_uid')
             trains = i.get('trains')
             pre_material_id = tank_data.pop('pre_material_id', '')
-            # 上一计划的条码物料归零(同计划中同物料的先一物料扣重时归0)
+            # 上一计划的条码物料归零(同计划中同物料的先一物料扣重时归0): 料包可能对应多条数据
             if pre_material_id:
                 pre_material = LoadTankMaterialLog.objects.filter(id=pre_material_id).first()
-                pre_material.actual_weight = pre_material.init_weight
-                pre_material.adjust_left_weight = 0
-                pre_material.real_weight = 0
-                pre_material.useup_time = datetime.now()
-                pre_material.save()
+                LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=pre_material.bra_code)\
+                    .update(**{'actual_weight': pre_material.init_weight, 'adjust_left_weight': 0, 'real_weight': 0,
+                               'useup_time': datetime.now()})
             instance = LoadTankMaterialLog.objects.create(**tank_data)
         # 判断补充进料后是否能进上辅机
         fml = FeedingMaterialLog.objects.using('SFJ').filter(plan_classes_uid=plan_classes_uid, trains=int(trains)).last()
