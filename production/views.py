@@ -3817,14 +3817,13 @@ class AttendanceRecordSearch(APIView):
                 end_date = record.last().end_date
                 work_time = [{'title': f"上班: {datetime.datetime.strftime(begin_date, '%Y-%m-%d %H:%M:%S')}"}]
                 if record.filter(status='换岗'):
-                    times = record.filter(status='换岗').values_list('begin_date', flat=True)
+                    times = record.filter(status='换岗').values_list('begin_date', flat=True).order_by('begin_date')
                     if times:
                         for t in list(set(times)):
                             work_time.append({'title': f"换岗: {datetime.datetime.strftime(t, '%Y-%m-%d %H:%M:%S')}"})
                 if end_date:
                     work_time.append({'title': f"下班: {datetime.datetime.strftime(end_date, '%Y-%m-%d %H:%M:%S')}"})
                 results['work_time'] = round((end_date - begin_date).seconds / 3600, 2) if end_date else 0
-                work_time.sort()
                 results['time'] = work_time
                 return Response(results)
             return Response(results)
