@@ -10,6 +10,7 @@ from itertools import groupby, count
 from itertools import count as c
 
 import requests
+import xlrd
 import xlwt
 from django.http import HttpResponse
 
@@ -3930,6 +3931,13 @@ class MlTrainsInfoViewSet(ModelViewSet):
                 raise ValidationError('胶料编码不可为空')
             if not item[4]:
                 raise ValidationError('车数不可为空')
+            if not isinstance(item[4], int):
+                raise ValidationError('车数必须为整数')
+            kwargs['factory_date'] = datetime.date(xlrd.xldate.xldate_as_datetime(item[0], 0))
+            kwargs['classes'] = item[1]
+            kwargs['equip_no'] = item[2]
+            kwargs['product_no'] = item[3]
+            kwargs['trains'] = item[4]
         s = MlTrainsInfoSerializer(data=kwargs, context={'request': request})
         if s.is_valid(raise_exception=False):
             if len(s.validated_data) < 1:
