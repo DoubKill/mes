@@ -2464,10 +2464,9 @@ class EmployeeAttendanceRecordsView(APIView):
             group_list.append([item['group__global_name'] for item in group])
 
         results = {}
-        data = EmployeeAttendanceRecords.objects.filter(factory_date__year=year,
-                                                        factory_date__month=month,
-                                                        user__username__icontains=name,
-                                                        end_date__isnull=False).values(
+        data = EmployeeAttendanceRecords.objects.filter(
+            Q(Q(end_date__isnull=True, begin_date__isnull=True) | Q(begin_date__isnull=False, end_date__isnull=False)
+            ) & Q(factory_date__year=year, factory_date__month=month, user__username__icontains=name)).values(
             'equip', 'section', 'group', 'factory_date__day', 'user__username', 'actual_time')
         for item in data:
             equip = item['equip']
