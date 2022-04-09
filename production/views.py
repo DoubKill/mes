@@ -2352,7 +2352,7 @@ class SummaryOfWeighingOutput(APIView):
         result = []
         result1 = {}
         group_dic = {}
-        users = {}  # {'1-早班'： '张三'}
+        users = {}
         work_times = {}
         user_result = {}
         group = WorkSchedulePlan.objects.filter(start_time__year=year,
@@ -2360,13 +2360,11 @@ class SummaryOfWeighingOutput(APIView):
         for item in group:
             group_dic[f'{item[2]}-{item[0]}'] = item[1]
         # 查询称量分类下当前月上班的所有员工
-        user_list = EmployeeAttendanceRecords.objects.filter(Q(factory_date__year=year,
-                                                             factory_date__month=month,
-                                                             equip__in=equip_list) &
-                                                             Q(Q(end_date__isnull=False) | ~Q(is_use='废弃'))
-                                                             ).values('user__username', 'factory_date__day', 'group', 'section', 'equip')
+        user_list = EmployeeAttendanceRecords.objects.filter(
+            Q(factory_date__year=year, factory_date__month=month, equip__in=equip_list) &
+            Q(Q(end_date__isnull=False, begin_date__isnull=False) | Q(end_date__isnull=True, begin_date__isnull=True)) &
+            ~Q(is_use='废弃')).values('user__username', 'factory_date__day', 'group', 'section', 'equip')
 
-        # user_list = EmployeeAttendanceRecords.objects.filter(factory_date__year=year, factory_date__month=month, equip__in=equip_list).values('user__username', 'factory_date__day', 'group', 'section', 'equip')
         # 岗位系数
         section_dic = {}
         section_info = PerformanceJobLadder.objects.filter(delete_flag=False, type__in=['细料称量', '硫磺称量']).values('type', 'name', 'coefficient', 'post_standard', 'post_coefficient')
@@ -2465,8 +2463,10 @@ class EmployeeAttendanceRecordsView(APIView):
 
         results = {}
         data = EmployeeAttendanceRecords.objects.filter(
-            Q(Q(end_date__isnull=True, begin_date__isnull=True) | Q(begin_date__isnull=False, end_date__isnull=False)
-            ) & Q(factory_date__year=year, factory_date__month=month, user__username__icontains=name)).values(
+            Q(Q(end_date__isnull=True, begin_date__isnull=True) | Q(begin_date__isnull=False, end_date__isnull=False)) &
+            Q(factory_date__year=year, factory_date__month=month, user__username__icontains=name) &
+            ~Q(is_use='废弃')
+            ).values(
             'equip', 'section', 'group', 'factory_date__day', 'user__username', 'actual_time')
         for item in data:
             equip = item['equip']
@@ -2810,9 +2810,9 @@ class PerformanceSummaryView(APIView):
         if day_d:
             kwargs['factory_date__day'] = day_d
             kwargs2['factory_date__day'] = day_d
-        user_query = EmployeeAttendanceRecords.objects.filter(Q(**kwargs) &
-                                                             Q(Q(end_date__isnull=False) | ~Q(is_use='废弃'))
-                                                             )
+        user_query = EmployeeAttendanceRecords.objects.filter(Q(**kwargs) & ~Q(is_use='废弃') &
+                                                             Q(Q(end_date__isnull=False, begin_date__isnull=False) |
+                                                               Q(end_date__isnull=True, begin_date__isnull=True)))
         queryset = user_query.values_list('user__username', 'section', 'factory_date__day', 'group', 'equip', 'actual_time', 'classes')
         user_dic = {}
         equip_shut_down_dic = {}
