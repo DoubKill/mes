@@ -3871,9 +3871,26 @@ class AttendanceRecordSearch(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class AttendanceTimeStatisticsViewSet(ModelViewSet):
     queryset = EmployeeAttendanceRecords.objects.filter(
-        Q(end_date__isnull=False) | Q(is_use='添加'))
+        Q(end_date__isnull=False, begin_date__isnull=False) |
+        Q(end_date__isnull=True, begin_date__isnull=True))
     serializer_class = EmployeeAttendanceRecordsSerializer
     permission_classes = (IsAuthenticated,)
+
+    def list(self, request, *args, **kwargs):
+        name = self.request.query_params.get('name')
+        date = self.request.query_params.get('date')
+        year, month = int(date.split('-')[0]), int(date.split('-')[-1])
+        queryset = self.get_queryset().filter(factory_date__year=year,
+                                              factory_date__month=month, user__username=name)
+        data = self.get_serializer(queryset, many=True).data
+        if data:
+            user = User.objects.filter(username=name).first()
+            id_card_num = user.id_card_num
+            principal_obj = AttendanceGroupSetup.objects.filter(Q(attendance_users__icontains=user.username) |
+                                                                Q(principal__icontains=user.username)).first()
+            principal = principal_obj.principal if principal_obj else None
+        return Response({'results': data, 'principal': principal if data else None,
+                     'id_card_num': id_card_num if data else None})
 
 
 @method_decorator([api_recorder], name="dispatch")
