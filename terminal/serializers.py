@@ -544,7 +544,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         add_materials = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, useup_time__year='1970', material_name=material_name)
         if not add_materials:
             # 上一条计划剩余量判定
-            pre_material = LoadTankMaterialLog.objects.filter(bra_code=bra_code).last()
+            pre_material = LoadTankMaterialLog.objects.filter(bra_code=bra_code).order_by('id').last()
             # 料框表中无该条码信息
             if not pre_material:
                 attrs['tank_data'].update({'actual_weight': 0, 'adjust_left_weight': total_weight,
