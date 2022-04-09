@@ -3823,7 +3823,8 @@ class AttendanceRecordSearch(APIView):
                             work_time.append({'title': f"换岗: {datetime.datetime.strftime(t, '%Y-%m-%d %H:%M:%S')}"})
                 if end_date:
                     work_time.append({'title': f"下班: {datetime.datetime.strftime(end_date, '%Y-%m-%d %H:%M:%S')}"})
-                results['work_time'] = round((end_date - begin_date).seconds / 3600, 2) if end_date else  0
+                results['work_time'] = round((end_date - begin_date).seconds / 3600, 2) if end_date else 0
+                work_time.sort()
                 results['time'] = work_time
                 return Response(results)
             return Response(results)
