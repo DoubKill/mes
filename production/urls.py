@@ -63,7 +63,7 @@ router.register('attendance-clock', AttendanceClockViewSet)
 # 用户打卡明细
 router.register('attendance-clock-detail', AttendanceClockDetailViewSet)
 # 员工出勤工时统计
-router.register('attendance-time-statistics/', AttendanceTimeStatisticsViewSet)
+router.register('attendance-time-statistics', AttendanceTimeStatisticsViewSet)
 # 190E机台规格信息维护
 router.register('equip-190e', Equip190EViewSet)
 
