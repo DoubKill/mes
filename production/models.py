@@ -517,14 +517,8 @@ class IndependentPostTemplate(models.Model):
 
 
 class AttendanceGroupSetup(models.Model):
-    ATTENDANCE_TYPE = (
-        (1, '不固定时间上下班'),
-        (2, '按排班时间下班'),
-        (3, '固定时间上下班')
-    )
     attendance_group = models.CharField(max_length=64, help_text='考勤组名称')
     attendance_users = models.CharField(max_length=64, help_text='参加考勤人员')
-    attendance_type = models.PositiveIntegerField(choices=ATTENDANCE_TYPE, help_text='考勤类型', default=1)
     attendance_st = models.TimeField(help_text='考勤开始时间')
     attendance_et = models.TimeField(help_text='考勤结束时间')
     principal = models.CharField(max_length=64, help_text='考勤负责人')

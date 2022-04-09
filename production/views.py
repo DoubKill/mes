@@ -3809,7 +3809,6 @@ class AttendanceRecordSearch(APIView):
             group_setup = AttendanceGroupSetup.objects.filter(Q(attendance_users__icontains=username) | Q(principal=username)).first()
             record =queryset.filter(factory_date=f"{date}-{day}")
             results = {
-                'attendance_type': group_setup.get_attendance_type_display() if group_setup else None,
                 'attendance_st': group_setup.attendance_st,
                 'attendance_et': group_setup.attendance_et
             }
