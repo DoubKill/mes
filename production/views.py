@@ -2473,7 +2473,7 @@ class EmployeeAttendanceRecordsView(APIView):
             equip = item['equip']
             section = item['section']
             if not results.get(f'{equip}_{section}'):
-                results[f'{equip}_{section}'] = {'equip': equip, 'section': section}
+                results[f'{equip}_{section}'] = {'equip': equip, 'section': section, 'actual_time': item['actual_time']}
             results[f'{equip}_{section}'][f"{item['factory_date__day']}{item['group']}"] = item['user__username']
         res = list(results.values())
         for item in res:
