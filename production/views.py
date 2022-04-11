@@ -3155,13 +3155,13 @@ class PerformanceSummaryView(APIView):
             elif section in ['三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库']:
                 p = round(sum(p_dic.values()) * 0.2 * coefficient, 2) if p_dic.values() else 0
             else:
-                if len(dic.values()) > 0:
+                if len(dic.values()) > 1:
                     if post_standard == 1:
                         p = max(p_dic.values()) if p_dic.values() else 0
                     else:
                         p = round(sum(p_dic.values()) / len(dic.values()), 2) if p_dic.values() else 0
                 else:
-                    p = 0
+                    p = max(p_dic.values()) if p_dic.values() else 0
             results[name]['超产奖励'] += p
             results[name]['all'] = round(results[name]['all'] + p, 2)
             if p > 0:
