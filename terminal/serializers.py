@@ -254,7 +254,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 product_recipe = ProductBatchingDetail.objects.using('SFJ').filter(product_batching_id=pcp.product_batching_id, delete_flag=False, type=1)
                 query_set = product_recipe.filter(Q(Q(material__material_name__icontains='掺料') |
                                                   Q(material__material_name__icontains='待处理料')))
-                if query_set:
+                if query_set:  # 此处由工艺确认: 掺料与待处理料不会同时出现在一个配方中
                     recipe_material_name = query_set.first().material.material_name
                     # 炼胶类型判断: 混炼/终炼
                     if re.findall('FM|RFM|RE', classes_plan.product_batching.stage_product_batch_no):
@@ -544,7 +544,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         add_materials = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, useup_time__year='1970', material_name=material_name)
         if not add_materials:
             # 上一条计划剩余量判定
-            pre_material = LoadTankMaterialLog.objects.filter(bra_code=bra_code).last()
+            pre_material = LoadTankMaterialLog.objects.filter(bra_code=bra_code).order_by('id').last()
             # 料框表中无该条码信息
             if not pre_material:
                 attrs['tank_data'].update({'actual_weight': 0, 'adjust_left_weight': total_weight,
@@ -587,8 +587,10 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 if check_flag:
                     last_same_material = add_materials.first()
                     weight = total_weight + last_same_material.real_weight
-                    attrs['tank_data'].update({'actual_weight': 0, 'adjust_left_weight': weight, 'real_weight': weight,
-                                               'init_weight': weight, 'single_need': single_material_weight,
+                    attrs['tank_data'].update({'actual_weight': last_same_material.actual_weight,
+                                               'adjust_left_weight': weight, 'real_weight': weight,
+                                               'init_weight': total_weight + last_same_material.init_weight,
+                                               'single_need': single_material_weight,
                                                'pre_material_id': last_same_material.id})
                     attrs['status'] = 1
         return attrs
@@ -601,14 +603,12 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             plan_classes_uid = i.get('plan_classes_uid')
             trains = i.get('trains')
             pre_material_id = tank_data.pop('pre_material_id', '')
-            # 上一计划的条码物料归零(同计划中同物料的先一物料扣重时归0)
+            # 上一计划的条码物料归零(同计划中同物料的先一物料扣重时归0): 料包可能对应多条数据
             if pre_material_id:
                 pre_material = LoadTankMaterialLog.objects.filter(id=pre_material_id).first()
-                pre_material.actual_weight = pre_material.init_weight
-                pre_material.adjust_left_weight = 0
-                pre_material.real_weight = 0
-                pre_material.useup_time = datetime.now()
-                pre_material.save()
+                LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=pre_material.bra_code)\
+                    .update(**{'actual_weight': pre_material.init_weight, 'adjust_left_weight': 0, 'real_weight': 0,
+                               'useup_time': datetime.now()})
             instance = LoadTankMaterialLog.objects.create(**tank_data)
         # 判断补充进料后是否能进上辅机
         fml = FeedingMaterialLog.objects.using('SFJ').filter(plan_classes_uid=plan_classes_uid, trains=int(trains)).last()
