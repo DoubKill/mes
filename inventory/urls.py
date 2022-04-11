@@ -187,6 +187,7 @@ urlpatterns = [
     path('hf-stock/', HFStockView.as_view()),  # 烘房胶料信息统计列表
     path('hf-stock-detail/', HFStockDetailView.as_view()),  # 烘房胶料信息详细列表
     path('hf-real-status/', HFRealStatusView.as_view()),  # 烘房实时状态
+    path('hf-inventory-log/', HFInventoryLogView.as_view()),
 
     # 混炼胶库存管理
     path('bz-mixin-inventory/', BzMixingRubberInventory.as_view()),  # 北自混炼胶库存列表
