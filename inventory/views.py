@@ -5436,7 +5436,7 @@ class THCancelTaskView(WwsCancelTaskView):
 @method_decorator([api_recorder], name="dispatch")
 class HFStockView(APIView):
     DATABASE_CONF = HF_CONF
-    permission_classes = (IsAuthenticated, )
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_material_hf_summary'}))
 
     def get(self, request):
         st = self.request.query_params.get('st')
@@ -5563,7 +5563,7 @@ class HFStockView(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class HFStockDetailView(APIView):
     DATABASE_CONF = HF_CONF
-    permission_classes = (IsAuthenticated, )
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_material_hf_summary'}))
 
     def get(self, request):
         st = self.request.query_params.get('st')  # 开始时间
@@ -5685,8 +5685,136 @@ class HFStockDetailView(APIView):
 
 
 @method_decorator([api_recorder], name="dispatch")
+class HFInventoryLogView(APIView):
+    # 权限共用烘房统计信息查询
+    DATABASE_CONF = HF_CONF
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_material_hf_summary'}))
+
+    def export_xls(self, result):
+        response = HttpResponse(content_type='application/vnd.ms-excel')
+        filename = '物料出入库履历'
+        response['Content-Disposition'] = u'attachment;filename= ' + filename.encode('gbk').decode(
+            'ISO-8859-1') + '.xls'
+        # 创建一个文件对象
+        wb = xlwt.Workbook(encoding='utf8')
+        # 创建一个sheet对象
+        sheet = wb.add_sheet('出入库信息', cell_overwrite_ok=True)
+        style = xlwt.XFStyle()
+        style.alignment.wrap = 1
+
+        columns = ['No', '类别', '烘箱编号', '状态', '物料名称', '物料编码', '批次号', '托盘号',
+                   '入/出 烘房时间', '质检条码', '供应商', '单位', '单位重量(kg)', '件数']
+        # 写入文件标题
+        for col_num in range(len(columns)):
+            sheet.write(0, col_num, columns[col_num])
+            # 写入数据
+        data_row = 1
+        for i in result:
+            sheet.write(data_row, 0, result.index(i) + 1)
+            sheet.write(data_row, 1, i['order_type'])
+            sheet.write(data_row, 2, i['oven_no'])
+            sheet.write(data_row, 3, i['status'])
+            sheet.write(data_row, 4, i['material_name'])
+            sheet.write(data_row, 5, i['material_no'])
+            sheet.write(data_row, 6, i['batch_no'])
+            sheet.write(data_row, 7, i['pallet_no'])
+            sheet.write(data_row, 8, i['baking_start_time'] if i['order_type'] == '入烘房' else i['baking_end_time'])
+            sheet.write(data_row, 9, i['lot_no'])
+            sheet.write(data_row, 10, i['supplier'])
+            sheet.write(data_row, 11, i['unit'])
+            sheet.write(data_row, 12, i['weight'])
+            sheet.write(data_row, 13, i['piece_count'])
+            data_row = data_row + 1
+        # 写出到IO
+        output = BytesIO()
+        wb.save(output)
+        # 重新定位到开始
+        output.seek(0)
+        response.write(output.getvalue())
+        return response
+
+    def get(self, request):
+        st = self.request.query_params.get('st')  # 开始时间
+        et = self.request.query_params.get('et')  # 结束时间
+        material_no = self.request.query_params.get('material_no')  # 物料编码
+        material_name = self.request.query_params.get('material_name')  # 物料名称
+        page = int(self.request.query_params.get('page', 1))
+        page_size = int(self.request.query_params.get('page_size', 10))
+        inventory_type = self.request.query_params.get('inventory_type', '入烘房')
+        export = self.request.query_params.get('export')
+        if inventory_type == '入烘房':
+            extra_where_str = 'where OastInTime is not null'
+            if st:
+                extra_where_str += " and OastInTime >= '{}'".format(st)
+            if et:
+                extra_where_str += " and OastInTime <= '{}'".format(et)
+        else:
+            extra_where_str = 'where OastOutTime is not null'
+            if st:
+                extra_where_str += " and OastOutTime >= '{}'".format(st)
+            if et:
+                extra_where_str += " and OastOutTime <= '{}'".format(et)
+        if material_name:
+            extra_where_str += " and ProductName like N'%{}%'".format(material_name)
+        if material_no:
+            extra_where_str += " and ProductNo like '%{}%'".format(material_no)
+
+        if not export:
+            limit_str = 'OFFSET {} ROWS FETCH FIRST {} ROWS ONLY'.format((page-1)*page_size, page_size)
+        else:
+            limit_str = ''
+        sql = """select
+                OastNo,
+                TaskState,
+                ProductName,
+                ProductNo,
+                RFID,
+                OastInTime,
+                OastOutTime,
+                MissionID
+            from dsp_OastTask {} order by OastInTime DESC {}
+            """.format(extra_where_str, limit_str)
+        sc = SqlClient(sql=sql, **self.DATABASE_CONF)
+        temp = sc.all()
+        result = []
+        out_task = MaterialOutHistory.objects.using('wms').filter(
+            order_no__in=[item[7] for item in temp]).values(
+            'batch_no', 'supplier', 'unit', 'lot_no', 'piece_count', 'weight', 'order_no')
+        out_task_dict = {item['order_no']: item for item in out_task}
+        status_dict = {1: '入库中', 2: '烘烤运行中', 3: '出库中', 4: '等待烘烤', 5: '等待出库', 6: '已出库'}
+        for item in temp:
+            data = {'order_type': '出烘房' if inventory_type == '出库' else '入烘房',
+                    'oven_no': item[0],
+                    'status': status_dict.get(item[1]),
+                    'material_name': item[2],
+                    'material_no': item[3],
+                    'pallet_no': item[4],
+                    'baking_start_time': '' if not item[5] else item[5].strftime('%Y-%m-%d %H:%M:%S'),
+                    'baking_end_time': '' if not item[6] else item[6].strftime('%Y-%m-%d %H:%M:%S'),
+                    'batch_no': '',
+                    'supplier': '',
+                    'unit': '',
+                    'lot_no': '',
+                    'piece_count': '',
+                    'weight': '',
+                    'order_no': ''
+                }
+            if out_task:
+                data.update(out_task_dict.get(item[7], {}))
+            result.append(data)
+        if export:
+            return self.export_xls(result)
+        count_sql = 'select count(*) from dsp_OastTask {}'.format(extra_where_str)
+        sc = SqlClient(sql=count_sql, **self.DATABASE_CONF)
+        temp2 = sc.all()
+        count = temp2[0][0]
+        sc.close()
+        return Response({'result': result, 'count': count})
+
+
+@method_decorator([api_recorder], name="dispatch")
 class HFRealStatusView(APIView):
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_material_hf_real_data'}))
     DATABASE_CONF = HF_CONF
 
     def get(self, request):
