@@ -3136,7 +3136,7 @@ class PerformanceSummaryView(APIView):
             name, day = key.split('_')
             section = EmployeeAttendanceRecords.objects.filter(user__username=name).first().section
             post_standard = section_info[section]['post_standard']
-            coefficient = section_info[section]['coefficient']
+            coefficient = section_info[section]['coefficient'] / 100
             p_dic = {}
             for equip, qty in dic.items():
                 if max_value.get(equip) and settings_value.__dict__.get(equip):
