@@ -3025,11 +3025,19 @@ class PerformanceSummaryView(APIView):
                         price = (qty - s) * float(coefficient1_dic.get('超过目标产量部分'))
                     ccjl_dic[equip] = price
             post_coefficient = post_coefficient if len(list(results1.values())[0]) > 1 else 1
-            if post_standard == 1:  # 最大值
-                hj['ccjl'] = round(max(ccjl_dic.values()), 2) if ccjl_dic.values() else 0
+
+            if section in ['班长', '机动']:
+                hj['ccjl'] = round(sum(ccjl_dic.values()) * 0.15, 2) if ccjl_dic.values() else 0
+            elif section in ['三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库']:
+                hj['ccjl'] = round(sum(ccjl_dic.values()) * 0.2 * coefficient, 2) if ccjl_dic.values() else 0
+            else:
+                if post_standard == 1:  # 最大值
+                    hj['ccjl'] = round(max(ccjl_dic.values()), 2) if ccjl_dic.values() else 0
+                else:
+                    hj['ccjl'] = round(sum(ccjl_dic.values()) / (len(results_sort) // 3), 2) if ccjl_dic.values() else 0
+            if post_standard == 1:
                 hj['price'] = round(int(max(equip_price.values())) * post_coefficient * coefficient * a, 2) if equip_price.values() else 0
             else:
-                hj['ccjl'] = round(sum(ccjl_dic.values()) / (len(results_sort) // 3), 2) if ccjl_dic.values() else 0
                 hj['price'] = round(hj['price'] / (len(results_sort) // 3) * post_coefficient * coefficient * a, 2) if equip_price.values() else 0
 
             return Response({'results': results_sort.values(), 'hj': hj, 'all_price': hj['price'], '超产奖励': hj['ccjl'], 'group_list': group_list})
@@ -3146,17 +3154,17 @@ class PerformanceSummaryView(APIView):
                         price = (qty - s) * float(coefficient1_dic.get('超过目标产量部分'))
                     p_dic[equip] = price
             if section in ['班长', '机动']:
-                p = round(sum(p_dic.values()) * 0.15, 2)
+                p = round(sum(p_dic.values()) * 0.15, 2) if p_dic.values() else 0
             elif section in ['三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库']:
-                p = round(sum(p_dic.values()) * 0.2 * coefficient, 2)
+                p = round(sum(p_dic.values()) * 0.2 * coefficient, 2) if p_dic.values() else 0
             else:
-                if len(dic.values()) > 1:
+                if len(dic.values()) > 0:
                     if post_standard == 1:
-                        p = max(p_dic.values())
+                        p = max(p_dic.values()) if p_dic.values() else 0
                     else:
-                        p = round(sum(p_dic.values()) / len(dic.values()), 2)
+                        p = round(sum(p_dic.values()) / len(dic.values()), 2) if p_dic.values() else 0
                 else:
-                    p = max(p_dic.values())
+                    p = 0
             results[name]['超产奖励'] += p
             results[name]['all'] = round(results[name]['all'] + p, 2)
             if p > 0:
