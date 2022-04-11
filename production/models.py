@@ -521,7 +521,7 @@ class MlTrainsInfo(AbstractEntity):
     classes = models.CharField(help_text='班次', max_length=12)
     equip_no = models.CharField(max_length=12, help_text='机台')
     product_no = models.CharField(max_length=64, help_text='胶料编码')
-    trains = models.IntegerField(help_text='车数', default=0)
+    qty = models.IntegerField(help_text='车数', default=0)
 
     class Meta:
         db_table = 'ml_trains_info'
