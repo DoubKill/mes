@@ -2043,7 +2043,7 @@ class MonthlyOutputStatisticsReport(APIView):
                 if settings_value:
                     item['settings_value'] = settings_value.__dict__.get('E190') if item['equip_no'] == '190E' else\
                         settings_value.__dict__.get(item['equip_no'])
-                    item['settings_value'] *= ds
+                    item['settings_value'] *= ds * 2
                 else:
                     item['settings_value'] = None
             # 获取不同段次的总重量
