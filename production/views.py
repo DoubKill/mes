@@ -3126,7 +3126,9 @@ class PerformanceSummaryView(APIView):
         for key, dic in equip_qty.items():
             price = 0
             name, day = key.split('_')
+            section = EmployeeAttendanceRecords.objects.filter(user__username=name).first().section
             post_standard = section_info[section]['post_standard']
+            coefficient = section_info[section]['coefficient']
             p_dic = {}
             for equip, qty in dic.items():
                 if max_value.get(equip) and settings_value.__dict__.get(equip):
@@ -3140,13 +3142,18 @@ class PerformanceSummaryView(APIView):
                     elif qty < m and qty > s:
                         price = (qty - s) * float(coefficient1_dic.get('超过目标产量部分'))
                     p_dic[equip] = price
-            if len(dic.values()) > 1:
-                if post_standard == 1:
-                    p = max(p_dic.values())
-                else:
-                    p = round(sum(p_dic.values()) / len(dic.values()), 2)
+            if section in ['班长', '机动']:
+                p = round(sum(p_dic.values()) * 0.15, 2)
+            elif section in ['三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库']:
+                p = round(sum(p_dic.values()) * 0.2 * coefficient, 2)
             else:
-                p = max(p_dic.values())
+                if len(dic.values()) > 1:
+                    if post_standard == 1:
+                        p = max(p_dic.values())
+                    else:
+                        p = round(sum(p_dic.values()) / len(dic.values()), 2)
+                else:
+                    p = max(p_dic.values())
             results[name]['超产奖励'] += p
             results[name]['all'] = round(results[name]['all'] + p, 2)
             if p > 0:
