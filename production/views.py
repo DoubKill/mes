@@ -2047,7 +2047,7 @@ class MonthlyOutputStatisticsReport(APIView):
                 if settings_value:
                     item['settings_value'] = settings_value.__dict__.get('E190') if item['equip_no'] == '190E' else\
                         settings_value.__dict__.get(item['equip_no'])
-                    item['settings_value'] *= ds
+                    item['settings_value'] *= ds * 2
                 else:
                     item['settings_value'] = None
             # 获取不同段次的总重量
@@ -2843,9 +2843,12 @@ class PerformanceSummaryView(APIView):
 
         # 密炼的产量
         queryset = TrainsFeedbacks.objects.filter(Q(~Q(equip_no='Z04')) | Q(equip_no='Z04', operation_user='Mixer1'))
-        product_qty = queryset.filter(**kwargs2
+        product_qty = list(queryset.filter(**kwargs2
                                                      ).values('classes', 'equip_no', 'factory_date__day', 'product_no').\
-            annotate(qty=Count('id')).values('qty', 'classes', 'equip_no', 'factory_date__day', 'product_no')
+            annotate(qty=Count('id')).values('qty', 'classes', 'equip_no', 'factory_date__day', 'product_no'))
+        # 人工录入产量
+        add_qty = MlTrainsInfo.objects.filter(**kwargs2, delete_flag=False).values('qty', 'classes', 'equip_no', 'factory_date__day', 'product_no')
+        product_qty += add_qty
         price_dic = {}
         price_list = PerformanceUnitPrice.objects.values('equip_type', 'state', 'pt', 'dj')
         for item in price_list:
@@ -3931,7 +3934,7 @@ class MlTrainsInfoViewSet(ModelViewSet):
                 raise ValidationError('胶料编码不可为空')
             if not item[4]:
                 raise ValidationError('车数不可为空')
-            if not isinstance(item[4], int):
+            if isinstance(item[4], str) or item[4] % 1 != 0:
                 raise ValidationError('车数必须为整数')
             kwargs['factory_date'] = datetime.date(xlrd.xldate.xldate_as_datetime(item[0], 0))
             kwargs['classes'] = item[1]
