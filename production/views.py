@@ -3834,12 +3834,12 @@ class OverTimeView(APIView):
                     user=obj.user,
                     section=obj.section,
                     factory_date=serializer_data.get('factory_date'),
-                    begin_date=serializer_data.get('factory_date'),
-                    end_date=serializer_data.get('factory_date'),
+                    begin_date=serializer_data.get('begin_date'),
+                    end_date=serializer_data.get('end_date'),
                     work_time=work_time,
                     actual_time=work_time,
-                    classes=serializer_data.get('factory_date'),
-                    group=serializer_data.get('factory_date'),
+                    classes=serializer_data.get('classes'),
+                    group=serializer_data.get('group'),
                     equip=equip,
                     status='加班'
                 )
