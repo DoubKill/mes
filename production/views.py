@@ -3965,7 +3965,7 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
             serializer.save()
         elif confirm_list:
             for item in confirm_list:
-                is_use = item.pop('item')
+                is_use = item.pop('is_use')
                 self.queryset.filter(**item).update(is_use=is_use)
         return Response('ok')
 
