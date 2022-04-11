@@ -446,10 +446,16 @@ class AttendanceGroupSetupSerializer(serializers.ModelSerializer):
 
 
 class EmployeeAttendanceRecordsSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(write_only=True)
 
     class Meta:
         model = EmployeeAttendanceRecords
         fields = '__all__'
+
+    def validate(self, attrs):
+
+        attrs['user'] = User.objects.filter(username=attrs.pop('username')).first()
+        return attrs
 
 
 class FillCardApplySerializer(serializers.ModelSerializer):

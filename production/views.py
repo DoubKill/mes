@@ -2716,6 +2716,12 @@ class PerformanceJobLadderViewSet(ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filter_class = PerformanceJobLadderFilter
 
+    def list(self, request, *args, **kwargs):
+        if self.request.query_params.get('all'):
+            res = PerformanceJobLadder.objects.filter(delete_flag=False).values('id', 'type', 'name')
+            return Response({'results': res})
+        return super().list(request, *args, **kwargs)
+
 
 @method_decorator([api_recorder], name="dispatch")
 class PerformanceUnitPriceView(APIView):
@@ -3930,7 +3936,7 @@ class AttendanceRecordSearch(APIView):
 class AttendanceTimeStatisticsViewSet(ModelViewSet):
     queryset = EmployeeAttendanceRecords.objects.filter(
         Q(end_date__isnull=False, begin_date__isnull=False) |
-        Q(end_date__isnull=True, begin_date__isnull=True))
+        Q(end_date__isnull=True, begin_date__isnull=True)).order_by('begin_date')
     serializer_class = EmployeeAttendanceRecordsSerializer
     permission_classes = (IsAuthenticated,)
 
@@ -3949,6 +3955,19 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
             principal = principal_obj.principal if principal_obj else None
         return Response({'results': data, 'principal': principal if data else None,
                      'id_card_num': id_card_num if data else None})
+
+    def create(self, request, *args, **kwargs):
+        report_list = self.request.data.get('report_list', [])
+        confirm_list = self.request.data.get('confirm_list', [])
+        if report_list:
+            serializer = self.get_serializer(data=report_list, many=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+        elif confirm_list:
+            for item in confirm_list:
+                is_use = item.pop('item')
+                self.queryset.filter(**item).update(is_use=is_use)
+        return Response('ok')
 
 
 @method_decorator([api_recorder], name="dispatch")
