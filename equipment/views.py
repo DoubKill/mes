@@ -2943,6 +2943,8 @@ class EquipAutoPlanView(APIView):
                     area = EquipWarehouseArea.objects.filter(
                         Q(warehouse_area__equip_component_type=obj.equip_component_type) | Q(
                             warehouse_area__isnull=True)).first()
+                    areas = EquipWarehouseArea.objects.filter(delete_flag=False).values('id', 'area_name')
+                    areas = [{'equip_warehouse_area_id': item['id'], 'area_name': item['area_name']} for item in areas]
                     if not area:
                         return Response({"success": False, "message": '该备件没有可存放的库区', "data": None})
                     location = list(EquipWarehouseLocation.objects.filter(equip_warehouse_area=area,
@@ -2971,6 +2973,8 @@ class EquipAutoPlanView(APIView):
                         return Response({"success": False, "message": '库存中不存在该备件', "data": None})
                     area_id = default.equip_warehouse_area.id
                     area_name = default.equip_warehouse_area.area_name
+                    areas = queryset.values('equip_warehouse_area__id', 'equip_warehouse_area__area_name')
+                    areas = [{'equip_warehouse_area_id': item['equip_warehouse_area__id'], 'area_name': item['equip_warehouse_area__area_name']} for item in areas]
                     res = queryset.values('equip_warehouse_location__location_name', 'equip_warehouse_location__id').distinct()
                     location = [{'id': item['equip_warehouse_location__id'],
                                  'location_name': item['equip_warehouse_location__location_name']} for item in res]
@@ -2988,6 +2992,7 @@ class EquipAutoPlanView(APIView):
                     'quantity': quantity,
                     'area_id': area_id,
                     'area_name': area_name,
+                    'areas': areas,
                     'location': location,
                     'de_location_id': de_location_id,  # 默认显示的库区
                     'de_location_name': de_location_name,
