@@ -135,7 +135,7 @@ class Equip190EFilter(django_filters.rest_framework.FilterSet):
 
 class AttendanceClockDetailFilter(django_filters.rest_framework.FilterSet):
     date = django_filters.DateFilter(field_name='date')
-    name = django_filters.DateFilter(field_name='name')
+    name = django_filters.CharFilter(field_name='name')
 
     class Meta:
         model = AttendanceClockDetail
