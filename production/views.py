@@ -1769,15 +1769,46 @@ class ProductPlanRealView(ListAPIView):
 
     def list(self, request, *args, **kwargs):
         ret = {}
+        auto = self.request.query_params.get('auto', False)
+        manual = self.request.query_params.get('manual', False)
         day_time = self.request.query_params.get('day_time', datetime.datetime.now().date())
         queryset = self.filter_queryset(self.get_queryset())
         queryset = queryset.filter(work_schedule_plan__plan_schedule__day_time=day_time)
+        if manual:
+            add_data = MlTrainsInfo.objects.filter(factory_date=day_time, delete_flag=False).values(
+                'factory_date', 'equip_no', 'product_no', 'classes', 'qty')
+        else:
+            add_data = []
         for classes in ['早班', '中班', '夜班']:
             page = queryset.filter(work_schedule_plan__classes__global_name=classes)
             data = self.get_serializer(page, many=True).data
             data = list(filter(lambda x: x['begin_time'] is not None, data))
             data.sort(key=lambda x: x['begin_time'])
-            ret[classes] = data
+            ret[classes] = data if auto else []
+
+        for item in add_data:
+            tfb_obj = TrainsFeedbacks.objects.filter(product_no=item['product_no'],
+                                                     factory_date=item['factory_date']).order_by('id').first()
+            if tfb_obj:
+                plan_obj = self.queryset.filter(plan_classes_uid=tfb_obj.plan_classes_uid).first()
+            else:
+                plan_obj = None
+            last_obj = TrainsFeedbacks.objects.filter(product_no=item['product_no'],
+                                                     factory_date=item['factory_date']).order_by('id').last()
+            begin_time = tfb_obj.begin_time.strftime("%Y-%m-%d %H:%M:%S") if tfb_obj else None
+            kwargs = {
+                'classes': item['classes'],
+                'plan_trains': plan_obj.plan_trains if plan_obj else None,
+                'actual_trains': last_obj.actual_trains if last_obj else None,
+                'product_no': item['product_no'],
+                'begin_time': begin_time
+            }
+            if kwargs in ret[item['classes']]:
+                index = ret[item['classes']].index(kwargs)
+                ret[item['classes']][index] = kwargs.update({'actual_trains': kwargs['actual_trains'] + item['qty']})
+            else:
+                ret[item['classes']].append(kwargs.update({'actual_trains': item['qty']}))
+
         return Response(ret)
 
 
@@ -2282,6 +2313,8 @@ class SummaryOfMillOutput(APIView):
 
     def get(self, request):
         factory_date = self.request.query_params.get('factory_date')
+        auto = self.request.query_params.get('auto', False)
+        manual = self.request.query_params.get('manual', False)
         # 统计机台的机型
 
         queryset = Equip.objects.filter(category__equip_type__global_name='密炼设备').values('equip_no', 'category__category_name')
@@ -2308,16 +2341,24 @@ class SummaryOfMillOutput(APIView):
                 count[f"{state}-早"] = 0
                 count[f"{state}-晚"] = 0
 
-        data = TrainsFeedbacks.objects.filter(factory_date=factory_date).values('equip_no',
-                                                                                'product_no', 'classes').annotate(
-            actual_trains=Count('actual_trains')).values('equip_no', 'product_no', 'classes', 'actual_trains')
-
+        if auto:
+            data1 = TrainsFeedbacks.objects.filter(factory_date=factory_date).values('equip_no',
+                                                                                    'product_no', 'classes').annotate(
+                qty=Count('actual_trains')).values('equip_no', 'product_no', 'classes', 'actual_trains')
+        else:
+            data1 = []
+        if manual:
+            data2 = MlTrainsInfo.objects.filter(factory_date=factory_date, delete_flag=False).values(
+                'equip_no', 'product_no', 'classes', 'qty')
+        else:
+            data2 = []
+        data = data1 + data2
         dj = ProductInfoDingJi.objects.filter(delete_flag=False, is_use=True).values('product_no')
         for item in data:
             equip = item['equip_no']
             state = item['product_no'].split('-')[1]
             classes = '早' if item['classes'] == '早班' else '晚'
-            actual_trains = item['actual_trains']
+            actual_trains = item['qty']
             if state in state_list:
                 # 判断是否是丁基胶
                 if item['product_no'] in [item['product_no'] for item in dj]:
