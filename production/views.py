@@ -3517,8 +3517,6 @@ class AttendanceClockViewSet(ModelViewSet):
         user = self.request.user
         username = user.username
         status = data.get('status')
-        # factory_date = data.get('factory_date')
-        bk_date = data.get('bk_date')
         now_time = datetime.datetime.now()
         attendance_group_obj, section_list, equip_list, date_now, group_list = self.get_user_group(user)
         principal = attendance_group_obj.principal  # 考勤负责人
@@ -3640,7 +3638,7 @@ class ReissueCardView(APIView):
         # 分页
         page = self.request.query_params.get("page", 1)
         page_size = self.request.query_params.get("page_size", 10)
-        state = self.request.query_params.get('state', 1)
+        state = self.request.query_params.get('state', 0)
         name = self.request.query_params.get('name', None)
         try:
             st = (int(page) - 1) * int(page_size)
@@ -3864,11 +3862,12 @@ class AttendanceRecordSearch(APIView):
         day = self.request.query_params.get('day')
         year = int(date.split('-')[0])
         month = int(date.split('-')[1])
-        queryset = EmployeeAttendanceRecords.objects.filter(~Q(is_use='废弃'),
-                                                            user=self.request.user).order_by('id')
+        queryset = EmployeeAttendanceRecords.objects.filter(
+            Q(Q(begin_date__isnull=False, end_date__isnull=False) | Q(begin_date__isnull=True, end_date__isnull=True))
+            & ~Q(is_use='废弃') & Q(user=self.request.user)).order_by('id')
         if day:  # 当前的上下班时间
             group_setup = AttendanceGroupSetup.objects.filter(Q(attendance_users__icontains=username) | Q(principal=username)).first()
-            record =queryset.filter(factory_date=f"{date}-{day}")
+            record =queryset.filter(factory_date=f"{date}-{day}") if queryset else None
             results = {
                 'attendance_st': group_setup.attendance_st,
                 'attendance_et': group_setup.attendance_et
@@ -3903,10 +3902,7 @@ class AttendanceRecordSearch(APIView):
                 attendance_group_obj = AttendanceGroupSetup.objects.filter(Q(attendance_users__icontains=username) | Q(principal=username)).first()
                 begin_date = record.first().begin_date
                 end_date = record.last().end_date
-                if not end_date:
-                    work_time = 0
-                else:
-                    work_time = round((end_date - begin_date).seconds / 3600, 2)
+                work_time = round(record.aggregate(Sum('actual_time'))['actual_time__sum'], 2)
                 results['work_times'] += work_time
 
                 if begin_date > datetime.datetime.strptime(f"{str(item.factory_date)} {str(attendance_group_obj.attendance_st)}", '%Y-%m-%d %H:%M:%S'):
@@ -3915,11 +3911,11 @@ class AttendanceRecordSearch(APIView):
                     results['zt'] += 1
         if detail:
             equip_list = queryset.filter(factory_date__year=year, factory_date__month=month
-                                         ).values('equip', 'section').annotate(work_times=Sum('work_time')).values(
-                'equip', 'section', 'work_times')
+                                         ).values('equip', 'section').annotate(work_times=Sum('actual_time')).values(
+                'equip', 'section', 'actual_time')
             results['equip_list'] = equip_list
             work_detail = queryset.filter(factory_date__year=year, factory_date__month=month
-                                          ).values('factory_date', 'classes', 'group', 'equip', 'section', 'work_time')
+                                          ).values('factory_date', 'classes', 'group', 'equip', 'section', 'actual_time')
             results['work_detail'] = work_detail
         else:
             days = queryset.values('factory_date').annotate(Count('id')).count()
