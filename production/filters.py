@@ -140,14 +140,3 @@ class AttendanceClockDetailFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = AttendanceClockDetail
         fields = ('name', 'date')
-
-
-class MlTrainsInfoFilter(django_filters.rest_framework.FilterSet):
-    factory_date = django_filters.DateFilter(field_name='factory_date', help_text='工厂日期')
-    classes = django_filters.CharFilter(field_name='classes', help_text='班次')
-    equip_no = django_filters.CharFilter(field_name='equip_no', help_text='机台')
-    product_no = django_filters.CharFilter(field_name='equip_no', help_text='胶料编码', lookup_expr='icontains')
-
-    class Meta:
-        model = MlTrainsInfo
-        fields = ('factory_date', 'classes', 'equip_no', 'product_no')
