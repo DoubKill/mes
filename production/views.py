@@ -45,12 +45,12 @@ from plan.models import ProductClassesPlan, SchedulingEquipShutDownPlan
 from basics.models import Equip
 from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, QualityControlFilter, EquipStatusFilter, \
     PlanStatusFilter, ExpendMaterialFilter, CollectTrainsFeedbacksFilter, UnReachedCapacityCause, \
-    ProductInfoDingJiFilter, SubsidyInfoFilter, PerformanceJobLadderFilter, Equip190EFilter, MlTrainsInfoFilter
+    ProductInfoDingJiFilter, SubsidyInfoFilter, PerformanceJobLadderFilter, Equip190EFilter, ManualInputTrains
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, OperationLog, \
     QualityControl, ProcessFeedback, AlarmLog, MaterialTankStatus, ProductionDailyRecords, ProductionPersonnelRecords, \
     RubberCannotPutinReason, MachineTargetYieldSettings, EmployeeAttendanceRecords, PerformanceJobLadder, \
     PerformanceUnitPrice, ProductInfoDingJi, SetThePrice, SubsidyInfo, IndependentPostTemplate, EquipMaxValueCache, \
-    OuterMaterial, Equip190EWeight, Equip190E, MlTrainsInfo
+    OuterMaterial, Equip190EWeight, Equip190E, ManualInputTrains
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, CollectTrainsFeedbacksSerializer, \
@@ -59,7 +59,7 @@ from production.serializers import QualityControlSerializer, OperationLogSeriali
     ProcessFeedbackSerializer, TrainsFixSerializer, PalletFeedbacksBatchModifySerializer, ProductPlanRealViewSerializer, \
     RubberCannotPutinReasonSerializer, PerformanceJobLadderSerializer, ProductInfoDingJiSerializer, \
     SetThePriceSerializer, SubsidyInfoSerializer, Equip190EWeightSerializer, OuterMaterialSerializer, \
-    Equip190ESerializer, EquipStatusBatchSerializer, MlTrainsInfoSerializer
+    Equip190ESerializer, EquipStatusBatchSerializer, ManualInputTrainsSerializer
 from rest_framework.generics import ListAPIView, GenericAPIView, ListCreateAPIView, CreateAPIView, UpdateAPIView, \
     get_object_or_404
 from datetime import timedelta
@@ -1775,8 +1775,8 @@ class ProductPlanRealView(ListAPIView):
         queryset = self.filter_queryset(self.get_queryset())
         queryset = queryset.filter(work_schedule_plan__plan_schedule__day_time=day_time)
         if manual:
-            add_data = MlTrainsInfo.objects.filter(factory_date=day_time, delete_flag=False).values(
-                'factory_date', 'equip_no', 'product_no', 'classes', 'qty')
+            add_data = ManualInputTrains.objects.filter(factory_date=day_time, delete_flag=False).values(
+                'factory_date', 'equip_no', 'product_no', 'classes', 'actual_trains')
         else:
             add_data = []
         for classes in ['早班', '中班', '夜班']:
@@ -1805,9 +1805,9 @@ class ProductPlanRealView(ListAPIView):
             }
             if kwargs in ret[item['classes']]:
                 index = ret[item['classes']].index(kwargs)
-                ret[item['classes']][index] = kwargs.update({'actual_trains': kwargs['actual_trains'] + item['qty']})
+                ret[item['classes']][index] = kwargs.update({'actual_trains': kwargs['actual_trains'] + item['actual_trains']})
             else:
-                ret[item['classes']].append(kwargs.update({'actual_trains': item['qty']}))
+                ret[item['classes']].append(kwargs.update({'actual_trains': item['actual_trains']}))
 
         return Response(ret)
 
@@ -2345,21 +2345,21 @@ class SummaryOfMillOutput(APIView):
         if auto:
             data1 = TrainsFeedbacks.objects.filter(factory_date=factory_date).values('equip_no',
                                                                                     'product_no', 'classes').annotate(
-                qty=Count('actual_trains')).values('equip_no', 'product_no', 'classes', 'actual_trains')
+                actual_trains=Count('actual_trains')).values('equip_no', 'product_no', 'classes', 'actual_trains')
         else:
             data1 = []
         if manual:
-            data2 = MlTrainsInfo.objects.filter(factory_date=factory_date, delete_flag=False).values(
-                'equip_no', 'product_no', 'classes', 'qty')
+            data2 = ManualInputTrains.objects.filter(factory_date=factory_date, delete_flag=False).values(
+                'equip_no', 'product_no', 'classes', 'actual_trains')
         else:
             data2 = []
-        data = data1 + data2
+        data = data1 | data2
         dj = ProductInfoDingJi.objects.filter(delete_flag=False, is_use=True).values('product_no')
         for item in data:
             equip = item['equip_no']
             state = item['product_no'].split('-')[1]
             classes = '早' if item['classes'] == '早班' else '晚'
-            actual_trains = item['qty']
+            actual_trains = item['actual_trains']
             if state in state_list:
                 # 判断是否是丁基胶
                 if item['product_no'] in [item['product_no'] for item in dj]:
@@ -2883,10 +2883,10 @@ class PerformanceSummaryView(APIView):
         queryset = TrainsFeedbacks.objects.filter(Q(~Q(equip_no='Z04')) | Q(equip_no='Z04', operation_user='Mixer1'))
         product_qty = list(queryset.filter(**kwargs2
                                                      ).values('classes', 'equip_no', 'factory_date__day', 'product_no').\
-            annotate(qty=Count('id')).values('qty', 'classes', 'equip_no', 'factory_date__day', 'product_no'))
+            annotate(actual_trains=Count('id')).values('actual_trains', 'classes', 'equip_no', 'factory_date__day', 'product_no'))
         # 人工录入产量
-        add_qty = MlTrainsInfo.objects.filter(**kwargs2, delete_flag=False).values('qty', 'classes', 'equip_no', 'factory_date__day', 'product_no')
-        product_qty += add_qty
+        add_qty = ManualInputTrains.objects.filter(**kwargs2, delete_flag=False).values('actual_trains', 'classes', 'equip_no', 'factory_date__day', 'product_no')
+        product_qty = product_qty | add_qty
         price_dic = {}
         price_list = PerformanceUnitPrice.objects.values('equip_type', 'state', 'pt', 'dj')
         for item in price_list:
@@ -3252,48 +3252,3 @@ class IndependentPostTemplateView(APIView):
                 lst.append(IndependentPostTemplate(name=name, status=status, date_time=date, work_type=work_type))
         IndependentPostTemplate.objects.bulk_create(lst)
         return Response(f'导入成功')
-
-
-class MlTrainsInfoViewSet(ModelViewSet):
-    queryset = MlTrainsInfo.objects.order_by('factory_date')
-    serializer_class = MlTrainsInfoSerializer
-    permission_classes = (IsAuthenticated,)
-    filter_backends = (DjangoFilterBackend,)
-    filter_class = MlTrainsInfoFilter
-    pagination_class = None
-
-    @action(methods=['post'], detail=False, permission_classes=[], url_path='import_xlsx',
-            url_name='import_xlsx')
-    def import_xlsx(self, request):
-        excel_file = request.FILES.get('file', None)
-        if not excel_file:
-            raise ValidationError('文件不可为空！')
-        cur_sheet = get_cur_sheet(excel_file)
-        data = get_sheet_data(cur_sheet)
-        kwargs = {}
-        for item in data:
-            if not item[0]:
-                raise ValidationError('工厂日期不可为空')
-            if not item[1]:
-                raise ValidationError('班次不可为空')
-            if not item[2]:
-                raise ValidationError('机台不可为空')
-            if not item[3]:
-                raise ValidationError('胶料编码不可为空')
-            if not item[4]:
-                raise ValidationError('车数不可为空')
-            if isinstance(item[4], str) or item[4] % 1 != 0:
-                raise ValidationError('车数必须为整数')
-            kwargs['factory_date'] = datetime.date(xlrd.xldate.xldate_as_datetime(item[0], 0))
-            kwargs['classes'] = item[1]
-            kwargs['equip_no'] = item[2]
-            kwargs['product_no'] = item[3]
-            kwargs['trains'] = item[4]
-        s = MlTrainsInfoSerializer(data=kwargs, context={'request': request})
-        if s.is_valid(raise_exception=False):
-            if len(s.validated_data) < 1:
-                raise ValidationError('没有可导入的数据')
-            s.save()
-        else:
-            raise ValidationError('导入的数据类型有误')
-        return Response(f'成功导入{len(s.validated_data)}条数据')

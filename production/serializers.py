@@ -11,7 +11,7 @@ from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, QualityControl, \
     OperationLog, UnReachedCapacityCause, ProcessFeedback, AlarmLog, RubberCannotPutinReason, PerformanceJobLadder, \
-    ProductInfoDingJi, SetThePrice, SubsidyInfo, Equip190EWeight, OuterMaterial, Equip190E, MlTrainsInfo
+    ProductInfoDingJi, SetThePrice, SubsidyInfo, Equip190EWeight, OuterMaterial, Equip190E, ManualInputTrains
 
 
 class EquipStatusSerializer(BaseModelSerializer):
@@ -183,7 +183,7 @@ class CollectTrainsFeedbacksSerializer(BaseModelSerializer):
     def get_time_consuming(self, obj):
         if not obj.end_time or not obj.begin_time:
             return None
-        return obj.end_time - obj.begin_time
+        return (obj.end_time - obj.begin_time).total_seconds()
 
     def get_interval_time(self, obj):
         if obj.actual_trains > 1:
@@ -191,13 +191,13 @@ class CollectTrainsFeedbacksSerializer(BaseModelSerializer):
             tfb_obj = TrainsFeedbacks.objects.filter(plan_classes_uid=obj.plan_classes_uid,
                                                      actual_trains=actual_trains).last()
             if tfb_obj:
-                return obj.begin_time - tfb_obj.end_time
+                return (obj.begin_time - tfb_obj.end_time).total_seconds()
             else:
                 return 0
         elif obj.actual_trains == 1:
-            tfb_obj = TrainsFeedbacks.objects.filter(equip_no=obj.equip_no, id__lt=obj.id).last()
+            tfb_obj = TrainsFeedbacks.objects.filter(equip_no=obj.equip_no, id__lt=obj.id).order_by('-id').first()
             if tfb_obj:
-                return obj.begin_time - tfb_obj.end_time
+                return (obj.begin_time - tfb_obj.end_time).total_seconds()
             else:
                 return 0
 
@@ -475,9 +475,9 @@ class EquipStatusBatchSerializer(BaseModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
-class MlTrainsInfoSerializer(BaseModelSerializer):
+class ManualInputTrainsSerializer(BaseModelSerializer):
 
     class Meta:
-        model = MlTrainsInfo
+        model = ManualInputTrains
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
