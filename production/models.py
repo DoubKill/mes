@@ -597,7 +597,7 @@ class ManualInputTrains(models.Model):
     created_time = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
 
     class Meta:
-        db_table = 'ml_trains_info'
+        db_table = 'manual_input_trains'
         verbose_name_plural = verbose_name = '录入人工密炼车次信息'
 
 
