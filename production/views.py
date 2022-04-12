@@ -2525,7 +2525,13 @@ class EmployeeAttendanceRecordsView(APIView):
             item['equip'] = '' if not item.get('equip') else item['equip']
             item['sort'] = 2 if not item.get('equip') else 1
         results_sort = sorted(list(results.values()), key=lambda x: (x['sort'], x['equip']))
-        return Response({'results': results_sort, 'group_list': group_list})
+        audit_obj = AttendanceResultAudit.objects.filter(date=date, audit_user__isnull=False).last()
+        approve_obj = AttendanceResultAudit.objects.filter(date=date, approve_user__isnull=False).last()
+        return Response({'results': results_sort, 'group_list': group_list,
+                         'audit_user':  audit_obj.audit_user if audit_obj else None,
+                         'approve_user': approve_obj.approve_user if approve_obj else None})
+
+
 
     # 导入出勤记录
     @atomic
@@ -3485,13 +3491,13 @@ class AttendanceClockViewSet(ModelViewSet):
             )
             results['ids'] = ids
         elif status == '换岗':
-            begin_date = EmployeeAttendanceRecords.objects.filter(id__in=ids).first().begin_date
-            end_date = time_now
-
-            work_time = round((end_date - begin_date).seconds / 3600, 2)
-            EmployeeAttendanceRecords.objects.filter(id__in=ids).update(
-                end_date=end_date, work_time=work_time, actual_time=work_time
-            )
+            if EmployeeAttendanceRecords.objects.filter(id__in=ids, end_date__isnull=True).exists():
+                begin_date = EmployeeAttendanceRecords.objects.filter(id__in=ids).first().begin_date
+                end_date = time_now
+                work_time = round((end_date - begin_date).seconds / 3600, 2)
+                EmployeeAttendanceRecords.objects.filter(id__in=ids).update(
+                    end_date=end_date, work_time=work_time, actual_time=work_time
+                )
             for equip in equip_list:
                 obj = EmployeeAttendanceRecords.objects.create(
                     user=user,
