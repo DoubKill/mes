@@ -8,6 +8,7 @@ from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.views import APIView
 
 from basics.models import WorkSchedulePlan, Equip
+from equipment.utils import gen_template_response
 from inventory.models import InventoryLog, DispatchLog, FinalGumInInventoryLog, MixGumInInventoryLog, \
     FinalGumOutInventoryLog, MixGumOutInventoryLog
 from mes import settings
@@ -146,7 +147,7 @@ class ClassesBanBurySummaryView(ListAPIView):
                 'min_trains': item[5],
                 'max_train_time': item[6],
                 'min_train_time': item[7],
-                'total_time': item[8],
+                'total_time': item[8] if item[1] != 'Z04' else int(item[8]/2),
                 'date': item[3]
             }
             if dimension == '1':
@@ -255,7 +256,7 @@ class EquipBanBurySummaryView(ClassesBanBurySummaryView):
                 'equip_no': item[1],
                 'max_trains': item[3],
                 'min_trains': item[4],
-                'total_time': item[5],
+                'total_time': item[5] if item[1] != 'Z04' else int(item[5]/2),
                 'date': item[2]
             }
             if dimension == '1':
@@ -285,6 +286,22 @@ class CollectTrainsFeedbacksList(ListAPIView):
     filter_backends = (DjangoFilterBackend,)
     filter_class = CollectTrainsFeedbacksFilter
     permission_classes = (IsAuthenticatedOrReadOnly,)
+    EXPORT_FIELDS_DICT = {'班次': "classes", '设备编码': "equip_no", '胶料编码': "product_no", '车次': "actual_trains", '耗时/s': "time_consuming", '间隔时间/s': "interval_time"}
+    FILE_NAME = '胶料单车次时间汇总'
+
+    def list(self, request, *args, **kwargs):
+        export = self.request.query_params.get('export')
+        queryset = self.filter_queryset(self.get_queryset())
+        if export:
+            data = self.get_serializer(queryset, many=True).data
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -333,6 +350,8 @@ class SumCollectTrains(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class CutTimeCollect(APIView):
     """规格切换时间汇总"""
+    EXPORT_FIELDS_DICT = {'时间': "time", '设备编码': "equip_no", '切换前计划号': "plan_classes_uid_age", '切换后计划号': "plan_classes_uid_later", '切换前胶料编码': "cut_ago_product_no", '切换后胶料编码': "cut_later_product_no", '耗时/s': "time_consuming"}
+    FILE_NAME = '规格切换时间汇总'
 
     def get(self, request, *args, **kwargs):
         # 筛选工厂
@@ -378,7 +397,7 @@ class CutTimeCollect(APIView):
                 'equip_no': tfb_pn_age.equip_no,
                 'cut_ago_product_no': tfb_pn_age.product_no,
                 'cut_later_product_no': tfb_pn_later.product_no,
-                'time_consuming': tfb_pn_later.begin_time - tfb_pn_age.end_time}
+                'time_consuming': (tfb_pn_later.begin_time - tfb_pn_age.end_time).total_seconds()}
             return_list.append(return_dict)
         if st:  # 第二天的头一条
             mst = datetime.datetime.strptime(st, "%Y-%m-%d") + datetime.timedelta(days=1)
@@ -397,7 +416,7 @@ class CutTimeCollect(APIView):
                         'equip_no': tfb_pn_age.equip_no,
                         'cut_ago_product_no': tfb_pn_age.product_no,
                         'cut_later_product_no': m_tfb_obj.product_no,
-                        'time_consuming': m_tfb_obj.begin_time - tfb_pn_age.end_time}
+                        'time_consuming': (m_tfb_obj.begin_time - tfb_pn_age.end_time).total_seconds()}
                     return_list.append(return_dict)
 
         if not return_list:
@@ -405,8 +424,7 @@ class CutTimeCollect(APIView):
                 {'sum_time': None, 'max_time': None, 'min_time': None, 'avg_time': None})
             return Response({'results': return_list})
             # 统计最大、最小、综合、平均时间
-        sum_time = datetime.timedelta(days=0, seconds=0, microseconds=0, milliseconds=0, minutes=0, hours=0,
-                                      weeks=0)
+        sum_time = 0
         max_time = return_list[0]['time_consuming']
         min_time = return_list[0]['time_consuming']
         for train_dict in return_list:
@@ -420,6 +438,8 @@ class CutTimeCollect(APIView):
         # 分页
         counts = len(return_list)
         return_list = return_list[(page - 1) * page_size:page_size * page]
+        if self.request.query_params.get('export'):
+            return gen_template_response(self.EXPORT_FIELDS_DICT, return_list, self.FILE_NAME)
         return_list.append(
             {'sum_time': sum_time, 'max_time': max_time, 'min_time': min_time, 'avg_time': avg_time})
         return Response({'count': counts, 'results': return_list})
