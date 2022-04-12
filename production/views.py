@@ -2164,8 +2164,9 @@ class DailyProductionCompletionReport(APIView):
             results['name_1']['weight'] += round(item['weight'] / 100000, 2)
             results['name_1'][f"{item['factory_date__day']}日"] = round(item['weight'] / 100000, 2)
         for item in equip_190e_weight:
-            results['name_2']['weight'] += round(item['setup__weight'] / 1000 * item['qty'], 2)
-            results['name_2'][f"{item['factory_date__day']}日"] = round(item['setup__weight'] / 1000 * item['qty'], 2)
+            weight = round(item['setup__weight'] / 1000 * item['qty'], 2)
+            results['name_2']['weight'] += weight
+            results['name_2'][f"{item['factory_date__day']}日"] = results['name_2'].get(f"{item['factory_date__day']}日", 0) + weight
         for item in fin_queryset:
             results['name_2']['weight'] += round(item['weight'] / 100000, 2)
             results['name_4']['weight'] += round(item['weight'] / 100000, 2)
