@@ -115,7 +115,7 @@ class PerformanceJobLadderFilter(django_filters.rest_framework.FilterSet):
 
 
 class Equip190EFilter(django_filters.rest_framework.FilterSet):
-    specification = django_filters.CharFilter(field_name='specification', lookup_expr='icontains')
+    specification = django_filters.CharFilter(field_name='specification')
     state = django_filters.CharFilter(field_name='state', lookup_expr='icontains')
 
     class Meta:

@@ -383,8 +383,8 @@ class MachineTargetYieldSettings(models.Model):
 
 class EmployeeAttendanceRecords(models.Model):
     user = models.ForeignKey(User, help_text='员工', on_delete=models.SET_NULL, null=True)
-    section = models.CharField(help_text='岗位', max_length=64)
-    factory_date = models.DateField(help_text='工厂时间')
+    section = models.CharField(help_text='岗位', max_length=64, null=True, blank=True)
+    factory_date = models.DateField(help_text='工厂时间', null=True, blank=True)
     begin_date = models.DateTimeField(help_text='上岗时间', null=True, blank=True)
     end_date = models.DateTimeField(help_text='下岗时间', null=True, blank=True)
     work_time = models.FloatField(help_text='计算工作时间', null=True, blank=True, default=12)
