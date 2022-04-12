@@ -3749,17 +3749,6 @@ class ReissueCardView(APIView):
                 EmployeeAttendanceRecords.objects.filter(**dic).update(end_date=end_date,
                                                                        work_time=work_time,
                                                                        actual_time=work_time)
-            # 记录考勤打卡详情
-            AttendanceClockDetail.objects.create(
-                name=user.username,
-                equip=obj.equip,
-                group=data.get('group'),
-                classes=data.get('classes'),
-                section=data.get('section'),
-                work_type=data.get('status'),
-                date=datetime.date(date_time.year, date_time.month, date_time.day),
-                date_time=date_time
-            )
         return Response({'results': serializer_data})
 
 
@@ -3847,10 +3836,10 @@ class OverTimeView(APIView):
             AttendanceClockDetail.objects.create(
                 name=user.username,
                 equip=obj.equip,
-                group=data.get('group'),
-                classes=data.get('classes'),
-                section=data.get('section'),
-                work_type=data.get('status'),
+                group=obj.group,
+                classes=obj.classes,
+                section=obj.section,
+                work_type='加班',
                 date=datetime.date(date_time.year, date_time.month, date_time.day),
                 date_time=date_time
             )
