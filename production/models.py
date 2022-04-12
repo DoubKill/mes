@@ -596,3 +596,15 @@ class MlTrainsInfo(AbstractEntity):
     class Meta:
         db_table = 'ml_trains_info'
         verbose_name_plural = verbose_name = '录入人工密炼车次信息'
+
+
+class AttendanceResultAudit(AbstractEntity):
+    audit_user = models.CharField(max_length=64, help_text='审核人', null=True, blank=True)
+    approve_user = models.CharField(max_length=64, help_text='审批人', null=True, blank=True)
+    date = models.CharField(max_length=64, help_text='日期：2022-12')
+    result = models.BooleanField(default=False, help_text='处理结果')
+    result_desc = models.TextField(help_text='处理说明', null=True, blank=True)
+
+    class Meta:
+        db_table = 'attendance_result_audit'
+        verbose_name_plural = verbose_name = '考勤打卡审批'

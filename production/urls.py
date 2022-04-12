@@ -144,5 +144,7 @@ urlpatterns = [
     # 加班申请
     path('over-time/', OverTimeView.as_view()),
     # 考勤记录查询
-    path('attendance-record-search/', AttendanceRecordSearch.as_view())
+    path('attendance-record-search/', AttendanceRecordSearch.as_view()),
+    # 考勤打卡审批
+    path('attendance-result-audit/', AttendanceResultAuditView.as_view()),
 ]

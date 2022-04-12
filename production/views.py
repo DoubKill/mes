@@ -52,7 +52,7 @@ from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, Pla
     RubberCannotPutinReason, MachineTargetYieldSettings, EmployeeAttendanceRecords, PerformanceJobLadder, \
     PerformanceUnitPrice, ProductInfoDingJi, SetThePrice, SubsidyInfo, IndependentPostTemplate, AttendanceGroupSetup, \
     FillCardApply, ApplyForExtraWork, EquipMaxValueCache, Equip190EWeight, OuterMaterial, Equip190E, \
-    AttendanceClockDetail, MlTrainsInfo
+    AttendanceClockDetail, MlTrainsInfo, AttendanceResultAudit
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, CollectTrainsFeedbacksSerializer, \
@@ -4012,3 +4012,42 @@ class MlTrainsInfoViewSet(ModelViewSet):
         else:
             raise ValidationError('导入的数据类型有误')
         return Response(f'成功导入{len(s.validated_data)}条数据')
+
+
+class AttendanceResultAuditView(APIView):
+    permission_classes = (IsAuthenticated, )
+
+    def get(self, request):
+        date = self.request.query_params.get('date')
+        audit = self.request.query_params.get('audit', None)
+        approve = self.request.query_params.get('approve', None)
+        kwargs = {}
+        if audit:
+            kwargs['audit_user__isnull'] = False
+        if approve:
+            kwargs['approve_user__isnull'] = False
+        if not date:
+            raise ValidationError('缺少参数date')
+        last = AttendanceResultAudit.objects.filter(date=date, **kwargs).last()
+        data = {'audit_user': last.audit_user,
+                'approve_user': last.approve_user,
+                'result': last.result,
+                'result_desc': last.result_desc} if last else {}
+        return Response({"results": data})
+
+    def post(self, request):
+        data = self.request.data
+        audit = data.pop('audit', None)
+        approve = data.pop('approve', None)
+        try:
+            is_user = Section.objects.get(name='生产科').in_charge_user
+        except:
+            is_user = None
+        if self.request.user != is_user:
+            raise ValidationError('当前账号不是生产科负责人')
+        if audit:
+            data['audit_user'] = is_user.username
+        if approve:
+            data['approve_user'] = is_user.username
+        AttendanceResultAudit.objects.create(**data)
+        return Response('ok')
