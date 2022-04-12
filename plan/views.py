@@ -565,8 +565,7 @@ class RecipeMachineWeight(ListAPIView):
             query_kwargs['stage_product_batch_no__icontains'] = product_no
         return ProductBatching.objects.using('SFJ').exclude(
             used_type=6).filter(**query_kwargs).filter(
-            batching_type=1, stage__global_name__in=['FM', '3MB', '2MB', '2MB', 'HMB']
-        ).values('id', 'equip__equip_no', 'stage_product_batch_no', 'batching_weight').order_by('equip__equip_no')
+            batching_type=1).values('id', 'equip__equip_no', 'stage_product_batch_no', 'batching_weight', 'equip__category__category_no').order_by('equip__equip_no')
 
 
 @method_decorator([api_recorder], name="dispatch")

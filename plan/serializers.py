@@ -730,14 +730,31 @@ class RecipeMachineWeightSerializer(serializers.ModelSerializer):
 
     def get_devoted_weight(self, obj):
         stages = list(GlobalCode.objects.filter(global_type__type_name='胶料段次').values_list('global_name', flat=True))
-        c_pb = ProductBatchingDetail.objects.using('SFJ').filter(
-            product_batching=obj['id'],
-            delete_flag=False,
-            material__material_type__global_name__in=stages).first()
-        if c_pb:
-            return c_pb.actual_weight
+        if obj.get('equip__equip_no') == 'Z04':
+            pb = ProductBatching.objects.exclude(used_type=6).filter(
+                batching_type=2,
+                stage_product_batch_no=obj.get('stage_product_batch_no'),
+                dev_type__category_no=obj.get('equip__category__category_no')
+            ).first()
+            if pb:
+                c_pb = pb.batching_details.filter(
+                    delete_flag=False,
+                    material__material_type__global_name__in=stages).first()
+                if c_pb:
+                    return c_pb.actual_weight
+                else:
+                    return None
+            else:
+                return None
         else:
-            return 0
+            c_pb = ProductBatchingDetail.objects.using('SFJ').filter(
+                product_batching=obj['id'],
+                delete_flag=False,
+                material__material_type__global_name__in=stages).first()
+            if c_pb:
+                return c_pb.actual_weight
+            else:
+                return None
 
     class Meta:
         model = ProductBatching
