@@ -2571,10 +2571,10 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
             return Response({"success": True, "message": '入库成功', "data": data})
         if status == 2:
             # 出库的时候，根据出库的数量，判断库区中数量够不够
+            if not query:
+                return Response({"success": False, "message": '当前库位不存在该备件', "data": None})
             if query.quantity < out_quantity:
                 return Response({"success": False, "message": '当前库区中的数量不足', "data": None})
-            if not query:
-                return Response({"success": False, "message": '备件以删除不能出库', "data": None})
             if out_quantity > instance.plan_out_quantity - instance.out_quantity:
                 return Response({"success": False, "message": '出库数量不能大于单据出库数量', "data": None})
             if instance.plan_out_quantity <= out_quantity + instance.out_quantity:
