@@ -1779,7 +1779,7 @@ class ProductPlanRealView(ListAPIView):
         queryset = self.filter_queryset(self.get_queryset())
         queryset = queryset.filter(work_schedule_plan__plan_schedule__day_time=day_time)
         if manual:
-            add_data = ManualInputTrains.objects.filter(factory_date=day_time, delete_flag=False).values(
+            add_data = ManualInputTrains.objects.filter(factory_date=day_time).values(
                 'factory_date', 'equip_no', 'product_no', 'classes', 'actual_trains')
         else:
             add_data = []
@@ -2353,7 +2353,7 @@ class SummaryOfMillOutput(APIView):
         else:
             data1 = []
         if manual:
-            data2 = ManualInputTrains.objects.filter(factory_date=factory_date, delete_flag=False).values(
+            data2 = ManualInputTrains.objects.filter(factory_date=factory_date).values(
                 'equip_no', 'product_no', 'classes', 'actual_trains')
         else:
             data2 = []
@@ -2900,7 +2900,7 @@ class PerformanceSummaryView(APIView):
                                                      ).values('classes', 'equip_no', 'factory_date__day', 'product_no').\
             annotate(actual_trains=Count('id')).values('actual_trains', 'classes', 'equip_no', 'factory_date__day', 'product_no'))
         # 人工录入产量
-        add_qty = ManualInputTrains.objects.filter(**kwargs2, delete_flag=False).values('actual_trains', 'classes', 'equip_no', 'factory_date__day', 'product_no')
+        add_qty = ManualInputTrains.objects.filter(**kwargs2).values('actual_trains', 'classes', 'equip_no', 'factory_date__day', 'product_no')
         product_qty = product_qty | add_qty
         price_dic = {}
         price_list = PerformanceUnitPrice.objects.values('equip_type', 'state', 'pt', 'dj')
