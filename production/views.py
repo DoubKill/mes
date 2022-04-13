@@ -3682,8 +3682,8 @@ class ReissueCardView(APIView):
     def post(self, request):  # 处理补卡申请
         data = self.request.data
         obj = FillCardApply.objects.filter(id=data.get('id')).first()
-        obj.handling_suggestion = data.get('handling_suggestion')
-        obj.handling_result = data.get('handling_result')
+        obj.handling_suggestion = data.get('handling_suggestion', None)
+        obj.handling_result = data.get('handling_result', None)
         obj.save()
         serializer_data = FillCardApplySerializer(obj).data
         user = obj.user
@@ -3800,8 +3800,8 @@ class OverTimeView(APIView):
     def post(self, request):  # 处理加班申请
         data = self.request.data
         obj = ApplyForExtraWork.objects.filter(id=data.get('id')).first()
-        obj.handling_suggestion = data.get('handling_suggestion')
-        obj.handling_result = data.get('handling_result')
+        obj.handling_suggestion = data.get('handling_suggestion', None)
+        obj.handling_result = data.get('handling_result', None)
         obj.save()
         serializer_data = ApplyForExtraWorkSerializer(obj).data
         user = obj.user
