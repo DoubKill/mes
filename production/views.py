@@ -3928,6 +3928,8 @@ class AttendanceRecordSearch(APIView):
                 results['work_times'] += item['actual_time']
                 attendance_group_obj = AttendanceGroupSetup.objects.filter(
                     Q(attendance_users__icontains=username) | Q(principal=username)).first()
+            if day not in results.get('days'):
+                results['days'].append(day)
                 begin_date = record.first().begin_date
                 end_date = record.last().end_date
                 if begin_date and end_date:  # 导入的没有上岗和下岗时间
@@ -3939,8 +3941,6 @@ class AttendanceRecordSearch(APIView):
                             f"{str(item['factory_date'])} {str(attendance_group_obj.attendance_et)}",
                             '%Y-%m-%d %H:%M:%S'):
                         results['zt'] += 1
-            if day not in results.get('days'):
-                results['days'].append(day)
         if detail:
             equip_list = queryset.filter(factory_date__year=year, factory_date__month=month
                                          ).values('equip', 'section').annotate(work_times=Sum('actual_time')).values(
