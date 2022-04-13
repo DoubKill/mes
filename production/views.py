@@ -3885,9 +3885,16 @@ class AttendanceRecordSearch(APIView):
             if record:
                 begin_date = record.first().begin_date
                 end_date = record.last().end_date
-                all_time = record.filter(Q(Q(begin_date__isnull=False, end_date__isnull=False) |
-                                            Q(begin_date__isnull=True, end_date__isnull=True))).\
-                    aggregate(Sum('actual_time'))['actual_time__sum']
+                all_time = 0
+                lst = []
+                all_time_query = record.filter(Q(Q(begin_date__isnull=False, end_date__isnull=False) |
+                                            Q(begin_date__isnull=True, end_date__isnull=True))).values()
+                for query in all_time_query:
+                    query.pop('equip')
+                    if query not in lst:
+                        lst.append(query)
+                        all_time += query.get('actual_time')
+
                 if begin_date:
                     work_time = [{'title': f"上班: {datetime.datetime.strftime(begin_date, '%Y-%m-%d %H:%M:%S')}"}]
                 else:
@@ -3912,21 +3919,28 @@ class AttendanceRecordSearch(APIView):
             'cd': 0,  # 迟到
             'zt': 0,  # 早退
         }
-        for item in queryset.filter(factory_date__year=year, factory_date__month=month):
-            day = int(str(item.factory_date).split('-')[-1])
-            record = queryset.filter(factory_date=item.factory_date)
-            if day not in results.get('days'):
-                results['days'].append(day)
-                attendance_group_obj = AttendanceGroupSetup.objects.filter(Q(attendance_users__icontains=username) | Q(principal=username)).first()
+        lst = []
+        for item in queryset.filter(factory_date__year=year, factory_date__month=month).values():
+            item.pop('equip', None)
+            day = int(str(item['factory_date']).split('-')[-1])
+            record = queryset.filter(factory_date=item['factory_date'])
+            if item not in lst:
+                results['work_times'] += item['actual_time']
+                attendance_group_obj = AttendanceGroupSetup.objects.filter(
+                    Q(attendance_users__icontains=username) | Q(principal=username)).first()
                 begin_date = record.first().begin_date
                 end_date = record.last().end_date
-                work_time = record.aggregate(Sum('actual_time'))['actual_time__sum']
-                results['work_times'] += work_time
                 if begin_date and end_date:  # 导入的没有上岗和下岗时间
-                    if begin_date > datetime.datetime.strptime(f"{str(item.factory_date)} {str(attendance_group_obj.attendance_st)}", '%Y-%m-%d %H:%M:%S'):
+                    if begin_date > datetime.datetime.strptime(
+                            f"{str(item['factory_date'])} {str(attendance_group_obj.attendance_st)}",
+                            '%Y-%m-%d %H:%M:%S'):
                         results['cd'] += 1
-                    if end_date and end_date < datetime.datetime.strptime(f"{str(item.factory_date)} {str(attendance_group_obj.attendance_et)}", '%Y-%m-%d %H:%M:%S'):
+                    if end_date and end_date < datetime.datetime.strptime(
+                            f"{str(item['factory_date'])} {str(attendance_group_obj.attendance_et)}",
+                            '%Y-%m-%d %H:%M:%S'):
                         results['zt'] += 1
+            if day not in results.get('days'):
+                results['days'].append(day)
         if detail:
             equip_list = queryset.filter(factory_date__year=year, factory_date__month=month
                                          ).values('equip', 'section').annotate(work_times=Sum('actual_time')).values(
