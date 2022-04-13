@@ -3330,7 +3330,7 @@ class AttendanceClockViewSet(ModelViewSet):
         ding_uid = ding_api.get_user_id(phone)
         ding_api.send_message([ding_uid], content)
 
-    def get_user_group(self, user_obj):
+    def get_user_group(self, user_obj, now=None):
         username =user_obj.username
         # 获取登陆用户所在考勤组
         attendance_group_obj = AttendanceGroupSetup.objects.filter(Q(attendance_users__icontains=username) | Q(principal=username)).first()
@@ -3351,7 +3351,7 @@ class AttendanceClockViewSet(ModelViewSet):
         section_list = PerformanceJobLadder.objects.filter(type=group_type).values_list('name', flat=True)
 
         # 获取当前时间的工厂日期
-        now = datetime.datetime.now()
+        now = now if now else datetime.datetime.now()
         current_work_schedule_plan = WorkSchedulePlan.objects.filter(
             start_time__lte=now,
             end_time__gte=now,
@@ -3518,10 +3518,14 @@ class AttendanceClockViewSet(ModelViewSet):
         username = user.username
         status = data.get('status')
         now_time = datetime.datetime.now()
-        attendance_group_obj, section_list, equip_list, date_now, group_list = self.get_user_group(user)
+        bk_date = data.get('bk_date', None)
+        now = datetime.datetime.strptime(f'{bk_date}:00', '%Y-%m-%d %H:%M:%S')
+
+        attendance_group_obj, section_list, equip_list, date_now, group_list = self.get_user_group(user, now)
         principal = attendance_group_obj.principal  # 考勤负责人
         # 下岗时间
         equip_list = data.pop('equip_list')
+        print(date_now)
         if attendance_group_obj.attendance_et.hour > 12:  # 白班
             attendance_et = datetime.datetime.strptime(f"{date_now} {str(attendance_group_obj.attendance_et)}", '%Y-%m-%d %H:%M:%S')
             factory_date = date_now
@@ -3533,8 +3537,8 @@ class AttendanceClockViewSet(ModelViewSet):
                 factory_date = date_now
             factory_date1 = str(datetime.datetime.strptime(factory_date, '%Y-%m-%d') + datetime.timedelta(days=1))
             attendance_et = datetime.datetime.strptime(f"{factory_date1} {str(attendance_group_obj.attendance_et)}", '%Y-%m-%d %H:%M:%S')
-        if now_time > attendance_et:
-            raise ValidationError('不可提交超过12小时的申请')
+        if now_time > attendance_et + datetime.timedelta(days=1):
+            raise ValidationError('不可提交超过24小时的申请')
 
         if status == '上岗':
             # 判断是否有打卡记录
