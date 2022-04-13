@@ -3866,8 +3866,9 @@ class AttendanceRecordSearch(APIView):
             Q(Q(begin_date__isnull=False, end_date__isnull=False) | Q(begin_date__isnull=True, end_date__isnull=True))
             & ~Q(is_use='废弃') & Q(user=self.request.user)).order_by('id')
         if day:  # 当前的上下班时间
+            record = EmployeeAttendanceRecords.objects.filter(
+                ~Q(is_use='废弃') & Q(user=self.request.user, factory_date=f"{date}-{day}")).order_by('begin_date')
             group_setup = AttendanceGroupSetup.objects.filter(Q(attendance_users__icontains=username) | Q(principal=username)).first()
-            record =queryset.filter(factory_date=f"{date}-{day}") if queryset else None
             results = {
                 'attendance_st': group_setup.attendance_st,
                 'attendance_et': group_setup.attendance_et
@@ -3875,6 +3876,9 @@ class AttendanceRecordSearch(APIView):
             if record:
                 begin_date = record.first().begin_date
                 end_date = record.last().end_date
+                all_time = record.filter(Q(Q(begin_date__isnull=False, end_date__isnull=False) |
+                                            Q(begin_date__isnull=True, end_date__isnull=True))).\
+                    aggregate(Sum('actual_time'))['actual_time__sum']
                 work_time = [{'title': f"上班: {datetime.datetime.strftime(begin_date, '%Y-%m-%d %H:%M:%S')}"}]
                 if record.filter(status='换岗'):
                     times = record.filter(status='换岗').values_list('begin_date', flat=True).order_by('begin_date')
@@ -3883,7 +3887,7 @@ class AttendanceRecordSearch(APIView):
                             work_time.append({'title': f"换岗: {datetime.datetime.strftime(t, '%Y-%m-%d %H:%M:%S')}"})
                 if end_date:
                     work_time.append({'title': f"下班: {datetime.datetime.strftime(end_date, '%Y-%m-%d %H:%M:%S')}"})
-                results['work_time'] = round((end_date - begin_date).seconds / 3600, 2) if end_date else 0
+                results['work_time'] = round(all_time, 2) if all_time else 0
                 results['time'] = work_time
                 return Response(results)
             return Response(results)
@@ -3902,7 +3906,7 @@ class AttendanceRecordSearch(APIView):
                 attendance_group_obj = AttendanceGroupSetup.objects.filter(Q(attendance_users__icontains=username) | Q(principal=username)).first()
                 begin_date = record.first().begin_date
                 end_date = record.last().end_date
-                work_time = round(record.aggregate(Sum('actual_time'))['actual_time__sum'], 2)
+                work_time = record.aggregate(Sum('actual_time'))['actual_time__sum']
                 results['work_times'] += work_time
 
                 if begin_date > datetime.datetime.strptime(f"{str(item.factory_date)} {str(attendance_group_obj.attendance_st)}", '%Y-%m-%d %H:%M:%S'):
@@ -3921,6 +3925,7 @@ class AttendanceRecordSearch(APIView):
             days = queryset.values('factory_date').annotate(Count('id')).count()
             if days != 0:
                 results['avg_times'] = round(results['work_times'] / days, 2)
+        results['work_times'] = round(results['work_times'], 2)
         return Response({'results': results})
 
 
