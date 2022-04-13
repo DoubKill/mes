@@ -3108,7 +3108,9 @@ class EquipApplyOrderViewSet(ModelViewSet):
         my_order = self.request.query_params.get('my_order')
         status = self.request.query_params.get('status')
         searched = self.request.query_params.get('searched')
+        orders_filter = self.request.query_params.get('orders_filter', 'false')  # 工单大厅只展示个人相关的单据
         user_name = self.request.user.username
+        query_set = self.queryset
         # my_order: '1'个人工单页面、'2'工单大厅; status空表示进行中或工单搜索; searched空名下进行中工单,反之在所有工单中检索
         if my_order == '1':
             if not status:
@@ -3118,60 +3120,55 @@ class EquipApplyOrderViewSet(ModelViewSet):
                     if section:
                     # if Section.objects.filter(name='设备科', in_charge_user=self.request.user).exists():  # 写死，设备科
                         users = self.get_user(section, users=[])
-                        query_set = self.queryset.filter(
-                            Q(Q(status='已接单', receiving_user__in=users) |
-                              Q(status='已开始', repair_end_datetime__isnull=True, receiving_user__in=users)))
+                        query_set = query_set.filter(Q(Q(status='已接单', receiving_user__in=users) |
+                                                       Q(status='已开始', repair_end_datetime__isnull=True,
+                                                         receiving_user__in=users)))
                     else:
-                        query_set = self.queryset.filter(  # repair_user
+                        query_set = query_set.filter(  # repair_user
                             Q(Q(status='已接单', repair_user__icontains=user_name) |
                               Q(status='已开始', repair_end_datetime__isnull=True, repair_user__icontains=user_name) |
                               Q(status__in=['已接单', '已开始'], entrust_to_user__icontains=user_name)
                               ))
                 else:
-                    query_set = self.queryset.filter(
+                    query_set = query_set.filter(
                         Q(assign_to_user__icontains=user_name) | Q(receiving_user=user_name) |
                         Q(repair_user__icontains=user_name) | Q(accept_user=user_name) | Q(status='已生成'))
             else:
                 section = Section.objects.filter(in_charge_user=self.request.user).first()
                 if section:
                     users = self.get_user(section, users=[])
-                    query_set = self.queryset.filter(Q(status='已生成') |
-                    Q(Q(status='已完成') & Q(receiving_user__in=users)) |
-                    # Q(Q(status='已指派') & Q(assign_to_user__in=self.users)) |
-                    Q(Q(status__in=['已接单', '已开始']) & Q(receiving_user__in=users)) |
-                    Q(Q(status='已验收', receiving_user__in=users)))
+                    query_set = query_set.filter(Q(status='已生成') | Q(Q(status='已完成') & Q(receiving_user__in=users)) |
+                                                 Q(Q(status__in=['已接单', '已开始']) & Q(receiving_user__in=users)) |
+                                                 Q(Q(status='已验收', receiving_user__in=users)))
                     queryset_assigned = self.get_assign_user_queryset('已指派', users)
                     if queryset_assigned:
                         query_set = query_set | queryset_assigned
                 else:
-                    query_set = self.queryset.filter(Q(status='已生成') |
+                    query_set = query_set.filter(Q(status='已生成') |
                     Q(Q(status='已完成') & Q(Q(accept_user=user_name) | Q(repair_user__icontains=user_name) | Q(created_user__username=user_name))) |
                     Q(Q(status='已指派') & Q(assign_to_user__icontains=user_name)) |
                     Q(Q(status__in=['已接单', '已开始']) & Q(Q(entrust_to_user=user_name) | Q(repair_user__icontains=user_name))) |
                     Q(Q(status='已验收', accept_user=user_name)))
 
         elif my_order == '2':
-            if not status:
-                if not searched:
-                    query_set = self.queryset.filter(Q(Q(status='已接单') |
-                                                       Q(status='已开始', repair_end_datetime__isnull=True)))
-                else:
-                    query_set = self.queryset
-            else:
-                query_set = self.queryset
-        else:
-            query_set = self.queryset
+            if orders_filter == 'true':
+                query_set = query_set.filter(Q(assign_user__icontains=user_name) | Q(assign_to_user__icontains=user_name) |
+                                             Q(receiving_user__icontains=user_name) | Q(repair_user__icontains=user_name) |
+                                             Q(accept_user__icontains=user_name) | Q(created_user__username__icontains=user_name))
+            if not status and not searched:
+                query_set = query_set.filter(Q(Q(status='已接单') | Q(status='已开始', repair_end_datetime__isnull=True)))
         return query_set
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         my_order = self.request.query_params.get('my_order')
+        orders_filter = self.request.query_params.get('orders_filter', 'false')  # 工单大厅只展示个人相关的单据
+        user_name = self.request.user.username
         if self.request.query_params.get('export'):
             data = EquipApplyOrderExportSerializer(self.filter_queryset(self.get_queryset()), many=True).data
             return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
         # 小程序获取数量 带指派 带接单 进行中 已完成 已验收
         if my_order == '1':
-            user_name = self.request.user.username
             wait_assign = self.queryset.filter(status='已生成').count()
             section = Section.objects.filter(in_charge_user=self.request.user).first()
             if section:
@@ -3193,12 +3190,16 @@ class EquipApplyOrderViewSet(ModelViewSet):
                 finished = self.queryset.filter(Q(status='已完成') & Q(Q(accept_user=user_name) | Q(repair_user__icontains=user_name) | Q(created_user__username=user_name))).count()
             accepted = self.queryset.filter(status='已验收', accept_user=user_name).count()
         else:
-            wait_assign = self.queryset.filter(status='已生成').count()
-            assigned = self.queryset.filter(status='已指派').count()
-            processing = self.queryset.filter(Q(Q(status='已接单') |
-                                                Q(status='已开始', repair_end_datetime__isnull=True))).count()
-            finished = self.queryset.filter(status='已完成').count()
-            accepted = self.queryset.filter(status='已验收').count()
+            query_set = self.queryset
+            if orders_filter == 'true':
+                query_set = query_set.filter(Q(assign_user__icontains=user_name) | Q(assign_to_user__icontains=user_name) |
+                                             Q(receiving_user__icontains=user_name) | Q(repair_user__icontains=user_name) |
+                                             Q(accept_user__icontains=user_name) | Q(created_user__username__icontains=user_name))
+            wait_assign = query_set.filter(status='已生成').count()
+            assigned = query_set.filter(status='已指派').count()
+            processing = query_set.filter(Q(Q(status='已接单') | Q(status='已开始', repair_end_datetime__isnull=True))).count()
+            finished = query_set.filter(status='已完成').count()
+            accepted = query_set.filter(status='已验收').count()
         data = {'wait_assign': wait_assign, 'assigned': assigned, 'processing': processing,
                 'finished': finished, 'accepted': accepted}
         page = self.paginate_queryset(queryset)
@@ -3267,15 +3268,16 @@ class EquipApplyOrderViewSet(ModelViewSet):
         plan_ids = self.get_queryset().filter(id__in=pks).values_list('plan_id', flat=True)
         content = {}
         if opera_type == '指派':
-            assign_num = EquipApplyOrder.objects.filter(~Q(status='已生成'), id__in=pks).count()
+            assign_num = EquipApplyOrder.objects.filter(~Q(status__in=['已生成', '已指派', '已接单']), id__in=pks).count()
             if assign_num != 0:
-                raise ValidationError('存在非已生成的订单, 请刷新订单!')
+                raise ValidationError('存在非可指派/改派的订单, 请刷新订单!')
             assign_to_user = data.get('assign_to_user')
             if not assign_to_user:
                 raise ValidationError('未选择被指派人')
             data = {
                 'status': data.get('status'), 'assign_to_user': ','.join(assign_to_user), 'assign_user': user_ids,
-                'assign_datetime': now_date, 'last_updated_date': datetime.now()
+                'assign_datetime': now_date, 'last_updated_date': datetime.now(), 'receiving_user': None,
+                'receiving_datetime': None
             }
             content.update({"title": "您有新的设备维修单到达，请尽快处理！",
                             "form": [{"key": "指派人:", "value": self.request.user.username},
@@ -4094,8 +4096,8 @@ class EquipOrderListView(APIView):
                                     Q(receiving_user=self.request.user.username) |
                                     Q(status='已生成'))
 
-        serializer1 = EquipApplyOrderSerializer(instance=queryset1, many=True).data
-        serializer2 = EquipInspectionOrderSerializer(instance=queryset2, many=True).data
+        serializer1 = EquipApplyOrderSerializer(instance=queryset1, many=True, context={'request': request}).data
+        serializer2 = EquipInspectionOrderSerializer(instance=queryset2, many=True, context={'request': request}).data
         st = (int(page) - 1) * int(page_size)
         et = int(page) * int(page_size)
         data = sorted(serializer1 + serializer2, key=lambda x: x['created_date'], reverse=True)

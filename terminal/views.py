@@ -1810,6 +1810,7 @@ class XLPlanVIewSet(ModelViewSet):
         next_classes = self.request.data.get('next_classes')
         now_datetime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         now_date, now_time = now_datetime[:10], now_datetime[11:]
+        now_time = '19:46:00'
         if next_classes == '早班' and '07:45:00' <= now_time <= '08:15:00':
             msg = self.handle_trans(equip_no, next_classes, now_datetime)
             if msg:
@@ -1835,7 +1836,7 @@ class XLPlanVIewSet(ModelViewSet):
             next_classes 中班  -grouptime
             next_classes 夜班  早班切 -grouptime  中班切 grouptime
             """
-            filter_date = [now_date] + [(datetime.datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')] if next_classes == '早班' else []
+            filter_date = [now_date] + ([(datetime.datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')] if next_classes == '早班' else [])
             plan_list = Plan.objects.using(equip_no).filter(state__in=['运行中', '等待'], date_time__in=filter_date).order_by('-state')
             if not plan_list:
                 return '未找到运行中或者等待的计划'
