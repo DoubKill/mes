@@ -1806,9 +1806,11 @@ class ProductPlanRealView(ListAPIView):
             }
             if kwargs in ret[item['classes']]:
                 index = ret[item['classes']].index(kwargs)
-                ret[item['classes']][index] = kwargs.update({'actual_trains': kwargs['actual_trains'] + item['actual_trains']})
+                kwargs.update({'actual_trains': kwargs['actual_trains'] + item['actual_trains']})
+                ret[item['classes']][index] = kwargs
             else:
-                ret[item['classes']].append(kwargs.update({'actual_trains': item['actual_trains']}))
+                kwargs.update({'actual_trains': item['actual_trains']})
+                ret[item['classes']].append(kwargs)
 
         return Response(ret)
 
@@ -2355,7 +2357,7 @@ class SummaryOfMillOutput(APIView):
                 'equip_no', 'product_no', 'classes', 'actual_trains')
         else:
             data2 = []
-        data = data1 | data2
+        data = list(data1) + list(data2)
         dj = ProductInfoDingJi.objects.filter(delete_flag=False, is_use=True).values('product_no')
         for item in data:
             equip = item['equip_no']
