@@ -3891,6 +3891,7 @@ class AttendanceRecordSearch(APIView):
                                             Q(begin_date__isnull=True, end_date__isnull=True))).values()
                 for query in all_time_query:
                     query.pop('equip')
+                    query.pop('id')
                     if query not in lst:
                         lst.append(query)
                         all_time += query.get('actual_time')
@@ -3922,6 +3923,7 @@ class AttendanceRecordSearch(APIView):
         lst = []
         for item in queryset.filter(factory_date__year=year, factory_date__month=month).values():
             item.pop('equip', None)
+            item.pop('id', None)
             day = int(str(item['factory_date']).split('-')[-1])
             record = queryset.filter(factory_date=item['factory_date'])
             if item not in lst:
