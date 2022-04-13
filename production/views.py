@@ -3953,6 +3953,8 @@ class AttendanceRecordSearch(APIView):
             days = queryset.values('factory_date').annotate(Count('id')).count()
             if days != 0:
                 results['avg_times'] = round(results['work_times'] / days, 2)
+            else:
+                results['avg_times'] =0
         results['work_times'] = round(results['work_times'], 2)
         return Response({'results': results})
 
