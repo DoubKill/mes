@@ -3756,6 +3756,8 @@ class ReissueCardView(APIView):
                     'status__in': ['上岗', '换岗']
                 }
                 obj = EmployeeAttendanceRecords.objects.filter(**dic).first()
+                if not obj:
+                    raise ValidationError('提交的补卡参数有误')
                 begin_date = obj.begin_date
                 work_time = round((end_date - begin_date).seconds / 3600, 2)
                 EmployeeAttendanceRecords.objects.filter(**dic).update(end_date=end_date,
