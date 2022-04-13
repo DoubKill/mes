@@ -3925,6 +3925,7 @@ class AttendanceRecordSearch(APIView):
             day = int(str(item['factory_date']).split('-')[-1])
             record = queryset.filter(factory_date=item['factory_date'])
             if item not in lst:
+                lst.append(item)
                 results['work_times'] += item['actual_time']
                 attendance_group_obj = AttendanceGroupSetup.objects.filter(
                     Q(attendance_users__icontains=username) | Q(principal=username)).first()
