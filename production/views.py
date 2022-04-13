@@ -3883,7 +3883,10 @@ class AttendanceRecordSearch(APIView):
                 all_time = record.filter(Q(Q(begin_date__isnull=False, end_date__isnull=False) |
                                             Q(begin_date__isnull=True, end_date__isnull=True))).\
                     aggregate(Sum('actual_time'))['actual_time__sum']
-                work_time = [{'title': f"上班: {datetime.datetime.strftime(begin_date, '%Y-%m-%d %H:%M:%S')}"}]
+                if begin_date:
+                    work_time = [{'title': f"上班: {datetime.datetime.strftime(begin_date, '%Y-%m-%d %H:%M:%S')}"}]
+                else:
+                    work_time = []
                 if record.filter(status='换岗'):
                     times = record.filter(status='换岗').values_list('begin_date', flat=True).order_by('begin_date')
                     if times:
