@@ -1769,13 +1769,14 @@ class ProductPlanRealView(ListAPIView):
 
     def list(self, request, *args, **kwargs):
         ret = {}
-        auto = self.request.query_params.get('auto', False)
-        manual = self.request.query_params.get('manual', False)
+        auto = self.request.query_params.get('auto')
+        manual = self.request.query_params.get('manual')
+        equip_no = self.request.query_params.get('equip_no')
         day_time = self.request.query_params.get('day_time', datetime.datetime.now().date())
         queryset = self.filter_queryset(self.get_queryset())
         queryset = queryset.filter(work_schedule_plan__plan_schedule__day_time=day_time)
         if manual:
-            add_data = ManualInputTrains.objects.filter(factory_date=day_time).values(
+            add_data = ManualInputTrains.objects.filter(factory_date=day_time, equip_no=equip_no).values(
                 'factory_date', 'equip_no', 'product_no', 'classes', 'actual_trains')
         else:
             add_data = []
@@ -2315,8 +2316,8 @@ class SummaryOfMillOutput(APIView):
 
     def get(self, request):
         factory_date = self.request.query_params.get('factory_date')
-        auto = self.request.query_params.get('auto', False)
-        manual = self.request.query_params.get('manual', False)
+        auto = self.request.query_params.get('auto')
+        manual = self.request.query_params.get('manual')
         # 统计机台的机型
 
         queryset = Equip.objects.filter(category__equip_type__global_name='密炼设备').values('equip_no', 'category__category_name')
