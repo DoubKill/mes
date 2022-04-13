@@ -730,6 +730,7 @@ class EquipWarehouseOrder(AbstractEntity):
     work_order_no = models.CharField(max_length=64, help_text='工单编号', null=True, blank=True)
     barcode = models.CharField(max_length=64, help_text='领料单据', null=True, blank=True)
     processing_time = models.DateTimeField(help_text='处理时间', null=True, blank=True)
+    lluser = models.CharField(max_length=64, help_text='领料人', null=True, blank=True)
 
     class Meta:
         db_table = 'equip_warehouse_order'
