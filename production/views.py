@@ -3331,7 +3331,7 @@ class AttendanceClockViewSet(ModelViewSet):
         phone = user.phone_number
         ding_api = DinDinAPI()
         ding_uid = ding_api.get_user_id(phone)
-        ding_api.send_message([ding_uid], content)
+        ding_api.send_message([ding_uid], content, attendance=True)
 
     def get_user_group(self, user_obj, now=None):
         username =user_obj.username
@@ -3639,7 +3639,7 @@ class ReissueCardView(APIView):
         phone = user.phone_number
         ding_api = DinDinAPI()
         ding_uid = ding_api.get_user_id(phone)
-        ding_api.send_message([ding_uid], content)
+        ding_api.send_message([ding_uid], content, attendance=True)
 
     def get(self, request):
         # 分页
@@ -3773,7 +3773,7 @@ class OverTimeView(APIView):
         phone = user.phone_number
         ding_api = DinDinAPI()
         ding_uid = ding_api.get_user_id(phone)
-        ding_api.send_message([ding_uid], content)
+        ding_api.send_message([ding_uid], content, attendance=True)
 
     def get(self, request):
         # 分页
