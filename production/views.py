@@ -3883,7 +3883,8 @@ class AttendanceRecordSearch(APIView):
                 if record.filter(status='换岗'):
                     times = record.filter(status='换岗').values_list('begin_date', flat=True).order_by('begin_date')
                     if times:
-                        for t in list(set(times)):
+                        lst = set(times)
+                        for t in lst.sort():
                             work_time.append({'title': f"换岗: {datetime.datetime.strftime(t, '%Y-%m-%d %H:%M:%S')}"})
                 if end_date:
                     work_time.append({'title': f"下班: {datetime.datetime.strftime(end_date, '%Y-%m-%d %H:%M:%S')}"})
