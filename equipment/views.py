@@ -4558,7 +4558,8 @@ class GetSpareOrder(APIView):
                 submission_department='设备科',
                 status=1,
                 barcode=order.get('djbh'),
-                processing_time=order.get('clsj')
+                processing_time=order.get('clsj'),
+                lluser=order.get('llUser', None)
             )
             for spare in order_detail:
                 equip_spare = EquipSpareErp.objects.filter(unique_id=spare.get('wlxxid')).first()
