@@ -1773,8 +1773,8 @@ class ProductPlanRealView(ListAPIView):
 
     def list(self, request, *args, **kwargs):
         ret = {}
-        auto = self.request.query_params.get('auto')
-        manual = self.request.query_params.get('manual')
+        auto = int(self.request.query_params.get('auto'))
+        manual = int(self.request.query_params.get('manual'))
         equip_no = self.request.query_params.get('equip_no')
         day_time = self.request.query_params.get('day_time', datetime.datetime.now().date())
         queryset = self.filter_queryset(self.get_queryset())
@@ -2322,8 +2322,8 @@ class SummaryOfMillOutput(APIView):
 
     def get(self, request):
         factory_date = self.request.query_params.get('factory_date')
-        auto = self.request.query_params.get('auto')
-        manual = self.request.query_params.get('manual')
+        auto = int(self.request.query_params.get('auto'))
+        manual = int(self.request.query_params.get('manual'))
         # 统计机台的机型
 
         queryset = Equip.objects.filter(category__equip_type__global_name='密炼设备').values('equip_no', 'category__category_name')
