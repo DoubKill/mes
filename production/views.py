@@ -3681,13 +3681,13 @@ class ReissueCardView(APIView):
     @atomic
     def post(self, request):  # 处理补卡申请
         data = self.request.data
+        FillCardApply.objects.filter(id=data.get('id')).update(
+            handling_suggestion=data.get('handling_suggestion', None),
+            handling_result=data.get('handling_result', None)
+        )
         obj = FillCardApply.objects.filter(id=data.get('id')).first()
-        obj.handling_suggestion = data.get('handling_suggestion', None)
-        obj.handling_result = data.get('handling_result', None)
-        obj.save()
         serializer_data = FillCardApplySerializer(obj).data
         user = obj.user
-        date_time = obj.bk_date
         content = {
             "title": "补卡申请",
             "form": [
@@ -3799,10 +3799,11 @@ class OverTimeView(APIView):
     @atomic
     def post(self, request):  # 处理加班申请
         data = self.request.data
+        ApplyForExtraWork.objects.filter(id=data.get('id')).update(
+            handling_suggestion=data.get('handling_suggestion', None),
+            handling_result=data.get('handling_result', None)
+        )
         obj = ApplyForExtraWork.objects.filter(id=data.get('id')).first()
-        obj.handling_suggestion = data.get('handling_suggestion', None)
-        obj.handling_result = data.get('handling_result', None)
-        obj.save()
         serializer_data = ApplyForExtraWorkSerializer(obj).data
         user = obj.user
         date_time = obj.begin_date
