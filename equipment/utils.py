@@ -104,7 +104,7 @@ class DinDinAPI(object):
         if order_id:
             message_url = f"eapp://pages/repairOrder/repairOrder?id={order_id}" + ("&isInspection=true" if inspection else "")
         if attendance:
-            message_url = "eapp://pages/applicationDetails/applicationDetails"
+            message_url = "eapp://pages/index/index"
         data = {
             "msg": {
                 "msgtype": "oa",
