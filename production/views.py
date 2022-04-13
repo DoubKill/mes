@@ -3914,11 +3914,11 @@ class AttendanceRecordSearch(APIView):
                 end_date = record.last().end_date
                 work_time = record.aggregate(Sum('actual_time'))['actual_time__sum']
                 results['work_times'] += work_time
-
-                if begin_date > datetime.datetime.strptime(f"{str(item.factory_date)} {str(attendance_group_obj.attendance_st)}", '%Y-%m-%d %H:%M:%S'):
-                    results['cd'] += 1
-                if end_date and end_date < datetime.datetime.strptime(f"{str(item.factory_date)} {str(attendance_group_obj.attendance_et)}", '%Y-%m-%d %H:%M:%S'):
-                    results['zt'] += 1
+                if begin_date and end_date:  # 导入的没有上岗和下岗时间
+                    if begin_date > datetime.datetime.strptime(f"{str(item.factory_date)} {str(attendance_group_obj.attendance_st)}", '%Y-%m-%d %H:%M:%S'):
+                        results['cd'] += 1
+                    if end_date and end_date < datetime.datetime.strptime(f"{str(item.factory_date)} {str(attendance_group_obj.attendance_et)}", '%Y-%m-%d %H:%M:%S'):
+                        results['zt'] += 1
         if detail:
             equip_list = queryset.filter(factory_date__year=year, factory_date__month=month
                                          ).values('equip', 'section').annotate(work_times=Sum('actual_time')).values(
