@@ -1013,8 +1013,8 @@ class WeightPackageSingleViewSet(ModelViewSet):
         weight = self.request.query_params.get('weight')
         if history:
             res = {}
-            if not material_name:  # 配方历史数据
-                last_instance = self.get_queryset().filter(product_no=product_no, batching_type='配方').first()
+            if product_batching_id:  # 配方历史数据
+                last_instance = self.get_queryset().filter(product_no=product_no, batching_type='配方', material_name=material_name).first()
                 if not last_instance:
                     return Response(res)
                 recipe_manual = ProductBatchingEquip.objects.filter(Q(feeding_mode__startswith='R') | Q(is_manual=True) | Q(~Q(type=1), feeding_mode__startswith='P'),
@@ -1022,8 +1022,7 @@ class WeightPackageSingleViewSet(ModelViewSet):
                                                                     material__material_name=last_instance.material_name)
                 if not recipe_manual:
                     return Response(res)
-                res.update({'material_name': last_instance.material_name, 'package_count': last_instance.package_count,
-                            'single_weight': last_instance.single_weight.split('±')[0], 'split_num': last_instance.split_num,
+                res.update({'package_count': last_instance.package_count, 'split_num': last_instance.split_num,
                             'expire_day': last_instance.expire_day, 'print_count': last_instance.print_count})
             else:  # 通用历史数据
                 last_instance = self.get_queryset().filter(batching_type='通用', material_name=material_name).first()
@@ -1062,7 +1061,8 @@ class WeightPackageSingleViewSet(ModelViewSet):
         for i in recipe_manual:
             data = {'material_name': i.material.material_name, 'feeding_mode': i.feeding_mode,
                     'actual_weight': i.batching_detail_equip.actual_weight if i.batching_detail_equip else i.cnt_type_detail_equip.standard_weight}
-            results.append(data)
+            if data not in results:
+                results.append(data)
         return Response(results)
 
 
@@ -1810,7 +1810,6 @@ class XLPlanVIewSet(ModelViewSet):
         next_classes = self.request.data.get('next_classes')
         now_datetime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         now_date, now_time = now_datetime[:10], now_datetime[11:]
-        now_time = '19:46:00'
         if next_classes == '早班' and '07:45:00' <= now_time <= '08:15:00':
             msg = self.handle_trans(equip_no, next_classes, now_datetime)
             if msg:

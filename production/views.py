@@ -2903,8 +2903,8 @@ class PerformanceSummaryView(APIView):
                                                      ).values('classes', 'equip_no', 'factory_date__day', 'product_no').\
             annotate(actual_trains=Count('id')).values('actual_trains', 'classes', 'equip_no', 'factory_date__day', 'product_no'))
         # 人工录入产量
-        add_qty = ManualInputTrains.objects.filter(**kwargs2).values('actual_trains', 'classes', 'equip_no', 'factory_date__day', 'product_no')
-        product_qty = product_qty | add_qty
+        add_qty = list(ManualInputTrains.objects.filter(**kwargs2).values('actual_trains', 'classes', 'equip_no', 'factory_date__day', 'product_no'))
+        product_qty = product_qty + add_qty
         price_dic = {}
         price_list = PerformanceUnitPrice.objects.values('equip_type', 'state', 'pt', 'dj')
         for item in price_list:
