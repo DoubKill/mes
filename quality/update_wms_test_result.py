@@ -28,33 +28,33 @@ logger = logging.getLogger('quality_log')
 
 def main():
     ex_time = datetime.now() - timedelta(days=7)
-    materials = ExamineMaterial.objects.filter(Q(status=1) | Q(status=2, create_time__gte=ex_time))
-    url = WMS_URL + '/MESApi/UpdateTestingResult'
-    for m in materials:
-        if WmsNucleinManagement.objects.filter(locked_status='已锁定',
-                                               batch_no=m.batch,
-                                               material_no=m.wlxxid).exists():
-            continue
-        data = {
-                "TestingType": 2,
-                "SpotCheckDetailList": [{
-                    "BatchNo": m.batch,
-                    "MaterialCode": m.wlxxid,
-                    "CheckResult": 1 if m.qualified else 2
-                }]
-            }
-        headers = {"Content-Type": "application/json ;charset=utf-8"}
-        try:
-            r = requests.post(url, json=data, headers=headers, timeout=5)
-            r = r.json()
-        except Exception as e:
-            logger.error(e)
-            continue
-        status = r.get('state')
-        if not status == 1:
-            logger.error('wms error msg: {}'.format(r.get('msg')))
-        m.status = 2 if status == 1 else 3
-        m.save()
+    # materials = ExamineMaterial.objects.filter(Q(status=1) | Q(status=2, create_time__gte=ex_time))
+    # url = WMS_URL + '/MESApi/UpdateTestingResult'
+    # for m in materials:
+    #     if WmsNucleinManagement.objects.filter(locked_status='已锁定',
+    #                                            batch_no=m.batch,
+    #                                            material_no=m.wlxxid).exists():
+    #         continue
+    #     data = {
+    #             "TestingType": 2,
+    #             "SpotCheckDetailList": [{
+    #                 "BatchNo": m.batch,
+    #                 "MaterialCode": m.wlxxid,
+    #                 "CheckResult": 1 if m.qualified else 2
+    #             }]
+    #         }
+    #     headers = {"Content-Type": "application/json ;charset=utf-8"}
+    #     try:
+    #         r = requests.post(url, json=data, headers=headers, timeout=5)
+    #         r = r.json()
+    #     except Exception as e:
+    #         logger.error(e)
+    #         continue
+    #     status = r.get('state')
+    #     if not status == 1:
+    #         logger.error('wms error msg: {}'.format(r.get('msg')))
+    #     m.status = 2 if status == 1 else 3
+    #     m.save()
 
     # 核酸检测锁定（设定不合格）
     data_list = [{

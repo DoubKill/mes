@@ -1707,26 +1707,26 @@ class ExamineMaterialViewSet(viewsets.GenericViewSet,
             deal_time=datetime.datetime.now(),
             status=1
         )
-        if deal_result == '放行':
-            url = WMS_URL + '/MESApi/UpdateTestingResult'
-            for m in materials:
-                data = {
-                    "TestingType": 2,
-                    "SpotCheckDetailList": [{
-                        "BatchNo": m.batch,
-                        "MaterialCode": m.wlxxid,
-                        "CheckResult": 1
-                    }]
-                }
-                headers = {"Content-Type": "application/json ;charset=utf-8"}
-                try:
-                    r = requests.post(url, json=data, headers=headers, timeout=5)
-                    r = r.json()
-                except Exception:
-                    continue
-                resp_status = r.get('state')
-                m.status = 2 if resp_status == 1 else 3
-                m.save()
+        # if deal_result == '放行':
+        #     url = WMS_URL + '/MESApi/UpdateTestingResult'
+        #     for m in materials:
+        #         data = {
+        #             "TestingType": 2,
+        #             "SpotCheckDetailList": [{
+        #                 "BatchNo": m.batch,
+        #                 "MaterialCode": m.wlxxid,
+        #                 "CheckResult": 1
+        #             }]
+        #         }
+        #         headers = {"Content-Type": "application/json ;charset=utf-8"}
+        #         try:
+        #             r = requests.post(url, json=data, headers=headers, timeout=5)
+        #             r = r.json()
+        #         except Exception:
+        #             continue
+        #         resp_status = r.get('state')
+        #         m.status = 2 if resp_status == 1 else 3
+        #         m.save()
         return Response('成功')
 
 
