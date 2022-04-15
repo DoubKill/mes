@@ -606,7 +606,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             # 上一计划的条码物料归零(同计划中同物料的先一物料扣重时归0): 料包可能对应多条数据
             if pre_material_id:
                 pre_material = LoadTankMaterialLog.objects.filter(id=pre_material_id).first()
-                LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=pre_material.bra_code)\
+                LoadTankMaterialLog.objects.filter(plan_classes_uid=pre_material.plan_classes_uid, bra_code=pre_material.bra_code)\
                     .update(**{'actual_weight': pre_material.init_weight, 'adjust_left_weight': 0, 'real_weight': 0,
                                'useup_time': datetime.now()})
             instance = LoadTankMaterialLog.objects.create(**tank_data)
@@ -619,11 +619,11 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                      json=validated_data)
                 content = json.loads(resp.content.decode())
                 if content['success']:
-                    logger.info('扫码补料后调用接口成功')
+                    logger.info(f'{trains}车扫码补料后调用接口成功')
                 else:
-                    logger.error('扫码补料后调用接口时不可进料')
+                    logger.error(f'{trains}车扫码补料后调用接口时不可进料')
             except:
-                logger.error('扫码补料后调用接口时群控服务器错误！')
+                logger.error(f'{trains}车扫码补料后调用接口时群控服务器错误！')
         return validated_data
 
     class Meta:

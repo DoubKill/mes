@@ -660,6 +660,7 @@ class SchedulingRecipeMachineSettingSerializer(BaseModelSerializer):
     vice_machine_1MB = serializers.ListField(write_only=True, required=False, allow_empty=True)
     vice_machine_2MB = serializers.ListField(write_only=True, required=False, allow_empty=True)
     vice_machine_3MB = serializers.ListField(write_only=True, required=False, allow_empty=True)
+    vice_machine_RMB = serializers.ListField(write_only=True, required=False, allow_empty=True)
     vice_machine_FM = serializers.ListField(write_only=True, required=False, allow_empty=True)
     stages = serializers.ListField(write_only=True, required=False, allow_empty=True)
 
@@ -685,6 +686,10 @@ class SchedulingRecipeMachineSettingSerializer(BaseModelSerializer):
             data['vice_machine_3MB'] = instance.vice_machine_3MB.split('/')
         else:
             data['vice_machine_3MB'] = []
+        if instance.vice_machine_RMB:
+            data['vice_machine_RMB'] = instance.vice_machine_RMB.split('/')
+        else:
+            data['vice_machine_RMB'] = []
         if instance.vice_machine_FM:
             data['vice_machine_FM'] = instance.vice_machine_FM.split('/')
         else:
@@ -701,6 +706,7 @@ class SchedulingRecipeMachineSettingSerializer(BaseModelSerializer):
         attrs['vice_machine_1MB'] = '/'.join(attrs.get('vice_machine_1MB', ''))
         attrs['vice_machine_2MB'] = '/'.join(attrs.get('vice_machine_2MB', ''))
         attrs['vice_machine_3MB'] = '/'.join(attrs.get('vice_machine_3MB', ''))
+        attrs['vice_machine_RMB'] = '/'.join(attrs.get('vice_machine_RMB', ''))
         attrs['vice_machine_FM'] = '/'.join(attrs.get('vice_machine_FM', ''))
         attrs['stages'] = '/'.join(attrs.get('stages', ''))
         return attrs
@@ -724,14 +730,31 @@ class RecipeMachineWeightSerializer(serializers.ModelSerializer):
 
     def get_devoted_weight(self, obj):
         stages = list(GlobalCode.objects.filter(global_type__type_name='胶料段次').values_list('global_name', flat=True))
-        c_pb = ProductBatchingDetail.objects.using('SFJ').filter(
-            product_batching=obj['id'],
-            delete_flag=False,
-            material__material_type__global_name__in=stages).first()
-        if c_pb:
-            return c_pb.actual_weight
+        if obj.get('equip__equip_no') == 'Z04':
+            pb = ProductBatching.objects.exclude(used_type=6).filter(
+                batching_type=2,
+                stage_product_batch_no=obj.get('stage_product_batch_no'),
+                dev_type__category_no=obj.get('equip__category__category_no')
+            ).first()
+            if pb:
+                c_pb = pb.batching_details.filter(
+                    delete_flag=False,
+                    material__material_type__global_name__in=stages).first()
+                if c_pb:
+                    return c_pb.actual_weight
+                else:
+                    return None
+            else:
+                return None
         else:
-            return 0
+            c_pb = ProductBatchingDetail.objects.using('SFJ').filter(
+                product_batching=obj['id'],
+                delete_flag=False,
+                material__material_type__global_name__in=stages).first()
+            if c_pb:
+                return c_pb.actual_weight
+            else:
+                return None
 
     class Meta:
         model = ProductBatching

@@ -1,6 +1,7 @@
 import datetime
 import json
 import re
+from operator import itemgetter
 
 import requests
 import xlrd
@@ -534,8 +535,10 @@ class SchedulingRecipeMachineSettingView(ModelViewSet):
                               "vice_machine_2MB": item[11],
                               "main_machine_3MB": item[12],
                               "vice_machine_3MB": item[13],
-                              "main_machine_FM": item[14],
-                              "vice_machine_FM": item[15],
+                              "main_machine_RMB": item[14],
+                              "vice_machine_RMB": item[15],
+                              "main_machine_FM": item[16],
+                              "vice_machine_FM": item[17],
                               },
                     **{"rubber_type": item[0], "product_no": item[1], "version": item[2]}
                 )
@@ -562,8 +565,7 @@ class RecipeMachineWeight(ListAPIView):
             query_kwargs['stage_product_batch_no__icontains'] = product_no
         return ProductBatching.objects.using('SFJ').exclude(
             used_type=6).filter(**query_kwargs).filter(
-            batching_type=1, stage__global_name__in=['FM', '3MB', '2MB', '2MB', 'HMB']
-        ).values('id', 'equip__equip_no', 'stage_product_batch_no', 'batching_weight').order_by('equip__equip_no')
+            batching_type=1).values('id', 'equip__equip_no', 'stage_product_batch_no', 'batching_weight', 'equip__category__category_no').order_by('equip__equip_no')
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -1079,6 +1081,7 @@ class SchedulingMaterialDemanded(APIView):
         interval_type = self.request.query_params.get('interval_type', '1')
         filter_material_type = self.request.query_params.get('material_type')
         filter_material_name = self.request.query_params.get('material_name')
+        equip_no = self.request.query_params.get('equip_no')
 
         if datetime.datetime.now().hour < 8:
             now_time_str = datetime.datetime.now().strftime('%Y-%m-%d 08:00:00')
@@ -1088,13 +1091,13 @@ class SchedulingMaterialDemanded(APIView):
 
         if interval_type == '1':
             st = now_time
-            et = (now_time + datetime.timedelta(hours=4))
+            et = now_time + datetime.timedelta(hours=4)
         elif interval_type == '2':
-            st = (now_time + datetime.timedelta(hours=4))
-            et = (now_time + datetime.timedelta(hours=8))
+            st = now_time + datetime.timedelta(hours=4)
+            et = now_time + datetime.timedelta(hours=8)
         else:
-            st = (now_time + datetime.timedelta(hours=8))
-            et = (now_time + datetime.timedelta(hours=12))
+            st = now_time + datetime.timedelta(hours=8)
+            et = now_time + datetime.timedelta(hours=12)
 
         factory_date = get_current_factory_date().get('factory_date', datetime.datetime.now().date())
         if not factory_date:
@@ -1104,10 +1107,14 @@ class SchedulingMaterialDemanded(APIView):
             return Response([])
 
         else:
-            plan_data = []
-            for equip_no in Equip.objects.filter(
+            if not equip_no:
+                equip_nos = Equip.objects.filter(
                     category__equip_type__global_name='密炼设备'
-            ).values_list('equip_no', flat=True).order_by('equip_no'):
+                ).values_list('equip_no', flat=True).order_by('equip_no')
+            else:
+                equip_nos = [equip_no]
+            plan_data = []
+            for equip_no in equip_nos:
                 scheduling_plans = SchedulingResult.objects.filter(schedule_no=last_aps_result.schedule_no,
                                                                    equip_no=equip_no).order_by('sn')
                 plan_start_time = last_aps_result.created_time
@@ -1131,10 +1138,11 @@ class SchedulingMaterialDemanded(APIView):
                         plan_data.append(
                             {'equip_no': equip_no, 'recipe_name': plan.recipe_name, 'plan_trains': int(trains)})
                     elif st >= current_plan_start_time and et <= current_plan_finish_time:
-                        plan_data.append({'equip_no': equip_no, 'recipe_name': plan.recipe_name, 'plan_trains': plan.plan_trains})
+                        trains = int((et - st).total_seconds() / 3600 / plan.time_consume * plan.plan_trains)
+                        plan_data.append({'equip_no': equip_no, 'recipe_name': plan.recipe_name, 'plan_trains': trains})
             ret = {}
-            stages = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True,
-                                               global_type__type_name="胶料段次").values_list("global_name", flat=True)
+            stages = list(GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True,
+                                                    global_type__type_name="胶料段次").values_list("global_name", flat=True))
 
             for instance in plan_data:
                 if instance['equip_no'] == 'Z04':
@@ -1142,17 +1150,23 @@ class SchedulingMaterialDemanded(APIView):
                     pb = ProductBatching.objects.exclude(used_type=6).filter(batching_type=2,
                                                                              stage_product_batch_no=instance['recipe_name'],
                                                                              dev_type=equip_type).first()
+                    if not pb:
+                        continue
+                    details = pb.batching_details.filter(
+                        type=1, delete_flag=False).exclude(
+                        Q(material__material_name__in=('细料', '硫磺')) | Q(material__material_type__global_name__in=stages)
+                    ).values('material__material_name', 'material__material_type__global_name', 'actual_weight')
                 else:
                     pb = ProductBatching.objects.using('SFJ').exclude(used_type=6).filter(
                         batching_type=1,
                         stage_product_batch_no=instance['recipe_name'],
                         equip__equip_no=instance['equip_no']).first()
-                if not pb:
-                    continue
-                details = pb.batching_details.filter(
-                    type=1, delete_flag=False).exclude(
-                    Q(material__material_name__in=('细料', '硫磺')) | Q(material__material_type__global_name__in=stages)
-                ).values('material__material_name', 'material__material_type__global_name', 'actual_weight')
+                    if not pb:
+                        continue
+                    details = pb.batching_details.using('SFJ').filter(
+                        type=1, delete_flag=False).exclude(
+                        Q(material__material_name__in=('细料', '硫磺')) | Q(material__material_type__global_name__in=stages)
+                    ).values('material__material_name', 'material__material_type__global_name', 'actual_weight')
                 for item in details:
                     material_name = item['material__material_name'].rstrip('-C').rstrip('-X')
                     weight = item['actual_weight'] * instance['plan_trains']
@@ -1162,7 +1176,13 @@ class SchedulingMaterialDemanded(APIView):
                             'material_type': material_type,
                             'material_name': material_name,
                             instance['equip_no']: weight,
-                            'total_weight': weight
+                            'total_weight': weight,
+                            'detail': [{'equip_no': instance['equip_no'],
+                                        'recipe_name': instance['recipe_name'],
+                                        'material_type': material_type,
+                                        'material_name': material_name,
+                                        'weight': weight
+                                        }]
                         }
                     else:
                         if instance['equip_no'] in ret[material_name]:
@@ -1170,11 +1190,18 @@ class SchedulingMaterialDemanded(APIView):
                         else:
                             ret[material_name][instance['equip_no']] = weight
                         ret[material_name]['total_weight'] += weight
+                        ret[material_name]['detail'].append({'equip_no': instance['equip_no'],
+                                                             'recipe_name': instance['recipe_name'],
+                                                             'material_type': material_type,
+                                                             'material_name': material_name,
+                                                             'weight': weight
+                                                             })
             data = ret.values()
             if filter_material_type:
                 data = filter(lambda x: filter_material_type in x['material_type'], data)
             if filter_material_name:
                 data = filter(lambda x: filter_material_name in x['material_name'], data)
+            data = sorted(data, key=itemgetter('material_type', 'material_name'))  # 按多个字段排序
             return Response({'st': st.strftime('%H: %M'), 'et': et.strftime('%H: %M'), 'data': data})
 
 

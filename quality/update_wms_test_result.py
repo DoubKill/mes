@@ -16,7 +16,6 @@ sys.path.append(BASE_DIR)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()
 
-from quality.models import ExamineMaterial
 from inventory.models import WmsNucleinManagement
 
 from mes.conf import WMS_URL
