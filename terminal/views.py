@@ -1849,6 +1849,7 @@ class XLPlanVIewSet(ModelViewSet):
             handle_plan_data = {}
             plan_data = plans.values('recipe', 'recipe_id', 'recipe_ver', 'state', 'setno', 'actno', 'date_time', 'merge_flag')
             for index, plan in enumerate(plans):
+                time.sleep(1)  # 防止生成一样的计划号
                 replace_order_by = max(order_by_list) + 1
                 if plan.state == '运行中':
                     first_plan_id = datetime.datetime.now().strftime('%Y%m%d%H%M%S')[2:]
@@ -1879,11 +1880,14 @@ class XLPlanVIewSet(ModelViewSet):
                 if stop_plan:
                     # 终止运行中计划(下位机)
                     for single_stop_plan in stop_plan:
+                        time.sleep(1)  # 增加时延(称量程序接口响应时间为50m), 防止指令下发成功但称量未处理
                         client.stop(single_stop_plan.planid)
                 if issue_plan:
                     for single_issue_plan in issue_plan:
+                        time.sleep(1)  # 增加时延(称量程序接口响应时间为50m), 防止指令下发成功但称量未处理
                         # 通知新增计划
                         client.add_plan(single_issue_plan.planid)
+                        time.sleep(1)  # 增加时延(称量程序接口响应时间为50m), 防止指令下发成功但称量未处理
                         # 下达新计划
                         client.issue_plan(single_issue_plan.planid, single_issue_plan.recipe, single_issue_plan.setno)
             except Exception as e:
