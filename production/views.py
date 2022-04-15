@@ -2173,12 +2173,13 @@ class DailyProductionCompletionReport(APIView):
             results['name_4'][f"{item['factory_date__day']}日"] = results['name_4'].get(f"{item['factory_date__day']}日", 0) + weight
             results['name_5'][f"{item['factory_date__day']}日"] = results['name_5'].get(f"{item['factory_date__day']}日", 0) + weight
         for item in fin_queryset:
-            results['name_2']['weight'] += round(item['weight'] / 100000, 2)
-            results['name_4']['weight'] += round(item['weight'] / 100000, 2)
-            results['name_5']['weight'] += round(item['weight'] / 100000, 2)
-            results['name_2'][f"{item['factory_date__day']}日"] = round(item['weight'] / 100000, 2)
-            results['name_4'][f"{item['factory_date__day']}日"] = round(item['weight'] / 100000, 2)
-            results['name_5'][f"{item['factory_date__day']}日"] = round(item['weight'] / 100000, 2)
+            qty = round(item['weight'] / 100000, 2)
+            results['name_2']['weight'] += qty
+            results['name_4']['weight'] += qty
+            results['name_5']['weight'] += qty
+            results['name_2'][f"{item['factory_date__day']}日"] = results['name_2'].get(f"{item['factory_date__day']}日", 0) + qty
+            results['name_4'][f"{item['factory_date__day']}日"] = results['name_4'].get(f"{item['factory_date__day']}日", 0) + qty
+            results['name_5'][f"{item['factory_date__day']}日"] = results['name_5'].get(f"{item['factory_date__day']}日", 0) + qty
         # 外发无硫料（吨）
         out_queryset = OuterMaterial.objects.filter(factory_date__year=year,
                                                     factory_date__month=month).values('factory_date__day', 'weight')
