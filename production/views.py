@@ -2537,8 +2537,6 @@ class EmployeeAttendanceRecordsView(APIView):
                          'audit_user':  audit_obj.audit_user if audit_obj else None,
                          'approve_user': approve_obj.approve_user if approve_obj else None})
 
-
-
     # 导入出勤记录
     @atomic
     def post(self, request):
@@ -4061,6 +4059,7 @@ class AttendanceClockDetailViewSet(ModelViewSet):
     permission_classes = (IsAuthenticated,)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class AttendanceResultAuditView(APIView):
     permission_classes = (IsAuthenticated, )
 
