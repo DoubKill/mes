@@ -3280,6 +3280,14 @@ class AttendanceGroupSetupViewSet(ModelViewSet):
     filter_class = AttendanceGroupSetupFilter
     option = True
 
+    def get_queryset(self):
+        attendance_users = self.request.query_params.get('attendance_users', None)
+        queryset = self.filter_queryset(self.queryset)
+        if attendance_users:
+            queryset_ids = [obj.id for obj in queryset if attendance_users not in ','.join(list(obj.users.all().values_list('username', flat=True)))]
+            queryset = queryset.exclude(id__in=queryset_ids)
+        return queryset
+
     def get_section(self, section_name, section_id=None):  # 判断用户是不是设备科或生产科的成员
         if not self.option:
             return True
@@ -3297,8 +3305,16 @@ class AttendanceGroupSetupViewSet(ModelViewSet):
     @action(methods=['get'], detail=False, permission_classes=[], url_path='in_group', url_name='in_group')
     def in_group(self, request):  # 判断用户是否在考勤组
         name = self.request.user.username
-        res = AttendanceGroupSetup.objects.filter(Q(attendance_users__icontains=name) | Q(principal__icontains=name)).exists()
-        return Response({'status': res})
+        status = False
+        for obj in AttendanceGroupSetup.objects.all():
+            if obj.principal == name:
+                status = True
+                break
+            if name in obj.users.all().values_list('username', flat=True):
+                status = True
+                break
+
+        return Response({'status': status})
 
     @action(methods=['get'], detail=False, permission_classes=[], url_path='is_section', url_name='is_section')
     def is_section(self, request):  # 判断用户是否是设备科门或生产科
@@ -3336,7 +3352,15 @@ class AttendanceClockViewSet(ModelViewSet):
     def get_user_group(self, user_obj, now=None):
         username =user_obj.username
         # 获取登陆用户所在考勤组
-        attendance_group_obj = AttendanceGroupSetup.objects.filter(Q(attendance_users__icontains=username) | Q(principal=username)).first()
+        attendance_group_obj = None
+        for obj in AttendanceGroupSetup.objects.all():
+            if obj.principal == username:
+                attendance_group_obj = obj
+                break
+            if username in obj.users.all().values_list('username', flat=True):
+                attendance_group_obj = obj
+                break
+
         if not attendance_group_obj:
             raise ValidationError('当前用户未添加至考勤组')
         group_type = attendance_group_obj.type   # 密炼/细料称量/硫磺称量
@@ -3790,11 +3814,11 @@ class OverTimeView(APIView):
         if self.request.query_params.get('apply'):  # 查看自己的加班申请
             user_list = [self.request.user.username]
             if group_setup:
-                user_list += group_setup.attendance_users.split(',')
+                user_list += list(group_setup.users.all().values_list('username', flat=True))
             data = self.queryset.filter(user__username__in=user_list).order_by('-id')
         else:  # 审批加班申请
-            attendance_users = group_setup.attendance_users
-            attendance_users_list = attendance_users.split(',')
+
+            attendance_users_list = list(group_setup.users.all().values_list('username', flat=True))
             data = self.queryset.filter(user__username__in=attendance_users_list)
         serializer = ApplyForExtraWorkSerializer(data, many=True)
         count = len(serializer.data)
@@ -3877,7 +3901,16 @@ class AttendanceRecordSearch(APIView):
         if day:  # 当前的上下班时间
             record = EmployeeAttendanceRecords.objects.filter(
                 ~Q(is_use='废弃') & Q(user=self.request.user, factory_date=f"{date}-{day}")).order_by('begin_date')
-            group_setup = AttendanceGroupSetup.objects.filter(Q(attendance_users__icontains=username) | Q(principal=username)).first()
+            group_setup = None
+            for obj in AttendanceGroupSetup.objects.all():
+                if obj.principal == username:
+                    group_setup = obj
+                    break
+                if username in obj.users.all().values_list('username', flat=True):
+                    group_setup = obj
+                    break
+            if not group_setup:
+                raise ValidationError(f'{username}不在考勤组')
             results = {
                 'attendance_st': group_setup.attendance_st,
                 'attendance_et': group_setup.attendance_et
@@ -3929,8 +3962,16 @@ class AttendanceRecordSearch(APIView):
             if item not in lst:
                 lst.append(item)
                 results['work_times'] += item['actual_time']
-                attendance_group_obj = AttendanceGroupSetup.objects.filter(
-                    Q(attendance_users__icontains=username) | Q(principal=username)).first()
+                attendance_group_obj = None
+                for obj in AttendanceGroupSetup.objects.all():
+                    if obj.principal == username:
+                        attendance_group_obj = obj
+                        break
+                    if username in obj.users.all().values_list('username', flat=True):
+                        attendance_group_obj = obj
+                        break
+                if not attendance_group_obj:
+                    raise ValidationError(f'{username}不在考勤组')
             if day not in results.get('days'):
                 results['days'].append(day)
                 begin_date = record.first().begin_date
@@ -3980,8 +4021,16 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
         if data:
             user = User.objects.filter(username=name).first()
             id_card_num = user.id_card_num
-            principal_obj = AttendanceGroupSetup.objects.filter(Q(attendance_users__icontains=user.username) |
-                                                                Q(principal__icontains=user.username)).first()
+            principal_obj = None
+            for obj in AttendanceGroupSetup.objects.all():
+                if obj.principal == user.username:
+                    principal_obj = obj
+                    break
+                if user.username in obj.users.all().values_list('username', flat=True):
+                    principal_obj = obj
+                    break
+            if not principal_obj:
+                raise ValidationError(f'{user.username}不在考勤组')
             principal = principal_obj.principal if principal_obj else None
         return Response({'results': data, 'principal': principal if data else None,
                      'id_card_num': id_card_num if data else None})

@@ -439,10 +439,29 @@ class SubsidyInfoSerializer(serializers.ModelSerializer):
 
 
 class AttendanceGroupSetupSerializer(serializers.ModelSerializer):
+    attendance_users = serializers.SerializerMethodField()
 
     class Meta:
         model = AttendanceGroupSetup
         fields = '__all__'
+
+    def update(self, instance, validated_data):
+        users = validated_data.pop('users', None)  # [1, 2]
+        instance.users.clear()
+        instance.users.add(*users)
+        super().update(instance, validated_data)
+        return instance
+
+    def create(self, validated_data):
+        users = validated_data.pop('users', None)
+        instance = super().create(validated_data)
+        instance.users.add(*users)
+        return instance
+
+    def get_attendance_users(self, obj):
+        user_list = list(obj.users.all().values_list('username', flat=True))
+        res = ','.join(user_list)
+        return res
 
 
 class EmployeeAttendanceRecordsSerializer(serializers.ModelSerializer):
