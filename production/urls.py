@@ -145,4 +145,6 @@ urlpatterns = [
     path('attendance-record-search/', AttendanceRecordSearch.as_view()),
     # 考勤打卡审批
     path('attendance-result-audit/', AttendanceResultAuditView.as_view()),
+    # 物料消耗统计报表
+    path('material-expend-summary/', MaterialExpendSummaryView.as_view())
 ]
