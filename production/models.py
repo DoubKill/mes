@@ -386,13 +386,13 @@ class EmployeeAttendanceRecords(models.Model):
     section = models.CharField(help_text='岗位', max_length=64, null=True, blank=True)
     factory_date = models.DateField(help_text='工厂时间', null=True, blank=True)
     begin_date = models.DateTimeField(help_text='上岗时间', null=True, blank=True)
-    end_date = models.DateTimeField(help_text='下岗时间', null=True, blank=True)
+    end_date = models.DateTimeField(help_text='离岗时间', null=True, blank=True)
     work_time = models.FloatField(help_text='计算工作时间', null=True, blank=True, default=12)
     actual_time = models.FloatField(help_text='承认工作时间', null=True, blank=True, default=12)
     classes = models.CharField(help_text='班次', max_length=12, null=True, blank=True)
     group = models.CharField(help_text='班组', max_length=12, null=True, blank=True)
     equip = models.CharField(help_text='机台', max_length=12, null=True, blank=True)
-    status = models.CharField(max_length=12, help_text='上岗/换岗/加班', null=True, blank=True)
+    status = models.CharField(max_length=12, help_text='上岗/调岗/加班', null=True, blank=True)
     is_use = models.CharField(max_length=12, help_text='确认/添加/废弃', null=True, blank=True)
 
     class Meta:
@@ -413,7 +413,7 @@ class FillCardApply(models.Model):
     handling_suggestion = models.TextField(help_text='处理意见', null=True, blank=True)
     handling_result = models.NullBooleanField(help_text='处理结果', default=None)
     apply_date = models.DateTimeField(auto_now_add=True, help_text='申请时间')
-    status = models.CharField(max_length=12, help_text='上岗/换岗/下岗', null=True, blank=True)
+    status = models.CharField(max_length=12, help_text='上岗/调岗/离岗', null=True, blank=True)
 
     class Meta:
         db_table = 'fill_card_apply'

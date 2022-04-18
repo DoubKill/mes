@@ -3501,7 +3501,7 @@ class AttendanceClockViewSet(ModelViewSet):
                     **data
                 )
                 results['ids'].append(obj.id)
-        elif status == '下岗':  # 可重复打卡
+        elif status == '离岗':  # 可重复打卡
             attendance_st = datetime.datetime.strptime(f"{date_now} {str(attendance_group_obj.attendance_st)}", '%Y-%m-%d %H:%M:%S')
             range_time = datetime.timedelta(minutes=attendance_group_obj.range_time)
             # if time_now < attendance_st + range_time:
@@ -3515,7 +3515,7 @@ class AttendanceClockViewSet(ModelViewSet):
                 end_date=end_date, work_time=work_time, actual_time=work_time
             )
             results['ids'] = ids
-        elif status == '换岗':
+        elif status == '调岗':
             if EmployeeAttendanceRecords.objects.filter(id__in=ids, end_date__isnull=True).exists():
                 begin_date = EmployeeAttendanceRecords.objects.filter(id__in=ids).first().begin_date
                 end_date = time_now
@@ -3548,7 +3548,7 @@ class AttendanceClockViewSet(ModelViewSet):
 
         attendance_group_obj, section_list, equip_list, date_now, group_list = self.get_user_group(user, now)
         principal = attendance_group_obj.principal  # 考勤负责人
-        # 下岗时间
+        # 离岗时间
         equip_list = data.pop('equip_list')
         print(date_now)
         if attendance_group_obj.attendance_et.hour > 12:  # 白班
@@ -3569,11 +3569,11 @@ class AttendanceClockViewSet(ModelViewSet):
             # 判断是否有打卡记录
             if EmployeeAttendanceRecords.objects.filter(user=user, factory_date=factory_date, status=status).exists():
                 raise ValidationError('当天存在上岗打卡记录')
-        elif status == '换岗':
+        elif status == '调岗':
             if not EmployeeAttendanceRecords.objects.filter(user=user, factory_date=factory_date,
-                                                            status__in=['上岗', '换岗'], end_date__isnull=True).exists():
+                                                            status__in=['上岗', '调岗'], end_date__isnull=True).exists():
                 raise ValidationError('请先提交当天的上岗申请')
-        elif status == '下岗':
+        elif status == '离岗':
             obj = EmployeeAttendanceRecords.objects.filter(
                 user=user,
                 factory_date=factory_date,
@@ -3581,7 +3581,7 @@ class AttendanceClockViewSet(ModelViewSet):
                 section=data.get('section'),
                 classes=data.get('classes'),
                 group=data.get('group'),
-                status__in=['上岗', '换岗']
+                status__in=['上岗', '调岗']
             )
             if not obj:
                 raise ValidationError('提交的补卡申请有误')
@@ -3616,7 +3616,7 @@ class AttendanceClockViewSet(ModelViewSet):
 
     @action(methods=['post'], detail=False, permission_classes=[], url_path='overtime', url_name='overtime')
     def overtime(self, request):
-        # 加班也存在换岗的情况
+        # 加班也存在调岗的情况
         user = self.request.user
         data = self.request.data
         equip_list = data.pop('equip_list', None)
@@ -3746,11 +3746,11 @@ class ReissueCardView(APIView):
                             status=status
                         ))
                 EmployeeAttendanceRecords.objects.bulk_create(lst)
-            elif status == '换岗':
+            elif status == '调岗':
                 EmployeeAttendanceRecords.objects.filter(
                     factory_date=serializer_data.get('factory_date'),
                     end_date__isnull=True,
-                    status__in=['上岗', '换岗']
+                    status__in=['上岗', '调岗']
                 ).update(end_date=serializer_data.get('bk_date'))
                 lst = []
                 for equip in equip_list:
@@ -3766,7 +3766,7 @@ class ReissueCardView(APIView):
                             status=status
                         ))
                 EmployeeAttendanceRecords.objects.bulk_create(lst)
-            elif status == '下岗':
+            elif status == '离岗':
                 end_date = obj.bk_date
                 dic = {
                     'factory_date': serializer_data.get('factory_date'),
@@ -3774,7 +3774,7 @@ class ReissueCardView(APIView):
                     'section': serializer_data.get('section'),
                     'classes': serializer_data.get('classes'),
                     'group': serializer_data.get('group'),
-                    'status__in': ['上岗', '换岗']
+                    'status__in': ['上岗', '调岗']
                 }
                 obj = EmployeeAttendanceRecords.objects.filter(**dic).first()
                 if not obj:
@@ -3930,13 +3930,13 @@ class AttendanceRecordSearch(APIView):
                     work_time = [{'title': f"上班: {datetime.datetime.strftime(begin_date, '%Y-%m-%d %H:%M:%S')}"}]
                 else:
                     work_time = []
-                if record.filter(status='换岗'):
-                    times = record.filter(status='换岗').values_list('begin_date', flat=True).order_by('begin_date')
+                if record.filter(status='调岗'):
+                    times = record.filter(status='调岗').values_list('begin_date', flat=True).order_by('begin_date')
                     if times:
                         lst = list(set(times))
                         lst.sort()
                         for t in lst:
-                            work_time.append({'title': f"换岗: {datetime.datetime.strftime(t, '%Y-%m-%d %H:%M:%S')}"})
+                            work_time.append({'title': f"调岗: {datetime.datetime.strftime(t, '%Y-%m-%d %H:%M:%S')}"})
                 if end_date:
                     work_time.append({'title': f"下班: {datetime.datetime.strftime(end_date, '%Y-%m-%d %H:%M:%S')}"})
                 results['work_time'] = round(all_time, 2) if all_time else 0
@@ -3973,7 +3973,7 @@ class AttendanceRecordSearch(APIView):
                 results['days'].append(day)
                 begin_date = record.first().begin_date
                 end_date = record.last().end_date
-                if begin_date and end_date:  # 导入的没有上岗和下岗时间
+                if begin_date and end_date:  # 导入的没有上岗和离岗时间
                     if begin_date > datetime.datetime.strptime(
                             f"{str(item['factory_date'])} {str(attendance_group_obj.attendance_st)}",
                             '%Y-%m-%d %H:%M:%S'):
