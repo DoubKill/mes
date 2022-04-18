@@ -142,5 +142,6 @@ urlpatterns = [
     path('class-test-statics/', ClassTestStaticsView.as_view()),  # 班次别不合格率统计
     path('unqialified-equip/', UnqialifiedEquipView.as_view()),  # 机台别 不合格率统计
 
-    path('label-print-logs/', LabelPrintLogView.as_view())
+    path('label-print-logs/', LabelPrintLogView.as_view()),
+    path('mat-data-point-indicators-history/', MaterialDataPointIndicatorHistoryView.as_view())
 ]

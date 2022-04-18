@@ -28,7 +28,7 @@ from quality.models import TestMethod, MaterialTestOrder, \
     MaterialExamineRatingStandard, ExamineValueUnit, DataPointStandardError, MaterialEquipType, MaterialEquip, \
     IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, ProductReportEquip, \
     ProductReportValue, QualifiedRangeDisplay, ProductTestPlan, ProductTestPlanDetail, RubberMaxStretchTestResult, \
-    LabelPrintLog, MaterialTestPlan, MaterialTestPlanDetail
+    LabelPrintLog, MaterialTestPlan, MaterialTestPlanDetail, MaterialDataPointIndicatorHistory
 from recipe.models import MaterialAttribute
 
 
@@ -134,9 +134,39 @@ class MaterialDataPointIndicatorSerializer(BaseModelSerializer):
     # test_data_id = serializers.CharField(source='material_test_data.id')
     level = serializers.IntegerField(help_text='等级', min_value=0)
     last_updated_username = serializers.CharField(source='last_updated_user.username', read_only=True, default=None)
+    test_method_id = serializers.CharField(source='material_test_method.test_method_id', read_only=True)
+
+    def update(self, instance, validated_data):
+        if not instance.last_updated_user:
+            username = self.context['request'].user.username
+        else:
+            username = instance.last_updated_user.username
+        MaterialDataPointIndicatorHistory.objects.create(
+            product_no=instance.material_test_method.material.material_no,
+            test_method=instance.material_test_method.test_method,
+            data_point=instance.data_point,
+            level=instance.level,
+            result=instance.result,
+            upper_limit=instance.upper_limit,
+            lower_limit=instance.lower_limit,
+            created_username=username,
+            created_date=instance.last_updated_date
+        )
+        instance = super().update(instance, validated_data)
+        return instance
 
     class Meta:
         model = MaterialDataPointIndicator
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class MaterialDataPointIndicatorHistorySerializer(serializers.ModelSerializer):
+    data_point_name = serializers.CharField(source='data_point.name')
+    test_method_name = serializers.CharField(source='test_method.name')
+
+    class Meta:
+        model = MaterialDataPointIndicatorHistory
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
@@ -211,15 +241,21 @@ class MaterialTestOrderSerializer(BaseModelSerializer):
                         material_test_method=material_test_method,
                         data_point__name=item['data_point_name'],
                         data_point__test_type__test_indicator__name=item['test_indicator_name'],
-                        upper_limit__gte=item['value'],
-                        lower_limit__lte=item['value']).first()
+                        level=1).first()
                     if indicator:
-                        item['mes_result'] = indicator.result
+                        if indicator.lower_limit <= item['value'] <= indicator.upper_limit:
+                            item['mes_result'] = '一等品'
+                            item['level'] = 1
+                        else:
+                            item['mes_result'] = '三等品'
+                            item['level'] = 2
                         item['data_point_indicator'] = indicator
-                        item['level'] = indicator.level
+                        item['judged_upper_limit'] = indicator.upper_limit
+                        item['judged_lower_limit'] = indicator.lower_limit
                     else:
-                        item['mes_result'] = '三等品'
-                        item['level'] = 2
+                        continue
+                        # item['mes_result'] = '三等品'
+                        # item['level'] = 2
                 else:
                     raise serializers.ValidationError('该胶料实验方法不存在！')
                 item['created_user'] = self.context['request'].user  # 加一个create_user
@@ -401,18 +437,19 @@ class MaterialTestResultListSerializer(BaseModelSerializer):
     upper_lower = serializers.SerializerMethodField(read_only=True)
 
     def get_upper_lower(self, obj):
-        try:
-            mdp_obj = MaterialDataPointIndicator.objects.filter(
-                material_test_method__material__material_name=obj.material_test_order.product_no,
-                material_test_method__test_method__name=obj.test_method_name,
-                material_test_method__data_point__name=obj.data_point_name,
-                data_point__name=obj.data_point_name, level=1).first()
-            if not mdp_obj:
-                return None
-            else:
-                return f'{mdp_obj.lower_limit}-{mdp_obj.upper_limit}'
-        except:
-            return None
+        return f'{obj.judged_lower_limit}-{obj.judged_upper_limit}'
+        # try:
+        #     mdp_obj = MaterialDataPointIndicator.objects.filter(
+        #         material_test_method__material__material_name=obj.material_test_order.product_no,
+        #         material_test_method__test_method__name=obj.test_method_name,
+        #         material_test_method__data_point__name=obj.data_point_name,
+        #         data_point__name=obj.data_point_name, level=1).first()
+        #     if not mdp_obj:
+        #         return None
+        #     else:
+        #         return f'{mdp_obj.lower_limit}-{mdp_obj.upper_limit}'
+        # except:
+        #     return None
 
     class Meta:
         model = MaterialTestResult
@@ -574,7 +611,7 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
         pallet_data = PalletFeedbacks.objects.filter(lot_no=instance.lot_no,
                                                      product_no=instance.product_no).first()
         # test_order_data = MaterialTestOrder.objects.filter(lot_no=instance.lot_no).first()
-        test_results = MaterialTestResult.objects.filter(material_test_order__lot_no=instance.lot_no)
+        test_results = MaterialTestResult.objects.filter(material_test_order__lot_no=instance.lot_no).order_by('id')
         plan = ProductClassesPlan.objects.filter(plan_classes_uid=pallet_data.plan_classes_uid).first()
         if not plan:
             # classes = pallet_data.classes
@@ -611,53 +648,6 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
             ret['valid_time'] = expire_time  # 有效期
         else:
             ret['valid_time'] = None
-
-        m_list = ret.pop('mtr_list', [])
-        trains = []
-        indicators = []
-        data_point_range_data = {}
-        for indicator_name, points in m_list['table_head'].items():
-            point_head = []
-            for point in points:
-                indicator = MaterialDataPointIndicator.objects.filter(
-                    data_point__name=point,
-                    material_test_method__material__material_name=ret['product_no'],
-                    level=1).first()
-                if indicator:
-                    point_head.append(
-                        {"point": point,
-                         "upper_limit": indicator.upper_limit,
-                         "lower_limit": indicator.lower_limit}
-                    )
-                    data_point_range_data[point] = [indicator.lower_limit, indicator.upper_limit]
-                else:
-                    point_head.append(
-                        {"point": point,
-                         "upper_limit": None,
-                         "lower_limit": None}
-                    )
-            indicators.append({'point': indicator_name, 'point_head': point_head})
-
-        for i in m_list:
-            if i != 'table_head':
-                trains.append({'train': i, 'content': m_list[i]})
-                for item in m_list[i]:
-                    if item['result'] == '合格':
-                        item['tag'] = ''
-                    else:
-                        data_point_name = item['data_point_name']
-                        value = item['value']
-                        if not data_point_range_data.get(data_point_name):
-                            item['tag'] = ''
-                        else:
-                            if value > data_point_range_data[data_point_name][1]:
-                                item['tag'] = '+'
-                            elif value < data_point_range_data[data_point_name][0]:
-                                item['tag'] = '-'
-                            else:
-                                item['tag'] = ''
-        mtr_list = {'trains': trains, 'table_head': indicators}
-        ret['mtr_list'] = mtr_list
         ret['range_showed'] = QualifiedRangeDisplay.objects.first().is_showed
         return ret
 
@@ -671,6 +661,7 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
         methods = list(MaterialTestMethod.objects.filter(material__material_no=obj.product_no,
                                                          is_print=True
                                                          ).values_list('test_method__name', flat=True))
+        indicators = []
         for test_order in test_orders:
             ret[test_order.actual_trains] = []
             max_result_ids = list(test_order.order_results.values(
@@ -693,6 +684,16 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
                     status = 'PASS'
                 else:
                     status = '3:三等品'
+                if test_result.result == '合格':
+                    tag = ""
+                else:
+                    value = test_result.value
+                    if value > test_result.judged_upper_limit:
+                        tag = '+'
+                    elif value < test_result.judged_lower_limit:
+                        tag = '-'
+                    else:
+                        tag = ''
                 ret[test_order.actual_trains].append(
                     {
                         'add_subtract': '',
@@ -701,21 +702,34 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
                         'result': result,
                         'test_indicator_name': test_result.test_indicator_name,
                         'value': test_result.value,
-                        'status': status
+                        'status': status,
+                        'point': test_result.data_point_name,
+                        "upper_limit": test_result.judged_upper_limit,
+                        "lower_limit": test_result.judged_lower_limit,
+                        'tag': tag
                     }
                 )
                 test_indicator_name = test_result.test_indicator_name
                 if test_indicator_name in table_head_top:
-                    table_head_top[test_indicator_name].add(test_result.data_point_name)
+                    table_head_top[test_indicator_name][test_result.data_point_name] = {'upper_limit': test_result.judged_upper_limit,
+                                                                                         'lower_limit': test_result.judged_lower_limit,
+                                                                                         'point': test_result.data_point_name}
                 else:
-                    table_head_top[test_indicator_name] = {test_result.data_point_name}
-        table_head_top = {key: sorted(list(value)) for key, value in table_head_top.items()}
+                    table_head_top[test_indicator_name] = {test_result.data_point_name: {'upper_limit': test_result.judged_upper_limit,
+                                                                                         'lower_limit': test_result.judged_lower_limit,
+                                                                                         'point': test_result.data_point_name}}
+        for key, value in table_head_top.items():
+            sorted_value = sorted(value.values(), key=lambda x: x['point'])
+            indicators.append({'point': key, 'point_head': sorted_value})
         try:
-            table_head_top = sorted(table_head_top.items(), key=lambda d: sort_rules[d[0]])
+            indicators = sorted(indicators, key=lambda d: sort_rules[d['point']])
         except Exception:
             pass
-        ret['table_head'] = dict(table_head_top)
-        return ret
+        trains = []
+        for k, v in ret.items():
+            trains.append({'train': k, 'content': v})
+        mtr_list = {'trains': trains, 'table_head': indicators}
+        return mtr_list
 
     class Meta:
         model = MaterialDealResult
@@ -1884,7 +1898,8 @@ class ProductTestPlanSerializer(BaseModelSerializer):
     class Meta:
         model = ProductTestPlan
         fields = '__all__'
-        read_only_fields = ['plan_uid', 'test_time', 'test_user', 'status']
+        read_only_fields = ['plan_uid', 'test_time', 'test_user', 'status', 'created_date', 'last_updated_date',
+                            'delete_date', 'delete_flag', 'created_user', 'last_updated_user', 'delete_user']
 
 
 class ProductTEstResumeSerializer(BaseModelSerializer):
