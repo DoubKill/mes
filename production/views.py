@@ -3550,7 +3550,6 @@ class AttendanceClockViewSet(ModelViewSet):
         principal = attendance_group_obj.principal  # 考勤负责人
         # 离岗时间
         equip_list = data.pop('equip_list')
-        print(date_now)
         if attendance_group_obj.attendance_et.hour > 12:  # 白班
             attendance_et = datetime.datetime.strptime(f"{date_now} {str(attendance_group_obj.attendance_et)}", '%Y-%m-%d %H:%M:%S')
             factory_date = date_now
@@ -3573,6 +3572,11 @@ class AttendanceClockViewSet(ModelViewSet):
             if not EmployeeAttendanceRecords.objects.filter(user=user, factory_date=factory_date,
                                                             status__in=['上岗', '调岗'], end_date__isnull=True).exists():
                 raise ValidationError('请先提交当天的上岗申请')
+            last = EmployeeAttendanceRecords.objects.filter(user=user, factory_date=factory_date,
+                                                        status__in=['上岗', '调岗'], end_date__isnull=False).order_by('end_date').last()
+            if last:
+                if now < last.end_date:
+                    raise ValidationError('提交的补卡申请有误')
         elif status == '离岗':
             obj = EmployeeAttendanceRecords.objects.filter(
                 user=user,
