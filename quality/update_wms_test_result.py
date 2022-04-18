@@ -16,8 +16,8 @@ sys.path.append(BASE_DIR)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()
 
-from inventory.models import WmsNucleinManagement
 from quality.models import ExamineMaterial
+from inventory.models import WmsNucleinManagement, WMSExceptHandle
 
 from mes.conf import WMS_URL
 from quality.utils import update_wms_quality_result
@@ -34,6 +34,8 @@ def main():
         if WmsNucleinManagement.objects.filter(locked_status='已锁定',
                                                batch_no=m.batch,
                                                material_no=m.wlxxid).exists():
+            continue
+        if WMSExceptHandle.objects.filter(batch_no=m.batch).exists():
             continue
         data = {
                 "TestingType": 2,
