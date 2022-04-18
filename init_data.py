@@ -970,14 +970,10 @@ permission_data = [
     {'id': 980, 'code': 'powder_feed', 'name': 'PDA粉料罐投料', 'parent_id': None},
     {'id': 981, 'code': 'view_powder_feed', 'name': '查看', 'parent_id': 980},
 
-<<<<<<< HEAD
-    # 下一个 985 开始
-=======
-    {'id': 982, 'code': 'material_expend_summary', 'name': '原材料消耗量汇总表', 'parent_id': None},
-    {'id': 983, 'code': 'view_material_expend_summary', 'name': '查看', 'parent_id': 982},
+    {'id': 985, 'code': 'material_expend_summary', 'name': '原材料消耗量汇总表', 'parent_id': None},
+    {'id': 986, 'code': 'view_material_expend_summary', 'name': '查看', 'parent_id': 985},
 
-    # 下一个 984 开始
->>>>>>> 001f2a82a3c75e446914592b8f0f0e96222add5e
+    # 下一个 987 开始
 ]
 
 
