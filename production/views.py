@@ -3,11 +3,9 @@ import json
 import datetime
 import re
 
-import math
-import time
 from io import BytesIO
-from itertools import groupby, count
-from itertools import count as c
+from itertools import groupby
+from operator import itemgetter
 
 import requests
 import xlrd
@@ -15,12 +13,9 @@ import xlwt
 from django.http import HttpResponse
 
 from equipment.utils import gen_template_response
-from inventory.models import FinalGumOutInventoryLog
-from mes.common_code import SqlClient, OSum
-from django.conf import settings
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
-from django.db.models import Max, Sum, Count, Min, F, Q, Avg
+from django.db.models import Max, Sum, Count, Min, F, Q
 from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
@@ -33,9 +28,9 @@ from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticate
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet, ViewSet
-from basics.models import PlanSchedule, Equip, GlobalCode, WorkSchedulePlan, EquipCategoryAttribute
+from basics.models import GlobalCode, WorkSchedulePlan
 from equipment.models import EquipMaintenanceOrder
-from mes.common_code import OSum
+from mes.common_code import OSum, date_range
 from mes.conf import EQUIP_LIST
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
@@ -53,7 +48,7 @@ from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, Pla
     OuterMaterial, Equip190EWeight, Equip190E, ManualInputTrains
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
-    ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, CollectTrainsFeedbacksSerializer, \
+    ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, \
     ProductionPlanRealityAnalysisSerializer, UnReachedCapacityCauseSerializer, TrainsFeedbacksSerializer2, \
     CurveInformationSerializer, MixerInformationSerializer2, WeighInformationSerializer2, AlarmLogSerializer, \
     ProcessFeedbackSerializer, TrainsFixSerializer, PalletFeedbacksBatchModifySerializer, ProductPlanRealViewSerializer, \
@@ -68,6 +63,7 @@ from quality.models import BatchProductNo, BatchDay, Batch, BatchMonth, BatchYea
     MaterialDealResult, MaterialTestResult, MaterialDataPointIndicator
 from quality.serializers import BatchProductNoDateZhPassSerializer, BatchProductNoClassZhPassSerializer
 from quality.utils import get_cur_sheet, get_sheet_data
+from recipe.models import Material
 from system.models import User
 from terminal.models import Plan
 
@@ -3259,3 +3255,66 @@ class IndependentPostTemplateView(APIView):
                 lst.append(IndependentPostTemplate(name=name, status=status, date_time=date, work_type=work_type))
         IndependentPostTemplate.objects.bulk_create(lst)
         return Response(f'导入成功')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class MaterialExpendSummaryView(APIView):
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_material_expend_summary'}))
+
+    def get(self, request):
+        start_time = self.request.query_params.get('s_time')
+        end_time = self.request.query_params.get('e_time')
+        filter_material_type = self.request.query_params.get('material_type')
+        material_name = self.request.query_params.get('material_name')
+        equip_no = self.request.query_params.get('equip_no')
+        product_no = self.request.query_params.get('product_no')
+        if not all([start_time, end_time]):
+            raise ValidationError('请选择日期范围进行查询')
+        try:
+            e_time = datetime.datetime.strptime(end_time, '%Y-%m-%d')
+            s_time = datetime.datetime.strptime(start_time, '%Y-%m-%d')
+        except Exception:
+            raise ValidationError('日期错误！')
+        diff = e_time - s_time
+        if diff.days > 31:
+            raise ValidationError('搜索日期跨度不得超过一个月！')
+        queryset = ExpendMaterial.objects.filter(product_time__date__gte=s_time, product_time__date__lte=e_time)
+            # .exclude(Q(material__material_name__in=('细料', '硫磺')) | Q(material__material_type__global_name__in=stages))
+        if equip_no:
+            queryset = queryset.filter(equip_no=equip_no)
+        if product_no:
+            queryset = queryset.filter(product_no=product_no)
+        if material_name:
+            queryset = queryset.filter(material_name=material_name)
+        data = queryset.values('equip_no', 'product_no', 'material_no', 'material_name', 'product_time__date').annotate(actual_weight=Sum('actual_weight')/100).order_by('product_no', 'equip_no', 'material_name')
+        material_type_dict = dict(Material.objects.values_list('material_no', 'material_type__global_name'))
+        days = date_range(s_time, e_time)
+        ret = {}
+        for item in data:
+            material_name = item['material_name'].rstrip('-C').rstrip('-X')
+            equip_no = item['equip_no']
+            product_no = item['product_no']
+            key = '{}-{}-{}'.format(equip_no, material_name, product_no)
+            weight = item['actual_weight']
+            material_type = material_type_dict.get(item['material_no'], 'UN_KNOW')
+            factory_date = item['product_time__date'].strftime("%Y-%m-%d")
+            if key not in ret:
+                ret[key] = {
+                    'material_type': material_type,
+                    'material_name': material_name,
+                    'equip_no': equip_no,
+                    'product_no': product_no,
+                    factory_date: weight,
+                    'total_weight': weight
+                }
+            else:
+                if factory_date in ret[key]:
+                    ret[key][factory_date] += weight
+                else:
+                    ret[key][factory_date] = weight
+                ret[key]['total_weight'] += weight
+        result = ret.values()
+        if filter_material_type:
+            result = list(filter(lambda x: x['material_type'] == filter_material_type, result))
+        result = sorted(result, key=itemgetter('material_type', 'material_name', 'equip_no'))  #  按多个字段排序
+        return Response({'days': days, 'data': result})

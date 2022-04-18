@@ -434,12 +434,11 @@ class CutTimeCollect(APIView):
                 min_time = train_dict['time_consuming']
             sum_time += train_dict['time_consuming']
         avg_time = sum_time / len(return_list)
-
+        if self.request.query_params.get('export'):
+            return gen_template_response(self.EXPORT_FIELDS_DICT, return_list, self.FILE_NAME)
         # 分页
         counts = len(return_list)
         return_list = return_list[(page - 1) * page_size:page_size * page]
-        if self.request.query_params.get('export'):
-            return gen_template_response(self.EXPORT_FIELDS_DICT, return_list, self.FILE_NAME)
         return_list.append(
             {'sum_time': sum_time, 'max_time': max_time, 'min_time': min_time, 'avg_time': avg_time})
         return Response({'count': counts, 'results': return_list})
