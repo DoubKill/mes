@@ -3678,14 +3678,13 @@ class ReissueCardView(APIView):
         if self.request.query_params.get('apply'):  # 查看自己的补卡申请
             user_list = [self.request.user.username]
             if group_setup:
-                user_list += group_setup.attendance_users.split(',')
+                user_list += list(group_setup.users.all().values_list('username', flat=True))
             data = self.queryset.filter(user__username__in=user_list).order_by('-id')
             # data2 = self.queryset2.filter(user=self.request.user).order_by('-id')
             data2 = None
         else:  # 审批补卡申请
-            attendance_users = group_setup.attendance_users
             principal = group_setup.principal
-            attendance_users_list = attendance_users.split(',')
+            attendance_users_list = list(group_setup.users.all().values_list('username', flat=True))
             attendance_users_list.append(principal)
             # 列表中找出和name想象的
             if name:
