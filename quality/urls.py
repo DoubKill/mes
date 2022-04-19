@@ -84,6 +84,9 @@ router.register('material-examine-result', MaterialExamineResultViewSet)
 # 原材料管理
 router.register('examine-material', ExamineMaterialViewSet)
 
+# 原材料总部送检条码登记
+router.register('material-inspection-registration', MaterialInspectionRegistrationViewSet)
+
 # 原材料不合格管理
 # router.register('material-unqualified-process', UnqualifiedMaterialProcessModeViewSet)
 

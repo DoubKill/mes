@@ -741,6 +741,18 @@ class MaterialSingleTypeExamineResult(models.Model):
 #         verbose_name_plural = verbose_name = '不合格原材料处理方式'
 
 
+class MaterialInspectionRegistration(AbstractEntity):
+    tracking_num = models.CharField(max_length=64, help_text='条码号， 总厂wms查询条件', blank=True, null=True)
+    quality_status = models.CharField(max_length=8, help_text='品质状态,待检/合格/不合格', default='待检')
+    material_name = models.CharField(max_length=200, help_text='原材料名称')
+    material_no = models.CharField(max_length=64, help_text='物料编码', blank=True, null=True)
+    batch = models.CharField(max_length=200, help_text='批次号')
+
+    class Meta:
+        db_table = 'material_inspection_registration'
+        verbose_name_plural = verbose_name = '原材料总部送检条码登记'
+
+
 class MaterialReportEquip(AbstractEntity):
     """原材料快检上报设备"""
     no = models.CharField(max_length=64, help_text='设备编号')

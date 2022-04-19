@@ -963,7 +963,11 @@ permission_data = [
     {'id': 978, 'code': 'material_expend_summary', 'name': '原材料消耗量汇总表', 'parent_id': None},
     {'id': 979, 'code': 'view_material_expend_summary', 'name': '查看', 'parent_id': 978},
 
-    # 下一个 980 开始
+    {'id': 980, 'code': 'material_sjdj', 'name': '原材料总部送检条码登记', 'parent_id': None},
+    {'id': 981, 'code': 'view_material_sjdj', 'name': '查看', 'parent_id': 980},
+    {'id': 982, 'code': 'add_material_sjdj', 'name': '添加', 'parent_id': 980},
+
+    # 下一个 983 开始
 ]
 
 
