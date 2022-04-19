@@ -138,7 +138,7 @@ class BatchProductionInfoView(APIView):
                 max_trains = TrainsFeedbacks.objects.filter(plan_classes_uid=plan.plan_classes_uid).aggregate(max_trains=Max('actual_trains'))['max_trains']
                 actual_trains = actual_trains if not max_trains else max_trains
                 # 称量车数
-                total_feed = FeedingMaterialLog.objects.using('SFJ').filter(plan_classes_uid=plan.plan_classes_uid, feed_end_time__isnull=False).aggregate(total_feed=Count('id'))['total_feed']
+                total_feed = FeedingMaterialLog.objects.using('SFJ').filter(plan_classes_uid=plan.plan_classes_uid, feed_end_time__isnull=False).aggregate(max_trains=Max('trains'))['max_trains']
                 feed_trains = total_feed if total_feed else 0
                 data.update({'actual_trains': actual_trains, 'feed_trains': feed_trains})
                 plan_actual_data.insert(0, data)
