@@ -3318,3 +3318,73 @@ class MaterialExpendSummaryView(APIView):
             result = list(filter(lambda x: x['material_type'] == filter_material_type, result))
         result = sorted(result, key=itemgetter('material_type', 'material_name', 'equip_no'))  #  按多个字段排序
         return Response({'days': days, 'data': result})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ShiftTimeSummaryView(APIView):
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_shift_time_summary'}))
+
+    def get(self, request):
+        st = self.request.query_params.get('st', None)
+        et = self.request.query_params.get('et', None)
+        classes = self.request.query_params.get('classes', None)
+        if not st or not et:
+            raise ValidationError('缺少查询起止时间参数')
+        filter_kwargs = {
+            'factory_date__gte': st,
+            'factory_date__lte': et
+        }
+        if classes:
+            filter_kwargs['classes'] = classes
+        results = {}
+        group = WorkSchedulePlan.objects.filter(start_time__date__gte=st, start_time__date__lte=et). \
+            values_list('group__global_name','classes__global_name', 'start_time__date').order_by('start_time')
+        group_dic = {f'{item[2]}_{item[1]}': item[0] for item in group}
+        queryset = TrainsFeedbacks.objects.filter(**filter_kwargs).values('classes', 'factory_date', 'equip_no').\
+            annotate(begin=Min('begin_time'), end=Max('end_time'))
+        for item in queryset:
+            factory_date = item['factory_date']
+            equip_no = item['equip_no']
+            if item['classes'] == '早班':
+                s = datetime.datetime.strptime(f'{str(factory_date)} 08:00:00', '%Y-%m-%d %H:%M:%S')
+                time_consuming = round((item['begin'] - s).total_seconds() / 60, 2)  # 耗时
+                key = f'{factory_date}_早班'
+            else:
+                s = datetime.datetime.strptime(f'{str(factory_date)} 20:00:00', '%Y-%m-%d %H:%M:%S')
+                time_consuming = round((item['end'] - s).total_seconds() / 60, 2)  # 耗时
+                key = f'{factory_date}_夜班'
+            if not results.get(key, None):
+                results[key] = {'consuming': 0, 'abnormal': 0, 'factory_date': factory_date,
+                                'classes': key.split('_')[-1],
+                                'group': group_dic.get(f'{str(factory_date)}_{key.split("_")[-1]}', None)}
+            results[key][f'{equip_no}_time_consuming'] = time_consuming if time_consuming <= 20 else None
+            results[key][f'{equip_no}_time_abnormal'] = time_consuming if time_consuming > 20 else None
+            results[key]['consuming'] += time_consuming if time_consuming <= 20 else 0
+            results[key]['abnormal'] += time_consuming if time_consuming > 20 else 0
+        res = list(results.values())
+        for item in res:
+            equip_count = (len(item) - 5) // 2
+            item['consuming'] = round(item['consuming'] / equip_count, 2)
+            item['abnormal'] = round(item['abnormal'] / equip_count, 2)
+        return Response({'results': res})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ShiftTimeSummaryDetailView(APIView):
+
+    def get(self, request):
+        params = self.request.query_params
+        factory_date = params.get('factory_date', None)
+        classes = params.get('classes', None)
+        equip_no = params.get('equip_no', None)
+        if not factory_date or not classes or not equip_no:
+            raise ValidationError('查询参数缺失')
+        query = TrainsFeedbacks.objects.filter(factory_date=factory_date,
+                                               classes=classes, equip_no=equip_no)
+        if not query:
+            return Response({'results': None})
+        begin = query.order_by('begin_time').first()
+        end = query.order_by('end_time').last()
+        return Response({'results': {'begin': datetime.datetime.strftime(begin.begin_time, '%Y-%m-%d %H:%M:%S'),
+                                     'end': datetime.datetime.strftime(end.end_time, '%Y-%m-%d %H:%M:%S')}})
+
