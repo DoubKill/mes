@@ -14,7 +14,7 @@ from rest_framework.validators import UniqueTogetherValidator, UniqueValidator
 
 from django.db.models import Max
 
-from inventory.models import DeliveryPlan, DeliveryPlanStatus
+from inventory.models import DeliveryPlan, DeliveryPlanStatus, WmsNucleinManagement
 from mes.base_serializer import BaseModelSerializer
 
 from mes.conf import COMMON_READ_ONLY_FIELDS
@@ -28,7 +28,7 @@ from quality.models import TestMethod, MaterialTestOrder, \
     MaterialExamineRatingStandard, ExamineValueUnit, DataPointStandardError, MaterialEquipType, MaterialEquip, \
     IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, ProductReportEquip, \
     ProductReportValue, QualifiedRangeDisplay, ProductTestPlan, ProductTestPlanDetail, RubberMaxStretchTestResult, \
-    LabelPrintLog, MaterialTestPlan, MaterialTestPlanDetail
+    LabelPrintLog, MaterialTestPlan, MaterialTestPlanDetail, MaterialInspectionRegistration
 from recipe.models import MaterialAttribute
 
 
@@ -1770,6 +1770,34 @@ class MaterialReportValueCreateSerializer(serializers.ModelSerializer):
             'material': {'read_only': True},
         }
         fields = '__all__'
+
+
+class MaterialInspectionRegistrationSerializer(BaseModelSerializer):
+    mes_quality_status = serializers.SerializerMethodField()
+    locked_status = serializers.SerializerMethodField()
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        ret['created_date'] = ret['created_date'][:10]
+        return ret
+
+    def get_mes_quality_status(self, obj):
+        instance = ExamineMaterial.objects.filter(batch=obj.batch).first()
+        if instance:
+            return '合格' if instance.qualified else '不合格'
+        return '待检品'
+
+    def get_locked_status(self, obj):
+        instance = WmsNucleinManagement.objects.filter(batch_no=obj.batch).first()
+        if instance:
+            return instance.locked_status
+        else:
+            return '未管控'
+
+    class Meta:
+        model = MaterialInspectionRegistration
+        fields = "__all__"
+        read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
 class ProductTestPlanDetailSerializer(BaseModelSerializer):
