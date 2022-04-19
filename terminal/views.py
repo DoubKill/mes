@@ -1323,14 +1323,15 @@ class BatchChargeLogListViewSet(ListAPIView):
             split_count = 0
             for i in serializer.data:
                 single_data = standard_data.get(i['material_name'])
+                actual_weight, standard_error = [0, 0] if not single_data else [single_data.get('actual_weight', 0), single_data.get('standard_error', 0)]
                 if i['bra_code'][0] in ['F', 'S'] or i['bra_code'][:2] in ['MM', 'MC']:
                     if split_count == 0:
                         record = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code).last()
                         split_count = record.single_need
                         i['split_count'] = split_count
-                    i.update({'split_count': split_count, 'standard_weight': single_data['actual_weight'], 'standard_error': single_data['standard_error']})
+                    i.update({'split_count': split_count, 'standard_weight': actual_weight, 'standard_error': standard_error})
                 else:
-                    i.update({'split_count': split_count, 'standard_weight': i['actual_weight'], 'standard_error': single_data['standard_error']})
+                    i.update({'split_count': split_count, 'standard_weight': i['actual_weight'], 'standard_error': standard_error})
                 data.append(i)
         elif opera_type == '2':  # 原材料信息
             try:
