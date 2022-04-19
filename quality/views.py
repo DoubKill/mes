@@ -29,6 +29,7 @@ from basics.models import GlobalCodeType
 from basics.serializers import GlobalCodeSerializer
 import uuid
 
+from equipment.utils import gen_template_response
 from inventory.models import WmsNucleinManagement
 from mes import settings
 from mes.common_code import CommonDeleteMixin, date_range, get_template_response
@@ -44,7 +45,7 @@ from quality.filters import TestMethodFilter, DataPointFilter, \
     DealSuggestionFilter, PalletFeedbacksTestFilter, UnqualifiedDealOrderFilter, MaterialExamineTypeFilter, \
     ExamineMaterialFilter, MaterialEquipFilter, MaterialExamineResultFilter, MaterialReportEquipFilter, \
     MaterialReportValueFilter, ProductReportEquipFilter, ProductReportValueFilter, ProductTestResumeFilter, \
-    MaterialTestPlanFilter
+    MaterialTestPlanFilter, MaterialInspectionRegistrationFilter
 from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod, MaterialTestOrder, \
     MaterialTestMethod, TestType, DataPoint, DealSuggestion, MaterialDealResult, LevelResult, MaterialTestResult, \
     LabelPrint, TestDataPoint, BatchMonth, BatchDay, BatchProductNo, BatchEquip, BatchClass, UnqualifiedDealOrder, \
@@ -52,7 +53,7 @@ from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod
     DataPointStandardError, MaterialSingleTypeExamineResult, MaterialEquipType, MaterialEquip, \
     QualifiedRangeDisplay, IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, \
     ProductReportEquip, ProductReportValue, ProductTestPlan, ProductTestPlanDetail, RubberMaxStretchTestResult, \
-    LabelPrintLog, MaterialTestPlan, MaterialTestPlanDetail
+    LabelPrintLog, MaterialTestPlan, MaterialTestPlanDetail, MaterialInspectionRegistration
 
 from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestOrderSerializer, MaterialTestOrderListSerializer, \
@@ -70,7 +71,8 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     ProductTestPlanSerializer, ProductTEstResumeSerializer, ReportValueSerializer, RubberMaxStretchTestResultSerializer, \
     UnqualifiedPalletFeedBackSerializer, LabelPrintLogSerializer, ProductTestPlanDetailSerializer, \
     ProductTestPlanDetailBulkCreateSerializer, MaterialTestPlanSerializer, MaterialTestPlanCreateSerializer, \
-    MaterialTestPlanDetailSerializer
+    MaterialTestPlanDetailSerializer, MaterialSingleTypeExamineResultSerializer, \
+    MaterialInspectionRegistrationSerializer
 
 from django.db.models import Prefetch
 from django.db.models import Q
@@ -1707,26 +1709,26 @@ class ExamineMaterialViewSet(viewsets.GenericViewSet,
             deal_time=datetime.datetime.now(),
             status=1
         )
-        if deal_result == '放行':
-            url = WMS_URL + '/MESApi/UpdateTestingResult'
-            for m in materials:
-                data = {
-                    "TestingType": 2,
-                    "SpotCheckDetailList": [{
-                        "BatchNo": m.batch,
-                        "MaterialCode": m.wlxxid,
-                        "CheckResult": 1
-                    }]
-                }
-                headers = {"Content-Type": "application/json ;charset=utf-8"}
-                try:
-                    r = requests.post(url, json=data, headers=headers, timeout=5)
-                    r = r.json()
-                except Exception:
-                    continue
-                resp_status = r.get('state')
-                m.status = 2 if resp_status == 1 else 3
-                m.save()
+        # if deal_result == '放行':
+        #     url = WMS_URL + '/MESApi/UpdateTestingResult'
+        #     for m in materials:
+        #         data = {
+        #             "TestingType": 2,
+        #             "SpotCheckDetailList": [{
+        #                 "BatchNo": m.batch,
+        #                 "MaterialCode": m.wlxxid,
+        #                 "CheckResult": 1
+        #             }]
+        #         }
+        #         headers = {"Content-Type": "application/json ;charset=utf-8"}
+        #         try:
+        #             r = requests.post(url, json=data, headers=headers, timeout=5)
+        #             r = r.json()
+        #         except Exception:
+        #             continue
+        #         resp_status = r.get('state')
+        #         m.status = 2 if resp_status == 1 else 3
+        #         m.save()
         return Response('成功')
 
 
@@ -1749,6 +1751,36 @@ class WMSMaterialSearchView(APIView):
         if not ret:
             raise ValidationError('未找到该条码对应物料信息！')
         return Response(ret)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class MaterialInspectionRegistrationViewSet(viewsets.GenericViewSet,
+                                            mixins.ListModelMixin,
+                                            mixins.RetrieveModelMixin,
+                                            mixins.CreateModelMixin):
+    queryset = MaterialInspectionRegistration.objects.all()
+    serializer_class = MaterialInspectionRegistrationSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = MaterialInspectionRegistrationFilter
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_material_sjdj',
+                                                            'add': 'add_material_sjdj',}))
+    FILE_NAME = '原材料总部送检条码登记'
+    EXPORT_FIELDS_DICT = {"质检条码": "tracking_num", "总部品质状态": "quality_status", "物料名称": "material_name",
+                          "物料编码": "material_no", "批次号": "batch", "安吉质检状态": "mes_quality_status",
+                          "核酸状态": "locked_status", "送检日期": "created_date", "送检人": "created_username"}
+
+    def list(self, request, *args, **kwargs):
+        export = self.request.query_params.get('export')
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if export:
+            data = self.get_serializer(queryset, many=True).data
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 @method_decorator([api_recorder], name="dispatch")

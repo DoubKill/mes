@@ -3218,7 +3218,7 @@ class MaterialExpendSummaryView(APIView):
         if material_name:
             queryset = queryset.filter(material_name=material_name)
         data = queryset.values('equip_no', 'product_no', 'material_no', 'material_name', 'product_time__date').annotate(actual_weight=Sum('actual_weight')/100).order_by('product_no', 'equip_no', 'material_name')
-        material_type_dict = dict(Material.objects.values_list('material_no', 'material_type__global_name'))
+        material_type_dict = dict(Material.objects.values_list('material_name', 'material_type__global_name'))
         days = date_range(s_time, e_time)
         ret = {}
         for item in data:
@@ -3227,7 +3227,7 @@ class MaterialExpendSummaryView(APIView):
             product_no = item['product_no']
             key = '{}-{}-{}'.format(equip_no, material_name, product_no)
             weight = item['actual_weight']
-            material_type = material_type_dict.get(item['material_no'], 'UN_KNOW')
+            material_type = material_type_dict.get(item['material_name'], 'UN_KNOW')
             factory_date = item['product_time__date'].strftime("%Y-%m-%d")
             if key not in ret:
                 ret[key] = {
