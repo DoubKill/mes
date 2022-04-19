@@ -3537,7 +3537,7 @@ class AttendanceClockViewSet(ModelViewSet):
         return Response({'results': results})
 
     @action(methods=['post'], detail=False, permission_classes=[], url_path='reissue_card', url_name='reissue_card')
-    def reissue_card(self, request):
+    def reissue_card(self, request):  #  提交补卡申请
         data = self.request.data
         user = self.request.user
         username = user.username
@@ -3619,7 +3619,7 @@ class AttendanceClockViewSet(ModelViewSet):
         return Response('消息发送给审批人')
 
     @action(methods=['post'], detail=False, permission_classes=[], url_path='overtime', url_name='overtime')
-    def overtime(self, request):
+    def overtime(self, request):  # 提交加班申请
         # 加班也存在调岗的情况
         user = self.request.user
         data = self.request.data
@@ -4085,12 +4085,7 @@ class AttendanceResultAuditView(APIView):
         data = self.request.data
         audit = data.pop('audit', None)
         approve = data.pop('approve', None)
-        try:
-            is_user = Section.objects.get(name='生产科').in_charge_user
-        except:
-            is_user = None
-        if self.request.user != is_user:
-            raise ValidationError('当前账号不是生产科负责人')
+        is_user = self.request.user
         if audit:
             data['audit_user'] = is_user.username
         if approve:
