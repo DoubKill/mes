@@ -146,5 +146,11 @@ urlpatterns = [
     # 考勤打卡审批
     path('attendance-result-audit/', AttendanceResultAuditView.as_view()),
     # 物料消耗统计报表
-    path('material-expend-summary/', MaterialExpendSummaryView.as_view())
+    path('material-expend-summary/', MaterialExpendSummaryView.as_view()),
+
+    # 交接班时间汇总
+    path('shift-time-summary/', ShiftTimeSummaryView.as_view()),
+    # 交接班时间汇总明细
+    path('shift-time-summary/detail/', ShiftTimeSummaryDetailView.as_view()),
+
 ]
