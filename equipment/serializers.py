@@ -992,7 +992,7 @@ class EquipApplyRepairSerializer(BaseModelSerializer):
             'work_type': '维修', 'plan_id': validated_data['plan_id'], 'plan_name': validated_data['plan_name'],
             'equip_no': validated_data['equip_no'], 'equip_condition': validated_data['equip_condition'],
             'importance_level': validated_data.get('importance_level', '高'), 'status': '已生成工单',
-            'created_user': self.context['request'].user,
+            'created_user': self.context['request'].user, 'result_fault_cause': validated_data.get('result_fault_cause'),
             'planned_maintenance_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         }
         EquipPlan.objects.create(**equip_plan_data)
