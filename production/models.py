@@ -452,6 +452,7 @@ class PerformanceJobLadder(models.Model):
     post_standard = models.PositiveIntegerField(choices=Status, default=1, help_text='多岗位合并基准', null=True, blank=True)
     post_coefficient = models.IntegerField(help_text='多岗位合并系数', null=True, blank=True)
     delete_flag = models.BooleanField(help_text='是否删除', verbose_name='是否删除', default=False)
+    relation = models.BooleanField(help_text='是否与机台相关联', default=True)
 
     class Meta:
         db_table = 'performance_job_ladder'
