@@ -973,8 +973,7 @@ permission_data = [
     {'id': 982, 'code': 'powder_feed', 'name': 'PDA粉料罐投料', 'parent_id': None},
     {'id': 983, 'code': 'view_powder_feed', 'name': '查看', 'parent_id': 982},
 
-
-    # 下一个 986 开始
+    # 下一个 987 开始
 ]
 
 
