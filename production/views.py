@@ -3537,7 +3537,8 @@ class AttendanceClockViewSet(ModelViewSet):
         return Response({'results': results})
 
     @action(methods=['post'], detail=False, permission_classes=[], url_path='reissue_card', url_name='reissue_card')
-    def reissue_card(self, request):  #  提交补卡申请
+    def reissue_card(self, request):
+        """提交补卡申请"""
         data = self.request.data
         user = self.request.user
         username = user.username
@@ -3545,7 +3546,17 @@ class AttendanceClockViewSet(ModelViewSet):
         now_time = datetime.datetime.now()
         bk_date = data.get('bk_date', None)
         now = datetime.datetime.strptime(f'{bk_date}:00', '%Y-%m-%d %H:%M:%S')
-
+        # 补卡规则
+        card_rules = {item['global_no']: item['global_name'] for item in GlobalCode.objects.filter(global_type__type_name='补卡规则',
+                                                                                                   use_flag=True).values('global_no', 'global_name')}
+        # 一个月内可补卡次数
+        num = card_rules.get('一个月内补卡次数', None)
+        # 可补卡时间
+        card_time = card_rules.get('可补卡时间', None)
+        if not num or not card_time:
+            raise ValidationError('请先添加补卡规则')
+        if FillCardApply.objects.filter(user=user, bk_date__year=now.year, bk_date__month=now.month).count() > int(num):
+            raise ValidationError(f'当前已提交了{num}次补卡申请')
         attendance_group_obj, section_list, equip_list, date_now, group_list = self.get_user_group(user, now)
         principal = attendance_group_obj.principal  # 考勤负责人
         # 离岗时间
@@ -3561,20 +3572,20 @@ class AttendanceClockViewSet(ModelViewSet):
                 factory_date = date_now
             factory_date1 = str(datetime.datetime.strptime(factory_date, '%Y-%m-%d') + datetime.timedelta(days=1))
             attendance_et = datetime.datetime.strptime(f"{factory_date1} {str(attendance_group_obj.attendance_et)}", '%Y-%m-%d %H:%M:%S')
-        if now_time > attendance_et + datetime.timedelta(days=1):
-            raise ValidationError('不可提交超过24小时的申请')
+        if now_time > attendance_et + datetime.timedelta(hours=int(card_time)):
+            raise ValidationError(f'不可提交超过{card_time}小时的申请')
 
         if status == '上岗':
             # 判断是否有打卡记录
             if EmployeeAttendanceRecords.objects.filter(user=user, factory_date=factory_date, status=status).exists():
                 raise ValidationError('当天存在上岗打卡记录')
         elif status == '调岗':
-            if not EmployeeAttendanceRecords.objects.filter(user=user, factory_date=factory_date,
-                                                            status__in=['上岗', '调岗'], end_date__isnull=True).exists():
-                raise ValidationError('请先提交当天的上岗申请')
+            # if not EmployeeAttendanceRecords.objects.filter(user=user, factory_date=factory_date,
+            #                                                 status__in=['上岗', '调岗'], end_date__isnull=True).exists():
+            #     raise ValidationError('请先提交当天的上岗申请')
             last = EmployeeAttendanceRecords.objects.filter(user=user, factory_date=factory_date,
                                                         status__in=['上岗', '调岗'], end_date__isnull=False).order_by('end_date').last()
-            if last:
+            if last:  # 存在上岗或换岗的打卡，
                 if now < last.end_date:
                     raise ValidationError('提交的补卡申请有误')
         elif status == '离岗':
@@ -3619,7 +3630,8 @@ class AttendanceClockViewSet(ModelViewSet):
         return Response('消息发送给审批人')
 
     @action(methods=['post'], detail=False, permission_classes=[], url_path='overtime', url_name='overtime')
-    def overtime(self, request):  # 提交加班申请
+    def overtime(self, request):
+        """提交加班申请"""
         # 加班也存在调岗的情况
         user = self.request.user
         data = self.request.data
@@ -3653,6 +3665,35 @@ class AttendanceClockViewSet(ModelViewSet):
         }
         self.send_message(principal_obj, content)
         return Response('消息发送给审批人')
+
+    @action(methods=['get'], detail=False, permission_classes=[], url_path='default_value', url_name='default_value')
+    def default_value(self, request):
+        """获取补卡时默认数据显示"""
+        state = self.request.query_params.get('state')
+        user = self.request.user
+        queryset = EmployeeAttendanceRecords.objects.filter(Q(user=user) & ~Q(is_use='废弃'))
+        res = {'classes': None,
+               'group': None,
+               'section': None,
+               'equips': []}
+        equips = []
+        if state == '上岗':
+            obj = queryset.filter(status__in=['上岗', '调岗']).last()
+            if obj:
+                equips = queryset.filter(begin_date=obj.begin_date).values_list('equip', flat=True)
+        elif state == '调岗':
+            obj = queryset.filter(status__in=['上岗', '调岗']).last()
+            if obj:
+                equips = queryset.filter(begin_date=obj.begin_date).values_list('equip', flat=True)
+        elif state == '离岗':
+            obj = queryset.filter(status__in=['上岗', '调岗'], end_date__isnull=True).last()
+            if obj:
+                equips = queryset.filter(begin_date=obj.begin_date).values_list('equip', flat=True)
+        res['classes'] = obj.classes if obj else None
+        res['group'] = obj.group if obj else None
+        res['section'] = obj.section if obj else None
+        res['equips'] = equips
+        return Response({'results': res})
 
 
 @method_decorator([api_recorder], name="dispatch")
