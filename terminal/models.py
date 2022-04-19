@@ -150,6 +150,16 @@ class WeightPackageLog(AbstractEntity):
         verbose_name_plural = verbose_name = '称量打包履历'
 
 
+class WeightPackageLogManualDetails(models.Model):
+    plan_weight_uid = models.CharField(max_length=64, help_text='小料称量计划号')
+    type = models.CharField(max_length=64, help_text='物料在配方中所属类别: 胶料、炭黑、油料、细料/硫磺')
+
+
+    class Meta:
+        db_table = 'weight_package_log_manual_details'
+        verbose_name_plural = verbose_name = '人工配料信息(打印机配时添加)'
+
+
 class WeightPackageLogDetails(models.Model):
     weight_package = models.ForeignKey(WeightPackageLog, help_text='机配id', on_delete=models.CASCADE,
                                        related_name='weight_package_machine')

@@ -301,9 +301,9 @@ class AutoDispatch(object):
                 if repair_area == {None}:  # 机台或者部位未设置区域
                     continue
                 user = User.objects.filter(is_active=True, username=per['username']).last()
-                if not user.repair_areas:  # 人员所在部门没有设置区域
+                if not user.section.repair_areas:  # 人员所在部门没有设置区域
                     continue
-                section_repair_area = set(user.repair_areas.split(','))
+                section_repair_area = set(user.section.repair_areas.split(','))
                 if not repair_area & section_repair_area:  # 人员负责区域与机台或部位不符
                     continue
                 processing_order = EquipApplyOrder.objects.filter(~Q(result_repair_final_result='等待'), status='已开始',

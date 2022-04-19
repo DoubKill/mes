@@ -522,7 +522,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
     update:
         重新打印
     """
-    queryset = WeightPackageLog.objects.all().order_by('-created_date')
+    queryset = WeightPackageLog.objects.all().order_by('-plan_weight_uid', '-created_date')
     permission_classes = (IsAuthenticated,)
     filter_backends = [DjangoFilterBackend]
 
