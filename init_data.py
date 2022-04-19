@@ -923,9 +923,9 @@ permission_data = [
     {'id': 943, 'code': 'view_employee_attendance_records', 'name': '查看', 'parent_id': 942},
     {'id': 944, 'code': 'import_employee_attendance_records', 'name': '导入', 'parent_id': 942},
     {'id': 945, 'code': 'export_employee_attendance_records', 'name': '导出', 'parent_id': 942},
-    {'id': 982, 'code': 'add_employee_attendance_records', 'name': '添加', 'parent_id': 942},
-    {'id': 984, 'code': 'abandon_employee_attendance_records', 'name': '废弃', 'parent_id': 942},
-    {'id': 985, 'code': 'affirm_employee_attendance_records', 'name': '确认', 'parent_id': 942},
+    {'id': 984, 'code': 'add_employee_attendance_records', 'name': '添加', 'parent_id': 942},
+    {'id': 985, 'code': 'abandon_employee_attendance_records', 'name': '废弃', 'parent_id': 942},
+    {'id': 986, 'code': 'affirm_employee_attendance_records', 'name': '确认', 'parent_id': 942},
 
 
     {'id': 946, 'code': 'summary_of_mill_output', 'name': '密炼机台产量汇总表', 'parent_id': None},
