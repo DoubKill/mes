@@ -395,12 +395,6 @@ class UnqualifiedDealOrderUpdateSerializer(BaseModelSerializer):
             validated_data['c_deal_user'] = None
             validated_data['c_deal_date'] = None
             validated_data['c_agreed'] = None
-            for detail in instance.deal_details.all():
-                MaterialDealResult.objects.filter(lot_no=detail.lot_no).update(test_result='三等品',
-                                                                               deal_suggestion='不合格',
-                                                                               deal_time=None,
-                                                                               deal_user=None)
-        if tech_deal_result:
             for item in tech_deal_result:
                 deal_details = UnqualifiedDealOrderDetail.objects.filter(id=item['id'])
                 deal_details.update(suggestion=item['suggestion'], is_release=item['is_release'])
@@ -415,16 +409,15 @@ class UnqualifiedDealOrderUpdateSerializer(BaseModelSerializer):
                     MaterialDealResult.objects.filter(lot_no=detail.lot_no).update(test_result='PASS',
                                                                                    deal_suggestion=detail.suggestion,
                                                                                    deal_time=datetime.now(),
-                                                                                   deal_user=self.context['request'].
-                                                                                   user.username)
+                                                                                   deal_user=instance.t_deal_user,
+                                                                                   update_store_test_flag=4)
             else:
                 # 不同意
                 for detail in instance.deal_details.filter(is_release=True):
                     MaterialDealResult.objects.filter(lot_no=detail.lot_no).update(test_result='三等品',
                                                                                    deal_suggestion='不合格',
                                                                                    deal_time=datetime.now(),
-                                                                                   deal_user=self.context['request'].
-                                                                                   user.username)
+                                                                                   deal_user=instance.t_deal_user)
         return instance
 
     class Meta:

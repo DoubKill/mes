@@ -1126,6 +1126,7 @@ class UnqualifiedDealOrderViewSet(ModelViewSet):
     queryset = UnqualifiedDealOrder.objects.all()
     filter_backends = (DjangoFilterBackend,)
     filter_class = UnqualifiedDealOrderFilter
+    permission_classes = (IsAuthenticated, )
 
     def get_queryset(self):
         queryset = UnqualifiedDealOrder.objects.order_by('-id')
