@@ -4225,20 +4225,23 @@ class ShiftTimeSummaryView(APIView):
             equip_no = item['equip_no']
             if item['classes'] == '早班':
                 s = datetime.datetime.strptime(f'{str(factory_date)} 08:00:00', '%Y-%m-%d %H:%M:%S')
-                time_consuming = round((item['begin'] - s).total_seconds() / 60, 2)  # 耗时
+                e = datetime.datetime.strptime(f'{str(factory_date)} 20:00:00', '%Y-%m-%d %H:%M:%S')
+                # 计算耗时
+                time_consuming = round((item['begin'] - s + e - item['end']).total_seconds() / 60, 2)
                 key = f'{factory_date}_早班'
             else:
                 s = datetime.datetime.strptime(f'{str(factory_date)} 20:00:00', '%Y-%m-%d %H:%M:%S')
-                time_consuming = round((item['begin'] - s).total_seconds() / 60, 2)  # 耗时
+                e = datetime.datetime.strptime(f'{str(factory_date)} 08:00:00', '%Y-%m-%d %H:%M:%S') + datetime.timedelta(days=1)
+                time_consuming = round((item['begin'] - s + e - item['end']).total_seconds() / 60, 2)
                 key = f'{factory_date}_夜班'
             if not results.get(key, None):
                 results[key] = {'consuming': 0, 'abnormal': 0, 'factory_date': factory_date,
                                 'classes': key.split('_')[-1],
                                 'group': group_dic.get(f'{str(factory_date)}_{key.split("_")[-1]}', None)}
-            results[key][f'{equip_no}_time_consuming'] = time_consuming if time_consuming <= 20 else None
-            results[key][f'{equip_no}_time_abnormal'] = time_consuming if time_consuming > 20 else None
-            results[key]['consuming'] += time_consuming if time_consuming <= 20 else 0
-            results[key]['abnormal'] += time_consuming if time_consuming > 20 else 0
+            results[key][f'{equip_no}_time_consuming'] = time_consuming if abs(time_consuming) <= 20 else None
+            results[key][f'{equip_no}_time_abnormal'] = time_consuming if abs(time_consuming) > 20 else None
+            results[key]['consuming'] += time_consuming if abs(time_consuming) <= 20 else 0
+            results[key]['abnormal'] += time_consuming if abs(time_consuming) > 20 else 0
         res = list(results.values())
         for item in res:
             equip_count = (len(item) - 5) // 2
