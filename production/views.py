@@ -4219,7 +4219,7 @@ class ShiftTimeSummaryView(APIView):
             values_list('group__global_name','classes__global_name', 'start_time__date').order_by('start_time')
         group_dic = {f'{item[2]}_{item[1]}': item[0] for item in group}
         queryset = TrainsFeedbacks.objects.filter(**filter_kwargs).values('classes', 'factory_date', 'equip_no').\
-            annotate(begin=Min('begin_time'), end=Max('end_time'))
+            annotate(begin=Min('begin_time'), end=Max('end_time')).order_by('begin')
         for item in queryset:
             factory_date = item['factory_date']
             equip_no = item['equip_no']
