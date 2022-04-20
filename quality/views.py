@@ -1757,13 +1757,15 @@ class WMSMaterialSearchView(APIView):
 class MaterialInspectionRegistrationViewSet(viewsets.GenericViewSet,
                                             mixins.ListModelMixin,
                                             mixins.RetrieveModelMixin,
-                                            mixins.CreateModelMixin):
+                                            mixins.CreateModelMixin,
+                                            mixins.DestroyModelMixin):
     queryset = MaterialInspectionRegistration.objects.all()
     serializer_class = MaterialInspectionRegistrationSerializer
     filter_backends = (DjangoFilterBackend,)
     filter_class = MaterialInspectionRegistrationFilter
     permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_material_sjdj',
-                                                            'add': 'add_material_sjdj',}))
+                                                            'add': 'add_material_sjdj',
+                                                            'delete': 'delete_material_sjdj'}))
     FILE_NAME = '原材料总部送检条码登记'
     EXPORT_FIELDS_DICT = {"质检条码": "tracking_num", "总部品质状态": "quality_status", "物料名称": "material_name",
                           "物料编码": "material_no", "批次号": "batch", "安吉质检状态": "mes_quality_status",
