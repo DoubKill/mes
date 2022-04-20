@@ -676,6 +676,8 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
                     status = '1:一等品'
                 elif test_order.is_passed:
                     status = 'PASS'
+                elif obj.test_result == 'PASS' and obj.deal_user:
+                    status = 'PASS'
                 else:
                     status = '3:三等品'
                 if test_result.result == '合格':
