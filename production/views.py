@@ -4229,7 +4229,7 @@ class ShiftTimeSummaryView(APIView):
                 key = f'{factory_date}_早班'
             else:
                 s = datetime.datetime.strptime(f'{str(factory_date)} 20:00:00', '%Y-%m-%d %H:%M:%S')
-                time_consuming = round((item['end'] - s).total_seconds() / 60, 2)  # 耗时
+                time_consuming = round((item['begin'] - s).total_seconds() / 60, 2)  # 耗时
                 key = f'{factory_date}_夜班'
             if not results.get(key, None):
                 results[key] = {'consuming': 0, 'abnormal': 0, 'factory_date': factory_date,
