@@ -1,5 +1,6 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from suds import null
 
 
 class User(AbstractUser):
@@ -68,6 +69,7 @@ class Section(AbstractEntity):
                                        related_name='children_sections', blank=True, null=True)
     in_charge_user = models.ForeignKey(User, help_text='负责人', blank=True, null=True, on_delete=models.CASCADE,
                                        related_name='in_charge_sections')
+    repair_areas = models.CharField(max_length=128, help_text='班组负责区域', null=True, blank=True)
 
     def __str__(self):
         return self.name
