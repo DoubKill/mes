@@ -966,8 +966,9 @@ permission_data = [
     {'id': 980, 'code': 'material_sjdj', 'name': '原材料总部送检条码登记', 'parent_id': None},
     {'id': 981, 'code': 'view_material_sjdj', 'name': '查看', 'parent_id': 980},
     {'id': 982, 'code': 'add_material_sjdj', 'name': '添加', 'parent_id': 980},
+    {'id': 983, 'code': 'delete_material_sjdj', 'name': '删除', 'parent_id': 980},
 
-    # 下一个 983 开始
+    # 下一个 984 开始
 ]
 
 
