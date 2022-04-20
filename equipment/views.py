@@ -847,10 +847,13 @@ class EquipAreaDefineViewSet(CommonDeleteMixin, ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         export = self.request.query_params.get('export')
+        all_area = self.request.query_params.get('all')
         queryset = self.filter_queryset(self.get_queryset())
         if export:
             data = self.get_serializer(queryset, many=True).data
             return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+        if all_area:
+            return Response(list(queryset.values_list('area_name', flat=True).distinct()))
         return super().list(request, *args, **kwargs)
 
     @action(methods=['get'], detail=False, permission_classes=[], url_path='get_name', url_name='get_name')

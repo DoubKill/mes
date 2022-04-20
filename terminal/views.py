@@ -138,7 +138,7 @@ class BatchProductionInfoView(APIView):
                 max_trains = TrainsFeedbacks.objects.filter(plan_classes_uid=plan.plan_classes_uid).aggregate(max_trains=Max('actual_trains'))['max_trains']
                 actual_trains = actual_trains if not max_trains else max_trains
                 # 称量车数
-                total_feed = FeedingMaterialLog.objects.using('SFJ').filter(plan_classes_uid=plan.plan_classes_uid, feed_end_time__isnull=False).aggregate(total_feed=Count('id'))['total_feed']
+                total_feed = FeedingMaterialLog.objects.using('SFJ').filter(plan_classes_uid=plan.plan_classes_uid, feed_end_time__isnull=False).aggregate(max_trains=Max('trains'))['max_trains']
                 feed_trains = total_feed if total_feed else 0
                 data.update({'actual_trains': actual_trains, 'feed_trains': feed_trains})
                 plan_actual_data.insert(0, data)
@@ -522,7 +522,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
     update:
         重新打印
     """
-    queryset = WeightPackageLog.objects.all().order_by('-created_date')
+    queryset = WeightPackageLog.objects.all().order_by('-plan_weight_uid', '-created_date')
     permission_classes = (IsAuthenticated,)
     filter_backends = [DjangoFilterBackend]
 
@@ -1323,14 +1323,15 @@ class BatchChargeLogListViewSet(ListAPIView):
             split_count = 0
             for i in serializer.data:
                 single_data = standard_data.get(i['material_name'])
+                actual_weight, standard_error = [0, 0] if not single_data else [single_data.get('actual_weight', 0), single_data.get('standard_error', 0)]
                 if i['bra_code'][0] in ['F', 'S'] or i['bra_code'][:2] in ['MM', 'MC']:
                     if split_count == 0:
                         record = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code).last()
                         split_count = record.single_need
                         i['split_count'] = split_count
-                    i.update({'split_count': split_count, 'standard_weight': single_data['actual_weight'], 'standard_error': single_data['standard_error']})
+                    i.update({'split_count': split_count, 'standard_weight': actual_weight, 'standard_error': standard_error})
                 else:
-                    i.update({'split_count': split_count, 'standard_weight': i['actual_weight'], 'standard_error': single_data['standard_error']})
+                    i.update({'split_count': split_count, 'standard_weight': i['actual_weight'], 'standard_error': standard_error})
                 data.append(i)
         elif opera_type == '2':  # 原材料信息
             try:
@@ -1849,6 +1850,7 @@ class XLPlanVIewSet(ModelViewSet):
             handle_plan_data = {}
             plan_data = plans.values('recipe', 'recipe_id', 'recipe_ver', 'state', 'setno', 'actno', 'date_time', 'merge_flag')
             for index, plan in enumerate(plans):
+                time.sleep(1)  # 防止生成一样的计划号
                 replace_order_by = max(order_by_list) + 1
                 if plan.state == '运行中':
                     first_plan_id = datetime.datetime.now().strftime('%Y%m%d%H%M%S')[2:]
@@ -1879,11 +1881,14 @@ class XLPlanVIewSet(ModelViewSet):
                 if stop_plan:
                     # 终止运行中计划(下位机)
                     for single_stop_plan in stop_plan:
+                        time.sleep(1)  # 增加时延(称量程序接口响应时间为50m), 防止指令下发成功但称量未处理
                         client.stop(single_stop_plan.planid)
                 if issue_plan:
                     for single_issue_plan in issue_plan:
+                        time.sleep(1)  # 增加时延(称量程序接口响应时间为50m), 防止指令下发成功但称量未处理
                         # 通知新增计划
                         client.add_plan(single_issue_plan.planid)
+                        time.sleep(1)  # 增加时延(称量程序接口响应时间为50m), 防止指令下发成功但称量未处理
                         # 下达新计划
                         client.issue_plan(single_issue_plan.planid, single_issue_plan.recipe, single_issue_plan.setno)
             except Exception as e:
@@ -2091,7 +2096,7 @@ class XLPlanCViewSet(ListModelMixin, GenericViewSet):
         try:
             all_filter_plan = Plan.objects.using(equip_no).filter(
                 Q(planid__startswith=date_now_planid) | Q(planid__startswith=date_before_planid),
-                state__in=['运行中', '等待']).all()
+                state__in=['运行中', '等待']).all().order_by(*['-state', 'order_by'])
         except:
             return response(success=False, message='称量机台{}错误'.format(equip_no))
         if not all_filter_plan:
@@ -2142,13 +2147,19 @@ class WeightingTankStatus(APIView):
         tanks_info = WeightTankStatus.objects.filter(equip_no=equip_no, use_flag=True) \
             .values('id', 'tank_no', 'tank_name', 'status', 'material_name', 'material_no', 'open_flag')
         # 获取计划号
-        planids = ''
-        processing_plan = Plan.objects.using(equip_no).filter(state='运行中', actno__gte=1).order_by('id').last()
+        date_now = datetime.datetime.now().date()
+        date_before = date_now - timedelta(days=1)
+        date_now_planid = ''.join(str(date_now).split('-'))[2:]
+        date_before_planid = ''.join(str(date_before).split('-'))[2:]
+        all_filter_plan = Plan.objects.using(equip_no).filter(
+            Q(planid__startswith=date_now_planid) | Q(planid__startswith=date_before_planid),
+            state__in=['运行中', '等待']).all().order_by(*['-state', 'order_by'])
+        processing_plan = all_filter_plan.filter(state='运行中', actno__gte=1).order_by('id').last()
         if processing_plan:
             planids = processing_plan.planid.strip()
             diff_no = processing_plan.setno - processing_plan.actno
             if diff_no / processing_plan.setno <= 0.2:  # 不足20%查询下一条计划
-                next_plan = Plan.objects.using(equip_no).filter(state__in=['运行中', '等待'], order_by__gte=processing_plan.order_by, id__gt=processing_plan.id).order_by('order_by').first()
+                next_plan = all_filter_plan.filter(order_by__gte=processing_plan.order_by, id__gt=processing_plan.id).first()
                 if next_plan:
                     planids += f',{next_plan.planid.strip()}'
             data = xl_c_calculate(equip_no, planids, self.queryset)

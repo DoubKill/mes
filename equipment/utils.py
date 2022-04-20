@@ -73,7 +73,7 @@ class DinDinAPI(object):
         data = json.loads(ret.text)
         return data.get('result').get('userid') if data.get('errcode') == 0 else ''
 
-    def get_user_attendance(self, user_ids, begin_time=datetime.now().date(), end_time=datetime.now().date()):
+    def get_user_attendance(self, user_ids, begin_time, end_time):
         """
             获取用户考勤信息
         @param user_ids: 用户id列表
@@ -125,18 +125,38 @@ class DinDinAPI(object):
             print('请求错误')
 
 
+def get_children_section(init_section, include_self=True):
+    """获取所有可指派的部门(默认设备科及其下)"""
+    r = []
+    if include_self:
+        r.append(init_section.name)
+    for c_section in init_section.children_sections.all():
+        _r = get_children_section(c_section, include_self=True)
+        if len(_r) > 0:
+            r.extend(_r)
+    return r
+
+
 def get_staff_status(ding_api, section_name, group=''):
     """section_name: 设备部"""
     result = []
     filter_kwargs = {'section_users__repair_group': group} if group else {'section_users__repair_group__isnull': False}
+    # 获取所有下级部门
+    init_section = Section.objects.filter(name=section_name).last()
+    if not init_section:
+        return result
+    section_list = get_children_section(init_section)
     # 获取部门所有员工信息
-    staffs = Section.objects.filter(Q(name=section_name) | Q(parent_section__name=section_name), **filter_kwargs) \
+    staffs = Section.objects.filter(name__in=section_list, **filter_kwargs) \
         .annotate(username=F('section_users__username'), phone_number=F('section_users__phone_number'),
-                  group=F('section_users__repair_group'),
+                  group=F('section_users__repair_group'), is_active=F('section_users__is_active'),
                   uid=F('section_users__id'), leader=F('in_charge_user__username'),
                   leader_phone_number=F('in_charge_user__phone_number')) \
-        .values('username', 'phone_number', 'uid', 'leader', 'leader_phone_number', 'group', 'name')
+        .values('username', 'phone_number', 'uid', 'leader', 'leader_phone_number', 'group', 'name', 'is_active')
     for staff in staffs:
+        # 去除已经删除的员工
+        if staff.get('is_active') == 0:
+            continue
         staff_dict = {'id': staff.get('uid'), 'phone_number': staff.get('phone_number'), 'optional': False,
                       'username': staff.get('username'), 'group': staff.get('group'), 'leader': staff.get('leader'),
                       'leader_phone_number': staff.get('leader_phone_number'), 'section_name': staff.get('name')}
@@ -148,9 +168,10 @@ def get_staff_status(ding_api, section_name, group=''):
             if settings.DEBUG:
                 staff_dict['optional'] = True
             else:
-                records = ding_api.get_user_attendance([ding_uid])
-                if records and not len([i for i in records if i['checkType'] != 'OnDuty']):
+                records = ding_api.get_user_attendance([ding_uid], begin_time=datetime.now().date(), end_time=datetime.now().date())
+                if records and len([i for i in records if i['checkType'] != 'OnDuty' and i['timeResult'] != 'NotSigned']) == 0:
                     staff_dict['optional'] = True
+                staff_dict['records'] = records
         result.append(staff_dict)
     return result
 
@@ -167,10 +188,14 @@ def get_maintenance_status(ding_api, equip_no, maintenance_type):
                                       group=F('maintenance_user__repair_group'),
                                       uid=F('maintenance_user__id'),
                                       leader=F('maintenance_user__section__in_charge_user__username'),
-                                      leader_phone_number=F('maintenance_user__section__in_charge_user__phone_number'))\
-        .values('username', 'phone_number', 'uid', 'leader', 'leader_phone_number', 'group').distinct()
+                                      leader_phone_number=F('maintenance_user__section__in_charge_user__phone_number'),
+                                      is_active=F('maintenance_user__is_active'))\
+        .values('username', 'phone_number', 'uid', 'leader', 'leader_phone_number', 'group', 'is_active').distinct()
 
     for staff in maintenances:
+        # 去除已经删除的员工
+        if staff.get('is_active') == 0:
+            continue
         staff_dict = {'id': staff.get('uid'), 'phone_number': staff.get('phone_number'), 'optional': False,
                       'username': staff.get('username'), 'group': staff.get('group'), 'leader': staff.get('leader'),
                       'leader_phone_number': staff.get('leader_phone_number')}
@@ -182,8 +207,8 @@ def get_maintenance_status(ding_api, equip_no, maintenance_type):
             if settings.DEBUG:
                 staff_dict['optional'] = True
             else:
-                records = ding_api.get_user_attendance([ding_uid])
-                if records and len([i for i in records if i['checkType'] != 'OnDuty']) == 0:
+                records = ding_api.get_user_attendance([ding_uid], begin_time=datetime.now().date(), end_time=datetime.now().date())
+                if records and len([i for i in records if i['checkType'] != 'OnDuty' and i['timeResult'] != 'NotSigned']) == 0:
                     staff_dict['optional'] = True
                 staff_dict['records'] = records
         result.append(staff_dict)
