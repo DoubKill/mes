@@ -3351,11 +3351,13 @@ class ShiftTimeSummaryView(APIView):
                 # 计算耗时
                 time_consuming = round((item['begin'] - s + e - item['end']).total_seconds() / 60, 2)
                 key = f'{factory_date}_早班'
-            else:
+            elif item['classes'] == '夜班':
                 s = datetime.datetime.strptime(f'{str(factory_date)} 20:00:00', '%Y-%m-%d %H:%M:%S')
                 e = datetime.datetime.strptime(f'{str(factory_date)} 08:00:00', '%Y-%m-%d %H:%M:%S') + datetime.timedelta(days=1)
                 time_consuming = round((item['begin'] - s + e - item['end']).total_seconds() / 60, 2)
                 key = f'{factory_date}_夜班'
+            else:
+                continue
             if not results.get(key, None):
                 results[key] = {'consuming': 0, 'abnormal': 0, 'factory_date': factory_date,
                                 'classes': key.split('_')[-1],
