@@ -16,9 +16,10 @@ from django.http import HttpResponse
 from io import BytesIO
 
 from mes import settings
-from system.models import Section
+from system.models import Section, User
 from basics.models import WorkSchedulePlan, GlobalCode
-from equipment.models import PropertyTypeNode, Property, EquipApplyOrder, EquipApplyRepair, EquipInspectionOrder
+from equipment.models import PropertyTypeNode, Property, EquipApplyOrder, EquipApplyRepair, EquipInspectionOrder, \
+    EquipBom
 from equipment.utils import DinDinAPI, get_staff_status, get_maintenance_status
 from quality.utils import get_cur_sheet, get_sheet_data
 import json
@@ -286,6 +287,25 @@ class AutoDispatch(object):
         processing_person = []
         for per in working_persons:
             if order.work_type != '巡检':
+                # 5分钟内派过单的不再派单(维修工单)
+                c_time = datetime.datetime.now() - datetime.timedelta(minutes=5)
+                short_order = EquipApplyOrder.objects.filter(status='已指派', assign_to_user__icontains=per['username'],
+                                                             assign_datetime__gte=c_time)
+                if short_order:
+                    continue
+                # 人员不在指定区域不派单
+                equip_repair_area = EquipBom.objects.filter(equip_info__equip_no=order.equip_no)
+                if order.equip_part_new:
+                    equip_repair_area = equip_repair_area.filter(part=order.equip_part_new)
+                repair_area = set(equip_repair_area.values_list('equip_area_define__area_name', flat=True))
+                if repair_area == {None}:  # 机台或者部位未设置区域
+                    continue
+                user = User.objects.filter(is_active=True, username=per['username']).last()
+                if not user.section.repair_areas:  # 人员所在部门没有设置区域
+                    continue
+                section_repair_area = set(user.section.repair_areas.split(','))
+                if not repair_area & section_repair_area:  # 人员负责区域与机台或部位不符
+                    continue
                 processing_order = EquipApplyOrder.objects.filter(~Q(result_repair_final_result='等待'), status='已开始',
                                                                   repair_user__icontains=per['username'])
             else:
