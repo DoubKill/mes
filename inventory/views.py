@@ -2571,6 +2571,9 @@ class WmsStorageSummaryView(APIView):
         """.format(inventory_where_str, extra_where_str)
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)
         temp = sc.all()
+        l_data = list(WmsNucleinManagement.objects.filter(locked_status='已锁定').values_list('batch_no', flat=True))
+        if self.request.query_params.get('l_flag'):
+            temp = list(filter(lambda x: x[7] not in l_data, temp))
         count = len(temp)
         temp = temp[st:et]
         result = []
@@ -3374,6 +3377,7 @@ class WmsNucleinManagementView(ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filter_class = WmsNucleinManagementFilter
 
+    @atomic()
     def create(self, request, *args, **kwargs):
         data = self.request.data
         if not isinstance(data, list):
