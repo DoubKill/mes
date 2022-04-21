@@ -529,7 +529,7 @@ class DingDingBind(APIView):
         if not user.check_password(password):
             raise ValidationError('密码错误，请修改后重试！')
         if not user.is_active:
-            ValidationError('该账号已被停用！')
+            raise ValidationError('该账号已被停用！')
         try:
             d = DinDinAPI()
             dd_user_data = d.auth(auth_code)
