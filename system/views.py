@@ -18,6 +18,7 @@ from rest_framework_jwt.views import ObtainJSONWebToken
 
 from basics.models import GlobalCode
 from equipment.utils import get_children_section, DinDinAPI
+from mes.common_code import zdy_jwt_payload_handler
 from mes.conf import WMS_URL, TH_URL
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
@@ -32,7 +33,7 @@ from system.serializers import GroupExtensionSerializer, GroupExtensionUpdateSer
     MaterialReceiveSerializer, UserImportSerializer, UserLoginSerializer
 
 
-jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
+# jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
 jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
 
 
@@ -498,7 +499,7 @@ class DingDingLoginView(APIView):
             raise ValidationError("该钉钉账号未绑定MES用户！")
         if not user.is_active:
             raise ValidationError('该账号已被停用！')
-        payload = jwt_payload_handler(user)
+        payload = zdy_jwt_payload_handler(user)
         token = jwt_encode_handler(payload)
         return Response({"permissions": user.permissions_list,
                          'section': user.section.name if user.section else None,
@@ -545,7 +546,7 @@ class DingDingBind(APIView):
             "unionid": dd_user_data.get('unionid'),
         }
         DingDingInfo.objects.create(**dd_data)
-        payload = jwt_payload_handler(user)
+        payload = zdy_jwt_payload_handler(user)
         token = jwt_encode_handler(payload)
         return Response({"permissions": user.permissions_list,
                          'section': user.section.name if user.section else None,
