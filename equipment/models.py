@@ -759,6 +759,8 @@ class EquipWarehouseOrderDetail(AbstractEntity):
     out_quantity = models.IntegerField(help_text='已出库数量', blank=True, default=0)
     plan_in_quantity = models.IntegerField(help_text='计划入库数量', blank=True, default=0)
     plan_out_quantity = models.IntegerField(help_text='计划出库数量', blank=True, default=0)
+    enter_time = models.DateTimeField(help_text='入库时间', null=True, blank=True)
+    outer_time = models.DateTimeField(help_text='出库时间', null=True, blank=True)
     status = models.PositiveIntegerField(choices=ORDER_STATUS, help_text='状态', default=1)
 
     class Meta:

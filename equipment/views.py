@@ -2527,11 +2527,15 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
         data = self.request.data
         in_quantity = data.get('in_quantity', 1)
         out_quantity = data.get('out_quantity', 1)
+        enter_time = data.get('enter_time', None)
+        outer_time = data.get('enter_time', None)
         status = data.get('status')  # 1 入库 2 出库
         instance = self.queryset.filter(equip_warehouse_order_id=data['equip_warehouse_order'], equip_spare_id=data['equip_spare']).first()
         query = EquipWarehouseInventory.objects.filter(equip_spare_id=data['equip_spare'], delete_flag=False,
                                                        equip_warehouse_location_id=data[
                                                            'equip_warehouse_location']).first()
+        enter_time = datetime.strptime(enter_time, '%Y-%m-%d %H:%M:%S') if enter_time else datetime.now()
+        outer_time = datetime.strptime(outer_time, '%Y-%m-%d %H:%M:%S') if outer_time else datetime.now()
         if status == 1:
             if instance.plan_in_quantity <= instance.in_quantity:
                 return Response({"success": False, "message": '该单据已入库完成', "data": None})
@@ -2540,6 +2544,7 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
             elif instance.in_quantity + in_quantity < instance.plan_in_quantity:
                 instance.status = 2  # 入库中
             instance.in_quantity += data['in_quantity']
+            instance.enter_time = enter_time
             instance.save()
 
             if query:
@@ -2585,6 +2590,7 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
                 instance.status = 5  # 出库中
             query.quantity -= out_quantity
             query.save()
+            instance.outer_time = outer_time
             instance.save()
 
             # 判断出库单据是否完成
