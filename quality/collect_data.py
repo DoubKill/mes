@@ -7,9 +7,10 @@ import json
 import os
 import sys
 import uuid
+from decimal import Decimal
 
 import django
-
+from django.db.models import Max
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
@@ -76,7 +77,7 @@ def main():
             for rid in rids:
                 # 获取当前检测任务
                 current_test_detail = ProductTestPlanDetail.objects.filter(test_plan=equip_test_plan,
-                                                                           value__isnull=True
+                                                                           status=1
                                                                            ).order_by('id').first()
                 if not current_test_detail:
                     logger.error('检测机台：{}，检测任务已全部完成'.format(sub_machine.machine_no))
@@ -140,7 +141,7 @@ def main():
 
                         # 对数据点进行判级
                         for item in data:
-                            value = item[0]
+                            value = Decimal(item[0]).quantize(Decimal('0.000'))
                             data_point_name = item[1].strip(' ')
                             if data_point_name not in test_data_points:
                                 continue
@@ -150,14 +151,18 @@ def main():
                                 material_test_method=material_test_method,
                                 data_point__name=data_point_name,
                                 data_point__test_type__test_indicator__name=indicator_name,
-                                upper_limit__gte=value,
-                                lower_limit__lte=value).first()
+                                level=1).first()
                             if indicator:
-                                mes_result = indicator.result
-                                level = indicator.level
+                                if indicator.lower_limit <= value <= indicator.upper_limit:
+                                    mes_result = '一等品'
+                                    level = 1
+                                else:
+                                    mes_result = '三等品'
+                                    level = 2
                             else:
-                                mes_result = '三等品'
-                                level = 2
+                                continue
+                                # mes_result = '三等品'
+                                # level = 2
 
                             # 创建数据点检测结果
                             MaterialTestResult.objects.create(
@@ -175,9 +180,23 @@ def main():
                                 level=level,
                                 test_class=test_class,
                                 is_judged=material_test_method.is_judged,
-                                created_user=equip_test_plan.created_user
+                                created_user=equip_test_plan.created_user,
+                                judged_upper_limit=indicator.upper_limit,
+                                judged_lower_limit=indicator.lower_limit
                             )
 
+                test_indicator_name = current_test_detail.test_plan.test_indicator_name
+                mto = MaterialTestOrder.objects.filter(lot_no=current_test_detail.lot_no,
+                                                       actual_trains=current_test_detail.actual_trains).first()
+                if mto:
+                    max_result_ids = list(mto.order_results.filter(
+                        test_indicator_name=test_indicator_name
+                    ).values('data_point_name').annotate(max_id=Max('id')).values_list('max_id', flat=True))
+                    if mto.order_results.filter(id__in=max_result_ids, level__gt=1).exists():
+                        current_test_detail.is_qualified = False
+                    else:
+                        current_test_detail.is_qualified = True
+                    current_test_detail.save()
             # 判断该机台计划是否全部检测完成
             # if equip_test_plan.product_test_plan_detail.filter(
             #         value__isnull=False).count() == equip_test_plan.product_test_plan_detail.count():
