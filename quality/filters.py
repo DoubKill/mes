@@ -3,7 +3,8 @@ import django_filters
 from quality.models import MaterialTestOrder, MaterialDataPointIndicator, \
     MaterialTestMethod, TestMethod, DataPoint, DealSuggestion, MaterialDealResult, UnqualifiedDealOrder, \
     ExamineMaterial, MaterialExamineType, MaterialExamineResult, MaterialEquip, MaterialReportEquip, \
-    MaterialReportValue, ProductReportEquip, ProductReportValue, ProductTestPlanDetail, MaterialTestPlan
+    MaterialReportValue, ProductReportEquip, ProductReportValue, ProductTestPlanDetail, MaterialTestPlan, \
+    MaterialInspectionRegistration
 
 
 class TestMethodFilter(django_filters.rest_framework.FilterSet):
@@ -163,6 +164,19 @@ class ExamineMaterialFilter(django_filters.rest_framework.FilterSet):
                   'deal_result')
 
 
+class MaterialInspectionRegistrationFilter(django_filters.rest_framework.FilterSet):
+    tracking_num = django_filters.CharFilter(field_name='tracking_num', lookup_expr='icontains')
+    material_name = django_filters.CharFilter(field_name='material_name', lookup_expr='icontains')
+    material_no = django_filters.CharFilter(field_name='material_no', lookup_expr='icontains')
+    batch = django_filters.CharFilter(field_name='batch', lookup_expr='icontains')
+    st = django_filters.DateFilter(field_name="created_date__date", help_text='开始日期', lookup_expr='gte')
+    et = django_filters.DateFilter(field_name="created_date__date", help_text='结束日期', lookup_expr='lte')
+
+    class Meta:
+        model = MaterialInspectionRegistration
+        fields = ('tracking_num', 'material_name', 'material_no', 'batch', 'quality_status', 'st', 'et')
+
+
 class MaterialReportEquipFilter(django_filters.rest_framework.FilterSet):
     no = django_filters.CharFilter(field_name='no', lookup_expr='icontains')
     type = django_filters.CharFilter(field_name='type__id', lookup_expr='icontains')
@@ -203,6 +217,7 @@ class ProductTestResumeFilter(django_filters.rest_framework.FilterSet):
     test_equip = django_filters.CharFilter(field_name='test_plan__test_equip__no', help_text='检测机台')
     plan_uid = django_filters.CharFilter(field_name='test_plan__plan_uid', lookup_expr='icontains', help_text='检测计划编码')
     status = django_filters.CharFilter(field_name='status', help_text='检测状态')
+    lot_no = django_filters.CharFilter(field_name='lot_no', help_text='收皮条码')
 
     class Meta:
         model = ProductTestPlanDetail

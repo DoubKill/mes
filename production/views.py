@@ -2261,13 +2261,26 @@ class DailyProductionCompletionReport(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class Equip190EViewSet(ModelViewSet):
-    queryset = Equip190E.objects.order_by('id')
+    queryset = Equip190E.objects.filter(delete_flag=False).order_by('id')
     serializer_class = Equip190ESerializer
     filter_backends = (DjangoFilterBackend,)
     filter_class = Equip190EFilter
     pagination_class = None
+    FILE_NAME = '190E机台规格信息'
+    EXPORT_FIELDS_DICT = {
+        "规格": "specification",
+        "段次": "state",
+        "重量(kg)": "weight",
+    }
+
+    def get_queryset(self):
+        """获取specification, state字段相同时，id最大的那一条"""
+        ids = self.queryset.values('specification', 'state').annotate(id=Max('id')).values_list('id', flat=True)
+        return self.queryset.filter(id__in=ids).order_by('id')
 
     def list(self, request, *args, **kwargs):
+        if self.request.query_params.get('export'):
+            return gen_template_response(self.EXPORT_FIELDS_DICT, [], self.FILE_NAME)
         if self.request.query_params.get('search'):
             return Response({'results': list(set(self.queryset.values_list('specification', flat=True)))})
         if self.request.query_params.get('detail'):
@@ -2303,17 +2316,23 @@ class Equip190EViewSet(ModelViewSet):
             })
 
         s = Equip190ESerializer(data=parts_list, many=True, context={'request': request})
-        if s.is_valid(raise_exception=False):
-            if len(s.validated_data) < 1:
-                raise ValidationError('没有可导入的数据')
-            data = s.validated_data
-            for item in data:
-                Equip190E.objects.update_or_create(defaults=item,
-                                                   specification=item['specification'],
-                                                   state=item['state'])
-        else:
-            raise ValidationError('导入的数据类型有误')
+        s.is_valid(raise_exception=True)
+        if len(s.validated_data) < 1:
+            raise ValidationError('没有可导入的数据')
+        data = s.validated_data
+        for item in data:
+            Equip190E.objects.filter(delete_flag=False).update_or_create(defaults=item,
+                                               specification=item['specification'],
+                                               state=item['state'],
+                                               weight=item['weight']
+                                               )
         return Response(f'成功导入{len(s.validated_data)}条数据')
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.delete_flag = True
+        instance.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -4165,7 +4184,7 @@ class MaterialExpendSummaryView(APIView):
         if material_name:
             queryset = queryset.filter(material_name=material_name)
         data = queryset.values('equip_no', 'product_no', 'material_no', 'material_name', 'product_time__date').annotate(actual_weight=Sum('actual_weight')/100).order_by('product_no', 'equip_no', 'material_name')
-        material_type_dict = dict(Material.objects.values_list('material_no', 'material_type__global_name'))
+        material_type_dict = dict(Material.objects.values_list('material_name', 'material_type__global_name'))
         days = date_range(s_time, e_time)
         ret = {}
         for item in data:
@@ -4174,7 +4193,7 @@ class MaterialExpendSummaryView(APIView):
             product_no = item['product_no']
             key = '{}-{}-{}'.format(equip_no, material_name, product_no)
             weight = item['actual_weight']
-            material_type = material_type_dict.get(item['material_no'], 'UN_KNOW')
+            material_type = material_type_dict.get(item['material_name'], 'UN_KNOW')
             factory_date = item['product_time__date'].strftime("%Y-%m-%d")
             if key not in ret:
                 ret[key] = {

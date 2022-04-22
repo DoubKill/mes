@@ -555,7 +555,9 @@ class OuterMaterial(models.Model):
 class Equip190E(models.Model):
     specification = models.CharField(max_length=12, help_text='规格')
     state = models.CharField(max_length=12, help_text='段次')
-    weight = models.DecimalField(max_digits=8, decimal_places=2, help_text='kg')
+    weight = models.DecimalField(max_digits=10, decimal_places=3, help_text='kg')
+    date = models.DateField(auto_now_add=True, help_text='规格适用时间', null=True, blank=True)
+    delete_flag = models.BooleanField(help_text='是否删除', verbose_name='是否删除', default=False)
 
     class Meta:
         db_table = 'equip_190e'
