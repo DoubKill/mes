@@ -217,6 +217,7 @@ class ProductTestResumeFilter(django_filters.rest_framework.FilterSet):
     test_equip = django_filters.CharFilter(field_name='test_plan__test_equip__no', help_text='检测机台')
     plan_uid = django_filters.CharFilter(field_name='test_plan__plan_uid', lookup_expr='icontains', help_text='检测计划编码')
     status = django_filters.CharFilter(field_name='status', help_text='检测状态')
+    lot_no = django_filters.CharFilter(field_name='lot_no', help_text='收皮条码')
 
     class Meta:
         model = ProductTestPlanDetail

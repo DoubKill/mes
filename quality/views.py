@@ -53,7 +53,8 @@ from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod
     DataPointStandardError, MaterialSingleTypeExamineResult, MaterialEquipType, MaterialEquip, \
     QualifiedRangeDisplay, IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, \
     ProductReportEquip, ProductReportValue, ProductTestPlan, ProductTestPlanDetail, RubberMaxStretchTestResult, \
-    LabelPrintLog, MaterialTestPlan, MaterialTestPlanDetail, MaterialInspectionRegistration
+    LabelPrintLog, MaterialTestPlan, MaterialTestPlanDetail, MaterialDataPointIndicatorHistory, \
+    MaterialInspectionRegistration
 
 from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestOrderSerializer, MaterialTestOrderListSerializer, \
@@ -72,7 +73,7 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     UnqualifiedPalletFeedBackSerializer, LabelPrintLogSerializer, ProductTestPlanDetailSerializer, \
     ProductTestPlanDetailBulkCreateSerializer, MaterialTestPlanSerializer, MaterialTestPlanCreateSerializer, \
     MaterialTestPlanDetailSerializer, MaterialSingleTypeExamineResultSerializer, \
-    MaterialInspectionRegistrationSerializer
+    MaterialInspectionRegistrationSerializer, MaterialDataPointIndicatorHistorySerializer
 
 from django.db.models import Prefetch
 from django.db.models import Q
@@ -307,6 +308,16 @@ class MaterialDataPointIndicatorViewSet(ModelViewSet):
     permission_classes = (IsAuthenticated,)
     filter_class = MaterialDataPointIndicatorFilter
     pagination_class = None
+
+
+@method_decorator([api_recorder], name="dispatch")
+class MaterialDataPointIndicatorHistoryView(ListAPIView):
+    """物料数据点评判指标历史修改数据"""
+    queryset = MaterialDataPointIndicatorHistory.objects.order_by('-id')
+    serializer_class = MaterialDataPointIndicatorHistorySerializer
+    filter_backends = (DjangoFilterBackend,)
+    permission_classes = (IsAuthenticated,)
+    filter_fields = ('product_no', 'data_point_id', 'level', 'test_method_id')
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -1118,6 +1129,7 @@ class UnqualifiedDealOrderViewSet(ModelViewSet):
     queryset = UnqualifiedDealOrder.objects.all()
     filter_backends = (DjangoFilterBackend,)
     filter_class = UnqualifiedDealOrderFilter
+    permission_classes = (IsAuthenticated, )
 
     def get_queryset(self):
         queryset = UnqualifiedDealOrder.objects.order_by('-id')
@@ -1345,6 +1357,10 @@ class ImportAndExportView(APIView):
                             result_data['mes_result'] = '一等品'
                             result_data['result'] = '一等品'
                             result_data['level'] = 1
+                        result_data['judged_upper_limit'] = method['qualified_range'][1]
+                        result_data['judged_lower_limit'] = method['qualified_range'][0]
+                    else:
+                        continue
                     if created:
                         result_data['test_times'] = 1
                     else:
@@ -1988,6 +2004,44 @@ class ProductTestPlanViewSet(ModelViewSet):
         ProductTestPlanDetail.objects.filter(test_plan=instance, status=1).update(status=4)
         instance.save()
 
+    @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated], url_path='underway-plan',
+            url_name='underway-plan')
+    def underway_plan(self, request):
+        """查看机台正在检测或者上一次检测完成但是未合格的计划"""
+        test_equip = self.request.query_params.get('test_equip')
+        try:
+            test_equip = int(test_equip)
+        except Exception:
+            raise ValidationError('参数错误！')
+        current_plan = self.queryset.filter(status=1, test_equip=test_equip).first()
+        if current_plan:
+            data = self.serializer_class(instance=current_plan).data
+            return Response(data)
+        else:
+            current_plan = self.queryset.filter(test_equip=test_equip).order_by('id').last()
+            if current_plan:
+                product_test_plan_detail = list(
+                    current_plan.product_test_plan_detail.filter(is_qualified=False).order_by('id').values(
+                        'equip_no', 'product_no', 'lot_no', 'factory_date', 'production_classes',
+                        'production_group', 'actual_trains', 'is_qualified'))
+                if not product_test_plan_detail:
+                    return Response({})
+                for item in product_test_plan_detail:
+                    item['is_recheck'] = True
+                data = {'count': current_plan.count,
+                        "test_classes": current_plan.test_classes,
+                        "test_group": current_plan.test_group,
+                        "test_indicator_name": current_plan.test_indicator_name,
+                        "test_method_name": current_plan.test_method_name,
+                        "test_times": current_plan.test_times,
+                        "test_interval": current_plan.test_interval,
+                        "test_equip": current_plan.test_equip_id,
+                        "product_test_plan_detail": product_test_plan_detail
+                        }
+                return Response(data)
+            else:
+                return Response({})
+
 
 @method_decorator([api_recorder], name="dispatch")
 class ProductTestPlanDetailViewSet(ModelViewSet):
@@ -2121,7 +2175,7 @@ class ReportValueView(APIView):
 
         # 获取当前检测任务
         current_test_detail = ProductTestPlanDetail.objects.filter(test_plan=equip_test_plan,
-                                                                   value__isnull=True
+                                                                   status=1
                                                                    ).order_by('id').first()
         if not current_test_detail:
             return Response({'msg': '全部检测完成', 'success': True})
@@ -2154,8 +2208,8 @@ class ReportValueView(APIView):
                     current_test_detail.value = json.dumps(values, ensure_ascii=False)
                     current_test_detail.save()
                 else:
-                    current_test_detail.status = 3  # 检测中
-                    current_test_detail.save()
+                    # current_test_detail.status = 3  # 检测中
+                    # current_test_detail.save()
                     return Response('ok')
             # 如果是物性应检测三次
             elif equip_test_plan.test_indicator_name == '物性' and test_type == '物性':
@@ -2194,8 +2248,8 @@ class ReportValueView(APIView):
                     current_test_detail.value = json.dumps(values, ensure_ascii=False)
                     current_test_detail.save()
                 else:
-                    current_test_detail.status = 3  # 检测中
-                    current_test_detail.save()
+                    # current_test_detail.status = 3  # 检测中
+                    # current_test_detail.save()
                     return Response('ok')
         else:
             current_test_detail.value = json.dumps(data['value'])
@@ -2276,14 +2330,18 @@ class ReportValueView(APIView):
                         material_test_method=material_test_method,
                         data_point__name=data_point_name,
                         data_point__test_type__test_indicator__name=indicator_name,
-                        upper_limit__gte=test_value,
-                        lower_limit__lte=test_value).first()
+                        level=1).first()
                     if indicator:
-                        mes_result = indicator.result
-                        level = indicator.level
+                        if indicator.lower_limit <= test_value <= indicator.upper_limit:
+                            mes_result = '一等品'
+                            level = 1
+                        else:
+                            mes_result = '三等品'
+                            level = 2
                     else:
-                        mes_result = '三等品'
-                        level = 2
+                        # mes_result = '三等品'
+                        # level = 2
+                        continue
 
                     MaterialTestResult.objects.create(
                         material_test_order=test_order,
@@ -2300,9 +2358,23 @@ class ReportValueView(APIView):
                         level=level,
                         test_class=production_class,
                         is_judged=material_test_method.is_judged,
-                        created_user=equip_test_plan.created_user
+                        created_user=equip_test_plan.created_user,
+                        judged_upper_limit=indicator.upper_limit,
+                        judged_lower_limit=indicator.lower_limit
                     )
 
+        test_indicator_name = current_test_detail.test_plan.test_indicator_name
+        mto = MaterialTestOrder.objects.filter(lot_no=current_test_detail.lot_no,
+                                               actual_trains=current_test_detail.actual_trains).first()
+        if mto:
+            max_result_ids = list(mto.order_results.filter(
+                test_indicator_name=test_indicator_name
+            ).values('data_point_name').annotate(max_id=Max('id')).values_list('max_id', flat=True))
+            if mto.order_results.filter(id__in=max_result_ids, level__gt=1).exists():
+                current_test_detail.is_qualified = False
+            else:
+                current_test_detail.is_qualified = True
+            current_test_detail.save()
         return Response({'msg': '检测完成', 'success': True})
 
 
