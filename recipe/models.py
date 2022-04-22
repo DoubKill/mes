@@ -2,7 +2,6 @@ from django.db import models
 from django.db.models import Sum, F, Q
 
 from basics.models import GlobalCode, Equip, EquipCategoryAttribute
-from mes import settings
 from system.models import AbstractEntity, User
 
 
@@ -143,6 +142,8 @@ class ProductBatching(AbstractEntity):
     equip = models.ForeignKey(Equip, help_text='设备', blank=True, null=True, on_delete=models.CASCADE)
     batching_type = models.PositiveIntegerField(verbose_name='配料类型', help_text='配料类型',
                                                 choices=BATCHING_TYPE_CHOICE, default=2)
+    is_synced = models.BooleanField(default=False, help_text='是否已同步至MES')
+    is_changed = models.BooleanField(default=False, help_text='较上次同步是否做过修改')
 
     def __str__(self):
         return self.stage_product_batch_no
@@ -429,4 +430,20 @@ class ProductBatchingMixed(models.Model):
     class Meta:
         db_table = 'product_batching_mixed'
         verbose_name_plural = verbose_name = '对搭设置表'
+
+
+class MultiReplaceMaterial(AbstractEntity):
+    """批量替换原材料履历表"""
+    product_batching = models.ForeignKey(ProductBatching, help_text='配方记录', on_delete=models.CASCADE)
+    equip_no = models.CharField(max_length=64, help_text='机台', null=True, blank=True)
+    origin_material = models.CharField(max_length=64, help_text='被替换原材料名称')
+    replace_material = models.CharField(max_length=64, help_text='替换原材料名称')
+    failed_reason = models.CharField(max_length=128, help_text='替换失败原因', null=True, blank=True)
+    status = models.CharField(max_length=4, help_text='替换结果: 成功或者失败', default='失败')
+    times = models.IntegerField(help_text='执行替换的次数')
+
+    class Meta:
+        db_table = 'multi_replace_material'
+        verbose_name_plural = verbose_name = '批量替换原材料履历表'
+
 

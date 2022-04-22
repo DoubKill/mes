@@ -1,7 +1,6 @@
 import logging
 import uuid
 from datetime import datetime
-from email.policy import default
 
 from django.db.models import Q
 from django.db.transaction import atomic
@@ -13,7 +12,7 @@ from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from recipe.models import Material, ProductInfo, ProductBatching, ProductBatchingDetail, \
     MaterialAttribute, MaterialSupplier, WeighBatchingDetail, WeighCntType, ZCMaterial, ERPMESMaterialRelation, \
-    ProductBatchingEquip, ProductBatchingMixed
+    ProductBatchingEquip, ProductBatchingMixed, MultiReplaceMaterial
 
 sync_logger = logging.getLogger('sync_log')
 
@@ -935,3 +934,12 @@ class ERPMaterialUpdateSerializer(BaseModelSerializer):
         fields = '__all__'
         extra_kwargs = {'material_no': {'read_only': True}}
         read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class ReplaceRecipeMaterialSerializer(serializers.ModelSerializer):
+    product_no = serializers.ReadOnlyField(source='product_batching.stage_product_batch_no')
+    dev_type = serializers.ReadOnlyField(source='product_batching.dev_type.category_name')
+
+    class Meta:
+        model = MultiReplaceMaterial
+        fields = '__all__'

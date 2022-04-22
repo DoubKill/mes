@@ -2,7 +2,7 @@ import base64
 import datetime
 import hashlib
 import hmac
-import json
+import logging
 import os
 import time
 import urllib
@@ -14,11 +14,14 @@ import django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()
 
+from mes import settings
 from django.db.models import Sum, Count
 
 from plan.models import ProductClassesPlan
 from production.models import TrainsFeedbacks
-from basics.models import Equip
+from basics.models import Equip, PlanSchedule
+
+logger = logging.getLogger('send_log')
 
 
 def product_day_message():
@@ -154,6 +157,30 @@ def send_ding_msg(data=None, isAtAll=True, atMobiles=None,
     return r
 
 
+def check_classes():
+    limit_date = datetime.datetime.now().date() - datetime.timedelta(days=7)
+    already_classes = PlanSchedule.objects.filter(delete_flag=False, day_time__gte=limit_date)
+    if not already_classes:  # 提醒排班
+        message = {
+            "msgtype": "markdown",
+            "markdown": {
+                "title": "每日mes排班检查",
+                "text": "最新排班日期距今天已不足7日, 请尽快登录mes系统处理"
+            },
+            "at": {
+                "atMobiles": [],
+                "isAtAll": True
+            }
+        }
+        if settings.DEBUG:
+            send_ding_msg(data=message, url='https://oapi.dingtalk.com/robot/send?access_token=3daeb8d9276b40e29fdba4b6578e39af6c860a7be0f8c75d55040a0bad57aad4', secret='SEC6ac31d2d123d02e32b221f49605f96b8ebeb2e9c5d4776b86c3d49c211fdd6a2')
+        else:
+            send_ding_msg(data=message)
+        logger.info('发送排班提醒成功')
+    else:
+        logger.info('排班周期充足')
+
+
 if __name__ == '__main__':
     # 产量通知
     message = product_day_message()
@@ -162,3 +189,7 @@ if __name__ == '__main__':
     # 设备故障统计通知
     equip_message = equip_errors()
     send_ding_msg(data=equip_message)
+
+    # 检查排班
+    check_classes()
+

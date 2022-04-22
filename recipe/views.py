@@ -1,7 +1,8 @@
 # Create your views here.
 import datetime
+import re
 
-from django.db.models import Prefetch, Q
+from django.db.models import Prefetch, Q, Max
 from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
@@ -15,6 +16,7 @@ from rest_framework.viewsets import ModelViewSet, GenericViewSet, ReadOnlyModelV
 
 from basics.models import GlobalCode, EquipCategoryAttribute
 from basics.views import CommonDeleteMixin
+from equipment.utils import gen_template_response
 from mes import settings
 from mes.derorators import api_recorder
 from mes.sync import ProductBatchingSyncInterface
@@ -27,10 +29,11 @@ from recipe.serializers import MaterialSerializer, ProductInfoSerializer, \
     ProductBatchingRetrieveSerializer, ProductBatchingUpdateSerializer, \
     ProductBatchingPartialUpdateSerializer, MaterialSupplierSerializer, \
     ProductBatchingDetailMaterialSerializer, WeighCntTypeSerializer, ERPMaterialCreateSerializer, ERPMaterialSerializer, \
-    ERPMaterialUpdateSerializer, ZCMaterialSerializer, ProductBatchingDetailRetrieveSerializer
+    ERPMaterialUpdateSerializer, ZCMaterialSerializer, ProductBatchingDetailRetrieveSerializer, \
+    ReplaceRecipeMaterialSerializer
 from recipe.models import Material, ProductInfo, ProductBatching, MaterialAttribute, \
     ProductBatchingDetail, MaterialSupplier, WeighCntType, WeighBatchingDetail, ZCMaterial, ERPMESMaterialRelation, \
-    ProductBatchingEquip, ProductBatchingMixed
+    ProductBatchingEquip, ProductBatchingMixed, MultiReplaceMaterial
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -229,11 +232,18 @@ class ProductBatchingViewSet(ModelViewSet):
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = ProductBatchingFilter
+    EXPORT_FIELDS_DICT = {
+        '序号': 'id',
+        '配方名称': 'stage_product_batch_no'
+    }
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         exclude_used_type = self.request.query_params.get('exclude_used_type')
         filter_type = self.request.query_params.get('filter_type')  # 1 表示部分发送(蓝色) 2 表示未设置可用机台
+        recipe_type = self.request.query_params.get('recipe_type')  # 配方类别(车胎胶料、斜交胎胶料...)
+        wms_material_name = self.request.query_params.get('wms_material_name')  # 原材料名称过滤
+        export = self.request.query_params.get('export')  # 导出涉及上述原材料的配方名称
         if exclude_used_type:
             queryset = queryset.exclude(used_type=exclude_used_type)
         if self.request.query_params.get('all'):
@@ -259,6 +269,25 @@ class ProductBatchingViewSet(ModelViewSet):
                     queryset = queryset.filter(id__in=res_id)
                 elif filter_type == '2':
                     queryset = queryset.exclude(id__in=list(recipe_ids))
+            if recipe_type:
+                stage_prefix = re.split(r'[,|，]', recipe_type)
+                filter_str = ''
+                for i in stage_prefix:
+                    filter_str += ('' if not filter_str else '|') + f"Q(product_info__product_name__startswith='{i.strip()}')"
+                queryset = queryset.filter(eval(filter_str))
+                if 'C' in stage_prefix or 'TC' in stage_prefix:  # 车胎类别(C)与半钢类别(CJ)需要区分
+                    queryset = queryset.filter(~Q(product_info__product_name__startswith='CJ'), ~Q(product_info__product_name__startswith='TCJ'))
+                if 'U' in stage_prefix or 'TU' in stage_prefix:  # 车胎类别(UC)与斜胶类别(U)需要区分
+                    queryset = queryset.filter(~Q(product_info__product_name__startswith='UC'), ~Q(product_info__product_name__startswith='TUC'))
+            if wms_material_name:
+                queryset = queryset.filter(Q(batching_details__material__material_name=wms_material_name) |
+                                           Q(weight_cnt_types__delete_flag=False,
+                                             weight_cnt_types__weight_details__material__material_name=wms_material_name)).distinct()
+                if export:
+                    now_date = datetime.datetime.now().strftime('%Y-%m-%d')
+                    file_name = f"原材料({wms_material_name})使用配方列表{now_date}.xls"
+                    data = self.get_serializer(queryset.order_by('id'), many=True).data
+                    return gen_template_response(self.EXPORT_FIELDS_DICT, data, file_name)
             page = self.paginate_queryset(queryset)
             if page is not None:
                 serializer = self.get_serializer(page, many=True)
@@ -292,6 +321,170 @@ class ProductBatchingViewSet(ModelViewSet):
         instance.save()
         instance.batching_details.filter().update(delete_flag=True, delete_user=request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ReplaceRecipeMaterialViewSet(ModelViewSet):
+    queryset = MultiReplaceMaterial.objects.all().order_by('-times', '-id')
+    serializer_class = ReplaceRecipeMaterialSerializer
+    permission_classes = (IsAuthenticated,)
+
+    def get_queryset(self):
+        origin_material = self.request.query_params.get('origin_material')
+        replace_material = self.request.query_params.get('replace_material')
+        status = self.request.query_params.get('status')
+        filter_kwargs = {}
+        if origin_material:
+            filter_kwargs['origin_material'] = origin_material
+        if origin_material:
+            filter_kwargs['replace_material'] = replace_material
+        if status:
+            filter_kwargs['status'] = status
+        queryset = self.queryset.filter(**filter_kwargs)
+        return queryset
+
+    def list(self, request, *args, **kwargs):
+        replace_ids_str = self.request.query_params.get('replace_ids')
+        replace_ids = re.split(r'[,|，]', replace_ids_str)
+        max_times = self.queryset.aggregate(max_times=Max('times'))['max_times']
+        times = 1 if not max_times else max_times
+        queryset = self.get_queryset().filter(product_batching_id__in=replace_ids, times=times)
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    def create(self, request, *args, **kwargs):
+        origin_material = self.request.data.get('origin_material')
+        replace_material = self.request.data.get('replace_material')
+        replace_ids_str = self.request.data.get('replace_ids')
+        if not all([origin_material, replace_material, replace_ids_str]):
+            raise ValidationError('检查参数是否完整')
+        replace_ids = re.split(r'[,|，]', replace_ids_str)
+        # 校验原材料信息
+        wms_instance = Material.objects.filter(delete_flag=False, use_flag=True, material_name=origin_material).last()
+        replace_instance = Material.objects.filter(delete_flag=False, use_flag=True, material_name=replace_material).last()
+        if not all([wms_instance, replace_instance]):
+            raise ValidationError('请检查所选择物料在mes的状态')
+        # 获取群控原材料信息
+        sfj_origin_instance = Material.objects.using('SFJ').filter(delete_flag=False, use_flag=True,
+                                                                   material_name=origin_material).last()
+        sfj_replace_instance = Material.objects.using('SFJ').filter(delete_flag=False, use_flag=True,
+                                                                    material_name=replace_material).last()
+        if not all([sfj_origin_instance, sfj_replace_instance]):
+            raise ValidationError('请检查所选择物料在群控中的状态')
+        max_times = MultiReplaceMaterial.objects.all().aggregate(max_times=Max('times'))['max_times']
+        times = 1 if not max_times else max_times + 1
+        for i in replace_ids:
+            recipe = ProductBatching.objects.filter(id=i).last()
+            created_data = {'origin_material': origin_material, 'replace_material': replace_material,
+                            'created_user': self.request.user, 'created_date': datetime.datetime.now(),
+                            'product_batching': recipe, 'times': times}
+            # 查询群控配方
+            sfj_recipe = ProductBatching.objects.using('SFJ').filter(
+                stage_product_batch_no=recipe.stage_product_batch_no,
+                dev_type__category_name=recipe.dev_type.category_name,
+                batching_type=1)
+            if not sfj_recipe:
+                created_data.update({'failed_reason': '未找到群控配方'})
+                MultiReplaceMaterial.objects.create(**created_data)
+                continue
+            # 查看配方是否都在密炼
+            processing_recipe = ProductClassesPlan.objects.using('SFJ').filter(
+                product_batching__in=list(sfj_recipe), status__in=['等待', '运行中'])
+            if processing_recipe:
+                created_data.update({'failed_reason': '存在机台正在密炼的群控配方'})
+                MultiReplaceMaterial.objects.create(**created_data)
+                continue
+            with atomic():
+                # 替换mes
+                update_data = {}
+                batching_detail = recipe.batching_details.filter(delete_flag=False, material=wms_instance)
+                xl_info = recipe.weight_cnt_types.filter(delete_flag=False)
+                xl_detail = xl_info.last().weight_details.filter(delete_flag=False, material=wms_instance) if xl_info else None
+                if batching_detail:
+                    update_data.update({'handle_material_name': replace_material, 'material': replace_instance,
+                                        'batching_detail_equip_id': batching_detail.last().id})
+                    batching_detail.update(**{'material': replace_instance})
+                elif xl_detail:
+                    update_data.update(
+                        {'handle_material_name': replace_material.rstrip('-C|-X'), 'material': replace_instance,
+                         'cnt_type_detail_equip_id': xl_detail.last().id})
+                    xl_detail.update(**{'material': replace_instance})
+                else:
+                    created_data.update({'failed_reason': '配方中未找到该原材料'})
+                    MultiReplaceMaterial.objects.create(**created_data)
+                    continue
+                ProductBatchingEquip.objects.filter(product_batching=recipe, material=wms_instance).update(
+                    **update_data)
+
+            with atomic(using='SFJ'):
+                # 替换群控
+                sfj_detail = ProductBatchingDetail.objects.using('SFJ').filter(delete_flag=False,
+                                                                               product_batching__in=list(sfj_recipe),
+                                                                               material=sfj_origin_instance)
+                equip_no_list = set(sfj_detail.values_list('product_batching__equip__equip_no', flat=True))
+                sfj_detail.update(**{'material': sfj_replace_instance})
+            for equip_no in equip_no_list:
+                created_data.update({'status': '成功', 'equip_no': equip_no})
+                MultiReplaceMaterial.objects.create(**created_data)
+        return Response({'results': "替换操作执行完成"})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductBatchingNoNew(APIView):
+    permission_class = (IsAuthenticated,)
+
+    @atomic
+    def post(self, request):
+        opera_type = self.request.data.get('opera_type')
+        product_batching_id = self.request.data.get('product_batching_id')
+        if opera_type == 1:  # 删除可用机台
+            equip_nos = set(self.request.data.get('equip_no_list'))
+            if not equip_nos:
+                raise ValidationError('未选择要删除的可用机台')
+            # 查询可用机台
+            recipe_info = ProductBatchingEquip.objects.filter(product_batching_id=product_batching_id)
+            enable_equips = set(recipe_info.values_list('equip_no', flat=True))
+            if not enable_equips:
+                raise ValidationError('配方未设置可用机台')
+            if equip_nos - enable_equips or equip_nos == enable_equips:
+                raise ValidationError('检查配方可用机台和删除机台列表的设置')
+            # 删除可用机台
+            recipe_info.filter(equip_no__in=equip_nos).delete()
+        elif opera_type == 2:  # 胶料单配设定变更
+            single_manual = self.request.data.get('single_manual')
+            recipe_info = ProductBatchingEquip.objects.filter(product_batching_id=product_batching_id)
+            if not recipe_info:
+                raise ValidationError('未设置配方可用机台, 不可修改胶料单配设置')
+            for i in single_manual:
+                nid, is_manual = i.get('id', 0), i.get('is_manual', False)
+                recipe_info.filter(batching_detail_equip_id=nid).update(**{'is_manual': is_manual})
+        else:  # 对搭比例设置
+            mixed_ratio = self.request.data.get('mixed_ratio')
+            feeds, ratios = mixed_ratio['stage'], mixed_ratio['ratio']
+            instance = ProductBatching.objects.filter(id=product_batching_id).last()
+            f_s = instance.batching_details.filter(Q(material__material_name__icontains=feeds['f_feed']) | Q(
+                material__material_name__icontains=feeds['s_feed'])).last()
+            if not f_s:
+                raise ValidationError('对搭设置的段次信息在配方中不存在')
+            f_weight, s_weight = round(float(f_s.actual_weight) * (ratios['f_ratio'] / sum(ratios.values())), 3), \
+                                 round(float(f_s.actual_weight) * (ratios['s_ratio'] / sum(ratios.values())), 3)
+            # 查询对搭设置
+            mixed = ProductBatchingMixed.objects.filter(product_batching_id=product_batching_id)
+            use_data = {'f_feed': feeds['f_feed'], 's_feed': feeds['s_feed'], 's_weight': s_weight,
+                        'f_feed_name': instance.stage_product_batch_no.replace(instance.stage.global_name, feeds['f_feed']),
+                        's_feed_name': instance.stage_product_batch_no.replace(instance.stage.global_name, feeds['s_feed']),
+                        'f_ratio': ratios['f_ratio'], 's_ratio': ratios['s_ratio'], 'f_weight': f_weight}
+            if not mixed:  # 不存在新增
+                use_data.update({'product_batching': instance})
+                ProductBatchingMixed.objects.create(**use_data)
+            else:  # 存在则更新
+                ProductBatchingMixed.objects.update(**use_data)
+        return Response('操作成功')
 
 
 @method_decorator([api_recorder], name="dispatch")

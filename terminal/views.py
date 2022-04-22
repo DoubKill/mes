@@ -226,6 +226,19 @@ class BatchProductBatchingVIew(APIView):
                                 xl_bra.append(i['bra_code'])
                             else:
                                 continue
+                        # 增加原材料小料显示
+                        wms_material_list = []
+                        wms_xl_material = OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, status=1,
+                                                                          other_type='原材料小料').values('id', 'bra_code', 'material_name')
+                        for j in wms_xl_material:
+                            if j['material_name'] not in wms_xl_material:
+                                wms_data = {'bra_code': j['bra_code'], 'init_weight': Decimal(9999), 'unit': '包',
+                                            'used_weight': Decimal(0), 'single_need': Decimal(1), 'msg': '',
+                                            'scan_material': j['material_name'], 'id': j['id'],
+                                            'adjust_left_weight': Decimal(9999), 'scan_material_type': '人工配'
+                                            }
+                                wms_material_list.append(j['material_name'])
+                                detail.append(wms_data)
                         single_material.update({'detail': detail})
                     res.append(single_material)
                     continue
@@ -281,10 +294,10 @@ class BatchProductBatchingVIew(APIView):
                                                                              material__material_name__in=['细料', '硫磺']).last()
                 if other_xl:  # 防止配方中没有料包但是扫了通用料包条码
                     res.append({
-                        "material__material_name": f"通用料包({other_xl.material.material_name})", "actual_weight": 1, "standard_error": 1, "msg": "",
+                        "material__material_name": other_xl.material.material_name, "actual_weight": 1, "standard_error": 1, "msg": "",
                         "detail": [{
                             "bra_code": common_scan.bra_code, "init_weight": Decimal(9999), "used_weight": Decimal(0),
-                            "single_need": Decimal(1), "scan_material": f"通用料包({other_xl.material.material_name})",
+                            "single_need": Decimal(1), "scan_material": other_xl.material.material_name,
                             "unit": "包", "msg": "", "id": 0, "scan_material_type": "机配",
                             "adjust_left_weight": Decimal(9999)
                         }]
@@ -938,7 +951,7 @@ class WeightPackageManualViewSet(ModelViewSet):
             last_instance = self.get_queryset().filter(product_no=product_no).first()
             if last_instance:
                 res.update({'batching_equip': last_instance.batching_equip, 'split_num': last_instance.split_num,
-                            'package_count': last_instance.package_count, 'print_count': last_instance.print_count})
+                            'package_count': last_instance.package_count, 'print_count': 1})
             return Response(res)
         page = self.paginate_queryset(self.get_queryset())
         if page is not None:
@@ -1023,7 +1036,7 @@ class WeightPackageSingleViewSet(ModelViewSet):
                 if not recipe_manual:
                     return Response(res)
                 res.update({'package_count': last_instance.package_count, 'split_num': last_instance.split_num,
-                            'expire_day': last_instance.expire_day, 'print_count': last_instance.print_count})
+                            'expire_day': last_instance.expire_day, 'print_count': 1})
             else:  # 通用历史数据
                 last_instance = self.get_queryset().filter(batching_type='通用', material_name=material_name).first()
                 if not last_instance:

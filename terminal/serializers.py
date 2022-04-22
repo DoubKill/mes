@@ -100,7 +100,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         for i in material_name_weight:
             if i['material__material_name'] in ['硫磺', '细料']:
                 if not cnt_type_details:
-                    raise serializers.ValidationError('mes未找到料包配料明细')
+                    raise serializers.ValidationError('未找到MES配方')
                 detail_infos[i['material__material_name']] = sum([i['actual_weight'] for i in cnt_type_details])
             else:
                 detail_infos[i['material__material_name']] = i['actual_weight']
@@ -358,12 +358,17 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                         if weight_package.dev_type != classes_plan.equip.category.category_name:
                             raise serializers.ValidationError('投料与生产机型不一致, 无法投料')
                         if product_no_dev != classes_plan.product_batching.stage_product_batch_no:
-                            res = self.material_pass(plan_classes_uid, scan_material, material_type=scan_material_type)
-                            if not res[0]:
-                                scan_material_msg = '配方名不一致, 请工艺确认'
-                                if not ReplaceMaterial.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code, reason_type='物料名不一致'):
-                                    ReplaceMaterial.objects.create(**replace_material_data)
-                                flag, send_flag = False, False
+                            # 试验配方会使用正常配方料包 ex: C-1MB-C590-07(正常) K-1MB-TC590-45(试验[版本可能不同])
+                            if product_no_dev.count('-') >= 2:
+                                stage, site = product_no_dev.split('-')[1:3]
+                                test_name_prefix = f'K-{stage}-T{site}'
+                                if not classes_plan.product_batching.stage_product_batch_no.startswith(test_name_prefix):
+                                    res = self.material_pass(plan_classes_uid, scan_material, material_type=scan_material_type)
+                                    if not res[0]:
+                                        scan_material_msg = '配方名不一致, 请工艺确认'
+                                        if not ReplaceMaterial.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code, reason_type='物料名不一致'):
+                                            ReplaceMaterial.objects.create(**replace_material_data)
+                                        flag, send_flag = False, False
                         if flag and weight_package.expire_days != 0 and now_date - weight_package.batch_time > timedelta(days=weight_package.expire_days):
                             res = self.material_pass(plan_classes_uid, scan_material, reason_type='超过有效期', material_type=scan_material_type)
                             if not res[0]:
@@ -439,12 +444,17 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                         if manual.dev_type != classes_plan.equip.category.category_name:
                             raise serializers.ValidationError('投料与生产机型不一致, 无法投料')
                         if product_no_dev != classes_plan.product_batching.stage_product_batch_no:
-                            res = self.material_pass(plan_classes_uid, scan_material, material_type=scan_material_type)
-                            if not res[0]:
-                                scan_material_msg = '配方名不一致, 请工艺确认'
-                                if not ReplaceMaterial.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code):
-                                    ReplaceMaterial.objects.create(**replace_material_data)
-                                flag, send_flag = False, False
+                            # 试验配方会使用正常配方料包 ex: C-1MB-C590-07(正常) K-1MB-TC590-45(试验[版本可能不同])
+                            if product_no_dev.count('-') >= 2:
+                                stage, site = product_no_dev.split('-')[1:3]
+                                test_name_prefix = f'K-{stage}-T{site}'
+                                if not classes_plan.product_batching.stage_product_batch_no.startswith(test_name_prefix):
+                                    res = self.material_pass(plan_classes_uid, scan_material, material_type=scan_material_type)
+                                    if not res[0]:
+                                        scan_material_msg = '配方名不一致, 请工艺确认'
+                                        if not ReplaceMaterial.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code):
+                                            ReplaceMaterial.objects.create(**replace_material_data)
+                                        flag, send_flag = False, False
                         if flag and manual.expire_day != 0 and now_date > manual.expire_datetime:
                             res = self.material_pass(plan_classes_uid, scan_material, reason_type='超过有效期', material_type=scan_material_type)
                             if not res[0]:
@@ -489,7 +499,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 elif bra_code.startswith('MC'):
                     single_material_weight = 1 if single.batching_type == '通用' else single.split_num
                     instance = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, material_name=material_name).last()
-                    if instance and single_material_weight != instance.single_need:
+                    if instance and instance.unit == '包' and single_material_weight != instance.single_need:
                         raise serializers.ValidationError('投入物料分包数与之前不一致')
                 else:
                     single_material_weight = detail_infos[material_name]
@@ -574,24 +584,53 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             else:
                 n_scan_material_type = attrs['tank_data'].get('scan_material_type')
                 check_flag = True
-                # 胶块4分钟内不超过3框, 胶皮6分钟内不超过4架
-                limit_data = {"胶块": [4, 3], "胶皮": [6, 4]}
+                # 胶块6分钟内不超过4框, 胶皮4分钟内不超过4架
+                limit_data = {"胶块": [6, 4], "胶皮": [4, 4]}
                 if n_scan_material_type in ['胶块', '胶皮']:
                     limit_minutes, limit_nums = limit_data[n_scan_material_type]
                     limit_time = datetime.now() - timedelta(minutes=limit_minutes)
                     num = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, material_name=material_name, scan_time__gte=limit_time).count()
                     if num >= limit_nums:
                         check_flag = False
-                        attrs['tank_data'].update({'msg': '扫码过快: 胶皮10分钟不超过4架/胶块4分钟3框'})
+                        attrs['tank_data'].update({'msg': '扫码过快: 胶皮4分钟不超过4架/胶块6分钟4框'})
                         attrs['status'] = 2
                 if check_flag:
                     last_same_material = add_materials.first()
-                    weight = total_weight + last_same_material.real_weight
-                    attrs['tank_data'].update({'actual_weight': last_same_material.actual_weight,
-                                               'adjust_left_weight': weight, 'real_weight': weight,
-                                               'init_weight': total_weight + last_same_material.init_weight,
-                                               'single_need': single_material_weight,
-                                               'pre_material_id': last_same_material.id})
+                    # 包->重量(换算累加)  重量->包(换算累加)  包->包(直接累加)  重量->重量(直接累加)
+                    if n_scan_material_type in ['胶块', '胶皮']:
+                        if last_same_material.unit == '包' and not bra_code.startswith('MC'):
+                            last_single = WeightPackageSingle.objects.filter(bra_code=last_same_material.bra_code).last()
+                            if last_single:
+                                last_single_weight = Decimal(last_single.single_weight)
+                                weight = total_weight + last_same_material.real_weight * last_single_weight
+                                attrs['tank_data'].update(
+                                    {
+                                        'actual_weight': last_same_material.actual_weight * last_single_weight,
+                                        'adjust_left_weight': weight, 'real_weight': weight,
+                                        'init_weight': total_weight + last_same_material.init_weight * last_single_weight,
+                                        'single_need': single_material_weight,
+                                        'pre_material_id': last_same_material.id})
+                            else:
+                                weight = total_weight
+                                attrs['tank_data'].update({'actual_weight': 0, 'adjust_left_weight': weight,
+                                                           'real_weight': weight, 'init_weight': total_weight,
+                                                           'single_need': single_material_weight,
+                                                           'pre_material_id': last_same_material.id})
+                        elif last_same_material.unit != '包' and bra_code.startswith('MC'):
+                            last_single_weight = last_same_material.single_need
+                            weight = total_weight + last_same_material.real_weight // last_single_weight
+                            attrs['tank_data'].update({'actual_weight': last_same_material.actual_weight // last_single_weight,
+                                                       'adjust_left_weight': weight, 'real_weight': weight,
+                                                       'init_weight': total_weight + last_same_material.init_weight // last_single_weight,
+                                                       'single_need': single_material_weight,
+                                                       'pre_material_id': last_same_material.id})
+                        else:
+                            weight = total_weight + last_same_material.real_weight
+                            attrs['tank_data'].update({'actual_weight': last_same_material.actual_weight,
+                                                       'adjust_left_weight': weight, 'real_weight': weight,
+                                                       'init_weight': total_weight + last_same_material.init_weight,
+                                                       'single_need': single_material_weight,
+                                                       'pre_material_id': last_same_material.id})
                     attrs['status'] = 1
         return attrs
 
