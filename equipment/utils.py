@@ -124,6 +124,16 @@ class DinDinAPI(object):
         if not data.get('errcode') == 0:
             print('请求错误')
 
+    def auth(self, code):
+        """微信认证，获取用户信息"""
+        user_info_url = "https://oapi.dingtalk.com/topapi/v2/user/getuserinfo"
+        data = {"code": code}
+        user_ret = requests.post(user_info_url, params={'access_token': self.access_token}, json=data, timeout=5)
+        user_data = json.loads(user_ret.text)
+        if not user_data.get('errcode') == 0:
+            raise Exception(user_data.get('errmsg'))
+        return user_data.get('result')
+
 
 def get_children_section(init_section, include_self=True):
     """获取所有可指派的部门(默认设备科及其下)"""
