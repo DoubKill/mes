@@ -966,13 +966,18 @@ permission_data = [
     {'id': 978, 'code': 'material_expend_summary', 'name': '原材料消耗量汇总表', 'parent_id': None},
     {'id': 979, 'code': 'view_material_expend_summary', 'name': '查看', 'parent_id': 978},
 
-    {'id': 980, 'code': 'rubber_out', 'name': 'PDA胶料外发', 'parent_id': None},
-    {'id': 981, 'code': 'view_rubber_out', 'name': '查看', 'parent_id': 980},
+    {'id': 980, 'code': 'material_sjdj', 'name': '原材料总部送检条码登记', 'parent_id': None},
+    {'id': 981, 'code': 'view_material_sjdj', 'name': '查看', 'parent_id': 980},
+    {'id': 982, 'code': 'add_material_sjdj', 'name': '添加', 'parent_id': 980},
+    {'id': 983, 'code': 'delete_material_sjdj', 'name': '删除', 'parent_id': 980},
 
-    {'id': 982, 'code': 'powder_feed', 'name': 'PDA粉料罐投料', 'parent_id': None},
-    {'id': 983, 'code': 'view_powder_feed', 'name': '查看', 'parent_id': 982},
+    {'id': 987, 'code': 'rubber_out', 'name': 'PDA胶料外发', 'parent_id': None},
+    {'id': 988, 'code': 'view_rubber_out', 'name': '查看', 'parent_id': 987},
 
-    # 下一个 987 开始
+    {'id': 989, 'code': 'powder_feed', 'name': 'PDA粉料罐投料', 'parent_id': None},
+    {'id': 990, 'code': 'view_powder_feed', 'name': '查看', 'parent_id': 989},
+
+    # 下一个 991 开始
 ]
 
 

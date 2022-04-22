@@ -1817,6 +1817,13 @@ class WmsInventoryMaterialSerializer(serializers.ModelSerializer):
 
 class WmsNucleinManagementSerializer(BaseModelSerializer):
 
+    def create(self, validated_data):
+        if WmsNucleinManagement.objects.filter(
+                batch_no=validated_data['batch_no'],
+                material_no=validated_data['material_no']).exists():
+            raise serializers.ValidationError('请勿重复添加批次号为{}的物料信息'.format(validated_data['batch_no']))
+        return super().create(validated_data)
+
     def update(self, instance, validated_data):
         instance = super().update(instance, validated_data)
         if 'locked_status' in validated_data:

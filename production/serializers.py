@@ -257,7 +257,7 @@ class TrainsFeedbacksSerializer2(BaseModelSerializer):
               current_trains=obj.actual_trains)
             &
             ~Q(Q(condition='') | Q(condition__isnull=True))
-        ).order_by('-sn').first()
+        ).exclude(condition__in=('配方结束', '同时执行')).order_by('-sn').first()
         if irm_queryset:
             return irm_queryset.power
         return None

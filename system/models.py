@@ -38,6 +38,15 @@ class User(AbstractUser):
         verbose_name_plural = verbose_name = '用户'
 
 
+class DingDingInfo(models.Model):
+    user = models.OneToOneField(User, related_name='dingding', verbose_name="账户名", on_delete=models.CASCADE)
+    dd_user_id = models.CharField(verbose_name="钉钉用户唯一id", unique=True, max_length=100)
+    associated_unionid = models.CharField(verbose_name="associated_unionid", null=True, blank=True, max_length=100)
+    unionid = models.CharField(verbose_name="UNIONID", null=True, blank=True, max_length=100)
+    modify_time = models.DateTimeField(verbose_name="修改时间", auto_now=True, null=True, blank=True)
+    create_time = models.DateTimeField(verbose_name="创建时间", auto_now_add=True, null=True, blank=True)
+
+
 class AbstractEntity(models.Model):
     created_date = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
     last_updated_date = models.DateTimeField(verbose_name='修改时间', auto_now=True)
@@ -68,6 +77,7 @@ class Section(AbstractEntity):
                                        related_name='children_sections', blank=True, null=True)
     in_charge_user = models.ForeignKey(User, help_text='负责人', blank=True, null=True, on_delete=models.CASCADE,
                                        related_name='in_charge_sections')
+    repair_areas = models.CharField(max_length=128, help_text='班组负责区域', null=True, blank=True)
 
     def __str__(self):
         return self.name

@@ -84,6 +84,9 @@ router.register('material-examine-result', MaterialExamineResultViewSet)
 # 原材料管理
 router.register('examine-material', ExamineMaterialViewSet)
 
+# 原材料总部送检条码登记
+router.register('material-inspection-registration', MaterialInspectionRegistrationViewSet)
+
 # 原材料不合格管理
 # router.register('material-unqualified-process', UnqualifiedMaterialProcessModeViewSet)
 
@@ -142,5 +145,6 @@ urlpatterns = [
     path('class-test-statics/', ClassTestStaticsView.as_view()),  # 班次别不合格率统计
     path('unqialified-equip/', UnqialifiedEquipView.as_view()),  # 机台别 不合格率统计
 
-    path('label-print-logs/', LabelPrintLogView.as_view())
+    path('label-print-logs/', LabelPrintLogView.as_view()),
+    path('mat-data-point-indicators-history/', MaterialDataPointIndicatorHistoryView.as_view())
 ]

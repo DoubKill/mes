@@ -151,6 +151,24 @@ class MaterialDataPointIndicator(AbstractEntity):
         verbose_name_plural = verbose_name = '数据点评判指标'
 
 
+class MaterialDataPointIndicatorHistory(models.Model):
+    """数据点评判指标"""
+    product_no = models.CharField(max_length=64, help_text='胶料编码')
+    test_method = models.ForeignKey(TestMethod, help_text='试验方法', on_delete=models.CASCADE)
+    data_point = models.ForeignKey(DataPoint, help_text='数据点', on_delete=models.CASCADE,
+                                   related_name='point_indicator_history')
+    level = models.PositiveIntegerField(help_text='等级')
+    result = models.CharField(max_length=64, help_text='结果')
+    upper_limit = models.DecimalField(help_text='上限', decimal_places=3, max_digits=8)
+    lower_limit = models.DecimalField(help_text='下限', decimal_places=3, max_digits=8)
+    created_username = models.CharField(max_length=64, help_text='修改人')
+    created_date = models.DateTimeField(verbose_name='修改时间')
+
+    class Meta:
+        db_table = 'material_data_indicator_history'
+        verbose_name_plural = verbose_name = '数据点评判指标历史修改数据'
+
+
 # 统计用中间表 BatchYear BatchMonth BatchDay Batch Lot Train Indicator TestDataPoint TestResult
 
 class BatchYear(models.Model):
@@ -229,7 +247,10 @@ class TestResult(models.Model):
 
 
 class MaterialTestOrder(AbstractEntity):
-    """物料检测单"""
+    """
+    物料检测单
+    来源：手动录入、手动导入、定时任务自动采集、程序上报
+    """
     lot_no = models.CharField(max_length=64, help_text='收皮条码')
     material_test_order_uid = models.CharField(max_length=64, help_text='唯一码', unique=True)
     actual_trains = models.PositiveIntegerField(help_text='车次')
@@ -279,10 +300,16 @@ class MaterialTestResult(AbstractEntity):
     is_passed = models.BooleanField(help_text='是否通过pass章', default=False)
     pass_suggestion = models.CharField(max_length=64, help_text='pass意见', blank=True, null=True)
     is_judged = models.BooleanField(help_text='是否做为判定', default=True)
+    judged_upper_limit = models.DecimalField(help_text='判定基准上限', decimal_places=3, max_digits=8, default=0)
+    judged_lower_limit = models.DecimalField(help_text='判定基准下限', decimal_places=3, max_digits=8, default=0)
 
     class Meta:
         db_table = 'material_test_result'
         verbose_name_plural = verbose_name = '检测结果'
+        indexes = [models.Index(fields=['data_point_name']),
+                   models.Index(fields=['test_indicator_name']),
+                   models.Index(fields=['is_judged']),
+                   models.Index(fields=['level'])]
 
 
 class DealSuggestion(AbstractEntity):
@@ -528,10 +555,12 @@ class ProductTestPlanDetail(models.Model):
     production_classes = models.CharField(max_length=64, help_text='生产班次')
     production_group = models.CharField(max_length=64, help_text='生产班组')
     actual_trains = models.PositiveIntegerField(help_text='生产车次')
-    value = models.CharField(max_length=200, help_text="检测结果值json格式,{'ML(1+4)': 12}", null=True)
-    raw_value = models.TextField(null=True, help_text='检测原数据')
+    value = models.CharField(max_length=200, help_text="检测结果值json格式,{'ML(1+4)': 12}", null=True, blank=True)
+    raw_value = models.TextField(help_text='检测原数据', null=True,  blank=True)
     test_time = models.DateTimeField(auto_now=True)
     status = models.PositiveIntegerField(help_text='状态', choices=STATUS_CHOICE, default=1)
+    is_qualified = models.NullBooleanField(help_text='检测是否合格', default=None)
+    is_recheck = models.BooleanField(help_text='是否为复检', default=False)
 
     class Meta:
         db_table = 'product_test_plan_detail'
@@ -710,6 +739,18 @@ class MaterialSingleTypeExamineResult(models.Model):
 #     class Meta:
 #         db_table = 'unqualified_material_process_mode'
 #         verbose_name_plural = verbose_name = '不合格原材料处理方式'
+
+
+class MaterialInspectionRegistration(AbstractEntity):
+    tracking_num = models.CharField(max_length=64, help_text='条码号， 总厂wms查询条件', blank=True, null=True)
+    quality_status = models.CharField(max_length=8, help_text='品质状态,待检/合格/不合格', default='待检')
+    material_name = models.CharField(max_length=200, help_text='原材料名称')
+    material_no = models.CharField(max_length=64, help_text='物料编码', blank=True, null=True)
+    batch = models.CharField(max_length=200, help_text='批次号')
+
+    class Meta:
+        db_table = 'material_inspection_registration'
+        verbose_name_plural = verbose_name = '原材料总部送检条码登记'
 
 
 class MaterialReportEquip(AbstractEntity):

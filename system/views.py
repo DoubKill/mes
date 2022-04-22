@@ -13,8 +13,12 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
+from rest_framework_jwt.settings import api_settings
 from rest_framework_jwt.views import ObtainJSONWebToken
 
+from basics.models import GlobalCode
+from equipment.utils import get_children_section, DinDinAPI
+from mes.common_code import zdy_jwt_payload_handler
 from mes.conf import WMS_URL, TH_URL
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
@@ -23,10 +27,14 @@ from production.models import PlanStatus
 from quality.utils import get_cur_sheet, get_sheet_data
 from recipe.models import Material
 from system.filters import UserFilter, GroupExtensionFilter, SectionFilter
-from system.models import GroupExtension, User, Section, Permissions
+from system.models import GroupExtension, User, Section, Permissions, DingDingInfo
 from system.serializers import GroupExtensionSerializer, GroupExtensionUpdateSerializer, UserSerializer, \
     UserUpdateSerializer, SectionSerializer, GroupUserUpdateSerializer, PlanReceiveSerializer, \
     MaterialReceiveSerializer, UserImportSerializer, UserLoginSerializer
+
+
+# jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
+jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -221,7 +229,7 @@ class SectionViewSet(ModelViewSet):
                                                'section_id': section.section_id,
                                                'in_charge_user_id': section.in_charge_user_id,
                                                'in_charge_username': in_charge_username,
-                                               "label": section.name,
+                                               "label": section.name, 'repair_areas': section.repair_areas,
                                                'children': []})
 
             if not section.parent_section_id:  # 根节点
@@ -240,7 +248,7 @@ class SectionViewSet(ModelViewSet):
                      'in_charge_user_id': section.in_charge_user_id,
                      'in_charge_username': in_charge_username,
                      "label": section.parent_section.name,
-                     "children": []})
+                     "children": [], 'repair_areas': section.repair_areas})
                 index_tree[section.parent_section_id]["children"].append(index_tree[section.id])
         return Response({'results': data})
 
@@ -469,3 +477,83 @@ class IdentityCard(APIView):
         else:
             raise ValidationError('输入的长度有误！')
         return Response('ok')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class DingDingLoginView(APIView):
+    """钉钉登录"""
+
+    def post(self, request):
+        auth_code = self.request.data.get('auth_code')
+        if not auth_code:
+            raise ValidationError('参数缺失！')
+        try:
+            d = DinDinAPI()
+            dd_user_data = d.auth(auth_code)
+        except Exception as err:
+            raise ValidationError(str(err))
+        dd_user_id = dd_user_data.get('userid')
+        try:
+            user = User.objects.get(dingding__dd_user_id=dd_user_id)
+        except User.DoesNotExist:
+            raise ValidationError("该钉钉账号未绑定MES用户！")
+        if not user.is_active:
+            raise ValidationError('该账号已被停用！')
+        payload = zdy_jwt_payload_handler(user)
+        token = jwt_encode_handler(payload)
+        return Response({"permissions": user.permissions_list,
+                         'section': user.section.name if user.section else None,
+                         'id_card_num': user.id_card_num,
+                         "username": user.username,
+                         "userNo": user.num,
+                         'id': user.id,
+                         "token": token,
+                         'wms_url': WMS_URL,
+                         'th_url': TH_URL})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class DingDingBind(APIView):
+    """钉钉账号与MES绑定"""
+
+    def post(self, request):
+        username = self.request.data.get('username')
+        password = self.request.data.get('password')
+        auth_code = self.request.data.get('auth_code')
+        if not all([username, password, auth_code]):
+            raise ValidationError('参数缺失！')
+        try:
+            user = User.objects.get(username=username)
+        except Exception:
+            raise ValidationError('改用户不存在！')
+        if not user.check_password(password):
+            raise ValidationError('密码错误，请修改后重试！')
+        if not user.is_active:
+            raise ValidationError('该账号已被停用！')
+        try:
+            d = DinDinAPI()
+            dd_user_data = d.auth(auth_code)
+        except Exception as err:
+            raise ValidationError(str(err))
+        if DingDingInfo.objects.filter(dd_user_id=dd_user_data.get('userid')).exists():
+            raise ValidationError('改钉钉已绑定其他MES账号！')
+        if DingDingInfo.objects.filter(user__username=username).exists():
+            raise ValidationError('MES账号已绑定其他钉钉账号！')
+        dd_data = {
+            "user": user,
+            "dd_user_id": dd_user_data.get('userid'),
+            "associated_unionid": dd_user_data.get('associated_unionid'),
+            "unionid": dd_user_data.get('unionid'),
+        }
+        DingDingInfo.objects.create(**dd_data)
+        payload = zdy_jwt_payload_handler(user)
+        token = jwt_encode_handler(payload)
+        return Response({"permissions": user.permissions_list,
+                         'section': user.section.name if user.section else None,
+                         'id_card_num': user.id_card_num,
+                         "username": user.username,
+                         "userNo": user.num,
+                         'id': user.id,
+                         "token": token,
+                         'wms_url': WMS_URL,
+                         'th_url': TH_URL})

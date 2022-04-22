@@ -826,6 +826,7 @@ class EquipPlan(AbstractEntity):
     status = models.CharField(max_length=64, help_text='状态', null=True, blank=True)
     planned_maintenance_date = models.DateTimeField(help_text='计划维护日期', null=True, blank=True)
     next_maintenance_date = models.DateTimeField(help_text='下次维护日期', null=True, blank=True)
+    result_fault_cause = models.CharField(max_length=512, help_text='故障原因', null=True, blank=True)
 
     class Meta:
         db_table = 'equip_plan'
