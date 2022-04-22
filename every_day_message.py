@@ -14,12 +14,13 @@ import django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()
 
+from system.models import User
 from mes import settings
 from django.db.models import Sum, Count
 
 from plan.models import ProductClassesPlan
 from production.models import TrainsFeedbacks
-from basics.models import Equip, PlanSchedule
+from basics.models import Equip, PlanSchedule, GlobalCode
 
 logger = logging.getLogger('send_log')
 
@@ -158,38 +159,45 @@ def send_ding_msg(data=None, isAtAll=True, atMobiles=None,
 
 
 def check_classes():
-    limit_date = datetime.datetime.now().date() - datetime.timedelta(days=7)
+    limit_date = datetime.datetime.now().date() + datetime.timedelta(days=7)
     already_classes = PlanSchedule.objects.filter(delete_flag=False, day_time__gte=limit_date)
+    message = ''
     if not already_classes:  # 提醒排班
+        # 获取人员信息
+        user_name_list = set(GlobalCode.objects.filter(delete_flag=False, global_type__use_flag=True, global_type__type_name='未排班提醒').values_list('global_name', flat=True))
+        users = User.objects.filter(is_active=True, username__in=user_name_list)
+        phones = list(users.values_list('phone_number', flat=True))
         message = {
             "msgtype": "markdown",
             "markdown": {
                 "title": "每日mes排班检查",
-                "text": "最新排班日期距今天已不足7日, 请尽快登录mes系统处理"
+                "text": ("" if not phones else " ".join([f"@{i}" for i in phones]) + "\n\n") + "最新排班日期距今天已不足7日, 请尽快登录mes系统处理"
             },
             "at": {
-                "atMobiles": [],
-                "isAtAll": True
+                "atMobiles": phones,
+                "isAtAll": False if phones else True
             }
         }
-        if settings.DEBUG:
-            send_ding_msg(data=message, url='https://oapi.dingtalk.com/robot/send?access_token=3daeb8d9276b40e29fdba4b6578e39af6c860a7be0f8c75d55040a0bad57aad4', secret='SEC6ac31d2d123d02e32b221f49605f96b8ebeb2e9c5d4776b86c3d49c211fdd6a2')
-        else:
-            send_ding_msg(data=message)
         logger.info('发送排班提醒成功')
     else:
         logger.info('排班周期充足')
+    return message
 
 
 if __name__ == '__main__':
     # 产量通知
     message = product_day_message()
-    send_ding_msg(data=message)
-
     # 设备故障统计通知
     equip_message = equip_errors()
-    send_ding_msg(data=equip_message)
-
     # 检查排班
-    check_classes()
-
+    class_message = check_classes()
+    if settings.DEBUG:
+        send_ding_msg(data=message, url='https://oapi.dingtalk.com/robot/send?access_token=3daeb8d9276b40e29fdba4b6578e39af6c860a7be0f8c75d55040a0bad57aad4', secret='SEC6ac31d2d123d02e32b221f49605f96b8ebeb2e9c5d4776b86c3d49c211fdd6a2')
+        send_ding_msg(data=equip_message, url='https://oapi.dingtalk.com/robot/send?access_token=3daeb8d9276b40e29fdba4b6578e39af6c860a7be0f8c75d55040a0bad57aad4', secret='SEC6ac31d2d123d02e32b221f49605f96b8ebeb2e9c5d4776b86c3d49c211fdd6a2')
+        if class_message:
+            send_ding_msg(data=class_message, url='https://oapi.dingtalk.com/robot/send?access_token=3daeb8d9276b40e29fdba4b6578e39af6c860a7be0f8c75d55040a0bad57aad4', secret='SEC6ac31d2d123d02e32b221f49605f96b8ebeb2e9c5d4776b86c3d49c211fdd6a2')
+    else:
+        send_ding_msg(data=message)
+        send_ding_msg(data=equip_message)
+        if class_message:
+            send_ding_msg(data=class_message)
