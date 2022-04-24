@@ -27,7 +27,7 @@ from terminal.models import EquipOperationLog, WeightBatchingLog, FeedingLog, We
     ReportWeight, LoadTankMaterialLog, PackageExpire, RecipeMaterial, CarbonTankFeedWeightSet, \
     FeedingOperationLog, CarbonTankFeedingPrompt, PowderTankSetting, OilTankSetting, ReplaceMaterial, ReturnRubber, \
     ToleranceRule, WeightPackageManual, WeightPackageManualDetails, WeightPackageSingle, OtherMaterialLog, \
-    WeightPackageWms, MachineManualRelation, WeightPackageLogDetails
+    WeightPackageWms, MachineManualRelation, WeightPackageLogDetails, WeightPackageLogManualDetails
 from terminal.utils import TankStatusSync, CLSystem, material_out_barcode, get_tolerance, get_common_equip
 
 logger = logging.getLogger('send_log')
@@ -899,6 +899,7 @@ class WeightTankStatusSerializer(BaseModelSerializer):
 
 class WeightPackageLogCreateSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(write_only=True, help_text='行标')
+    display_manual_info = serializers.ListField(help_text='打印机配卡片时人工配料显示', write_only=True, default=[])
     manual_infos = serializers.ListField(help_text="""人工配物料信息[{"manual_type": "manual_single", "manual_id":1, "package_count": 10, "name": ["a", "b"]},
                                                                    {"manual_type": "manual", "manual_id":2, "package_count": 10, "name": ["c"]}]""", write_only=True, default=[])
 
@@ -971,6 +972,7 @@ class WeightPackageLogCreateSerializer(serializers.ModelSerializer):
     @atomic
     def create(self, validated_data):
         manual_infos = validated_data.pop('manual_infos')
+        display_manual_info = validated_data.pop('display_manual_info')
         already_print = validated_data.pop('already_print')
         plan_weight_uid = validated_data['plan_weight_uid']
         machine_package_count = validated_data['package_count']
@@ -1006,6 +1008,16 @@ class WeightPackageLogCreateSerializer(serializers.ModelSerializer):
                 # 归零和减重(最新一条减重,其余的归零)
                 db_name.objects.filter(id=i['manual_id']).update(**update_kwargs)
                 MachineManualRelation.objects.create(**create_data)
+        if display_manual_info:  # 固定人工配料信息(没有则新建)
+            history_record = WeightPackageLogManualDetails.objects.filter(plan_weight_uid=plan_weight_uid)
+            if not history_record:
+                create_list = []
+                for i in display_manual_info:
+                    created_data = {'plan_weight_uid': plan_weight_uid, 'material_type': i['material_type'],
+                                    'handle_material_name': i['handle_material_name'], 'weight': i['weight'],
+                                    'error': i['error']}
+                    create_list.append(WeightPackageLogManualDetails(**created_data))
+                WeightPackageLogManualDetails.objects.bulk_create(create_list)
         # 更新未打印数量
         noprint_count = validated_data['package_fufil'] - (already_print + machine_package_count)
         WeightPackageLog.objects.filter(plan_weight_uid=plan_weight_uid).update(noprint_count=noprint_count)
@@ -1016,7 +1028,7 @@ class WeightPackageLogCreateSerializer(serializers.ModelSerializer):
         fields = ['plan_weight_uid', 'product_no', 'plan_weight', 'dev_type', 'id', 'record', 'print_flag', 'batch_time',
                   'package_count', 'print_begin_trains', 'noprint_count', 'package_fufil', 'package_plan_count',
                   'equip_no', 'batch_group', 'batch_classes', 'status', 'print_count', 'merge_flag', 'manual_infos',
-                  'expire_days', 'split_count', 'batch_user', 'bra_code', 'machine_manual_weight']
+                  'expire_days', 'split_count', 'batch_user', 'bra_code', 'machine_manual_weight', 'display_manual_info']
 
 
 class WeightPackageLogCUpdateSerializer(serializers.ModelSerializer):
@@ -1116,32 +1128,41 @@ class WeightPackageLogSerializer(BaseModelSerializer):
                                    'manual_weight': total_manual_weight, 'manual_tolerance': tolerance,
                                    'detail_manual': detail_manual, 'detail_machine': total_manual_weight - detail_manual})
         else:  # 不合包显示人工配料信息
-            ml_equip_no, msg = '', ''
-            product_no_dev = re.split(r'\(|\（|\[', res['product_no'])[0]
-            if 'ONLY' in res['product_no']:
-                ml_equip_no = res['product_no'].split('-')[-2]
+            manual_record = WeightPackageLogManualDetails.objects.filter(plan_weight_uid=res['plan_weight_uid'])
+            if manual_record:
+                res.update({'display_manual_info': list(manual_record.values('material_type', 'handle_material_name', 'weight', 'error'))})
             else:
-                flag, result = get_common_equip(product_no_dev, res['dev_type'])
-                if flag:
-                    ml_equip_no = result[0]
+                # res.update({'display_manual_info': ''})  适配之前打印的数据所以注释这行
+                ml_equip_no, msg = '', ''
+                product_no_dev = re.split(r'\(|\（|\[', res['product_no'])[0]
+                if 'ONLY' in res['product_no']:
+                    ml_equip_no = res['product_no'].split('-')[-2]
                 else:
-                    msg = result
-            if ml_equip_no:
-                machine_materials = list(instance.weight_package_machine.all().values_list('name', flat=True))
-                batch_info_res = []
-                batch_info = ProductBatchingEquip.objects.filter(
-                    ~Q(Q(feeding_mode__startswith='C') | Q(feeding_mode__startswith='P')),
-                    ~Q(handle_material_name__in=machine_materials), is_used=True, type=4, equip_no=ml_equip_no,
-                    product_batching__stage_product_batch_no=product_no_dev, product_batching__dev_type__category_name=res['dev_type'])
-                for j in batch_info:
-                    batch_info_res.append({
-                        'material_type': j.material.material_type.global_name, 'handle_material_name': j.handle_material_name,
-                        'weight': j.batching_detail_equip.actual_weight if j.batching_detail_equip else j.cnt_type_detail_equip.standard_weight,
-                        'error': j.batching_detail_equip.standard_error if j.batching_detail_equip else j.cnt_type_detail_equip.standard_error,
-                    })
-                res.update({'display_manual_info': list(batch_info_res)})
-            else:
-                res.update({'display_manual_info': msg})
+                    flag, result = get_common_equip(product_no_dev, res['dev_type'])
+                    if flag:
+                        ml_equip_no = result[0]
+                    else:
+                        msg = result
+                if ml_equip_no:
+                    machine_materials = list(instance.weight_package_machine.all().values_list('name', flat=True))
+                    batch_info_res = []
+                    batch_info = ProductBatchingEquip.objects.filter(
+                        ~Q(Q(feeding_mode__startswith='C') | Q(feeding_mode__startswith='P')),
+                        ~Q(handle_material_name__in=machine_materials), is_used=True, type=4, equip_no=ml_equip_no,
+                        product_batching__stage_product_batch_no=product_no_dev, product_batching__dev_type__category_name=res['dev_type'])
+                    for j in batch_info:
+                        batch_info_res.append({
+                            'material_type': '细料' if res['equip_no'][0] == 'F' else '硫磺', 'handle_material_name': j.handle_material_name,
+                            'weight': j.batching_detail_equip.actual_weight if j.batching_detail_equip else j.cnt_type_detail_equip.standard_weight,
+                            'error': j.batching_detail_equip.standard_error if j.batching_detail_equip else j.cnt_type_detail_equip.standard_error,
+                        })
+                    res.update({'display_manual_info': list(batch_info_res + batch_info_res)})
+                else:
+                    res.update({'display_manual_info': msg})
+            # 计算合计
+            if isinstance(res['display_manual_info'], list) and res['display_manual_info']:
+                all_manual_weight = sum([j['weight'] for j in res['display_manual_info']])
+                res.update({'all_manual_weight': all_manual_weight})
         # 总公差
         machine_manual_tolerance = get_tolerance(batching_equip=res['equip_no'], standard_weight=instance.machine_manual_weight, project_name='all')
         res.update({'batching_type': batching_type, 'manual_headers': manual_headers, 'manual_body': manual_body,

@@ -40,7 +40,8 @@ from terminal.models import TerminalLocation, EquipOperationLog, WeightBatchingL
     RecipeMaterial, ReportBasic, ReportWeight, Plan, LoadTankMaterialLog, PackageExpire, MaterialChangeLog, \
     FeedingOperationLog, CarbonTankFeedingPrompt, OilTankSetting, PowderTankSetting, CarbonTankFeedWeightSet, \
     ReplaceMaterial, ReturnRubber, ToleranceDistinguish, ToleranceProject, ToleranceHandle, ToleranceRule, \
-    WeightPackageManual, WeightPackageSingle, WeightPackageWms, OtherMaterialLog, EquipHaltReason
+    WeightPackageManual, WeightPackageSingle, WeightPackageWms, OtherMaterialLog, EquipHaltReason, \
+    WeightPackageLogManualDetails
 from terminal.serializers import LoadMaterialLogCreateSerializer, \
     EquipOperationLogSerializer, BatchingClassesEquipPlanSerializer, WeightBatchingLogSerializer, \
     WeightBatchingLogCreateSerializer, FeedingLogSerializer, WeightTankStatusSerializer, \
@@ -688,6 +689,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         batching_equip = data.get('batching_equip', 'S01')
         machine_package_count = data.get('package_count')
         already_scan_info = data.get('manual_infos', [])
+        plan_weight_uid = data.get('plan_weight_uid')
         if not merge_flag:
             raise ValidationError('称量计划未设置合包, 不可扫码')
         # 手工配料(配方)
@@ -704,7 +706,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                 raise ValidationError('单种人工配料机型或配方不符合')
             # 返回人工配料id，关联使用
             try:
-                manual_type, manual_id = self.scan_check(product_no, batching_equip, dev_type, machine_package_count, manual, already_scan_info)
+                manual_type, manual_id = self.scan_check(plan_weight_uid, product_no, batching_equip, dev_type, machine_package_count, manual, already_scan_info)
             except Exception as e:
                 raise ValidationError(e.args[0])
             details = WeightPackageManualSerializer(manual).data
@@ -715,13 +717,15 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                 raise ValidationError(e.args[0])
             if res:
                 # 查询配方中人工配物料
-                try:
-                    if 'ONLY' in product_no:
-                        recipe_manual = get_manual_materials(product_no, dev_type, batching_equip, equip_no=product_no.split('-')[-2])
-                    else:
-                        recipe_manual = get_manual_materials(product_no, dev_type, batching_equip)
-                except Exception as e:
-                    raise ValidationError(e.args[0])
+                recipe_manual = WeightPackageLogManualDetails.objects.filter(plan_weight_uid=plan_weight_uid).annotate(material_name=F('handle_material_name'), material__material_name=F('handle_material_name'), tolerance=F('error'), standard_weight=F('weight'))
+                if not recipe_manual:
+                    try:
+                        if 'ONLY' in product_no:
+                            recipe_manual = get_manual_materials(product_no, dev_type, batching_equip, equip_no=product_no.split('-')[-2])
+                        else:
+                            recipe_manual = get_manual_materials(product_no, dev_type, batching_equip)
+                    except Exception as e:
+                        raise ValidationError(e.args[0])
                 materials = set([i.get('material__material_name') for i in recipe_manual])
                 # ERP绑定关系
                 material_name_set = set(ERPMESMaterialRelation.objects.filter(zc_material__wlxxid=res['WLXXID'], use_flag=True).values_list('material__material_name', flat=True))
@@ -789,14 +793,18 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         results = {'manual_type': manual_type, 'manual_id': manual_id, 'details': details}
         return Response({'results': results})
 
-    def scan_check(self, product_no, batching_equip, dev_type, machine_package_count, manual, already_scan_info, check_type='manual'):
-        try:
-            if 'ONLY' in product_no:
-                recipe_manual = get_manual_materials(product_no, dev_type, batching_equip, equip_no=product_no.split('-')[-2])
-            else:
-                recipe_manual = get_manual_materials(product_no, dev_type, batching_equip)
-        except Exception as e:
-            raise ValidationError(e.args[0])
+    def scan_check(self, plan_weight_uid, product_no, batching_equip, dev_type, machine_package_count, manual, already_scan_info, check_type='manual'):
+        recipe_manual = WeightPackageLogManualDetails.objects.filter(plan_weight_uid=plan_weight_uid).annotate(
+            material_name=F('handle_material_name'), material__material_name=F('handle_material_name'),
+            tolerance=F('error'), standard_weight=F('weight'))
+        if not recipe_manual:
+            try:
+                if 'ONLY' in product_no:
+                    recipe_manual = get_manual_materials(product_no, dev_type, batching_equip, equip_no=product_no.split('-')[-2])
+                else:
+                    recipe_manual = get_manual_materials(product_no, dev_type, batching_equip)
+            except Exception as e:
+                raise ValidationError(e.args[0])
         recipe_manual_names = {i['material__material_name']: i['standard_weight'] for i in recipe_manual}
         scan_info = list(manual.package_details.all().values_list('material_name', flat=True))
         if set(scan_info) - set(recipe_manual_names.keys()):
@@ -841,17 +849,17 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         total_weight = plan_weight * split_count
         product_no_dev = re.split(r'\(|\（|\[', i['product_no'])[0]
         msg, ml_equip_no = '', ''
+        type_name = '细料' if equip_no.startswith('F') else '硫磺'
+        if 'ONLY' in i['product_no']:
+            ml_equip_no = i['product_no'].split('-')[-2]
+        else:
+            flag, result = get_common_equip(product_no_dev, dev_type)
+            if flag:
+                ml_equip_no = result[0]
+            else:
+                msg = result
         if i['merge_flag']:
             # 配方中料包重量
-            type_name = '细料' if equip_no.startswith('F') else '硫磺'
-            if 'ONLY' in i['product_no']:
-                ml_equip_no = i['product_no'].split('-')[-2]
-            else:
-                flag, result = get_common_equip(product_no_dev, dev_type)
-                if flag:
-                    ml_equip_no = result[0]
-                else:
-                    msg = result
             sfj_recipe = ProductBatching.objects.using('SFJ').filter(delete_flag=False, used_type=4,
                                                                      stage_product_batch_no=product_no_dev,
                                                                      dev_type__category_name=dev_type,
@@ -883,11 +891,15 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                 product_batching__dev_type__category_name=dev_type)
             for j in batch_info:
                 batch_info_res.append({
-                    'material_type': j.material.material_type.global_name, 'handle_material_name': j.handle_material_name,
+                    'material_type': type_name, 'handle_material_name': j.handle_material_name,
                     'weight': j.batching_detail_equip.actual_weight if j.batching_detail_equip else j.cnt_type_detail_equip.standard_weight,
                     'error': j.batching_detail_equip.standard_error if j.batching_detail_equip else j.cnt_type_detail_equip.standard_error,
                 })
             i.update({'display_manual_info': list(batch_info_res)})
+        # 计算合计
+        if isinstance(i['display_manual_info'], list) and i['display_manual_info']:
+            all_manual_weight = sum([j['weight'] for j in i['display_manual_info']])
+            i.update({'all_manual_weight': all_manual_weight})
         # 公差查询
         machine_tolerance = get_tolerance(batching_equip=equip_no, standard_weight=total_weight, project_name='all')
         i.update({'plan_weight': plan_weight, 'equip_no': equip_no, 'dev_type': dev_type, 'machine_weight': plan_weight,
