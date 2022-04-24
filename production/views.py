@@ -3600,9 +3600,9 @@ class AttendanceClockViewSet(ModelViewSet):
             if EmployeeAttendanceRecords.objects.filter(user=user, factory_date=factory_date, status=status).exists():
                 raise ValidationError('当天存在上岗打卡记录')
         elif status == '调岗':
-            # if not EmployeeAttendanceRecords.objects.filter(user=user, factory_date=factory_date,
-            #                                                 status__in=['上岗', '调岗'], end_date__isnull=True).exists():
-            #     raise ValidationError('请先提交当天的上岗申请')
+            if not EmployeeAttendanceRecords.objects.filter(user=user, factory_date=factory_date,
+                                                            status__in=['上岗', '调岗'], end_date__isnull=True).exists():
+                raise ValidationError('请先提交当天的上岗申请')
             last = EmployeeAttendanceRecords.objects.filter(user=user, factory_date=factory_date,
                                                         status__in=['上岗', '调岗'], end_date__isnull=False).order_by('end_date').last()
             if last:  # 存在上岗或换岗的打卡，
