@@ -3597,6 +3597,8 @@ class AttendanceClockViewSet(ModelViewSet):
 
         if status == '上岗':
             # 判断是否有打卡记录
+            if FillCardApply.objects.filter(user=user, factory_date=factory_date, status=status).exists():
+                raise ValidationError('当前已提交过上岗补卡申请')
             if EmployeeAttendanceRecords.objects.filter(user=user, factory_date=factory_date, status=status).exists():
                 raise ValidationError('当天存在上岗打卡记录')
         elif status == '调岗':
