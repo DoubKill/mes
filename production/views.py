@@ -3575,8 +3575,8 @@ class AttendanceClockViewSet(ModelViewSet):
         if not num or not card_time:
             raise ValidationError('请先添加补卡规则')
         if FillCardApply.objects.filter(user=user, bk_date__year=now.year, bk_date__month=now.month,
-                                        handling_result=True).count() > int(num):
-            raise ValidationError(f'当前已提交了{num}次补卡申请')
+                                        handling_result=True).count() == int(num):
+            raise ValidationError(f'当月已提交了{num}次补卡申请')
         attendance_group_obj, section_list, equip_list, date_now, group_list = self.get_user_group(user, now)
         principal = attendance_group_obj.principal  # 考勤负责人
         # 离岗时间
