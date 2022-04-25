@@ -2103,6 +2103,30 @@ class ReportWeightView(ListAPIView):
 
 
 @method_decorator([api_recorder], name="dispatch")
+class ReportWeightViewStaticsView(APIView):
+    """
+    物料消耗量统计
+    """
+
+    def get(self, request):
+        equip_no = self.request.query_params.get('equip_no', 'F01')
+        st = self.request.query_params.get('st', (datetime.datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d') + ' 08:00:00')
+        et = self.request.query_params.get('et', datetime.datetime.now().strftime('%Y-%m-%d') + ' 08:00:00')
+
+        # 限制查询周期31天
+        diff = (datetime.datetime.strptime(et, '%Y-%m-%d %H:%M:%S') - datetime.datetime.strptime(st, '%Y-%m-%d %H:%M:%S')).days
+        if diff > 31:
+            raise ValidationError('查询周期不可超过31天')
+        try:
+            data = ReportWeight.objects.using(equip_no).filter(~Q(material='总重量'), 时间__gte=st, 时间__lte=et)
+            results = data.values('material').annotate(material_total_weight=Sum('act_weight')).values('material', 'material_total_weight')
+            total_weight = sum(data.values_list('act_weight', flat=True))
+        except Exception as e:
+            raise ValidationError('称量机台{}服务错误！'.format(equip_no))
+        return Response({'results': results, 'total_weight': total_weight})
+
+
+@method_decorator([api_recorder], name="dispatch")
 class XLPlanCViewSet(ListModelMixin, GenericViewSet):
     """
     list:
