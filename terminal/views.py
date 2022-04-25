@@ -4,6 +4,7 @@ import time
 from datetime import timedelta
 from decimal import Decimal
 
+from django.contrib.auth.models import Permission
 from django.db.models import Max, Sum, Q, Prefetch, Count, F
 from django.db.transaction import atomic
 from django.db.utils import ConnectionDoesNotExist
@@ -11,7 +12,7 @@ from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
-from rest_framework.decorators import action
+from rest_framework.decorators import action, permission_classes
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import CreateAPIView, ListAPIView
 from rest_framework.mixins import CreateModelMixin, ListModelMixin, UpdateModelMixin
@@ -27,6 +28,7 @@ from inventory.models import MaterialOutHistory
 from mes.common_code import CommonDeleteMixin, TerminalCreateAPIView, response, SqlClient
 from mes.conf import TH_CONF
 from mes.derorators import api_recorder
+from mes.permissions import PermissionClass
 from mes.settings import DATABASES
 from plan.models import ProductClassesPlan, BatchingClassesPlan, BatchingClassesEquipPlan
 from production.models import PlanStatus, MaterialTankStatus, TrainsFeedbacks
@@ -2107,6 +2109,7 @@ class ReportWeightViewStaticsView(APIView):
     """
     物料消耗量统计
     """
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_xl_report_weight_statics'}))
 
     def get(self, request):
         equip_no = self.request.query_params.get('equip_no', 'F01')

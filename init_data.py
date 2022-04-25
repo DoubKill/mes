@@ -968,7 +968,10 @@ permission_data = [
     {'id': 982, 'code': 'add_material_sjdj', 'name': '添加', 'parent_id': 980},
     {'id': 983, 'code': 'delete_material_sjdj', 'name': '删除', 'parent_id': 980},
 
-    # 下一个 984 开始
+    {'id': 984, 'code': 'xl_report_weight_statics', 'name': '称量机台物料统计', 'parent_id': None},
+    {'id': 985, 'code': 'view_xl_report_weight_statics', 'name': '查看', 'parent_id': 984},
+
+    # 下一个 986 开始
 ]
 
 
