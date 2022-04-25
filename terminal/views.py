@@ -2153,7 +2153,7 @@ class XLPlanCViewSet(ListModelMixin, GenericViewSet):
             return response(success=False, message='称量机台{}错误'.format(equip_no))
         if not all_filter_plan:
             return response(success=False, message='机台{}无进行中或已完成的配料计划'.format(equip_no))
-        serializer = self.get_serializer(all_filter_plan, many=True)
+        serializer = self.get_serializer(all_filter_plan[:5], many=True)
         for i in serializer.data:
             recipe_pre = RecipePre.objects.using(equip_no).filter(name=i['recipe'])
             dev_type = recipe_pre.first().ver.upper().strip() if recipe_pre else ''

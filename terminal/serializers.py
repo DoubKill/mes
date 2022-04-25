@@ -819,7 +819,7 @@ class WeightBatchingLogCreateSerializer(BaseModelSerializer):
             date_before_planid = ''.join(str(date_before).split('-'))[2:]
             all_recipe = Plan.objects.using(equip_no).filter(
                 Q(planid__startswith=date_now_planid) | Q(planid__startswith=date_before_planid),
-                state__in=['运行中', '等待']).all().values_list('recipe', flat=True)
+                state__in=['运行中', '等待']).all().order_by('-state', 'order_by')[:3].values_list('recipe', flat=True)
         except:
             raise serializers.ValidationError('称量机台{}错误'.format(equip_no))
         if not all_recipe:
