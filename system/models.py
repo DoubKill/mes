@@ -1,6 +1,5 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
-from suds import null
 
 
 class User(AbstractUser):
@@ -37,6 +36,15 @@ class User(AbstractUser):
     class Meta:
         db_table = "user"
         verbose_name_plural = verbose_name = '用户'
+
+
+class DingDingInfo(models.Model):
+    user = models.OneToOneField(User, related_name='dingding', verbose_name="账户名", on_delete=models.CASCADE)
+    dd_user_id = models.CharField(verbose_name="钉钉用户唯一id", unique=True, max_length=100)
+    associated_unionid = models.CharField(verbose_name="associated_unionid", null=True, blank=True, max_length=100)
+    unionid = models.CharField(verbose_name="UNIONID", null=True, blank=True, max_length=100)
+    modify_time = models.DateTimeField(verbose_name="修改时间", auto_now=True, null=True, blank=True)
+    create_time = models.DateTimeField(verbose_name="创建时间", auto_now_add=True, null=True, blank=True)
 
 
 class AbstractEntity(models.Model):
