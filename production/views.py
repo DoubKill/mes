@@ -3815,6 +3815,7 @@ class ReissueCardView(APIView):
                 EmployeeAttendanceRecords.objects.bulk_create(lst)
             elif status == '调岗':
                 EmployeeAttendanceRecords.objects.filter(
+                    user=user,
                     factory_date=serializer_data.get('factory_date'),
                     end_date__isnull=True,
                     status__in=['上岗', '调岗']
@@ -3836,6 +3837,7 @@ class ReissueCardView(APIView):
             elif status == '离岗':
                 end_date = obj.bk_date
                 dic = {
+                    'user': obj.user,
                     'factory_date': serializer_data.get('factory_date'),
                     'end_date__isnull': True,
                     'section': serializer_data.get('section'),
