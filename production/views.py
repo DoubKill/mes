@@ -3766,7 +3766,7 @@ class ReissueCardView(APIView):
         elif int(state) == 2:
             res = [item for item in res if item.get('handling_result') != None]
         count = len(res)
-        results = sorted(list(res), key=lambda x: x['apply_date'])
+        results = sorted(list(res), key=lambda x: x['apply_date'], reverse=True)
         return Response({'results': results[st:et], 'count': count})
 
     @atomic
