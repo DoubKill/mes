@@ -4113,7 +4113,7 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
             serializer.save()
         elif confirm_list:
             for item in confirm_list:
-                EmployeeAttendanceRecords.objects.filter(pk=item['id']).update(actual_time=item['actual_time'])
+                EmployeeAttendanceRecords.objects.filter(pk=item['id']).update(actual_time=item.get('actual_time', 0))
         return Response('ok')
 
 

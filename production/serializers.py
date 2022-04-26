@@ -465,7 +465,7 @@ class AttendanceGroupSetupSerializer(serializers.ModelSerializer):
 
 
 class EmployeeAttendanceRecordsSerializer(serializers.ModelSerializer):
-    username = serializers.CharField(write_only=True)
+    username = serializers.CharField(default=None)
 
     class Meta:
         model = EmployeeAttendanceRecords
