@@ -14,7 +14,7 @@ from inventory.models import InventoryLog, DispatchLog, FinalGumInInventoryLog, 
 from mes import settings
 from mes.common_code import get_weekdays
 from mes.derorators import api_recorder
-from plan.models import ProductClassesPlan
+from plan.models import ProductClassesPlan, SchedulingEquipCapacity
 from production.filters import CollectTrainsFeedbacksFilter
 from production.models import TrainsFeedbacks
 from production.serializers import CollectTrainsFeedbacksSerializer
@@ -793,81 +793,66 @@ class IndexEquipMaintenanceAnalyze(IndexOverview):
         st = self.request.query_params.get('st')
         et = self.request.query_params.get('et')
         factory_date, factory_begin_time, _ = self.get_current_factory_date()
+        filter_kwargs = {}
 
-        equip_data = [equip.equip_no for equip in Equip.objects.filter(
-            category__equip_type__global_name='密炼设备').order_by('equip_no')]
-
-        time_now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        end_time = time_now
-        st_case_str = "emo.DOWN_TIME"
-        extra_where_str = ''
         if dimension:
             if dimension == '1':  # 今天
-                begin_time = factory_begin_time
+                filter_kwargs['factory_date'] = factory_date
             elif dimension == '2':  # 昨天
                 yesterday = datetime.datetime.strptime(factory_date, '%Y-%m-%d') - datetime.timedelta(days=1)
-                begin_time = "{} 08:00:00".format(str(yesterday.date()))
-                end_time = factory_begin_time
-            else:  # 所有
-                begin_time = None
-                extra_where_str = ''
-        elif st and et:
-            if et > factory_date:
-                raise ValidationError('结束日期不得大于当前工厂日期！')
-            # et工厂结束时间
-            end_time = str(
-                (datetime.datetime.strptime(et, '%Y-%m-%d') + datetime.timedelta(days=1)).date()
-            ) + " 08:00:00"
-            if et == factory_date:
-                end_time = time_now
-            begin_time = st + " 08:00:00"  # st工厂日期开始时间
-        else:
-            raise ValidationError('参数错误')
-        if begin_time:
-            st_case_str = """
-                        (
-                            case when emo.DOWN_TIME < to_date('{}', 'yyyy-mm-dd hh24-mi-ss')
-                        THEN
-                        to_date('{}', 'yyyy-mm-dd hh24-mi-ss')
-                        else emo.DOWN_TIME
-                        end
-                        )
-                        """.format(begin_time, begin_time)
-            extra_where_str = """and (to_char(emo.DOWN_TIME, 'yyyy-mm-dd hh24-mi-ss')<='{}' and emo.END_TIME is null)
-                            or (to_char(emo.DOWN_TIME, 'yyyy-mm-dd hh24-mi-ss')>'{}'
-                                   and (to_char(emo.END_TIME, 'yyyy-mm-dd hh24-mi-ss') >'{}'))
-                            or (to_char(emo.DOWN_TIME, 'yyyy-mm-dd hh24-mi-ss')<'{}'
-                                   and (to_char(emo.END_TIME, 'yyyy-mm-dd hh24-mi-ss') >'{}'))
-                                   """.format(end_time, begin_time, begin_time, begin_time, begin_time)
+                filter_kwargs['factory_date'] = yesterday.date()
+            else:  # 本月
+                st = datetime.datetime.strptime(factory_date[:-2] + '01', '%Y-%m-%d')
+                filter_kwargs.update({'factory_date__gte': st, 'factory_date__lte': factory_date})
 
-        sql = """
-        select
-                equip_no,
-                sum(ceil((To_date(to_char(et,'yyyy-mm-dd hh24:mi:ss') , 'yyyy-mm-dd hh24-mi-ss')
-                             - To_date(to_char(st,'yyyy-mm-dd hh24:mi:ss'), 'yyyy-mm-dd hh24-mi-ss')
-                            ) * 24 * 60 ))
-            from (
-                select
-                       equip_no,
-                       {} as st,
-                       (CASE WHEN emo.end_time is null THEN To_date('{}', 'yyyy-mm-dd hh24-mi-ss')
-                        when emo.END_TIME > To_date('{}', 'yyyy-mm-dd hh24-mi-ss') then To_date('{}', 'yyyy-mm-dd hh24-mi-ss')
-                         ELSE emo.end_time END) as et
-                from EQUIP_MAINTENANCE_ORDER emo
-                inner join EQUIP_PART ep on emo.equip_part_id = ep.id
-                inner join EQUIP e on ep.equip_id = e.id
-                where emo.DOWN_FLAG=1 {}) tmp
-        group by equip_no;""".format(st_case_str, end_time, end_time, end_time, extra_where_str)
-        cursor = connection.cursor()
-        cursor.execute(sql)
-        data = cursor.fetchall()
-        data_dict = {item[0]: int(item[1]) for item in data}
+        if st and et:
+            filter_kwargs = {'factory_date__gte': st, 'factory_date__lte': et}
 
+        # 整合设备生产能力数据
+        product_limit_ids = list(SchedulingEquipCapacity.objects.values('equip_no', 'product_no').annotate(m_id=Max('id')).values_list('id', flat=True))
+        product_limit = SchedulingEquipCapacity.objects.filter(id__in=product_limit_ids).values('equip_no', 'product_no', 'avg_mixing_time', 'avg_interval_time')
+        product_info = {}
+        for i in product_limit:
+            keyword = f"{i['equip_no']}_{i['product_no']}"
+            product_info[keyword] = [i['avg_mixing_time'], i['avg_interval_time']]
+
+        equip_data = [equip.equip_no for equip in Equip.objects.filter(category__equip_type__global_name='密炼设备').order_by('equip_no')]
         maintenance_data = {}
+        # 当日超过平均工作时间、平均间隔时间数据
         for equip_no in equip_data:
-            maintenance_data[equip_no] = {'minutes': 0}
-            if equip_no in data_dict:
-                maintenance_data[equip_no]['minutes'] += data_dict[equip_no]
+            data = TrainsFeedbacks.objects.filter(equip_no=equip_no, **filter_kwargs).filter(delete_flag=False).order_by('product_no', 'actual_trains').values('equip_no', 'product_no', 'plan_classes_uid', 'actual_trains', 'mixer_time', 'interval_time')
+            res = self.handle_equip_no(equip_no, data, product_info)
+            maintenance_data.update(res)
 
-        return Response({'maintenance_data': maintenance_data,
-                         'equip_data': equip_data})
+        return Response({'maintenance_data': maintenance_data, 'equip_data': equip_data})
+
+    def handle_equip_no(self, equip_no, data, product_info):
+        minutes = 0
+        # 处理4号机数据
+        if equip_no == 'Z04':
+            data = self.special_equip_no(data)
+        for j in data:
+            keyword = f"{j['equip_no']}_{j['product_no']}"
+            if not product_info.get(keyword):
+                continue
+            avg_mixing_time, avg_interval_time = product_info[keyword]
+            # 超平均
+            if j['mixer_time'] > avg_mixing_time:
+                minutes += j['mixer_time'] - avg_mixing_time
+            # 超间隔
+            elif j['interval_time'] > avg_interval_time:
+                minutes += j['interval_time'] - avg_interval_time
+            else:
+                continue
+        return {equip_no: {'minutes': round(minutes / 60, 2)}}
+
+    def special_equip_no(self, special_data):
+        data = {}
+        for j in special_data:
+            keyword = f"{j['equip_no']}_{j['product_no']}_{j['plan_classes_uid']}_{j['actual_trains']}"
+            if keyword not in data:
+                data[keyword] = {'equip_no': j['equip_no'], 'product_no': j['product_no'], 'actual_trains': j['actual_trains'],
+                                 'mixer_time': j['mixer_time'], 'interval_time': j['interval_time']}
+            else:
+                data[keyword].update({'mixer_time': j['mixer_time'] + data[keyword]['mixer_time'], 'interval_time': j['interval_time'] + data[keyword]['interval_time']})
+        return data.values()
