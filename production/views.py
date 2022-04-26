@@ -2468,7 +2468,7 @@ class SummaryOfWeighingOutput(APIView):
                         work_time = work_times.get(f'{day}-{classes}-{equip_no}').get(name)
                         # 车数计算：当天产量 / 12小时 * 实际工作时间，向上取整数
                         if user_result.get(key):
-                            user_result[key][equip_no] = ceil(item['count'] / 12 * work_time)
+                            user_result[key][equip_no] = user_result[key].get(equip_no, 0) + ceil(item['count'] / 12 * work_time)
                         else:
                             user_result[key] = {equip_no: ceil(item['count'] / 12 * work_time)}
             result.append(dic)
@@ -2907,7 +2907,10 @@ class PerformanceSummaryView(APIView):
                 e_list = [item[4]]
             for equip in e_list:
                 key = f"{item[2]}_{item[3]}_{item[1]}_{equip}_{item[6]}"  # 1_A班_挤出_Z01_早班
-                user_dic[key] = {'name': item[0], 'section': item[1], 'day': item[2], 'group': item[3], 'equip': equip, 'actual_time': item[5], 'classes': item[6]}
+                if user_dic.get(key):  # 可能出现调岗后又换回来的情况，两次时间累加
+                    user_dic[key]['actual_time'] += item[5]
+                else:
+                    user_dic[key] = {'name': item[0], 'section': item[1], 'day': item[2], 'group': item[3], 'equip': equip, 'actual_time': item[5], 'classes': item[6]}
         group = WorkSchedulePlan.objects.filter(start_time__year=year,
                                                 start_time__month=month).values_list('group__global_name', 'classes__global_name', 'start_time__day').order_by('start_time')
         group_list = []
