@@ -183,7 +183,7 @@ class ProductBatching(AbstractEntity):
             # 查看是否存在对搭设置
             mixed = self.product_batching_mixed.all()
             if mixed:
-                material_name_weight = list(sfj_details.exclude(material__material_name__in=list(mixed.values_list('f_feed_name', 's_feed_name'))).values('material__material_name', 'actual_weight', 'standard_error'))
+                material_name_weight = list(sfj_details.exclude(material__material_name__in=list(mixed.values_list('f_feed_name', 's_feed_name')[0])).values('material__material_name', 'actual_weight', 'standard_error'))
                 l_mixed = mixed.last()
                 material_name_weight += [{'material__material_name': l_mixed.f_feed_name, 'actual_weight': l_mixed.f_weight, 'standard_error': 0},
                                          {'material__material_name': l_mixed.s_feed_name, 'actual_weight': l_mixed.s_weight, 'standard_error': 0}]
