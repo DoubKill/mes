@@ -3219,6 +3219,8 @@ class PerformanceSummaryView(APIView):
                                                 date__month=month).aggregate(price=Sum('price'))['price']
             item['其他奖惩'] = price1
             item['生产补贴'] = price2
+            item['all'] += price1 if price1 else 0
+            item['all'] += price2 if price2 else 0
             # 乘员工类别系数
             if independent.get(item['name']):
                 work_type = independent[item['name']].get('work_type')
