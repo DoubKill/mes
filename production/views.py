@@ -2468,9 +2468,9 @@ class SummaryOfWeighingOutput(APIView):
                         work_time = work_times.get(f'{day}-{classes}-{equip_no}').get(name)
                         # 车数计算：当天产量 / 12小时 * 实际工作时间
                         if user_result.get(key):
-                            user_result[key][equip_no] = user_result[key].get(equip_no, 0) + item['count'] / 12 * work_time
+                            user_result[key][equip_no] = round(user_result[key].get(equip_no, 0) + item['count'] / 12 * work_time, 2)
                         else:
-                            user_result[key] = {equip_no: item['count'] / 12 * work_time}
+                            user_result[key] = {equip_no: round(item['count'] / 12 * work_time, 2)}
             result.append(dic)
         for key, value in user_result.items():  # value {'F03': 109, 'F02': 100,},
             name, day, classes, section = key.split('_')
@@ -2959,8 +2959,8 @@ class PerformanceSummaryView(APIView):
                             unit = price_dic.get(f"fz_{state}").get('dj')
                         else:
                             unit = price_dic.get(f"{equip_type}_{state}").get('dj')
-                        user_dic[key][f"{state}_dj_qty"] = user_dic[key].get(f"{state}_dj_qty", 0) + \
-                                                           item['actual_trains'] / 12 * work_time
+                        user_dic[key][f"{state}_dj_qty"] = round(user_dic[key].get(f"{state}_dj_qty", 0) + \
+                                                           item['actual_trains'] / 12 * work_time, 2)
                         user_dic[key][f"{state}_dj_unit"] = unit
                     else:
                         work_time = user_dic[key]['actual_time']
@@ -2968,8 +2968,8 @@ class PerformanceSummaryView(APIView):
                             unit = price_dic.get(f"fz_{state}").get('pt')
                         else:
                             unit = price_dic.get(f"{equip_type}_{state}").get('pt')
-                        user_dic[key][f"{state}_pt_qty"] = user_dic[key].get(f"{state}_pt_qty", 0) + \
-                                                           item['actual_trains'] / 12 * work_time
+                        user_dic[key][f"{state}_pt_qty"] = round(user_dic[key].get(f"{state}_pt_qty", 0) + \
+                                                           item['actual_trains'] / 12 * work_time, 2)
                         user_dic[key][f"{state}_pt_unit"] = unit
         results1 = {}
         # 是否独立上岗
