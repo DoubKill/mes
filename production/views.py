@@ -2468,9 +2468,9 @@ class SummaryOfWeighingOutput(APIView):
                         work_time = work_times.get(f'{day}-{classes}-{equip_no}').get(name)
                         # 车数计算：当天产量 / 12小时 * 实际工作时间
                         if user_result.get(key):
-                            user_result[key][equip_no] = round(user_result[key].get(equip_no, 0) + item['count'] / 12 * work_time, 2)
+                            user_result[key][equip_no] = int(item['count'] / 12 * work_time)
                         else:
-                            user_result[key] = {equip_no: round(item['count'] / 12 * work_time, 2)}
+                            user_result[key] = {equip_no: int(item['count'] / 12 * work_time)}
             result.append(dic)
         for key, value in user_result.items():  # value {'F03': 109, 'F02': 100,},
             name, day, classes, section = key.split('_')
