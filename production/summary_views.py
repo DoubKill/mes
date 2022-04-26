@@ -836,12 +836,14 @@ class IndexEquipMaintenanceAnalyze(IndexOverview):
             if not product_info.get(keyword):
                 continue
             avg_mixing_time, avg_interval_time = product_info[keyword]
+            mixer_time = j['mixer_time'] if j['mixer_time'] else 0
+            interval_time = j['interval_time'] if j['interval_time'] else 0
             # 超平均
-            if j['mixer_time'] > avg_mixing_time:
-                minutes += j['mixer_time'] - avg_mixing_time
+            if mixer_time > avg_mixing_time:
+                minutes += mixer_time - avg_mixing_time
             # 超间隔
-            elif j['interval_time'] > avg_interval_time:
-                minutes += j['interval_time'] - avg_interval_time
+            elif interval_time > avg_interval_time:
+                minutes += interval_time - avg_interval_time
             else:
                 continue
         return {equip_no: {'minutes': round(minutes / 60, 2)}}
@@ -850,9 +852,11 @@ class IndexEquipMaintenanceAnalyze(IndexOverview):
         data = {}
         for j in special_data:
             keyword = f"{j['equip_no']}_{j['product_no']}_{j['plan_classes_uid']}_{j['actual_trains']}"
+            mixer_time = j['mixer_time'] if j['mixer_time'] else 0
+            interval_time = j['interval_time'] if j['interval_time'] else 0
             if keyword not in data:
                 data[keyword] = {'equip_no': j['equip_no'], 'product_no': j['product_no'], 'actual_trains': j['actual_trains'],
-                                 'mixer_time': j['mixer_time'], 'interval_time': j['interval_time']}
+                                 'mixer_time': mixer_time, 'interval_time': interval_time}
             else:
-                data[keyword].update({'mixer_time': j['mixer_time'] + data[keyword]['mixer_time'], 'interval_time': j['interval_time'] + data[keyword]['interval_time']})
+                data[keyword].update({'mixer_time': mixer_time + data[keyword]['mixer_time'], 'interval_time': interval_time + data[keyword]['interval_time']})
         return data.values()
