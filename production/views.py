@@ -2999,6 +2999,19 @@ class PerformanceSummaryView(APIView):
             else:
                 results1[key] = [v]
         # 绩效详情
+
+
+
+
+
+
+
+
+
+
+
+
+
         if day_d and group_d:
             start_with = f"{name_d}_{day_d}_{group_d}"
             results1 = {k: v for k, v in results1.items() if k.startswith(start_with)}
@@ -3042,6 +3055,7 @@ class PerformanceSummaryView(APIView):
             a = float(coefficient_dic.get('是'))
             if independent.get(name_d, 1) == False:
                 a = float(coefficient_dic.get('否'))
+
             # 计算超产奖励
             for section, equip_dic in equip_qty.items():
                 coefficient = section_info[section]['coefficient'] / 100
@@ -3073,13 +3087,37 @@ class PerformanceSummaryView(APIView):
                     else:
                         hj['ccjl'] += round(sum(ccjl_dic.values()) / (len(results_sort) // 3),
                                            2) if ccjl_dic.values() else 0
+                k = equip_price[section].values()
                 if post_standard == 1:
-                    hj['price'] += round(max(equip_price[section].values()) * post_coefficient * coefficient * a,
-                                        2) if equip_price[section].values() else 0
+                    hj['price'] += round(max(k) * post_coefficient * coefficient * a, 2) if k else 0
                 else:
-                    hj['price'] += round(hj['price'] / (len(results_sort) // 3) * post_coefficient * coefficient * a,
-                                        2) if equip_price[section].values() else 0
+                    hj['price'] += sum(k) / len(k) * post_coefficient * coefficient * a if k else 0
+                hj['price'] = round(hj['price'], 2)
             return Response({'results': results_sort.values(), 'hj': hj, 'all_price': hj['price'], '超产奖励': hj['ccjl'], 'group_list': group_list})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         results = {}
         ccjl_dic = {}
         equip_qty = {}
