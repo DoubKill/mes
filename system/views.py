@@ -16,8 +16,7 @@ from rest_framework.viewsets import ModelViewSet, GenericViewSet
 from rest_framework_jwt.settings import api_settings
 from rest_framework_jwt.views import ObtainJSONWebToken
 
-from basics.models import GlobalCode
-from equipment.utils import get_children_section, DinDinAPI
+from equipment.utils import DinDinAPI
 from mes.common_code import zdy_jwt_payload_handler
 from mes.conf import WMS_URL, TH_URL
 from mes.derorators import api_recorder
@@ -33,7 +32,7 @@ from system.serializers import GroupExtensionSerializer, GroupExtensionUpdateSer
     MaterialReceiveSerializer, UserImportSerializer, UserLoginSerializer
 
 
-# jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
+jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
 jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
 
 
@@ -547,6 +546,34 @@ class DingDingBind(APIView):
         }
         DingDingInfo.objects.create(**dd_data)
         payload = zdy_jwt_payload_handler(user)
+        token = jwt_encode_handler(payload)
+        return Response({"permissions": user.permissions_list,
+                         'section': user.section.name if user.section else None,
+                         'id_card_num': user.id_card_num,
+                         "username": user.username,
+                         "userNo": user.num,
+                         'id': user.id,
+                         "token": token,
+                         'wms_url': WMS_URL,
+                         'th_url': TH_URL})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class QRLoginView(APIView):
+    """钉钉扫码登录"""
+
+    def post(self, request):
+        code = self.request.data.get("code")
+        d = DinDinAPI()
+        union_id = d.get_union_id(code)
+        dd_user_id = d.get_user_id_through_union_id(union_id)
+        try:
+            user = User.objects.get(dingding__dd_user_id=dd_user_id)
+        except User.DoesNotExist:
+            raise ValidationError("该钉钉账号未绑定MES用户！")
+        if not user.is_active:
+            raise ValidationError('该账号已被停用！')
+        payload = jwt_payload_handler(user)
         token = jwt_encode_handler(payload)
         return Response({"permissions": user.permissions_list,
                          'section': user.section.name if user.section else None,
