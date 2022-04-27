@@ -147,7 +147,7 @@ class PalletFeedbacksViewSet(mixins.CreateModelMixin,
         lot_no = validated_data.pop("lot_no", None)
         validated_data.pop("factory_date", None)
         plan_classes_uid = validated_data.get('plan_classes_uid')
-        if not plan_classes_uid:
+        if plan_classes_uid:
             plan = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid).first()
             if plan:
                 validated_data['factory_date'] = plan.work_schedule_plan.plan_schedule.day_time
