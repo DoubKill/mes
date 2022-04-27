@@ -3007,22 +3007,25 @@ class PerformanceSummaryView(APIView):
             results_sort = {}
             equip_qty = {}
             equip_price = {}
-            hj = {'name': '产量工资合计', 'price': 0}
+            hj = {'name': '产量工资合计', 'price': 0, 'ccjl': 0}
             for item in results1.values():
                 for dic in item:
                     section, equip = dic['section'], dic['equip']
                     if len(dic) == 7:
                         continue
+                    if not equip_qty.get(section):
+                        equip_qty[section] = {}
+                        equip_price[section] = {}
                     for k in dic.keys():
                         if k.split('_')[-1] == 'qty':
                             state = k.split('_')[0]
                             type1 = k.split('_')[1]
                             qty = dic.get(f"{state}_{type1}_qty")  # 数量
                             unit = dic.get(f"{state}_{type1}_unit")  # 单价
-                            equip_qty[f'{equip}_{section}'] = equip_qty.get(f'{equip}_{section}', 0) + qty
-                            equip_price[f'{equip}_{section}'] = equip_price.get(f'{equip}_{section}', 0) + round(qty * unit, 2)
+                            equip_qty[section][equip] = equip_qty[section].get(equip, 0) + qty
+                            equip_price[section][equip] = equip_price[section].get(equip, 0) + round(qty * unit, 2)
+
                             hj[state] = round(hj.get(state, 0) + qty * unit, 2)
-                            hj['price'] += round(qty * unit, 2)
                             type2 = '普通' if type1 == 'pt' else '丁基'
                             if results.get(f"{equip}_{type2}_{section}_1"):
                                 results[f"{equip}_{type2}_{section}_1"].update({state: dic[k]})
@@ -3039,107 +3042,62 @@ class PerformanceSummaryView(APIView):
             a = float(coefficient_dic.get('是'))
             if independent.get(name_d, 1) == False:
                 a = float(coefficient_dic.get('否'))
-            coefficient = section_info[section]['coefficient'] / 100
-            post_coefficient = section_info[section]['post_coefficient'] / 100
-            post_standard = section_info[section]['post_standard']  # 1最大值 2 平均值
             # 计算超产奖励
-            for equip_section, qty in equip_qty.items():
-                equip, section = equip_section.split('_')
+            for section, equip_dic in equip_qty.items():
                 coefficient = section_info[section]['coefficient'] / 100
                 post_coefficient = section_info[section]['post_coefficient'] / 100
                 post_standard = section_info[section]['post_standard']  # 1最大值 2 平均值
+                post_coefficient = 1 if len(equip_qty) > 1 else post_coefficient
+
                 price = 0
-                if max_value.get(equip) and settings_value.__dict__.get(equip):
-                    m = max_value.get(equip)
-                    s = settings_value.__dict__.get(equip)
-                    if qty < s:
-                        price = 0
-                    elif qty > m:
-                        price = (m - s) * float(coefficient1_dic.get('超过目标产量部分')) + (qty - m) * float(
-                            coefficient1_dic.get('超过最高值部分'))
-                    elif qty < m and qty > s:
-                        price = (qty - s) * float(coefficient1_dic.get('超过目标产量部分'))
-                    ccjl_dic[equip] = price
-            post_coefficient = post_coefficient if len(list(results1.values())[0]) > 1 else 1
-
-            if section in ['班长', '机动']:
-                hj['ccjl'] = round(sum(ccjl_dic.values()) * 0.15, 2) if ccjl_dic.values() else 0
-            elif section in ['三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库']:
-                hj['ccjl'] = round(sum(ccjl_dic.values()) * 0.2 * coefficient, 2) if ccjl_dic.values() else 0
-            else:
-                if post_standard == 1:  # 最大值
-                    hj['ccjl'] = round(max(ccjl_dic.values()), 2) if ccjl_dic.values() else 0
+                for equip, qty in equip_dic.items():
+                    if max_value.get(equip) and settings_value.__dict__.get(equip):
+                        m = max_value.get(equip)
+                        s = settings_value.__dict__.get(equip)
+                        if qty < s:
+                            price = 0
+                        elif qty > m:
+                            price = (m - s) * float(coefficient1_dic.get('超过目标产量部分')) + (qty - m) * float(
+                                coefficient1_dic.get('超过最高值部分'))
+                        elif qty < m and qty > s:
+                            price = (qty - s) * float(coefficient1_dic.get('超过目标产量部分'))
+                        ccjl_dic[equip] = ccjl_dic.get(equip, 0) + price
+                # 岗位不同，计算超产奖励的方式不同
+                if section in ['班长', '机动']:
+                    hj['ccjl'] += round(sum(ccjl_dic.values()) * 0.15, 2) if ccjl_dic.values() else 0
+                elif section in ['三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库']:
+                    hj['ccjl'] += round(sum(ccjl_dic.values()) * 0.2 * coefficient, 2) if ccjl_dic.values() else 0
                 else:
-                    hj['ccjl'] = round(sum(ccjl_dic.values()) / (len(results_sort) // 3), 2) if ccjl_dic.values() else 0
-            if post_standard == 1:
-                hj['price'] = round(int(max(equip_price.values())) * post_coefficient * coefficient * a, 2) if equip_price.values() else 0
-            else:
-                hj['price'] = round(hj['price'] / (len(results_sort) // 3) * post_coefficient * coefficient * a, 2) if equip_price.values() else 0
-
+                    if post_standard == 1:  # 最大值
+                        hj['ccjl'] += round(max(ccjl_dic.values()), 2) if ccjl_dic.values() else 0
+                    else:
+                        hj['ccjl'] += round(sum(ccjl_dic.values()) / (len(results_sort) // 3),
+                                           2) if ccjl_dic.values() else 0
+                if post_standard == 1:
+                    hj['price'] += round(max(equip_price[section].values()) * post_coefficient * coefficient * a,
+                                        2) if equip_price[section].values() else 0
+                else:
+                    hj['price'] += round(hj['price'] / (len(results_sort) // 3) * post_coefficient * coefficient * a,
+                                        2) if equip_price[section].values() else 0
             return Response({'results': results_sort.values(), 'hj': hj, 'all_price': hj['price'], '超产奖励': hj['ccjl'], 'group_list': group_list})
-
         results = {}
         ccjl_dic = {}
         equip_qty = {}
         equip_price = {}
+
         for item in list(results1.values()):
-            if len(item) > 1:
-                section, name = item[0].get('section'), item[0].get('name')
-                a = float(coefficient_dic.get('是'))
-                aa = '是'
-                if independent.get(name, 1) == False:
-                    a = float(coefficient_dic.get('否'))
-                    aa = '否'
-                coefficient = section_info[section]['coefficient'] / 100
-                post_coefficient = section_info[section]['post_coefficient'] / 100
-                post_standard = section_info[section]['post_standard']  # 1最大值 2 平均值
-                for dic in item:
-                    section, name, day, group, equip = dic.get('section'), dic.get('name'), dic.get('day'), dic.get(
-                        'group'), dic.get('equip')
-                    for k in dic.keys():
-                        if k.split('_')[-1] == 'qty':
-                            state = k.split('_')[0]
-                            type1 = k.split('_')[1]
-                            qty = dic.get(f"{state}_{type1}_qty")  # 数量
-                            unit = dic.get(f"{state}_{type1}_unit")  # 单价
-                            # 统计车数
-                            key = f"{name}_{day}"
-                            if equip_qty.get(key):
-                                equip_qty[key][equip] = equip_qty[key].get(equip, 0) + qty
-                            else:
-                                equip_qty[key] = {equip: qty}
-                            if equip_price.get(key):
-                                equip_price[key][equip] = equip_price[key].get(equip, 0) + qty * unit
-                            else:
-                                equip_price[key] = {equip: qty * unit}
-                # 计算薪资
-                if not equip_price.get(f"{name}_{day}"):
-                    price = 0
-                else:
-                    if post_standard == 1:  # 最大值
-                        price = max(equip_price.get(f"{name}_{day}").values())
-                    else:  # 平均值
-                        price = round(
-                            sum(equip_price.get(f"{name}_{day}").values()) / len(equip_price.get(f"{name}_{day}")), 2)
-                    price = round(price * coefficient * a * post_coefficient, 2)
-                if results.get(name):
-                    results[name][f"{day}_{group}"] = results[name].get(f"{day}_{group}", 0) + price
-                    results[name]['hj'] += price
-                    results[name]['all'] += price
-                else:
-                    results[name] = {'name': name, '超产奖励': 0, '是否定岗': aa, 'hj': price, 'all': price,
-                                     f"{day}_{group}": price}
-            else:
-                dic = item[0]
-                section, name, day, group, equip = dic.get('section'), dic.get('name'), dic.get('day'), dic.get(
-                    'group'), dic.get('equip')
-                coefficient = section_info[section]['coefficient'] / 100
-                post_coefficient = 1
-                a = float(coefficient_dic.get('是'))
-                aa = '是'
-                if independent.get(name, 1) == False:
-                    a = float(coefficient_dic.get('否'))
-                    aa = '否'
+            section, name, day, group = item[0].get('section'), item[0].get('name'), item[0].get('day'), item[0].get('group')
+            key = f"{name}_{day}_{section}"
+            a = float(coefficient_dic.get('是'))
+            aa = '是'
+            if independent.get(name, 1) == False:
+                a = float(coefficient_dic.get('否'))
+                aa = '否'
+            coefficient = section_info[section]['coefficient'] / 100
+            post_coefficient = section_info[section]['post_coefficient'] / 100
+            post_standard = section_info[section]['post_standard']  # 1最大值 2 平均值
+            for dic in item:
+                equip = dic.get('equip')
                 for k in dic.keys():
                     if k.split('_')[-1] == 'qty':
                         state = k.split('_')[0]
@@ -3147,7 +3105,7 @@ class PerformanceSummaryView(APIView):
                         qty = dic.get(f"{state}_{type1}_qty")  # 数量
                         unit = dic.get(f"{state}_{type1}_unit")  # 单价
                         # 统计车数
-                        key = f"{name}_{day}"
+                        key = f"{name}_{day}_{section}"
                         if equip_qty.get(key):
                             equip_qty[key][equip] = equip_qty[key].get(equip, 0) + qty
                         else:
@@ -3156,28 +3114,26 @@ class PerformanceSummaryView(APIView):
                             equip_price[key][equip] = equip_price[key].get(equip, 0) + qty * unit
                         else:
                             equip_price[key] = {equip: qty * unit}
-                # 计算薪资
-                if equip_price.get(f"{name}_{day}"):
-                    price = max(equip_price.get(f"{name}_{day}").values())
-                    price = round(price * coefficient * a * post_coefficient, 2)
-                else:
-                    price = 0
-                if results.get(name):
-                    results[name][f"{day}_{group}"] = round(results[name].get(f"{day}_{group}", 0) + price, 2)
-                    results[name]['hj'] = round(results[name]['hj'] + price, 2)
-                    results[name]['all'] = round(results[name]['all'] + price, 2)
-                else:
-                    results[name] = {'name': name, '超产奖励': 0, '是否定岗': aa, 'hj': price, 'all': price,
-                                     f"{day}_{group}": price}
-        # 计算超产奖励
-        for key, dic in equip_qty.items():
-            price = 0
-            name, day = key.split('_')
-            section = EmployeeAttendanceRecords.objects.filter(user__username=name).first().section
-            post_standard = section_info[section]['post_standard']
-            coefficient = section_info[section]['coefficient'] / 100
+            # 计算薪资
+            if not equip_price.get(key):
+                price = 0
+            else:
+                if post_standard == 1:  # 最大值
+                    price = max(equip_price.get(key).values())
+                else:  # 平均值
+                    price = round(
+                        sum(equip_price.get(key).values()) / len(equip_price.get(key)), 2)
+                price = round(price * coefficient * a * post_coefficient, 2)
+            if results.get(name):
+                results[name][f"{day}_{group}"] = results[name].get(f"{day}_{group}", 0) + price
+                results[name]['hj'] += price
+                results[name]['all'] += price
+            else:
+                results[name] = {'name': name, '超产奖励': 0, '是否定岗': aa, 'hj': price, 'all': price,
+                                 f"{day}_{group}": price}
+            # 计算超产奖励
             p_dic = {}
-            for equip, qty in dic.items():
+            for equip, qty in equip_qty[key].items():
                 if max_value.get(equip) and settings_value.__dict__.get(equip):
                     m = max_value.get(equip)
                     s = settings_value.__dict__.get(equip)
@@ -3189,16 +3145,17 @@ class PerformanceSummaryView(APIView):
                     elif qty < m and qty > s:
                         price = (qty - s) * float(coefficient1_dic.get('超过目标产量部分'))
                     p_dic[equip] = price
+
             if section in ['班长', '机动']:
                 p = round(sum(p_dic.values()) * 0.15, 2) if p_dic.values() else 0
             elif section in ['三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库']:
                 p = round(sum(p_dic.values()) * 0.2 * coefficient, 2) if p_dic.values() else 0
             else:
-                if len(dic.values()) > 1:
+                if len(equip_qty[key].values()) > 1:
                     if post_standard == 1:
                         p = max(p_dic.values()) if p_dic.values() else 0
                     else:
-                        p = round(sum(p_dic.values()) / len(dic.values()), 2) if p_dic.values() else 0
+                        p = round(sum(p_dic.values()) / len(equip_qty[key].values()), 2) if p_dic.values() else 0
                 else:
                     p = max(p_dic.values()) if p_dic.values() else 0
             results[name]['超产奖励'] += p
@@ -3229,6 +3186,7 @@ class PerformanceSummaryView(APIView):
             v = float(employee_type_dic.get(work_type, 1))
             item['work_type'] = work_type
             item['all'] = round(item['all'] * v, 2)
+            item['hj'] = round(item['hj'], 2)
         return Response({'results': results.values(), 'group_list': group_list})
 
 
