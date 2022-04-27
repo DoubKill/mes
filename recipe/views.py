@@ -403,7 +403,8 @@ class ReplaceRecipeMaterialViewSet(ModelViewSet):
                 multi_created_list.append(MultiReplaceMaterial(**created_data))
                 continue
             # 查看配方是否都在密炼(默认全部失败, 否则影响防错)
-            processing_plan = ProductClassesPlan.objects.using('SFJ').filter(product_batching__in=sfj_recipe, status__in=['等待', '运行中'])
+            limit_date = datetime.datetime.now().date() - datetime.timedelta(days=1)
+            processing_plan = ProductClassesPlan.objects.using('SFJ').filter(created_date__date__gte=limit_date, product_batching__in=sfj_recipe, status__in=['等待', '运行中'])
             processing_recipe = set(processing_plan.values_list('equip__equip_no', flat=True))
             if processing_recipe:
                 for j in processing_recipe:

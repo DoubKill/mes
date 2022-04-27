@@ -137,8 +137,7 @@ class ProductBatching(AbstractEntity):
     obsolete_user = models.ForeignKey(User, help_text='弃用人', blank=True, null=True,
                                       on_delete=models.CASCADE, related_name='obsolete_batching')
     obsolete_time = models.DateTimeField(help_text='弃用时间', verbose_name='弃用时间', blank=True, null=True)
-    production_time_interval = models.DecimalField(help_text='炼胶时间(分)', blank=True, null=True,
-                                                   decimal_places=2, max_digits=8)
+    production_time_interval = models.DecimalField(help_text='炼胶时间(分)', default=0, decimal_places=2, max_digits=8)
     equip = models.ForeignKey(Equip, help_text='设备', blank=True, null=True, on_delete=models.CASCADE)
     batching_type = models.PositiveIntegerField(verbose_name='配料类型', help_text='配料类型',
                                                 choices=BATCHING_TYPE_CHOICE, default=2)
