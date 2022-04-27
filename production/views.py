@@ -3097,6 +3097,8 @@ class PerformanceSummaryView(APIView):
             post_coefficient = section_info[section]['post_coefficient'] / 100
             post_standard = section_info[section]['post_standard']  # 1最大值 2 平均值
             for dic in item:
+                if len(dic) == 7:
+                        continue
                 equip = dic.get('equip')
                 for k in dic.keys():
                     if k.split('_')[-1] == 'qty':
@@ -3105,7 +3107,6 @@ class PerformanceSummaryView(APIView):
                         qty = dic.get(f"{state}_{type1}_qty")  # 数量
                         unit = dic.get(f"{state}_{type1}_unit")  # 单价
                         # 统计车数
-                        key = f"{name}_{day}_{section}"
                         if equip_qty.get(key):
                             equip_qty[key][equip] = equip_qty[key].get(equip, 0) + qty
                         else:
@@ -3133,6 +3134,7 @@ class PerformanceSummaryView(APIView):
                                  f"{day}_{group}": price}
             # 计算超产奖励
             p_dic = {}
+
             for equip, qty in equip_qty[key].items():
                 if max_value.get(equip) and settings_value.__dict__.get(equip):
                     m = max_value.get(equip)
