@@ -631,6 +631,13 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                                        'init_weight': total_weight + last_same_material.init_weight,
                                                        'single_need': single_material_weight,
                                                        'pre_material_id': last_same_material.id})
+                    else:
+                        weight = total_weight + last_same_material.real_weight
+                        attrs['tank_data'].update({'actual_weight': last_same_material.actual_weight,
+                                                   'adjust_left_weight': weight, 'real_weight': weight,
+                                                   'init_weight': total_weight + last_same_material.init_weight,
+                                                   'single_need': single_material_weight,
+                                                   'pre_material_id': last_same_material.id})
                     attrs['status'] = 1
         return attrs
 
