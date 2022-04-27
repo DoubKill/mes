@@ -1,4 +1,7 @@
+import hmac
 import json
+import time
+from base64 import standard_b64encode
 from datetime import datetime
 from io import BytesIO
 
@@ -6,6 +9,7 @@ import requests
 from django.db.models import Q, F
 from django.http import HttpResponse
 from openpyxl import load_workbook
+from rest_framework.exceptions import ValidationError
 
 from equipment.models import EquipApplyOrder, EquipMaintenanceAreaSetting, EquipInspectionOrder
 from mes import settings
@@ -61,6 +65,8 @@ class DinDinAPI(object):
         url = 'https://oapi.dingtalk.com/gettoken'
         ret = requests.get(url, params={'appkey': self.APP_KEY, 'appsecret': self.APP_SECRET})
         data = json.loads(ret.text)
+        if not data.get('errcode') == 0:
+            raise ValidationError(data.get('errmsg'))
         return data.get('access_token')
 
     def get_user_id(self, phone_num):
@@ -71,7 +77,9 @@ class DinDinAPI(object):
         url = 'https://oapi.dingtalk.com/topapi/v2/user/getbymobile'
         ret = requests.post(url, params={'access_token': self.access_token}, data={"mobile": phone_num}, timeout=5)
         data = json.loads(ret.text)
-        return data.get('result').get('userid') if data.get('errcode') == 0 else ''
+        if not data.get('errcode') == 0:
+            raise ValidationError(data.get('errmsg'))
+        return data.get('result').get('userid')
 
     def get_user_attendance(self, user_ids, begin_time, end_time):
         """
@@ -92,6 +100,8 @@ class DinDinAPI(object):
         }
         ret = requests.post(url, params={'access_token': self.access_token}, json=data, timeout=5)
         data = json.loads(ret.text)
+        if not data.get('errcode') == 0:
+            raise ValidationError(data.get('errmsg'))
         return data.get('recordresult')
 
     def send_message(self, user_ids, content, order_id=0, inspection=False):
@@ -122,7 +132,7 @@ class DinDinAPI(object):
         ret = requests.post(url, params={'access_token': self.access_token}, json=data, timeout=5)
         data = json.loads(ret.text)
         if not data.get('errcode') == 0:
-            print('请求错误')
+            raise ValidationError(data.get('errmsg'))
 
     def auth(self, code):
         """微信认证，获取用户信息"""
@@ -131,8 +141,56 @@ class DinDinAPI(object):
         user_ret = requests.post(user_info_url, params={'access_token': self.access_token}, json=data, timeout=5)
         user_data = json.loads(user_ret.text)
         if not user_data.get('errcode') == 0:
-            raise Exception(user_data.get('errmsg'))
+            raise ValidationError(user_data.get('errmsg'))
         return user_data.get('result')
+
+    @staticmethod
+    def get_ding_talk_signature(app_secret, utc_timestamp):
+        """
+        :param app_secret: 钉钉开发者文档创建的app密钥
+        :param utc_timestamp: 官方文档中要签名的数据，单位是毫秒时间戳
+        :return: 为所需要的签名值，此值为可逆的
+        """
+        digest = hmac.HMAC(key=app_secret.encode('utf8'),
+                           msg=utc_timestamp.encode('utf8'),
+                           digestmod=hmac._hashlib.sha256).digest()
+        signature = standard_b64encode(digest).decode('utf8')
+        return signature
+
+    def get_union_id(self, code):
+        """
+            根据扫码信息获取的临时登录码请求接口，换取钉钉用户名
+        """
+        payload = {'tmp_auth_code': code}
+        headers = {'Content-Type': 'application/json'}
+        t = time.time()
+        timestamp = str((int(round(t * 1000))))
+        signature = self.get_ding_talk_signature(self.APP_SECRET, timestamp)
+        query_params = {'accessKey': self.APP_KEY, 'timestamp': timestamp, 'signature': signature}
+        res = requests.post('https://oapi.dingtalk.com/sns/getuserinfo_bycode',
+                            params=query_params,
+                            json=payload,
+                            headers=headers)
+        res_dict = json.loads(res.text)
+        if not res_dict.get('errcode') == 0:
+            raise ValidationError(res_dict.get('errmsg'))
+        return res_dict.get('user_info').get('unionid')
+
+    def get_user_id_through_union_id(self, union_id):
+        """
+            通过unionid获取钉钉用户id
+        """
+        user_url = 'https://oapi.dingtalk.com/topapi/user/getbyunionid'
+        user_query_params = {'access_token': self.access_token}
+        user_data = {
+            "unionid": union_id
+        }
+        res = requests.post(user_url, params=user_query_params, json=user_data)
+        res_dict = json.loads(res.text)
+        if not res_dict.get('errcode') == 0:
+            raise ValidationError(res_dict.get('errmsg'))
+        dd_user_id = res_dict.get('result').get('userid')
+        return dd_user_id
 
 
 def get_children_section(init_section, include_self=True):
