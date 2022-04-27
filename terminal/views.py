@@ -1879,37 +1879,40 @@ class XLPlanVIewSet(ModelViewSet):
             for index, plan in enumerate(plans):
                 time.sleep(1)  # 防止生成一样的计划号
                 replace_order_by = max(order_by_list) + 1
-                if plan.state == '运行中':
-                    first_plan_id = datetime.datetime.now().strftime('%Y%m%d%H%M%S')[2:]
-                    p_data = plan_data[index]
-                    setno = p_data['setno'] - (p_data['actno'] if plan.actno else 0)
-                    p_data.update({'planid': first_plan_id, 'grouptime': next_classes, 'oper': self.request.user.username,
-                                   'order_by': replace_order_by, 'date_time': now_date, 'setno': setno, 'actno': None,
-                                   'addtime': now_datetime})
-                    new_plan = Plan.objects.using(equip_no).create(**p_data)
-                    if plan.actno:
-                        plan.stoptime = now_datetime
-                        handle_plan_data['stop'] = [plan] + ([] if not handle_plan_data.get('stop') else handle_plan_data['stop'])
-                        handle_plan_data['issue'] = [new_plan] + ([] if not handle_plan_data.get('issue') else handle_plan_data['issue'])
-                    else:
+                new_plan_id = datetime.datetime.now().strftime('%Y%m%d%H%M%S')[2:]
+                p_data = plan_data[index]
+                setno = p_data['setno'] - (p_data['actno'] if plan.actno else 0) if plan.state == '运行中' else p_data['setno']
+                p_data.update({'planid': new_plan_id, 'grouptime': next_classes, 'oper': self.request.user.username,
+                               'order_by': replace_order_by, 'date_time': now_date, 'setno': setno, 'actno': None,
+                               'addtime': now_datetime, 'state': '等待'})
+                new_plan = Plan.objects.using(equip_no).create(**p_data)
+                if plan.actno:
+                    plan.stoptime = now_datetime
+                    handle_plan_data['stop'] = [plan] + ([] if not handle_plan_data.get('stop') else handle_plan_data['stop'])
+                    handle_plan_data['issue'] = [new_plan] + ([] if not handle_plan_data.get('issue') else handle_plan_data['issue'])
+                else:
+                    if plan.state == '运行中':
                         handle_plan_data['stop'] = ([] if not handle_plan_data.get('stop') else handle_plan_data['stop']) + [plan]
                         handle_plan_data['issue'] = ([] if not handle_plan_data.get('issue') else handle_plan_data['issue']) + [new_plan]
-                else:
-                    plan.grouptime = next_classes
-                    plan.order_by = replace_order_by
-                    plan.oper = self.request.user.username
-                    plan.date_time = now_date
-                plan.save()
+                    else:
+                        handle_plan_data['stop'] = ([] if not handle_plan_data.get('stop') else handle_plan_data['stop']) + [plan]
+                        handle_plan_data['add'] = ([] if not handle_plan_data.get('add') else handle_plan_data['add']) + [new_plan]
                 order_by_list.append(replace_order_by)
             try:
                 client = CLSystem(equip_no)
                 stop_plan = handle_plan_data.get('stop')
                 issue_plan = handle_plan_data.get('issue')
+                add_plan = handle_plan_data.get('add')
                 if stop_plan:
                     # 终止运行中计划(下位机)
                     for single_stop_plan in stop_plan:
-                        time.sleep(1)  # 增加时延(称量程序接口响应时间为50m), 防止指令下发成功但称量未处理
-                        client.stop(single_stop_plan.planid)
+                        if single_stop_plan.state == '运行中':
+                            time.sleep(1)  # 增加时延(称量程序接口响应时间为50ms), 防止指令下发成功但称量未处理
+                            client.stop(single_stop_plan.planid)
+                            single_stop_plan.state = '终止'
+                            single_stop_plan.save()
+                        else:
+                            single_stop_plan.delete()
                 if issue_plan:
                     for single_issue_plan in issue_plan:
                         time.sleep(1)  # 增加时延(称量程序接口响应时间为50m), 防止指令下发成功但称量未处理
@@ -1918,6 +1921,11 @@ class XLPlanVIewSet(ModelViewSet):
                         time.sleep(1)  # 增加时延(称量程序接口响应时间为50m), 防止指令下发成功但称量未处理
                         # 下达新计划
                         client.issue_plan(single_issue_plan.planid, single_issue_plan.recipe, single_issue_plan.setno)
+                if add_plan:
+                    for single_add_plan in add_plan:
+                        time.sleep(1)  # 增加时延(称量程序接口响应时间为50m), 防止指令下发成功但称量未处理
+                        # 通知新增计划
+                        client.add_plan(single_add_plan.planid)
             except Exception as e:
                 return e.args[0]
             return ''
