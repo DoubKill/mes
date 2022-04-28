@@ -11,7 +11,7 @@ from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, QualityControl, \
     OperationLog, UnReachedCapacityCause, ProcessFeedback, AlarmLog, RubberCannotPutinReason, PerformanceJobLadder, \
-    ProductInfoDingJi, SetThePrice, SubsidyInfo, Equip190EWeight, OuterMaterial, Equip190E
+    ProductInfoDingJi, SetThePrice, SubsidyInfo, Equip190EWeight, OuterMaterial, Equip190E, ManualInputTrains
 
 
 class EquipStatusSerializer(BaseModelSerializer):
@@ -471,5 +471,13 @@ class EquipStatusBatchSerializer(BaseModelSerializer):
 
     class Meta:
         model = EquipStatus
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class ManualInputTrainsSerializer(BaseModelSerializer):
+
+    class Meta:
+        model = ManualInputTrains
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS

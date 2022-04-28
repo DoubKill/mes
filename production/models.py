@@ -383,8 +383,8 @@ class MachineTargetYieldSettings(models.Model):
 
 class EmployeeAttendanceRecords(models.Model):
     user = models.ForeignKey(User, help_text='员工', on_delete=models.SET_NULL, null=True)
-    section = models.CharField(help_text='岗位', max_length=64)
-    factory_date = models.DateField(help_text='工厂时间')
+    section = models.CharField(help_text='岗位', max_length=64, null=True, blank=True)
+    factory_date = models.DateField(help_text='工厂时间', null=True, blank=True)
     begin_date = models.DateTimeField(help_text='上岗时间', null=True, blank=True)
     end_date = models.DateTimeField(help_text='下岗时间', null=True, blank=True)
     work_time = models.FloatField(help_text='计算工作时间', null=True, blank=True, default=12)
@@ -412,6 +412,7 @@ class PerformanceJobLadder(models.Model):
     post_standard = models.PositiveIntegerField(choices=Status, default=1, help_text='多岗位合并基准', null=True, blank=True)
     post_coefficient = models.IntegerField(help_text='多岗位合并系数', null=True, blank=True)
     delete_flag = models.BooleanField(help_text='是否删除', verbose_name='是否删除', default=False)
+    relation = models.BooleanField(help_text='是否与机台相关联', default=True)
 
     class Meta:
         db_table = 'performance_job_ladder'
@@ -498,7 +499,9 @@ class OuterMaterial(models.Model):
 class Equip190E(models.Model):
     specification = models.CharField(max_length=12, help_text='规格')
     state = models.CharField(max_length=12, help_text='段次')
-    weight = models.DecimalField(max_digits=8, decimal_places=2, help_text='kg')
+    weight = models.DecimalField(max_digits=10, decimal_places=3, help_text='kg')
+    date = models.DateField(auto_now_add=True, help_text='规格适用时间', null=True, blank=True)
+    delete_flag = models.BooleanField(help_text='是否删除', verbose_name='是否删除', default=False)
 
     class Meta:
         db_table = 'equip_190e'
