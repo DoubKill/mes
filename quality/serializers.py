@@ -310,6 +310,12 @@ class UnqualifiedDealOrderCreateSerializer(BaseModelSerializer):
         deal_details = ret.pop('deal_details', [])
         deal_items = {}
         for item in deal_details:
+            pallet_test_data = {}
+            for i in item['test_data']:
+                pallet_test_data[i['data_point_name']] = {'test_min_value': i.get('test_min_value'),
+                                                          'test_max_value': i.get('test_max_value'),
+                                                          'judged_lower_limit': i.get('judged_lower_limit'),
+                                                          'judged_upper_limit': i.get('judged_upper_limit')}
             if item['ordering'] not in deal_items:
                 deal_items[item['ordering']] = {
                     "ordering": item['ordering'],
@@ -320,10 +326,10 @@ class UnqualifiedDealOrderCreateSerializer(BaseModelSerializer):
                     "product_no": item['product_no'],
                     "test_data": item['test_data'],
                     "reason": item['reason'],
-                    "trains": [{"id": item['id'], "train": item['trains']}]
+                    "trains": [{"id": item['id'], "train": item['trains'], 'pallet_test_data': pallet_test_data}]
                 }
             else:
-                deal_items[item['ordering']]['trains'].append({"id": item['id'], "train": item['trains']})
+                deal_items[item['ordering']]['trains'].append({"id": item['id'], "train": item['trains'], 'pallet_test_data': pallet_test_data})
         ret['deal_details'] = list(deal_items.values())
         return ret
 
@@ -1984,8 +1990,14 @@ class UnqualifiedPalletFeedBackSerializer(serializers.ModelSerializer):
             level__gt=1,
             id__in=last_result_ids).values(
             'data_point_name').annotate(min_value=Min('value'),
-                                        max_value=Max('value')
-                                        ).values('data_point_name', 'min_value', 'max_value')
+                                        max_value=Max('value'),
+                                        judged_upper_limit=Min('judged_upper_limit'),
+                                        judged_lower_limit=Max('judged_lower_limit'),
+                                        test_min_value=Min('value'),
+                                        test_max_value=Max('value'),
+                                        ).values('data_point_name', 'min_value', 'max_value',
+                                                 'judged_upper_limit', 'judged_lower_limit',
+                                                 'test_min_value', 'test_max_value')
 
     class Meta:
         model = MaterialDealResult

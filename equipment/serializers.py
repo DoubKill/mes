@@ -1424,12 +1424,18 @@ class EquipWarehouseOrderSerializer(BaseModelSerializer):
     order_id = serializers.CharField(help_text='单据条码', validators=[
         UniqueValidator(EquipWarehouseOrder.objects.all(), message='该条码已存在')])
     order_detail = EquipWarehouseOrderDetailSerializer(many=True, read_only=True)
+    created_username = serializers.SerializerMethodField()
 
     class Meta:
         model = EquipWarehouseOrder
         fields = ("id", "created_username", "order_id", "order_detail", "submission_department",
         "status", "desc", "work_order_no", 'status_name', 'equip_spare', 'created_date', 'barcode')
         read_only_fields = COMMON_READ_ONLY_FIELDS
+
+    def get_created_username(self, obj):
+        if obj.lluser is not None:
+            return obj.lluser
+        return obj.created_user.username
 
     @atomic
     def create(self, validated_data):

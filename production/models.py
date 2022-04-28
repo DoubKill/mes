@@ -383,21 +383,61 @@ class MachineTargetYieldSettings(models.Model):
 
 class EmployeeAttendanceRecords(models.Model):
     user = models.ForeignKey(User, help_text='员工', on_delete=models.SET_NULL, null=True)
-    section = models.CharField(help_text='岗位', max_length=64)
-    factory_date = models.DateField(help_text='工厂时间')
+    section = models.CharField(help_text='岗位', max_length=64, null=True, blank=True)
+    factory_date = models.DateField(help_text='工厂时间', null=True, blank=True)
     begin_date = models.DateTimeField(help_text='上岗时间', null=True, blank=True)
-    end_date = models.DateTimeField(help_text='下岗时间', null=True, blank=True)
+    end_date = models.DateTimeField(help_text='离岗时间', null=True, blank=True)
     work_time = models.FloatField(help_text='计算工作时间', null=True, blank=True, default=12)
     actual_time = models.FloatField(help_text='承认工作时间', null=True, blank=True, default=12)
     classes = models.CharField(help_text='班次', max_length=12, null=True, blank=True)
     group = models.CharField(help_text='班组', max_length=12, null=True, blank=True)
     equip = models.CharField(help_text='机台', max_length=12, null=True, blank=True)
-    status = models.CharField(max_length=12, help_text='上岗/换岗/加班', null=True, blank=True)
+    status = models.CharField(max_length=12, help_text='上岗/调岗/加班', null=True, blank=True)
     is_use = models.CharField(max_length=12, help_text='确认/添加/废弃', null=True, blank=True)
 
     class Meta:
         db_table = 'employee_attendance_records'
         verbose_name_plural = verbose_name = '员工出勤记录表'
+
+
+class FillCardApply(models.Model):
+    factory_date = models.DateField(help_text='工厂时间')
+    user = models.ForeignKey(User, help_text='员工', on_delete=models.SET_NULL, null=True)
+    equip = models.CharField(max_length=64, help_text='机台')
+    classes = models.CharField(help_text='班次', max_length=12, null=True, blank=True)
+    group = models.CharField(help_text='班组', max_length=12, null=True, blank=True)
+    section = models.CharField(help_text='岗位', max_length=64)
+    # employee_attendance_records_ids = models.CharField(max_length=32, help_text='考勤记录', null=True, blank=True)
+    bk_date = models.DateTimeField(help_text='补卡时间', null=True, blank=True)
+    desc = models.TextField(help_text='补卡理由', null=True, blank=True)
+    handling_suggestion = models.TextField(help_text='处理意见', null=True, blank=True)
+    handling_result = models.NullBooleanField(help_text='处理结果', default=None)
+    apply_date = models.DateTimeField(auto_now_add=True, help_text='申请时间')
+    status = models.CharField(max_length=12, help_text='上岗/调岗/离岗', null=True, blank=True)
+
+    class Meta:
+        db_table = 'fill_card_apply'
+        verbose_name_plural = verbose_name = '补卡申请'
+
+
+class ApplyForExtraWork(models.Model):
+    factory_date = models.DateField(help_text='工厂时间')
+    user = models.ForeignKey(User, help_text='员工', on_delete=models.SET_NULL, null=True)
+    equip = models.CharField(max_length=64, help_text='机台')
+    classes = models.CharField(help_text='班次', max_length=12, null=True, blank=True)
+    group = models.CharField(help_text='班组', max_length=12, null=True, blank=True)
+    section = models.CharField(help_text='岗位', max_length=64)
+    employee_attendance_records_ids = models.CharField(max_length=32, help_text='考勤记录', null=True, blank=True)
+    begin_date = models.DateTimeField(help_text='加班开始时间', null=True, blank=True)
+    end_date = models.DateTimeField(help_text='加班结束', null=True, blank=True)
+    desc = models.TextField(help_text='加班理由', null=True, blank=True)
+    handling_suggestion = models.TextField(help_text='处理意见', null=True, blank=True)
+    apply_date = models.DateTimeField(auto_now_add=True, help_text='申请时间')
+    handling_result = models.NullBooleanField(help_text='处理结果', default=None)
+
+    class Meta:
+        db_table = 'apply_for_extra_work'
+        verbose_name_plural = verbose_name = '加班申请'
 
 
 class PerformanceJobLadder(models.Model):
@@ -412,6 +452,7 @@ class PerformanceJobLadder(models.Model):
     post_standard = models.PositiveIntegerField(choices=Status, default=1, help_text='多岗位合并基准', null=True, blank=True)
     post_coefficient = models.IntegerField(help_text='多岗位合并系数', null=True, blank=True)
     delete_flag = models.BooleanField(help_text='是否删除', verbose_name='是否删除', default=False)
+    relation = models.BooleanField(help_text='是否与机台相关联', default=True)
 
     class Meta:
         db_table = 'performance_job_ladder'
@@ -476,6 +517,22 @@ class IndependentPostTemplate(models.Model):
         verbose_name_plural = verbose_name = '是否独立上岗'
 
 
+class AttendanceGroupSetup(models.Model):
+    attendance_group = models.CharField(max_length=64, help_text='考勤组名称')
+    # attendance_users = models.CharField(max_length=64, help_text='参加考勤人员')
+    users = models.ManyToManyField(to=User, related_name='attendance_group')
+    attendance_st = models.TimeField(help_text='考勤开始时间')
+    attendance_et = models.TimeField(help_text='考勤结束时间')
+    principal = models.CharField(max_length=64, help_text='考勤负责人')
+    range_time = models.IntegerField(help_text='上班多久后可打下班卡', null=True, blank=True)
+    lead_time = models.IntegerField(help_text='提前几分钟可打工卡', null=True, blank=True)
+    type = models.CharField(help_text='类别', max_length=64, null=True, blank=True)
+
+    class Meta:
+        db_table = 'attendance_group_setup'
+        verbose_name_plural = verbose_name = '绩效管理考勤组'
+
+
 class EquipMaxValueCache(models.Model):
     equip_no = models.CharField(max_length=12, help_text='机台')
     date_time = models.DateField(help_text='缓存截止时间')
@@ -498,7 +555,9 @@ class OuterMaterial(models.Model):
 class Equip190E(models.Model):
     specification = models.CharField(max_length=12, help_text='规格')
     state = models.CharField(max_length=12, help_text='段次')
-    weight = models.DecimalField(max_digits=8, decimal_places=2, help_text='kg')
+    weight = models.DecimalField(max_digits=10, decimal_places=3, help_text='kg')
+    date = models.DateField(auto_now_add=True, help_text='规格适用时间', null=True, blank=True)
+    delete_flag = models.BooleanField(help_text='是否删除', verbose_name='是否删除', default=False)
 
     class Meta:
         db_table = 'equip_190e'
@@ -516,6 +575,21 @@ class Equip190EWeight(models.Model):
         verbose_name_plural = verbose_name = '190E机台产量信息'
 
 
+class AttendanceClockDetail(models.Model):
+    name = models.CharField(max_length=64, help_text='姓名')
+    date = models.DateField(auto_now_add=True, help_text='打卡日期')
+    date_time = models.DateTimeField(auto_now_add=True, help_text='打卡时间')
+    equip = models.CharField(max_length=64, help_text='机台')
+    group = models.CharField(max_length=64, help_text='班组')
+    classes = models.CharField(max_length=64, help_text='班次')
+    section = models.CharField(max_length=64, help_text='岗位')
+    work_type = models.CharField(max_length=64, help_text='打卡类别')
+
+    class Meta:
+        db_table = 'attendance_clock_detail'
+        verbose_name_plural = verbose_name = '用户考勤打卡明细'
+
+
 class ManualInputTrains(models.Model):
     """计算绩效使用"""
     factory_date = models.DateField(help_text='工厂日期', verbose_name='工厂日期')
@@ -528,4 +602,16 @@ class ManualInputTrains(models.Model):
 
     class Meta:
         db_table = 'manual_input_trains'
-        verbose_name_plural = verbose_name = '手动录入车次信息'
+        verbose_name_plural = verbose_name = '录入人工密炼车次信息'
+
+
+class AttendanceResultAudit(AbstractEntity):
+    audit_user = models.CharField(max_length=64, help_text='审核人', null=True, blank=True)
+    approve_user = models.CharField(max_length=64, help_text='审批人', null=True, blank=True)
+    date = models.CharField(max_length=64, help_text='日期：2022-12')
+    result = models.BooleanField(default=False, help_text='处理结果')
+    result_desc = models.TextField(help_text='处理说明', null=True, blank=True)
+
+    class Meta:
+        db_table = 'attendance_result_audit'
+        verbose_name_plural = verbose_name = '考勤打卡审批'

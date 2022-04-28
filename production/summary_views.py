@@ -1,10 +1,10 @@
 from django.db import connection
-from django.db.models import Q, Max, Sum, Count, F, DecimalField
+from django.db.models import Q, Max, Sum, Count, F, DecimalField, Min
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import ListAPIView
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated
 from rest_framework.views import APIView
 
 from basics.models import WorkSchedulePlan, Equip
@@ -15,6 +15,7 @@ from mes import settings
 from mes.common_code import get_weekdays
 from mes.derorators import api_recorder
 from plan.models import ProductClassesPlan, SchedulingEquipCapacity
+from mes.permissions import PermissionClass
 from production.filters import CollectTrainsFeedbacksFilter
 from production.models import TrainsFeedbacks
 from production.serializers import CollectTrainsFeedbacksSerializer
@@ -350,97 +351,80 @@ class SumCollectTrains(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class CutTimeCollect(APIView):
     """规格切换时间汇总"""
-    EXPORT_FIELDS_DICT = {'时间': "time", '设备编码': "equip_no", '切换前计划号': "plan_classes_uid_age", '切换后计划号': "plan_classes_uid_later", '切换前胶料编码': "cut_ago_product_no", '切换后胶料编码': "cut_later_product_no", '耗时/s': "time_consuming"}
+    EXPORT_FIELDS_DICT = {'时间': "time", '设备编码': "equip_no", '切换前计划号': "plan_classes_uid_age", '切换后计划号': "plan_classes_uid_later", '切换前胶料编码': "cut_ago_product_no", '切换后胶料编码': "cut_later_product_no", '切换规格耗时（秒）': "normal_cut_time_consumer", '异常时间(秒）': 'err_cut_time_consumer'}
     FILE_NAME = '规格切换时间汇总'
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'product_exchange_consume'}))
 
     def get(self, request, *args, **kwargs):
         # 筛选工厂
-        params = request.query_params
-        st = params.get("st", None)  # 一天的
-        equip_no = params.get("equip_no", None)  # 设备编号
+        equip_no = self.request.query_params.get('equip_no')  # 设备编号
+        st = self.request.query_params.get('st')
+        et = self.request.query_params.get('et')
+        classes = self.request.query_params.get('classes')
+        group = self.request.query_params.get('group')
+        page = int(self.request.query_params.get('page', 1))
+        page_size = int(self.request.query_params.get('page_size', 10))
         try:
-            page = int(params.get("page", 1))
-            page_size = int(params.get("page_size", 10))
-        except Exception as e:
-            return Response("page和page_size必须是int", status=400)
-        dict_filter = {}
-        if equip_no:  # 设备
-            dict_filter['equip_no'] = equip_no
+            s_time = datetime.datetime.strptime(st, '%Y-%m-%d')
+            e_time = datetime.datetime.strptime(et, '%Y-%m-%d')
+        except Exception:
+            raise ValidationError('日期错误！')
+        filter_kwargs = {}
         if st:
-            dict_filter['factory_date'] = st
-        # 统计过程
+            filter_kwargs['factory_date__gte'] = s_time
+        if et:
+            filter_kwargs['factory_date__lte'] = e_time
+        if equip_no:
+            filter_kwargs['equip_no'] = equip_no
+        query_set = list(TrainsFeedbacks.objects.filter(**filter_kwargs).values(
+            'plan_classes_uid', 'factory_date', 'classes', 'equip_no', 'product_no'
+        ).annotate(st_time=Min('begin_time'), et_time=Max('end_time')
+                   ).values(
+            'plan_classes_uid', 'factory_date', 'classes', 'equip_no', 'st_time', 'et_time', 'product_no'
+        ).order_by('factory_date', 'equip_no', 'st_time'))
+
+        factory_classes_group_map = WorkSchedulePlan.objects.filter(
+            plan_schedule__day_time__gte=s_time,
+            plan_schedule__day_time__lte=e_time,
+            plan_schedule__work_schedule__work_procedure__global_name='密炼'
+        ).values('plan_schedule__day_time', 'classes__global_name', 'group__global_name')
+        factory_classes_group_map_dict = {
+            i['plan_schedule__day_time'].strftime('%Y-%m-%d') + '-' + i['classes__global_name']: i for i in
+            factory_classes_group_map}
         return_list = []
-        tfb_equip_uid_list = TrainsFeedbacks.objects.filter(delete_flag=False, **dict_filter).values(
-            'plan_classes_uid').annotate(et=Max("end_time")).distinct().values('plan_classes_uid', 'et')
-        tfb_equip_uid_list = list(tfb_equip_uid_list)
-        tfb_equip_uid_list.sort(key=lambda x: x["et"], reverse=False)
-        if not tfb_equip_uid_list:
-            return_list.append(
-                {'sum_time': None, 'max_time': None, 'min_time': None, 'avg_time': None})
-            return Response({'results': return_list})
-        for j in range(len(tfb_equip_uid_list) - 1):
-            tfb_equip_uid_list[j].pop('et', None)
-            tfb_equip_uid_list[j + 1].pop('et', None)
-            tfb_equip_uid_dict_ago = tfb_equip_uid_list[j]
-            tfb_equip_uid_dict_later = tfb_equip_uid_list[j + 1]
-            # 这里也要加筛选
-            if st:
-                tfb_equip_uid_dict_ago['factory_date'] = st
-                tfb_equip_uid_dict_later['factory_date'] = st
-
-            tfb_pn_age = TrainsFeedbacks.objects.filter(delete_flag=False, **tfb_equip_uid_dict_ago).last()
-            tfb_pn_later = TrainsFeedbacks.objects.filter(delete_flag=False, **tfb_equip_uid_dict_later).first()
-            return_dict = {
-                'time': tfb_pn_age.end_time.strftime("%Y-%m-%d"),
-                'plan_classes_uid_age': tfb_pn_age.plan_classes_uid,
-                'plan_classes_uid_later': tfb_pn_later.plan_classes_uid,
-                'equip_no': tfb_pn_age.equip_no,
-                'cut_ago_product_no': tfb_pn_age.product_no,
-                'cut_later_product_no': tfb_pn_later.product_no,
-                'time_consuming': (tfb_pn_later.begin_time - tfb_pn_age.end_time).total_seconds()}
-            return_list.append(return_dict)
-        if st:  # 第二天的头一条
-            mst = datetime.datetime.strptime(st, "%Y-%m-%d") + datetime.timedelta(days=1)
-            m_tfb_obj = TrainsFeedbacks.objects.filter(delete_flag=False, equip_no=equip_no,
-                                                       end_time__date=mst).first()
-            if m_tfb_obj:
-                tfb_equip_uid_dict = tfb_equip_uid_list[-1]
-                tfb_equip_uid_dict['factory_date'] = st
-
-                tfb_pn_age = TrainsFeedbacks.objects.filter(delete_flag=False, **tfb_equip_uid_dict).last()
-                if tfb_pn_age.plan_classes_uid != m_tfb_obj.plan_classes_uid:
-                    return_dict = {
-                        'time': tfb_pn_age.end_time.strftime("%Y-%m-%d"),
-                        'plan_classes_uid_age': tfb_pn_age.plan_classes_uid,
-                        'plan_classes_uid_later': m_tfb_obj.plan_classes_uid,
-                        'equip_no': tfb_pn_age.equip_no,
-                        'cut_ago_product_no': tfb_pn_age.product_no,
-                        'cut_later_product_no': m_tfb_obj.product_no,
-                        'time_consuming': (m_tfb_obj.begin_time - tfb_pn_age.end_time).total_seconds()}
-                    return_list.append(return_dict)
-
-        if not return_list:
-            return_list.append(
-                {'sum_time': None, 'max_time': None, 'min_time': None, 'avg_time': None})
-            return Response({'results': return_list})
-            # 统计最大、最小、综合、平均时间
-        sum_time = 0
-        max_time = return_list[0]['time_consuming']
-        min_time = return_list[0]['time_consuming']
-        for train_dict in return_list:
-            if train_dict['time_consuming'] > max_time:
-                max_time = train_dict['time_consuming']
-            if train_dict['time_consuming'] < min_time:
-                min_time = train_dict['time_consuming']
-            sum_time += train_dict['time_consuming']
-        avg_time = sum_time / len(return_list)
+        for idx, item in enumerate(query_set[:-1]):
+            key = item['factory_date'].strftime('%Y-%m-%d') + '-' + item['classes']
+            next_st_time = query_set[idx + 1]['st_time']
+            if item['equip_no'] != query_set[idx + 1]['equip_no']:
+                continue
+            time_consuming = int((next_st_time - item['et_time']).total_seconds())
+            data = dict()
+            data['group'] = factory_classes_group_map_dict[key]['group__global_name']
+            if time_consuming >= 1000:
+                data['err_cut_time_consumer'] = time_consuming
+                data['normal_cut_time_consumer'] = None
+            else:
+                data['err_cut_time_consumer'] = None
+                data['normal_cut_time_consumer'] = time_consuming
+            data['classes'] = item['classes']
+            data['time'] = item['factory_date'].strftime('%Y-%m-%d')
+            data['cut_ago_product_no'] = item['product_no']
+            data['equip_no'] = item['equip_no']
+            data['cut_later_product_no'] = query_set[idx + 1]['product_no']
+            data['plan_classes_uid_age'] = item['plan_classes_uid']
+            data['plan_classes_uid_later'] = query_set[idx + 1]['plan_classes_uid']
+            return_list.append(data)
+        if group:
+            return_list = list(filter(lambda x: x['group'] == group, return_list))
+        if classes:
+            return_list = list(filter(lambda x: x['classes'] == classes, return_list))
         if self.request.query_params.get('export'):
             return gen_template_response(self.EXPORT_FIELDS_DICT, return_list, self.FILE_NAME)
         # 分页
         counts = len(return_list)
         return_list = return_list[(page - 1) * page_size:page_size * page]
-        return_list.append(
-            {'sum_time': sum_time, 'max_time': max_time, 'min_time': min_time, 'avg_time': avg_time})
+        # return_list.append(
+        #     {'sum_time': sum_time, 'max_time': max_time, 'min_time': min_time, 'avg_time': avg_time})
         return Response({'count': counts, 'results': return_list})
 
 
@@ -860,3 +844,73 @@ class IndexEquipMaintenanceAnalyze(IndexOverview):
             else:
                 data[keyword].update({'mixer_time': mixer_time + data[keyword]['mixer_time'], 'interval_time': interval_time + data[keyword]['interval_time']})
         return data.values()
+
+
+@method_decorator([api_recorder], name="dispatch")
+class CutTimeCollectSummary(APIView):
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'product_exchange_consume'}))
+
+    def get(self, request):
+        st = self.request.query_params.get('st')
+        et = self.request.query_params.get('et')
+        classes = self.request.query_params.get('classes')
+        group = self.request.query_params.get('group')
+        try:
+            e_time = datetime.datetime.strptime(st, '%Y-%m-%d')
+            s_time = datetime.datetime.strptime(et, '%Y-%m-%d')
+        except Exception:
+            raise ValidationError('日期错误！')
+        filter_kwargs = {}
+        if st:
+            filter_kwargs['factory_date__gte'] = s_time
+        if et:
+            filter_kwargs['factory_date__lte'] = e_time
+        query_set = list(TrainsFeedbacks.objects.filter(**filter_kwargs).values(
+            'plan_classes_uid', 'factory_date', 'classes', 'equip_no'
+        ).annotate(st_time=Min('begin_time'), et_time=Max('end_time')
+                   ).values(
+            'plan_classes_uid', 'factory_date', 'classes', 'equip_no', 'st_time', 'et_time'
+        ).order_by('factory_date', 'equip_no', 'st_time'))
+        factory_classes_group_map = WorkSchedulePlan.objects.filter(
+            plan_schedule__day_time__gte=s_time,
+            plan_schedule__day_time__lte=e_time,
+            plan_schedule__work_schedule__work_procedure__global_name='密炼'
+        ).values('plan_schedule__day_time', 'classes__global_name', 'group__global_name')
+        factory_classes_group_map_dict = {
+            i['plan_schedule__day_time'].strftime('%Y-%m-%d') + '-' + i['classes__global_name']: i for i in factory_classes_group_map}
+        ret = {}
+        for idx, item in enumerate(query_set[:-1]):
+            key = item['factory_date'].strftime('%Y-%m-%d') + '-' + item['classes']
+            next_st_time = query_set[idx + 1]['st_time']
+            if not query_set[idx + 1]['equip_no'] == item['equip_no']:
+                continue
+            cut_time_consume = int((next_st_time - item['et_time']).total_seconds())
+            if key in ret:
+                if item['equip_no'] in ret[key]:
+                    ret[key][item['equip_no']] += cut_time_consume
+                    ret[key][item['equip_no'] + 'cnt'] += 1
+                else:
+                    ret[key][item['equip_no']] = cut_time_consume
+                    ret[key][item['equip_no'] + 'cnt'] = 1
+            else:
+                ret[key] = {'factory_date': item['factory_date'].strftime('%Y-%m-%d'),
+                            'classes': item['classes'],
+                            item['equip_no']: cut_time_consume,
+                            item['equip_no'] + 'cnt': 1,
+                            'group': factory_classes_group_map_dict[key]['group__global_name'],
+                            }
+            avg_cut_time_consume = int(ret[key][item['equip_no']] / ret[key][item['equip_no'] + 'cnt'])
+            if avg_cut_time_consume >= 1000:
+                err_cut_time_consumer = avg_cut_time_consume
+                normal_cut_time_consumer = None
+            else:
+                err_cut_time_consumer = None
+                normal_cut_time_consumer = avg_cut_time_consume
+            ret[key][item['equip_no'] + 'err_cut_time_consumer'] = err_cut_time_consumer
+            ret[key][item['equip_no'] + 'normal_cut_time_consumer'] = normal_cut_time_consumer
+        result = ret.values()
+        if group:
+            result = list(filter(lambda x: x['group'] == group, result))
+        if classes:
+            result = list(filter(lambda x: x['classes'] == classes, result))
+        return Response(result)
