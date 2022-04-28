@@ -1178,6 +1178,7 @@ class WeightPackageLogSerializer(BaseModelSerializer):
                     'print_datetime': instance.last_updated_date.strftime('%Y-%m-%d %H:%M:%S'), 'expire_datetime': expire_datetime})
         # 最新打印数据
         last_instance = WeightPackageLog.objects.filter(plan_weight_uid=instance.plan_weight_uid).last()
+        res['order_flag'] = True if last_instance.bra_code == res['bra_code'] else False
         res.update({'next_package_count': last_instance.package_count})
         return res
 

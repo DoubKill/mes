@@ -908,7 +908,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                   'product_no': i['product_no'], 'batching_type': '机配', 'batch_time': actual_batch_time,
                   'manual_weight': 0, 'batch_user': self.request.user.username, 'expire_days': expire_days,
                   'print_datetime': now_date.strftime('%Y-%m-%d %H:%M:%S'), 'expire_datetime': expire_datetime,
-                  'split_count': split_count, 'machine_manual_weight': total_weight,
+                  'split_count': split_count, 'machine_manual_weight': total_weight, 'order_flag': True,
                   'machine_manual_tolerance': machine_tolerance})
 
 
