@@ -11,7 +11,9 @@ from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, QualityControl, \
     OperationLog, UnReachedCapacityCause, ProcessFeedback, AlarmLog, RubberCannotPutinReason, PerformanceJobLadder, \
-    ProductInfoDingJi, SetThePrice, SubsidyInfo, Equip190EWeight, OuterMaterial, Equip190E, ManualInputTrains
+    ProductInfoDingJi, SetThePrice, SubsidyInfo, AttendanceGroupSetup, EmployeeAttendanceRecords, FillCardApply, \
+    ApplyForExtraWork, Equip190EWeight, OuterMaterial, Equip190E, AttendanceClockDetail
+from system.models import User
 
 
 class EquipStatusSerializer(BaseModelSerializer):
@@ -436,6 +438,75 @@ class SubsidyInfoSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class AttendanceGroupSetupSerializer(serializers.ModelSerializer):
+    attendance_users = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AttendanceGroupSetup
+        fields = '__all__'
+
+    def update(self, instance, validated_data):
+        users = validated_data.pop('users', None)  # [1, 2]
+        instance.users.clear()
+        instance.users.add(*users)
+        super().update(instance, validated_data)
+        return instance
+
+    def create(self, validated_data):
+        users = validated_data.pop('users', None)
+        instance = super().create(validated_data)
+        instance.users.add(*users)
+        return instance
+
+    def get_attendance_users(self, obj):
+        user_list = list(obj.users.all().values_list('username', flat=True))
+        res = ','.join(user_list)
+        return res
+
+
+class EmployeeAttendanceRecordsSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(default=None)
+
+    class Meta:
+        model = EmployeeAttendanceRecords
+        fields = '__all__'
+
+    def validate(self, attrs):
+
+        attrs['user'] = User.objects.filter(username=attrs.pop('username')).first()
+        return attrs
+
+
+class FillCardApplySerializer(serializers.ModelSerializer):
+    username = serializers.SerializerMethodField()
+    id_card_num = serializers.SerializerMethodField()
+
+    class Meta:
+        model = FillCardApply
+        fields = '__all__'
+
+    def get_username(self, obj):
+        return obj.user.username
+
+    def get_id_card_num(self, obj):
+        return obj.user.id_card_num
+
+
+class ApplyForExtraWorkSerializer(serializers.ModelSerializer):
+    username = serializers.SerializerMethodField()
+    id_card_num = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ApplyForExtraWork
+        fields = '__all__'
+
+    def get_username(self, obj):
+        return obj.user.username
+
+    def get_id_card_num(self, obj):
+        return obj.user.id_card_num
+
+
 class Equip190EWeightSerializer(serializers.ModelSerializer):
     specification = serializers.CharField(source='setup.specification', read_only=True)
     state = serializers.CharField(source='setup.state', read_only=True)
@@ -475,9 +546,8 @@ class EquipStatusBatchSerializer(BaseModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
-class ManualInputTrainsSerializer(BaseModelSerializer):
+class AttendanceClockDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
-        model = ManualInputTrains
+        model = AttendanceClockDetail
         fields = '__all__'
-        read_only_fields = COMMON_READ_ONLY_FIELDS
