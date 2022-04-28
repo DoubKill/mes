@@ -3112,19 +3112,6 @@ class PerformanceSummaryView(APIView):
             else:
                 results1[key] = [v]
         # 绩效详情
-
-
-
-
-
-
-
-
-
-
-
-
-
         if day_d and group_d:
             start_with = f"{name_d}_{day_d}_{group_d}"
             results1 = {k: v for k, v in results1.items() if k.startswith(start_with)}
@@ -3207,29 +3194,6 @@ class PerformanceSummaryView(APIView):
                     hj['price'] += sum(k) / len(k) * post_coefficient * coefficient * a if k else 0
                 hj['price'] = round(hj['price'], 2)
             return Response({'results': results_sort.values(), 'hj': hj, 'all_price': hj['price'], '超产奖励': hj['ccjl'], 'group_list': group_list})
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
         results = {}
         ccjl_dic = {}
