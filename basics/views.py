@@ -354,8 +354,8 @@ class CurrentClassView(APIView):
             "classes",
             "plan_schedule"
         ).order_by("id").last()
-        current_class = work_schedule_plan.classes.global_name
-        factory_date = work_schedule_plan.plan_schedule.day_time
+        current_class = work_schedule_plan.classes.global_name if work_schedule_plan else None
+        factory_date = work_schedule_plan.plan_schedule.day_time if work_schedule_plan else None
         return Response(f"{factory_date}/{current_class}")
 
 

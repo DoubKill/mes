@@ -115,9 +115,20 @@ class PerformanceJobLadderFilter(django_filters.rest_framework.FilterSet):
 
 
 class Equip190EFilter(django_filters.rest_framework.FilterSet):
-    specification = django_filters.CharFilter(field_name='specification', lookup_expr='icontains')
+    specification = django_filters.CharFilter(field_name='specification')
     state = django_filters.CharFilter(field_name='state', lookup_expr='icontains')
 
     class Meta:
         model = Equip190E
         fields = ('specification', 'state')
+
+
+class ManualInputTrainsFilter(django_filters.rest_framework.FilterSet):
+    factory_date = django_filters.DateFilter(field_name='factory_date', help_text='工厂日期')
+    classes = django_filters.CharFilter(field_name='classes', help_text='班次')
+    equip_no = django_filters.CharFilter(field_name='equip_no', help_text='机台')
+    product_no = django_filters.CharFilter(field_name='equip_no', help_text='胶料编码', lookup_expr='icontains')
+
+    class Meta:
+        model = ManualInputTrains
+        fields = ('factory_date', 'classes', 'equip_no', 'product_no')
