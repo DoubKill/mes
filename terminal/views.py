@@ -2122,9 +2122,12 @@ class ReportWeightViewStaticsView(APIView):
 
     def get(self, request):
         equip_no = self.request.query_params.get('equip_no', 'F01')
-        st = self.request.query_params.get('st', (datetime.datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d') + ' 08:00:00')
-        et = self.request.query_params.get('et', datetime.datetime.now().strftime('%Y-%m-%d') + ' 08:00:00')
-
+        st = self.request.query_params.get('st')
+        if not st:
+            st = (datetime.datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d') + ' 08:00:00'
+        et = self.request.query_params.get('et')
+        if not et:
+            et = datetime.datetime.now().strftime('%Y-%m-%d') + ' 08:00:00'
         # 限制查询周期31天
         diff = (datetime.datetime.strptime(et, '%Y-%m-%d %H:%M:%S') - datetime.datetime.strptime(st, '%Y-%m-%d %H:%M:%S')).days
         if diff > 31:
