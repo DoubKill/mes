@@ -2120,6 +2120,84 @@ class DailyProductionCompletionReport(APIView):
     permission_classes = (IsAuthenticated,)
     pagination_class = None
 
+    def export(self, month, days, data1, data2):
+        response = HttpResponse(content_type='application/vnd.ms-excel')
+        filename = '月产量完成报表'
+        response['Content-Disposition'] = u'attachment;filename= ' + filename.encode('gbk').decode(
+            'ISO-8859-1') + '.xls'
+        # 创建一个文件对象
+        wb = xlwt.Workbook(encoding='utf8')
+        # 创建一个sheet对象
+        sheet1 = wb.add_sheet('月产量完成', cell_overwrite_ok=True)
+        sheet2 = wb.add_sheet('班次车数', cell_overwrite_ok=True)
+        sheet3 = wb.add_sheet('月产量吨位', cell_overwrite_ok=True)
+        title1 = ['项目/日期']
+        title2 = ['序号', '规格', '段数', '机台', '型号', '班别']
+        title3 = ['序号', '规格', '段数', '机台', '型号', '班别']
+        for day in range(1, days + 1):
+            title1.append(f'{day}日')
+            title2.append(f'{month}/{day}')
+            title3.append(f'{month}/{day}')
+        title1.append('汇总')
+        title2.append('汇总')
+        title3.append('汇总')
+
+        style = xlwt.XFStyle()
+        style.alignment.wrap = 1
+
+        # 写入文件标题
+        for col_num in range(len(title1)):
+            sheet1.write(0, col_num, title1[col_num])
+        for col_num in range(len(title2)):
+            sheet2.write(0, col_num, title2[col_num])
+        for col_num in range(len(title3)):
+            sheet3.write(0, col_num, title3[col_num])
+        # 写入数据
+        for index, dic in enumerate(data1):
+            for key, value in dic.items():
+                if key == 'name':
+                    sheet1.write(index + 1, 0, dic['name'])
+                elif key == 'weight':
+                    sheet1.write(index + 1, len(title1) - 1, dic['weight'])
+                else:
+                    sheet1.write(index + 1, int(key[:-1]), value)
+        for index, dic in enumerate(data2):
+            sheet2.write(index + 1, 0, index + 1)
+            sheet3.write(index + 1, 0, index + 1)
+            for key, value in dic.items():
+                if key == '规格':
+                    sheet2.write(index + 1, 1, value)
+                    sheet3.write(index + 1, 1, value)
+                elif key == '段数':
+                    sheet2.write(index + 1, 2, value)
+                    sheet3.write(index + 1, 2, value)
+                elif key == '机台':
+                    sheet2.write(index + 1, 3, value)
+                    sheet3.write(index + 1, 3, value)
+                elif key == '机型':
+                    sheet2.write(index + 1, 4, value)
+                    sheet3.write(index + 1, 4, value)
+                elif key == '班别':
+                    sheet2.write(index + 1, 5, value)
+                    sheet3.write(index + 1, 5, value)
+                elif key == '汇总_qty':
+                    sheet2.write(index + 1, len(title2) - 1, value)
+                elif key == '汇总_weight':
+                    sheet3.write(index + 1, len(title3) - 1, value)
+                else:
+                    day, s =key.split('_')
+                    if s == 'qty':
+                        sheet2.write(index + 1, int(day) + 5, value)
+                    else:
+                        sheet3.write(index + 1, int(day) + 5, value)
+        # 写出到IO
+        output = BytesIO()
+        wb.save(output)
+        # 重新定位到开始
+        output.seek(0)
+        response.write(output.getvalue())
+        return response
+
     def get(self, request):
         params = self.request.query_params
         date = params.get('date')
@@ -2130,6 +2208,7 @@ class DailyProductionCompletionReport(APIView):
             this_month_end = datetime.datetime(year + 1, 1, 1) - timedelta(days=1)
         else:
             this_month_end = datetime.datetime(year, month + 1, 1) - timedelta(days=1)
+        days = this_month_end.day
         results = {
             'name_1': {'name': '混炼胶实际完成(吨)', 'weight': 0},
             'name_2': {'name': '终炼胶实际完成(吨)', 'weight': 0},
@@ -2223,6 +2302,35 @@ class DailyProductionCompletionReport(APIView):
                         results['name_8'][key] = round(results['name_5'][key] / decimal.Decimal(results['name_6'][key]), 2)
             results['name_7']['weight'] = round(results['name_4']['weight'] / decimal.Decimal(results['name_6']['weight']), 2)
             results['name_8']['weight'] = round(results['name_5']['weight'] / decimal.Decimal(results['name_6']['weight']), 2)
+        if self.request.query_params.get('export', None):
+            results2 = {}
+            equip_query = Equip.objects.filter(category__equip_type__global_name='密炼设备').values('equip_no',
+                                                                                                'category__category_name')
+            equip_dic = {item['equip_no']: item['category__category_name'] for item in equip_query}
+            data2 = TrainsFeedbacks.objects.filter(factory_date__year=2022, factory_date__month=4).values(
+                'factory_date__day', 'product_no', 'equip_no', 'classes').annotate(actual_trains=Count('actual_trains'),
+                                                                                   weight=Sum('actual_weight'))
+            for item in data2:
+                try:
+                    state = item['product_no'].split("-")[1]
+                    space = item['product_no'].split("-")[2]
+                    key = f'{space}_{state}_{item["equip_no"]}_{item["classes"]}'
+                except:
+                    pass
+                weight = round(float(item['actual_trains'] / 100 / 1000), 3)
+                if results2.get(key):
+                    results2[key][f'{item["factory_date__day"]}_qty'] = results2[key].get(
+                        f'{item["factory_date__day"]}_qty', 0) + item['actual_trains']
+                    results2[key][f'{item["factory_date__day"]}_weight'] = round(
+                        results2[key].get(f'{item["factory_date__day"]}_weight', 0) + weight, 3)
+                else:
+                    results2[key] = {'规格': space, '段数': state, '机台': item["equip_no"],
+                                     '机型': equip_dic[item["equip_no"]], '班别': item['classes'],
+                                     '汇总_qty': item['actual_trains'], '汇总_weight': weight,
+                                     f'{item["factory_date__day"]}_qty': item['actual_trains'],
+                                     f'{item["factory_date__day"]}_weight': weight}
+            return self.export(month, days, results.values(), results2.values())
+
         return Response({'results': results.values()})
 
     def post(self, request):
