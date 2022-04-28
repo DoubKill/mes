@@ -1193,7 +1193,7 @@ class WeightPackageLogSerializer(BaseModelSerializer):
 class WeightPackageLogUpdateSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
-        validated_data.update({'print_flag': True, 'last_updated_date': datetime.now(),
+        validated_data.update({'print_flag': True, 'last_updated_date': datetime.now(), 'ip_address': self.context['request'].META.get('REMOTE_ADDR'),
                                'last_updated_user': self.context['request'].user, 'print_datetime': datetime.now()})
         return super().update(instance, validated_data)
 
@@ -1280,7 +1280,7 @@ class WeightPackageManualSerializer(BaseModelSerializer):
     def update(self, instance, validated_data):
         if instance.print_flag == 1:
             raise serializers.ValidationError('打印尚未完成, 请稍后重试')
-        validated_data.update({'print_flag': True, 'last_updated_date': datetime.now(),
+        validated_data.update({'print_flag': True, 'last_updated_date': datetime.now(), 'ip_address': self.context['request'].META.get('REMOTE_ADDR'),
                                'last_updated_user': self.context['request'].user, 'print_datetime': datetime.now()})
         return super().update(instance, validated_data)
 
@@ -1341,7 +1341,7 @@ class WeightPackageSingleSerializer(BaseModelSerializer):
     def update(self, instance, validated_data):
         if instance.print_flag == 1:
             raise serializers.ValidationError('打印尚未完成, 请稍后重试')
-        validated_data.update({'print_flag': True, 'last_updated_date': datetime.now(),
+        validated_data.update({'print_flag': True, 'last_updated_date': datetime.now(), 'ip_address': self.context['request'].META.get('REMOTE_ADDR'),
                                'last_updated_user': self.context['request'].user, 'print_datetime': datetime.now()})
         return super().update(instance, validated_data)
 
