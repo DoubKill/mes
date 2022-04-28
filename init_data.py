@@ -979,16 +979,16 @@ permission_data = [
     {'id': 991, 'code': 'powder_feed', 'name': 'PDA粉料罐投料', 'parent_id': None},
     {'id': 992, 'code': 'view_powder_feed', 'name': '查看', 'parent_id': 991},
 
-    {'id': 991, 'code': 'shift_time_summary', 'name': '交接班时间汇总', 'parent_id': None},
-    {'id': 992, 'code': 'view_shift_time_summary', 'name': '查看', 'parent_id': 991},
+    {'id': 993, 'code': 'shift_time_summary', 'name': '交接班时间汇总', 'parent_id': None},
+    {'id': 994, 'code': 'view_shift_time_summary', 'name': '查看', 'parent_id': 993},
 
-    {'id': 993, 'code': 'attendance_group_setup', 'name': '考勤组设置', 'parent_id': None},
-    {'id': 994, 'code': 'view_attendance_group_setup', 'name': '查看', 'parent_id': 993},
-    {'id': 995, 'code': 'change_attendance_group_setup', 'name': '修改', 'parent_id': 993},
-    {'id': 996, 'code': 'add_attendance_group_setup', 'name': '新增', 'parent_id': 993},
-    {'id': 997, 'code': 'delete_attendance_group_setup', 'name': '删除', 'parent_id': 993},
+    {'id': 995, 'code': 'attendance_group_setup', 'name': '考勤组设置', 'parent_id': None},
+    {'id': 996, 'code': 'view_attendance_group_setup', 'name': '查看', 'parent_id': 995},
+    {'id': 997, 'code': 'change_attendance_group_setup', 'name': '修改', 'parent_id': 995},
+    {'id': 998, 'code': 'add_attendance_group_setup', 'name': '新增', 'parent_id': 995},
+    {'id': 999, 'code': 'delete_attendance_group_setup', 'name': '删除', 'parent_id': 995},
 
-    # 下一个 998 开始
+    # 下一个 1000 开始
 ]
 
 
