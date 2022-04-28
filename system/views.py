@@ -314,6 +314,7 @@ class LoginView(ObtainJSONWebToken):
                              'section': user.section.name if user.section else None,
                              'id_card_num': user.id_card_num,
                              "username": user.username,
+                             "userNo": user.num,
                              'id': user.id,
                              "token": token,
                              'wms_url': WMS_URL,

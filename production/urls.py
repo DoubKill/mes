@@ -2,7 +2,7 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from production.summary_views import ClassesBanBurySummaryView, EquipBanBurySummaryView, CollectTrainsFeedbacksList, \
-    CutTimeCollect, SumCollectTrains
+    CutTimeCollect, SumCollectTrains, CutTimeCollectSummary
 from production.views import *
 
 router = DefaultRouter()
@@ -56,6 +56,14 @@ router.register('product-info-dj', ProductInfoDingJiViewSet)
 router.register('set-the-price', SetThePriceViewSet)
 # 员工其他奖惩/补贴
 router.register('performance-subsidy', PerformanceSubsidyViewSet, basename='performance-subsidy')
+# 绩效管理 考勤组
+router.register('attendance-group-setup', AttendanceGroupSetupViewSet)
+# 用户考勤打卡
+router.register('attendance-clock', AttendanceClockViewSet)
+# 用户打卡明细
+router.register('attendance-clock-detail', AttendanceClockDetailViewSet)
+# 员工出勤工时统计
+router.register('attendance-time-statistics', AttendanceTimeStatisticsViewSet)
 # 190E机台规格信息维护
 router.register('equip-190e', Equip190EViewSet)
 
@@ -72,6 +80,7 @@ urlpatterns = [
     path('collect-trains-feed/', CollectTrainsFeedbacksList.as_view()),  # 胶料单车次时间汇总
     path('sum-collect-trains/', SumCollectTrains.as_view()),  # 胶料单车次时间汇总最大最小平均时间
     path('cut-time-collect/', CutTimeCollect.as_view()),  # 规格切换时间汇总
+    path('cut-time-collect-summary/', CutTimeCollectSummary.as_view()),  # 规格切换时间汇总
     path('equip-banbury-summary/', EquipBanBurySummaryView.as_view()),
     path('pallet-trains-feedbacks/', PalletTrainFeedback.as_view()),  # 托盘开始到结束车次列表
     path('production-plan-reality-analysis/', ProductionPlanRealityAnalysisView.as_view()),  # 产量计划实际分析
@@ -125,10 +134,24 @@ urlpatterns = [
     # 是否独立上岗模版
     path('independent-post-template/', IndependentPostTemplateView.as_view()),
 
-
     # 月产量完成报表
     path('daily-production-completion-report/', DailyProductionCompletionReport.as_view()),
 
+    # =============钉钉考勤======
+    # 补卡申请
+    path('reissue-card/', ReissueCardView.as_view()),
+    # 加班申请
+    path('over-time/', OverTimeView.as_view()),
+    # 考勤记录查询
+    path('attendance-record-search/', AttendanceRecordSearch.as_view()),
+    # 考勤打卡审批
+    path('attendance-result-audit/', AttendanceResultAuditView.as_view()),
     # 物料消耗统计报表
-    path('material-expend-summary/', MaterialExpendSummaryView.as_view())
+    path('material-expend-summary/', MaterialExpendSummaryView.as_view()),
+
+    # 交接班时间汇总
+    path('shift-time-summary/', ShiftTimeSummaryView.as_view()),
+    # 交接班时间汇总明细
+    path('shift-time-summary/detail/', ShiftTimeSummaryDetailView.as_view()),
+
 ]

@@ -104,7 +104,7 @@ class DinDinAPI(object):
             raise ValidationError(data.get('errmsg'))
         return data.get('recordresult')
 
-    def send_message(self, user_ids, content, order_id=0, inspection=False):
+    def send_message(self, user_ids, content, order_id=0, inspection=False, attendance=False):
         """
             发送钉钉工作消息给用户
         @param user_ids:
@@ -113,6 +113,8 @@ class DinDinAPI(object):
         message_url = "eapp://pages/workOrderList/workOrderList"
         if order_id:
             message_url = f"eapp://pages/repairOrder/repairOrder?id={order_id}" + ("&isInspection=true" if inspection else "")
+        if attendance:
+            message_url = "eapp://pages/index/index"
         data = {
             "msg": {
                 "msgtype": "oa",

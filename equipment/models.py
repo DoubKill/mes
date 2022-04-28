@@ -730,6 +730,7 @@ class EquipWarehouseOrder(AbstractEntity):
     work_order_no = models.CharField(max_length=64, help_text='工单编号', null=True, blank=True)
     barcode = models.CharField(max_length=64, help_text='领料单据', null=True, blank=True)
     processing_time = models.DateTimeField(help_text='处理时间', null=True, blank=True)
+    lluser = models.CharField(max_length=64, help_text='领料人', null=True, blank=True)
 
     class Meta:
         db_table = 'equip_warehouse_order'
@@ -758,6 +759,8 @@ class EquipWarehouseOrderDetail(AbstractEntity):
     out_quantity = models.IntegerField(help_text='已出库数量', blank=True, default=0)
     plan_in_quantity = models.IntegerField(help_text='计划入库数量', blank=True, default=0)
     plan_out_quantity = models.IntegerField(help_text='计划出库数量', blank=True, default=0)
+    enter_time = models.DateTimeField(help_text='入库时间', null=True, blank=True)
+    outer_time = models.DateTimeField(help_text='出库时间', null=True, blank=True)
     status = models.PositiveIntegerField(choices=ORDER_STATUS, help_text='状态', default=1)
 
     class Meta:

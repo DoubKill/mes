@@ -2530,11 +2530,15 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
         data = self.request.data
         in_quantity = data.get('in_quantity', 1)
         out_quantity = data.get('out_quantity', 1)
+        enter_time = data.get('enter_time', None)
+        outer_time = data.get('enter_time', None)
         status = data.get('status')  # 1 入库 2 出库
         instance = self.queryset.filter(equip_warehouse_order_id=data['equip_warehouse_order'], equip_spare_id=data['equip_spare']).first()
         query = EquipWarehouseInventory.objects.filter(equip_spare_id=data['equip_spare'], delete_flag=False,
                                                        equip_warehouse_location_id=data[
                                                            'equip_warehouse_location']).first()
+        enter_time = datetime.strptime(enter_time, '%Y-%m-%d %H:%M:%S') if enter_time else datetime.now()
+        outer_time = datetime.strptime(outer_time, '%Y-%m-%d %H:%M:%S') if outer_time else datetime.now()
         if status == 1:
             if instance.plan_in_quantity <= instance.in_quantity:
                 return Response({"success": False, "message": '该单据已入库完成', "data": None})
@@ -2543,6 +2547,7 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
             elif instance.in_quantity + in_quantity < instance.plan_in_quantity:
                 instance.status = 2  # 入库中
             instance.in_quantity += data['in_quantity']
+            instance.enter_time = enter_time
             instance.save()
 
             if query:
@@ -2574,10 +2579,10 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
             return Response({"success": True, "message": '入库成功', "data": data})
         if status == 2:
             # 出库的时候，根据出库的数量，判断库区中数量够不够
+            if not query:
+                return Response({"success": False, "message": '当前库位不存在该备件', "data": None})
             if query.quantity < out_quantity:
                 return Response({"success": False, "message": '当前库区中的数量不足', "data": None})
-            if not query:
-                return Response({"success": False, "message": '备件以删除不能出库', "data": None})
             if out_quantity > instance.plan_out_quantity - instance.out_quantity:
                 return Response({"success": False, "message": '出库数量不能大于单据出库数量', "data": None})
             if instance.plan_out_quantity <= out_quantity + instance.out_quantity:
@@ -2588,6 +2593,7 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
                 instance.status = 5  # 出库中
             query.quantity -= out_quantity
             query.save()
+            instance.outer_time = outer_time
             instance.save()
 
             # 判断出库单据是否完成
@@ -3656,11 +3662,12 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                     'job_item_sequence': item.get('job_item_sequence'),
                     'operation_result': item.get('operation_result'),
                     'unit': item.get('unit'),
-                    'abnormal_operation_url': None
+                    'abnormal_operation_url': None,
+                    'is_save': True if item.get('is_save', None) else False
                 }
                 if item.get('abnormal_operation_url'):
                     kwargs['abnormal_operation_url'] = json.dumps(item['abnormal_operation_url'])
-                kwargs.update({'work_type': '巡检', 'work_order_no': work_order_no, 'is_save': True})
+                kwargs.update({'work_type': '巡检', 'work_order_no': work_order_no})
                 if uid:  # 更新
                     EquipResultDetail.objects.filter(id=uid).update(**kwargs)
                 else:  # 新增
@@ -3772,11 +3779,12 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                         'job_item_sequence': item.get('job_item_sequence'),
                         'operation_result': item.get('operation_result'),
                         'unit': item.get('unit'),
-                        'abnormal_operation_url': None
+                        'abnormal_operation_url': None,
+                        'is_save': True if item.get('is_save', None) else False
                     }
                     if item.get('abnormal_operation_url'):
                         kwargs['abnormal_operation_url'] = json.dumps(item['abnormal_operation_url'])
-                    kwargs.update({'work_type': '巡检', 'work_order_no': work_order_no, 'is_save': True})
+                    kwargs.update({'work_type': '巡检', 'work_order_no': work_order_no})
                     if uid:  # 更新
                         EquipResultDetail.objects.filter(id=uid).update(**kwargs)
                     else:  # 新增
@@ -4561,7 +4569,8 @@ class GetSpareOrder(APIView):
                 submission_department='设备科',
                 status=1,
                 barcode=order.get('djbh'),
-                processing_time=order.get('clsj')
+                processing_time=order.get('clsj'),
+                lluser=order.get('llUser', None)
             )
             for spare in order_detail:
                 equip_spare = EquipSpareErp.objects.filter(unique_id=spare.get('wlxxid')).first()
