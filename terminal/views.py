@@ -1895,7 +1895,7 @@ class XLPlanVIewSet(ModelViewSet):
                         handle_plan_data['stop'] = ([] if not handle_plan_data.get('stop') else handle_plan_data['stop']) + [plan]
                         handle_plan_data['issue'] = ([] if not handle_plan_data.get('issue') else handle_plan_data['issue']) + [new_plan]
                     else:
-                        handle_plan_data['stop'] = ([] if not handle_plan_data.get('stop') else handle_plan_data['stop']) + [plan]
+                        handle_plan_data['delete'] = ([] if not handle_plan_data.get('delete') else handle_plan_data['delete']) + [plan.id]
                         handle_plan_data['add'] = ([] if not handle_plan_data.get('add') else handle_plan_data['add']) + [new_plan]
                 order_by_list.append(replace_order_by)
             try:
@@ -1903,16 +1903,17 @@ class XLPlanVIewSet(ModelViewSet):
                 stop_plan = handle_plan_data.get('stop')
                 issue_plan = handle_plan_data.get('issue')
                 add_plan = handle_plan_data.get('add')
+                delete_plan = handle_plan_data.get('delete')
+                # 1、删除等待的计划  2、停止运行中的计划  3、新增计划(前运行中->前等待)
+                if delete_plan:
+                    Plan.objects.using(equip_no).filter(id__in=delete_plan).delete()
                 if stop_plan:
                     # 终止运行中计划(下位机)
                     for single_stop_plan in stop_plan:
-                        if single_stop_plan.state == '运行中':
-                            time.sleep(1)  # 增加时延(称量程序接口响应时间为50ms), 防止指令下发成功但称量未处理
-                            client.stop(single_stop_plan.planid)
-                            single_stop_plan.state = '终止'
-                            single_stop_plan.save()
-                        else:
-                            single_stop_plan.delete()
+                        time.sleep(1)  # 增加时延(称量程序接口响应时间为50ms), 防止指令下发成功但称量未处理
+                        client.stop(single_stop_plan.planid)
+                        single_stop_plan.state = '终止'
+                        single_stop_plan.save()
                 if issue_plan:
                     for single_issue_plan in issue_plan:
                         time.sleep(1)  # 增加时延(称量程序接口响应时间为50m), 防止指令下发成功但称量未处理
