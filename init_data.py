@@ -973,11 +973,11 @@ permission_data = [
     {'id': 982, 'code': 'add_material_sjdj', 'name': '添加', 'parent_id': 980},
     {'id': 983, 'code': 'delete_material_sjdj', 'name': '删除', 'parent_id': 980},
 
-    {'id': 987, 'code': 'rubber_out', 'name': 'PDA胶料外发', 'parent_id': None},
-    {'id': 988, 'code': 'view_rubber_out', 'name': '查看', 'parent_id': 987},
+    {'id': 989, 'code': 'rubber_out', 'name': 'PDA胶料外发', 'parent_id': None},
+    {'id': 990, 'code': 'view_rubber_out', 'name': '查看', 'parent_id': 989},
 
-    {'id': 989, 'code': 'powder_feed', 'name': 'PDA粉料罐投料', 'parent_id': None},
-    {'id': 990, 'code': 'view_powder_feed', 'name': '查看', 'parent_id': 989},
+    {'id': 991, 'code': 'powder_feed', 'name': 'PDA粉料罐投料', 'parent_id': None},
+    {'id': 992, 'code': 'view_powder_feed', 'name': '查看', 'parent_id': 991},
 
     {'id': 991, 'code': 'shift_time_summary', 'name': '交接班时间汇总', 'parent_id': None},
     {'id': 992, 'code': 'view_shift_time_summary', 'name': '查看', 'parent_id': 991},
