@@ -2,7 +2,6 @@ from django.db import models
 from django.db.models import Sum, F, Q
 
 from basics.models import GlobalCode, Equip, EquipCategoryAttribute
-from mes import settings
 from system.models import AbstractEntity, User
 
 
@@ -138,11 +137,12 @@ class ProductBatching(AbstractEntity):
     obsolete_user = models.ForeignKey(User, help_text='弃用人', blank=True, null=True,
                                       on_delete=models.CASCADE, related_name='obsolete_batching')
     obsolete_time = models.DateTimeField(help_text='弃用时间', verbose_name='弃用时间', blank=True, null=True)
-    production_time_interval = models.DecimalField(help_text='炼胶时间(分)', blank=True, null=True,
-                                                   decimal_places=2, max_digits=8)
+    production_time_interval = models.DecimalField(help_text='炼胶时间(分)', default=0, decimal_places=2, max_digits=8)
     equip = models.ForeignKey(Equip, help_text='设备', blank=True, null=True, on_delete=models.CASCADE)
     batching_type = models.PositiveIntegerField(verbose_name='配料类型', help_text='配料类型',
                                                 choices=BATCHING_TYPE_CHOICE, default=2)
+    is_synced = models.BooleanField(default=False, help_text='是否已同步至MES')
+    is_changed = models.BooleanField(default=False, help_text='较上次同步是否做过修改')
 
     def __str__(self):
         return self.stage_product_batch_no
@@ -182,7 +182,7 @@ class ProductBatching(AbstractEntity):
             # 查看是否存在对搭设置
             mixed = self.product_batching_mixed.all()
             if mixed:
-                material_name_weight = list(sfj_details.exclude(material__material_name__in=list(mixed.values_list('f_feed_name', 's_feed_name'))).values('material__material_name', 'actual_weight', 'standard_error'))
+                material_name_weight = list(sfj_details.exclude(material__material_name__in=list(mixed.values_list('f_feed_name', 's_feed_name')[0])).values('material__material_name', 'actual_weight', 'standard_error'))
                 l_mixed = mixed.last()
                 material_name_weight += [{'material__material_name': l_mixed.f_feed_name, 'actual_weight': l_mixed.f_weight, 'standard_error': 0},
                                          {'material__material_name': l_mixed.s_feed_name, 'actual_weight': l_mixed.s_weight, 'standard_error': 0}]
@@ -429,4 +429,20 @@ class ProductBatchingMixed(models.Model):
     class Meta:
         db_table = 'product_batching_mixed'
         verbose_name_plural = verbose_name = '对搭设置表'
+
+
+class MultiReplaceMaterial(AbstractEntity):
+    """批量替换原材料履历表"""
+    product_batching = models.ForeignKey(ProductBatching, help_text='配方记录', on_delete=models.CASCADE)
+    equip_no = models.CharField(max_length=64, help_text='机台', null=True, blank=True)
+    origin_material = models.CharField(max_length=64, help_text='被替换原材料名称')
+    replace_material = models.CharField(max_length=64, help_text='替换原材料名称')
+    failed_reason = models.CharField(max_length=128, help_text='替换失败原因', null=True, blank=True)
+    status = models.CharField(max_length=4, help_text='替换结果: 成功或者失败', default='失败')
+    times = models.IntegerField(help_text='执行替换的次数')
+
+    class Meta:
+        db_table = 'multi_replace_material'
+        verbose_name_plural = verbose_name = '批量替换原材料履历表'
+
 

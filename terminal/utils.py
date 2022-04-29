@@ -724,8 +724,11 @@ def xl_c_calculate(equip_no, planid, queryset):
                     data[material_name].update(
                         {'need_weight': data[material_name]['need_weight'] + need_trains * weight})
     # 重量换算成包[通用重量25kg]
-    common_weight = 25
     for i in data.values():
+        if i['material_name'].startswith('ZNF活性剂'):
+            common_weight = 500
+        else:
+            common_weight = 25
         package_count = math.ceil(i['need_weight'] / common_weight)
         i.update({'package_count': package_count})
     return data
