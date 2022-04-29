@@ -988,7 +988,10 @@ permission_data = [
     {'id': 998, 'code': 'add_attendance_group_setup', 'name': '新增', 'parent_id': 995},
     {'id': 999, 'code': 'delete_attendance_group_setup', 'name': '删除', 'parent_id': 995},
 
-    # 下一个 1000 开始
+    {'id': 1000, 'code': 'xl_report_weight_statics', 'name': '称量机台物料统计', 'parent_id': None},
+    {'id': 1001, 'code': 'view_xl_report_weight_statics', 'name': '查看', 'parent_id': 1000},
+
+    # 下一个 1002 开始
 ]
 
 
