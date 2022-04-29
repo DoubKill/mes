@@ -1163,7 +1163,7 @@ class WeightPackageLogSerializer(BaseModelSerializer):
                             'weight': j.batching_detail_equip.actual_weight if j.batching_detail_equip else j.cnt_type_detail_equip.standard_weight,
                             'error': j.batching_detail_equip.standard_error if j.batching_detail_equip else j.cnt_type_detail_equip.standard_error,
                         })
-                    res.update({'display_manual_info': list(batch_info_res + batch_info_res)})
+                    res.update({'display_manual_info': list(batch_info_res)})
                 else:
                     res.update({'display_manual_info': msg})
             # 计算合计
