@@ -3212,9 +3212,11 @@ class PerformanceSummaryView(APIView):
             post_coefficient = section_info[section]['post_coefficient'] / 100
             post_standard = section_info[section]['post_standard']  # 1最大值 2 平均值
             for dic in item:
-                if len(dic) == 7:
-                        continue
                 equip = dic.get('equip')
+                if len(dic) == 7:
+                    equip_qty[key] = {equip: 0}
+                    equip_price[key] = {equip: 0}
+                    continue
                 for k in dic.keys():
                     if k.split('_')[-1] == 'qty':
                         state = k.split('_')[0]
