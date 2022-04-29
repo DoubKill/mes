@@ -1,6 +1,7 @@
 import hmac
 import json
 import time
+import logging
 from base64 import standard_b64encode
 from datetime import datetime
 from io import BytesIO
@@ -14,6 +15,8 @@ from rest_framework.exceptions import ValidationError
 from equipment.models import EquipApplyOrder, EquipMaintenanceAreaSetting, EquipInspectionOrder
 from mes import settings
 from system.models import User, Section
+
+logger = logging.getLogger('error_log')
 
 
 def gen_template_response(export_fields_dict, data, file_name):
@@ -78,8 +81,10 @@ class DinDinAPI(object):
         ret = requests.post(url, params={'access_token': self.access_token}, data={"mobile": phone_num}, timeout=5)
         data = json.loads(ret.text)
         if not data.get('errcode') == 0:
-            raise ValidationError(data.get('errmsg'))
-        return data.get('result').get('userid')
+            logger.error(data.get('errmsg'))
+            return ''
+        else:
+            return data.get('result').get('userid')
 
     def get_user_attendance(self, user_ids, begin_time, end_time):
         """
@@ -101,8 +106,10 @@ class DinDinAPI(object):
         ret = requests.post(url, params={'access_token': self.access_token}, json=data, timeout=5)
         data = json.loads(ret.text)
         if not data.get('errcode') == 0:
-            raise ValidationError(data.get('errmsg'))
-        return data.get('recordresult')
+            logger.error(data.get('errmsg'))
+            return []
+        else:
+            return data.get('recordresult')
 
     def send_message(self, user_ids, content, order_id=0, inspection=False, attendance=False):
         """
@@ -134,7 +141,7 @@ class DinDinAPI(object):
         ret = requests.post(url, params={'access_token': self.access_token}, json=data, timeout=5)
         data = json.loads(ret.text)
         if not data.get('errcode') == 0:
-            raise ValidationError(data.get('errmsg'))
+            logger.error(data.get('errmsg'))
 
     def auth(self, code):
         """微信认证，获取用户信息"""
