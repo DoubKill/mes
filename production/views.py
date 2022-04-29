@@ -3019,7 +3019,7 @@ class PerformanceSummaryView(APIView):
             else:
                 e_list = [item[4]]
             for equip in e_list:
-                key = f"{item[2]}_{item[3]}_{item[1]}_{equip}_{item[6]}"  # 1_A班_挤出_Z01_早班
+                key = f"{item[0]}_{item[2]}_{item[3]}_{item[1]}_{equip}_{item[6]}"  # 罗涛_1_A班_挤出_Z01_早班
                 if user_dic.get(key):  # 可能出现调岗后又换回来的情况，两次时间累加
                     user_dic[key]['actual_time'] += item[5]
                 else:
@@ -3048,7 +3048,7 @@ class PerformanceSummaryView(APIView):
             equip_dic[item['equip_no']] = item['category__category_no']
         dj_list = ProductInfoDingJi.objects.filter(is_use=True).values_list('product_name', flat=True)
         for key in user_dic.keys():
-            day, group, section, equip, classes = key.split('_')
+            name, day, group, section, equip, classes = key.split('_')
             for item in product_qty:
                 if item['equip_no'] == equip and str(item['factory_date__day']) == day and classes == item['classes']:
                     equip_type = equip_dic.get(equip)
