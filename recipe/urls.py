@@ -5,7 +5,7 @@ from recipe.views import MaterialViewSet, ProductInfoViewSet, \
     ProductBatchingViewSet, MaterialAttributeViewSet, \
     ValidateProductVersionsView, RecipeNoticeAPiView, MaterialSupplierViewSet, \
     WeighCntTypeViewSet, ProductBatchingDetailListView, ERPMaterialViewSet, ZCMaterialListView, GetERPZcMaterialAPiView, \
-    ProductDevBatchingReceive, DevTypeProductBatching
+    ProductDevBatchingReceive, DevTypeProductBatching, ReplaceRecipeMaterialViewSet, ProductBatchingNoNew
 
 router = DefaultRouter()
 
@@ -26,6 +26,9 @@ router.register(r'materials-supplier', MaterialSupplierViewSet)
 # 中策ERP原材料对应关系绑定
 router.register(r'erp-materials', ERPMaterialViewSet, basename='erp-mats')
 
+# 批量替换配方原材料
+router.register(r'replace-recipe-material', ReplaceRecipeMaterialViewSet)
+
 # 小料配方
 # router.register(r'weigh-batching', WeighBatchingViewSet)
 router.register(r'weigh-cnt-type', WeighCntTypeViewSet)
@@ -38,5 +41,6 @@ urlpatterns = [
     path('validate-versions/', ValidateProductVersionsView.as_view()),  # 验证版本号，创建胶料工艺信息前调用
     path('zc-materials-though-mes/', GetERPZcMaterialAPiView.as_view()),  # 通过mes物料名获取绑定关系的中策物料信息
     path('product-dev-batching-receive/', ProductDevBatchingReceive.as_view()),
-    path('dev-type-batching/', DevTypeProductBatching.as_view())
+    path('dev-type-batching/', DevTypeProductBatching.as_view()),
+    path('product-batching-no-new/', ProductBatchingNoNew.as_view())  # 不生成new配方修改对搭设置, 单配信息, 可用机台
     ]
