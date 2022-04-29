@@ -3408,21 +3408,21 @@ class AttendanceGroupSetupViewSet(ModelViewSet):
         else:
             return False
 
-    @action(methods=['get'], detail=False, permission_classes=[], url_path='in_group', url_name='in_group')
+    @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated, ], url_path='in_group', url_name='in_group')
     def in_group(self, request):  # 判断用户是否在考勤组
         name = self.request.user.username
-        status = False
+        state = False
         for obj in AttendanceGroupSetup.objects.all():
             if obj.principal == name:
-                status = True
+                state = True
                 break
             if name in obj.users.all().values_list('username', flat=True):
-                status = True
+                state = True
                 break
 
-        return Response({'status': status})
+        return Response({'status': state})
 
-    @action(methods=['get'], detail=False, permission_classes=[], url_path='is_section', url_name='is_section')
+    @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated, ], url_path='is_section', url_name='is_section')
     def is_section(self, request):  # 判断用户是否是设备科门或生产科
         section_id = self.request.user.section_id
         for section in ['设备科', '生产科']:
