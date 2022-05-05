@@ -1159,7 +1159,7 @@ class WeightPackageLogSerializer(BaseModelSerializer):
                         product_batching__stage_product_batch_no=product_no_dev, product_batching__dev_type__category_name=res['dev_type'])
                     for j in batch_info:
                         batch_info_res.append({
-                            'material_type': '细料' if res['equip_no'][0] == 'F' else '硫磺', 'handle_material_name': j.handle_material_name,
+                            'material_type': '细料' if res['equip_no'][0] == 'F' else '硫磺', 'handle_material_name': j.material.material_name,
                             'weight': j.batching_detail_equip.actual_weight if j.batching_detail_equip else j.cnt_type_detail_equip.standard_weight,
                             'error': j.batching_detail_equip.standard_error if j.batching_detail_equip else j.cnt_type_detail_equip.standard_error,
                         })
