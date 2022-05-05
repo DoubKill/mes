@@ -719,7 +719,10 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                 raise ValidationError(e.args[0])
             if res:
                 # 查询配方中人工配物料
-                recipe_manual = WeightPackageLogManualDetails.objects.filter(plan_weight_uid=plan_weight_uid).annotate(material_name=F('handle_material_name'), material__material_name=F('handle_material_name'), tolerance=F('error'), standard_weight=F('weight'))
+                recipe_manual = list(WeightPackageLogManualDetails.objects.filter(plan_weight_uid=plan_weight_uid)
+                                     .annotate(material_name=F('handle_material_name'), standard_weight=F('weight'),
+                                               material__material_name=F('handle_material_name'), tolerance=F('error'))
+                                     .values('material_name', 'tolerance', 'standard_weight', 'material__material_name'))
                 if not recipe_manual:
                     try:
                         if 'ONLY' in product_no:
@@ -796,9 +799,10 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         return Response({'results': results})
 
     def scan_check(self, plan_weight_uid, product_no, batching_equip, dev_type, machine_package_count, manual, already_scan_info, check_type='manual'):
-        recipe_manual = WeightPackageLogManualDetails.objects.filter(plan_weight_uid=plan_weight_uid).annotate(
-            material_name=F('handle_material_name'), material__material_name=F('handle_material_name'),
-            tolerance=F('error'), standard_weight=F('weight'))
+        recipe_manual = list(WeightPackageLogManualDetails.objects.filter(plan_weight_uid=plan_weight_uid)
+                             .annotate(material_name=F('handle_material_name'), standard_weight=F('weight'),
+                                       material__material_name=F('handle_material_name'), tolerance=F('error'))
+                             .values('material_name', 'tolerance', 'standard_weight', 'material__material_name'))
         if not recipe_manual:
             try:
                 if 'ONLY' in product_no:
@@ -893,7 +897,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                 product_batching__dev_type__category_name=dev_type)
             for j in batch_info:
                 batch_info_res.append({
-                    'material_type': type_name, 'handle_material_name': j.handle_material_name,
+                    'material_type': type_name, 'handle_material_name': j.material.material_name,
                     'weight': j.batching_detail_equip.actual_weight if j.batching_detail_equip else j.cnt_type_detail_equip.standard_weight,
                     'error': j.batching_detail_equip.standard_error if j.batching_detail_equip else j.cnt_type_detail_equip.standard_error,
                 })
