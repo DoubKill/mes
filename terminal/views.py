@@ -897,7 +897,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                 product_batching__dev_type__category_name=dev_type)
             for j in batch_info:
                 batch_info_res.append({
-                    'material_type': type_name, 'handle_material_name': j.handle_material_name,
+                    'material_type': type_name, 'handle_material_name': j.material.material_name,
                     'weight': j.batching_detail_equip.actual_weight if j.batching_detail_equip else j.cnt_type_detail_equip.standard_weight,
                     'error': j.batching_detail_equip.standard_error if j.batching_detail_equip else j.cnt_type_detail_equip.standard_error,
                 })
