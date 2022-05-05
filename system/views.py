@@ -535,17 +535,20 @@ class DingDingBind(APIView):
             dd_user_data = d.auth(auth_code)
         except Exception as err:
             raise ValidationError(str(err))
-        if DingDingInfo.objects.filter(dd_user_id=dd_user_data.get('userid')).exists():
-            raise ValidationError('改钉钉已绑定其他MES账号！')
-        if DingDingInfo.objects.filter(user__username=username).exists():
-            raise ValidationError('MES账号已绑定其他钉钉账号！')
-        dd_data = {
-            "user": user,
-            "dd_user_id": dd_user_data.get('userid'),
-            "associated_unionid": dd_user_data.get('associated_unionid'),
-            "unionid": dd_user_data.get('unionid'),
-        }
-        DingDingInfo.objects.create(**dd_data)
+        dd_user = DingDingInfo.objects.filter(dd_user_id=dd_user_data.get('userid')).first()
+        if dd_user:
+            if dd_user.user_id != user.id:
+                raise ValidationError('该钉钉账号已绑定其他MES账号！')
+        else:
+            if DingDingInfo.objects.filter(user__username=username).exists():
+                raise ValidationError('该MES账号已绑定其他钉钉账号！')
+            dd_data = {
+                "user": user,
+                "dd_user_id": dd_user_data.get('userid'),
+                "associated_unionid": dd_user_data.get('associated_unionid'),
+                "unionid": dd_user_data.get('unionid'),
+            }
+            DingDingInfo.objects.create(**dd_data)
         payload = zdy_jwt_payload_handler(user)
         token = jwt_encode_handler(payload)
         return Response({"permissions": user.permissions_list,
