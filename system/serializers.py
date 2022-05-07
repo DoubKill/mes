@@ -64,6 +64,10 @@ class UserSerializer(BaseModelSerializer):
     is_active = serializers.BooleanField(read_only=True)
     num = serializers.CharField(validators=[UniqueValidator(queryset=User.objects.all(), message='该员工工号已存在')])
     section_name = serializers.CharField(source="section.name", default="", read_only=True)
+    group_names = serializers.SerializerMethodField()
+
+    def get_group_names(self, obj):
+        return '/'.join(list(obj.group_extensions.values_list('name', flat=True)))
 
     def to_representation(self, instance):
         instance = super().to_representation(instance)
