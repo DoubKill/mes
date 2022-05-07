@@ -168,19 +168,21 @@ class ProductBatching(AbstractEntity):
         return material_names
 
     def get_product_batch(self, classes_plan):
-        equip_no, plan_classes_uid = classes_plan.equip.equip_no, classes_plan.plan_classes_uid
+        equip_no, dev_type, plan_classes_uid = classes_plan.equip.equip_no, classes_plan.equip.category.category_no, classes_plan.plan_classes_uid
         material_name_weight, cnt_type_details = [], []
         # 获取机台配方
         sfj_recipe = ProductBatching.objects.using('SFJ').filter(stage_product_batch_no=self.stage_product_batch_no,
                                                                  used_type=4, delete_flag=False, equip__equip_no=equip_no,
-                                                                 dev_type__category_no=self.dev_type.category_no).first()
+                                                                 dev_type__category_no=dev_type).first()
         if sfj_recipe:
             sfj_details = ProductBatchingDetail.objects.using('SFJ').filter(~Q(material__material_name__icontains='待处理料'),
                                                                             ~Q(material__material_name__icontains='掺料'),
                                                                             product_batching=sfj_recipe,
                                                                             delete_flag=False, type=1)
             # 查看是否存在对搭设置
-            mixed = self.product_batching_mixed.all()
+            mixed = ProductBatchingMixed.objects.filter(product_batching__stage_product_batch_no=self.stage_product_batch_no,
+                                                        product_batching__used_type=4, product_batching__delete_flag=False,
+                                                        product_batching__dev_type__category_no=dev_type)
             if mixed:
                 material_name_weight = list(sfj_details.exclude(material__material_name__in=list(mixed.values_list('f_feed_name', 's_feed_name')[0])).values('material__material_name', 'actual_weight', 'standard_error'))
                 l_mixed = mixed.last()
@@ -196,7 +198,7 @@ class ProductBatching(AbstractEntity):
                                                                 ~Q(feeding_mode__startswith='P'),
                                                                 ~Q(feeding_mode__startswith='R')),
                                                               product_batching__stage_product_batch_no=self.stage_product_batch_no,
-                                                              product_batching__dev_type__category_name=self.dev_type.category_no,
+                                                              product_batching__dev_type__category_name=dev_type,
                                                               equip_no=equip_no, is_used=True, type=4,
                                                               cnt_type_detail_equip__delete_flag=False)
                 cnt_type_details += list(details.annotate(actual_weight=F('cnt_type_detail_equip__standard_weight'),
