@@ -14,6 +14,7 @@ from suds.client import Client
 
 from basics.models import WorkSchedulePlan
 from inventory.conf import cb_ip, cb_port
+from inventory.models import MaterialOutHistory
 from inventory.utils import wms_out
 from mes.settings import DATABASES
 from plan.models import BatchingClassesPlan
@@ -325,16 +326,35 @@ def out_task_carbon(task_id, station_no, material_no, material_name, need_weight
 
 def material_out_barcode(bar_code):
     """获取出库条码信息"""
-    url = 'http://10.1.10.157:9091/WebService.asmx?wsdl'
-    try:
-        client = Client(url)
-        json_data = {"tofac": "AJ1", "tmh": bar_code}
-        data = client.service.FindZcdtmList(json.dumps(json_data))
-    except Exception:
-        raise ValueError('网络异常')
-    data = json.loads(data)
-    ret = data.get('Table')
-    return ret[0] if ret else ''
+    # 优先查询原材料出库信息，其次是总厂原材料信息
+    flag, ret = False, ''
+    wms_info = MaterialOutHistory.objects.using('wms').filter(lot_no=bar_code).last()
+    if wms_info:
+        try:
+            PH = wms_info.batch_no
+            SCRQ = wms_info.batch_no[:8]
+            SM_CREATE = f'{PH[:4]}-{PH[4:6]}-{PH[6:8]} {PH[8:10]}:{PH[10:12]}:00'
+            DDH = f'RKD{SCRQ}001'
+            SYQX = (datetime.strptime(SM_CREATE, '%Y-%m-%d %H:%M:%S') + timedelta(days=364)).strftime('%Y-%m-%d')
+            ret = {'WLXXID': wms_info.material_no, 'TMH': bar_code, 'BZDW': wms_info.standard_unit, 'SL': wms_info.piece_count,
+                   'ZL': wms_info.weight, 'SCRQ': SCRQ, 'TOFAC': 'AJ1', 'SM_CREATE': SM_CREATE, 'WLDWMC': wms_info.supplier,
+                   'WLMC': wms_info.material_name, 'CD': '参见供应商', 'SYQX': SYQX, 'PH': PH, 'DDH': DDH, 'ZSL': wms_info.zc_num}
+        except Exception as e:
+            flag = True
+    else:
+        flag = True
+    if flag:
+        url = 'http://10.1.10.157:9091/WebService.asmx?wsdl'
+        try:
+            client = Client(url)
+            json_data = {"tofac": "AJ1", "tmh": bar_code}
+            data = client.service.FindZcdtmList(json.dumps(json_data))
+        except Exception as e:
+            raise ValueError('网络异常: 无法获取总厂数据')
+        data = json.loads(data)
+        if data.get('Table'):
+            ret = data.get('Table')[0]
+    return ret
 
 
 # @atomic()
