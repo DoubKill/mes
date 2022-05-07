@@ -335,7 +335,7 @@ class AutoDispatch(object):
             url = self.get_group_url()
             send_ding_msg(url=url, secret=self.group_secret, msg=msg, isAtAll=False)
             logger.info(f"系统派单[{order.work_type}]-系统自动派单成功: {order.work_order_no}, 被指派人:{per['username']}")
-            continue
+            break
 
         if len(processing_person) == len(working_persons):
             # 所有人都在忙, 派单失败, 钉钉消息推送给上级
