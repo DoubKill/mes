@@ -172,8 +172,7 @@ class ProductBatching(AbstractEntity):
         material_name_weight, cnt_type_details = [], []
         # 获取机台配方
         sfj_recipe = ProductBatching.objects.using('SFJ').filter(stage_product_batch_no=self.stage_product_batch_no,
-                                                                 used_type=4, delete_flag=False, equip__equip_no=equip_no,
-                                                                 dev_type__category_no=dev_type).first()
+                                                                 used_type=4, delete_flag=False, equip__equip_no=equip_no).first()
         if sfj_recipe:
             sfj_details = ProductBatchingDetail.objects.using('SFJ').filter(~Q(material__material_name__icontains='待处理料'),
                                                                             ~Q(material__material_name__icontains='掺料'),
