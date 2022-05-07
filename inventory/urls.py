@@ -216,5 +216,7 @@ urlpatterns = [
     path('product-details/', ProductDetailsView.as_view()),            # 胶料车间库存明细
 
     # 线边库快检信息
-    path('pallet-test-result/', PalletTestResultView.as_view())
+    path('pallet-test-result/', PalletTestResultView.as_view()),
+    path('product-expires-list/', ProductExpireListView.as_view()),  # 胶料即将超期预警
+    path('product-expires-details/', ProductExpireDetailView.as_view())  # 胶料即将超期预警详情
 ]

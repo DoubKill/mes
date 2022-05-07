@@ -28,11 +28,12 @@ class MaterialAttribute(AbstractEntity):
     """原材料属性"""
     material = models.OneToOneField(Material, help_text='原材料', verbose_name='原材料',
                                     on_delete=models.CASCADE, related_name='material_attr', null=True, blank=True)
-    safety_inventory = models.PositiveIntegerField(help_text='安全库存标准', verbose_name='安全库存标准')
-    period_of_validity = models.PositiveIntegerField(help_text='有效期', verbose_name='有效期')
+    safety_inventory = models.PositiveIntegerField(help_text='安全库存标准', verbose_name='安全库存标准', null=True, blank=True)
+    period_of_validity = models.PositiveIntegerField(help_text='有效期', verbose_name='有效期', null=True, blank=True)
     validity_unit = models.CharField(verbose_name='有效期单位', help_text='有效期单位', max_length=8, default="天")
     ratio = models.DecimalField(max_digits=8, decimal_places=2, default=100.00, verbose_name='抽检比例', help_text='抽检比例')
     send_flag = models.BooleanField(default=False, verbose_name='抽检比例是否已发送标志', help_text='抽检比例是否已发送标志')
+    storage_time = models.PositiveIntegerField(verbose_name='放置时间（小时）', help_text='放置时间（小时）', null=True, blank=True)
 
     class Meta:
         db_table = 'material_attribute'
@@ -41,7 +42,8 @@ class MaterialAttribute(AbstractEntity):
 
 class MaterialSupplier(AbstractEntity):
     """原材料产地"""
-    material = models.ForeignKey(Material, help_text='原材料', verbose_name='原材料', on_delete=models.CASCADE)
+    material = models.ForeignKey(Material, help_text='原材料', verbose_name='原材料', on_delete=models.CASCADE,
+                                 related_name='suppliers')
     supplier_no = models.CharField(max_length=64, help_text='产地编码', verbose_name='编码', unique=True)
     provenance = models.CharField(max_length=64, help_text='产地', verbose_name='产地')
     use_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用', default=True)

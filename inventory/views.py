@@ -5895,3 +5895,128 @@ class HFRealStatusView(APIView):
             raise ValidationError(e.args[0])
         else:
             return Response(res)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductExpireListView(APIView):
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'product_expire_query'}))
+
+    def get(self, request):
+        expire_days = self.request.query_params.get('expire_days', 30)
+        warehouse_name = self.request.query_params.get('warehouse_name')
+        stage = self.request.query_params.get('stage')
+        page = self.request.query_params.get('page', 1)
+        page_size = self.request.query_params.get('page_size', 15)
+        st = (int(page) - 1) * int(page_size)
+        et = int(page) * int(page_size)
+        filter_kwargs = {}
+        if stage:
+            filter_kwargs['material_no__icontains'] = '-{}'.format(stage)
+        if warehouse_name == '混炼胶库':
+            product_data = BzFinalMixingRubberInventory.objects.using('bz').filter(**filter_kwargs).values(
+                'material_no', 'in_storage_time', 'qty', 'total_weight', 'quality_level')
+        elif warehouse_name == '终炼胶库':
+            product_data = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(store_name='炼胶库').filter(**filter_kwargs).values(
+                'material_no', 'in_storage_time', 'qty', 'total_weight', 'quality_level')
+        else:
+            m_data = list(BzFinalMixingRubberInventory.objects.using('bz').filter(**filter_kwargs).values(
+                'material_no', 'in_storage_time', 'qty', 'total_weight', 'quality_level'))
+            f_data = list(BzFinalMixingRubberInventoryLB.objects.using('lb').filter(store_name='炼胶库').filter(**filter_kwargs).values(
+                'material_no', 'in_storage_time', 'qty', 'total_weight', 'quality_level'))
+            product_data = m_data + f_data
+
+        product_validity_dict = dict(MaterialAttribute.objects.filter(
+            period_of_validity__isnull=False
+        ).values_list('material__material_no', 'period_of_validity'))
+        ret = {}
+        for m in product_data:
+            material_no = m['material_no']
+            quality_level = m['quality_level']
+            key = material_no + '-' + quality_level
+            period_of_validity = product_validity_dict.get(m['material_no'])
+            if period_of_validity:
+                if (period_of_validity * 24 * 60 * 60 - (
+                        datetime.datetime.now() - m['in_storage_time']).total_seconds()) <= int(
+                        expire_days) * 24 * 60 * 60:
+                    if key in ret:
+                        ret[key]['qty'] += m['qty']
+                        ret[key]['total_weight'] += m['total_weight']
+                    else:
+                        ret[key] = {'material_no': material_no,
+                                    'qty': m['qty'],
+                                    'total_weight': m['total_weight'],
+                                    'quality_status': quality_level}
+        temp = list(ret.values())
+        count = len(temp)
+        data = temp[st:et]
+        total_weight = sum([i['qty'] for i in temp])
+        total_quantity = sum([i['total_weight'] for i in temp])
+        return Response({'results': data, "count": count, 'total_weight': total_weight, 'total_quantity': total_quantity})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductExpireDetailView(APIView):
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'product_expire_query'}))
+    EXPORT_FIELDS_DICT = {'库区': 'store_name',
+                            '胶料名称': 'material_no',
+                            '追踪码': 'lot_no',
+                            '托盘号': 'container_no',
+                            '库存位': 'location',
+                            '车数': 'qty',
+                            '重量（kg）': 'total_weight',
+                            '品质状态': 'quality_level',
+                            '入库时间': 'in_storage_time',
+                            '有效期至': 'expire_time',
+                            '剩余有效天数': 'left_days'}
+    FILE_NAME = '库位明细'
+
+    def get(self, request):
+        expire_days = self.request.query_params.get('expire_days', 30)
+        warehouse_name = self.request.query_params.get('warehouse_name')
+        material_no = self.request.query_params.get('material_no')
+        quality_status = self.request.query_params.get('quality_status')
+        export = self.request.query_params.get('export')
+        page = self.request.query_params.get('page', 1)
+        page_size = self.request.query_params.get('page_size', 15)
+        st = (int(page) - 1) * int(page_size)
+        et = int(page) * int(page_size)
+        filter_kwargs = {}
+        if material_no:
+            filter_kwargs['material_no'] = material_no
+        if quality_status:
+            filter_kwargs['quality_level'] = quality_status
+        if warehouse_name == '混炼胶库':
+            product_data = BzFinalMixingRubberInventory.objects.using('bz').filter(**filter_kwargs).values()
+        elif warehouse_name == '终炼胶库':
+            product_data = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(store_name='炼胶库').filter(
+                **filter_kwargs).values()
+        else:
+            m_data = list(BzFinalMixingRubberInventory.objects.using('bz').filter(**filter_kwargs).values())
+            f_data = list(BzFinalMixingRubberInventoryLB.objects.using('lb').filter(store_name='炼胶库').filter(**filter_kwargs).values())
+            product_data = m_data + f_data
+
+        product_validity_dict = dict(MaterialAttribute.objects.filter(
+            period_of_validity__isnull=False
+        ).values_list('material__material_no', 'period_of_validity'))
+        temp = []
+        now_time = datetime.datetime.now()
+        for m in product_data:
+            period_of_validity = product_validity_dict.get(m['material_no'])
+            in_storage_time = m['in_storage_time']
+            if period_of_validity:
+                if (period_of_validity * 24 * 60 * 60 - (
+                        now_time - m['in_storage_time']).total_seconds()) <= int(
+                        expire_days) * 24 * 60 * 60:
+                    expire_date = in_storage_time + datetime.timedelta(days=period_of_validity)
+                    m['expire_time'] = expire_date.strftime("%Y-%m-%d %H:%M:%S")
+                    m['in_storage_time'] = in_storage_time.strftime("%Y-%m-%d %H:%M:%S")
+                    m['left_days'] = expire_date.__sub__(now_time).days
+                    temp.append(m)
+        if export:
+            return gen_template_response(self.EXPORT_FIELDS_DICT, temp, self.FILE_NAME)
+        count = len(temp)
+        data = temp[st:et]
+        total_weight = sum([i['total_weight'] for i in temp])
+        total_quantity = sum([i['qty'] for i in temp])
+        return Response(
+            {'results': data, "count": count, 'total_weight': total_weight, 'total_quantity': total_quantity})
