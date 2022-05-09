@@ -3431,7 +3431,7 @@ class AttendanceGroupSetupViewSet(ModelViewSet):
             self.option = True
             self.get_section(section, section_id)
             if not self.option:
-                return Response({'section': section})
+                return Response({'section': section, "permissions": self.request.user.permissions_list})
         return Response({'section': None, "permissions": self.request.user.permissions_list})
 
 
