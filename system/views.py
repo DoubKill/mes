@@ -457,6 +457,10 @@ class IdentityCard(APIView):
     def post(self, request):
         user = self.request.user
         id_card = self.request.data.get('id_card')
+        try:
+            id_card = str(id_card)
+        except Exception:
+            raise ValidationError('参数错误！')
         jy = id_card[len(id_card) - 1:len(id_card)]  # 截取校验位
         if len(id_card) == 18:  # 判断输入的身份证号是否为18位
             if not id_card[0:17].isdigit():
@@ -467,7 +471,7 @@ class IdentityCard(APIView):
                 e = id_card[i - 1:i]
                 s = s + int(e) * x[i - 1]
             b = s % 11
-            y = ("1", "O", "X", "9", "8", "7", "6", "5", "4", "3", "2")
+            y = ("1", "0", "X", "9", "8", "7", "6", "5", "4", "3", "2")
             c = y[b]
             if jy == c:  # 判断校验位是否相同
                 user.id_card_num = id_card
