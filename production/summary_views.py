@@ -353,7 +353,7 @@ class CutTimeCollect(APIView):
     """规格切换时间汇总"""
     EXPORT_FIELDS_DICT = {'时间': "time", '设备编码': "equip_no", '切换前计划号': "plan_classes_uid_age", '切换后计划号': "plan_classes_uid_later", '切换前胶料编码': "cut_ago_product_no", '切换后胶料编码': "cut_later_product_no", '切换规格耗时（秒）': "normal_cut_time_consumer", '异常时间(秒）': 'err_cut_time_consumer'}
     FILE_NAME = '规格切换时间汇总'
-    permission_classes = (IsAuthenticated, PermissionClass({'view': 'product_exchange_consume'}))
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_product_exchange_consume'}))
 
     def get(self, request, *args, **kwargs):
         # 筛选工厂
@@ -369,7 +369,7 @@ class CutTimeCollect(APIView):
             e_time = datetime.datetime.strptime(et, '%Y-%m-%d')
         except Exception:
             raise ValidationError('日期错误！')
-        filter_kwargs = {}
+        filter_kwargs = {'classes__isnull': False}
         if st:
             filter_kwargs['factory_date__gte'] = s_time
         if et:
@@ -400,7 +400,7 @@ class CutTimeCollect(APIView):
             time_consuming = int((next_st_time - item['et_time']).total_seconds())
             data = dict()
             data['group'] = factory_classes_group_map_dict[key]['group__global_name']
-            if time_consuming >= 1000:
+            if abs(time_consuming) >= 1000 or time_consuming <= 0:
                 data['err_cut_time_consumer'] = time_consuming
                 data['normal_cut_time_consumer'] = None
             else:
@@ -848,7 +848,7 @@ class IndexEquipMaintenanceAnalyze(IndexOverview):
 
 @method_decorator([api_recorder], name="dispatch")
 class CutTimeCollectSummary(APIView):
-    permission_classes = (IsAuthenticated, PermissionClass({'view': 'product_exchange_consume'}))
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_product_exchange_consume'}))
 
     def get(self, request):
         st = self.request.query_params.get('st')
@@ -856,11 +856,11 @@ class CutTimeCollectSummary(APIView):
         classes = self.request.query_params.get('classes')
         group = self.request.query_params.get('group')
         try:
-            e_time = datetime.datetime.strptime(st, '%Y-%m-%d')
-            s_time = datetime.datetime.strptime(et, '%Y-%m-%d')
+            s_time = datetime.datetime.strptime(st, '%Y-%m-%d')
+            e_time = datetime.datetime.strptime(et, '%Y-%m-%d')
         except Exception:
             raise ValidationError('日期错误！')
-        filter_kwargs = {}
+        filter_kwargs = {'classes__isnull': False}
         if st:
             filter_kwargs['factory_date__gte'] = s_time
         if et:
@@ -900,7 +900,7 @@ class CutTimeCollectSummary(APIView):
                             'group': factory_classes_group_map_dict[key]['group__global_name'],
                             }
             avg_cut_time_consume = int(ret[key][item['equip_no']] / ret[key][item['equip_no'] + 'cnt'])
-            if avg_cut_time_consume >= 1000:
+            if abs(avg_cut_time_consume) >= 1000 or avg_cut_time_consume <= 0:
                 err_cut_time_consumer = avg_cut_time_consume
                 normal_cut_time_consumer = None
             else:
