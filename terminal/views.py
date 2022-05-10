@@ -1168,6 +1168,11 @@ class WeightPackageCViewSet(ListModelMixin, UpdateModelMixin, GenericViewSet):
         serializer = []
         if print_data:
             serializer = WeightPackageLogSerializer(print_data, many=True).data
+            # display_manual_info(人工配信息统一格式给终端处理[字符串->[], []不变])
+            for i in serializer:
+                display_manual_info = i.get('display_manual_info')
+                if display_manual_info and isinstance(display_manual_info, str):
+                    i.update({'display_manual_info': []})
         return Response({"results": serializer})
 
     def update(self, request, *args, **kwargs):
