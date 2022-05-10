@@ -6,13 +6,12 @@ import math
 import random
 import re
 import time
-from io import BytesIO, StringIO
+from io import BytesIO
 
 import requests
 import xlwt
-from itertools import chain
 from django.core.paginator import Paginator
-from django.db.models import Sum, Count, Q, F, Prefetch
+from django.db.models import Sum, Count, Q, F
 from django.db.transaction import atomic
 from django.forms import model_to_dict
 from django.http import HttpResponse
@@ -21,10 +20,9 @@ from django.utils.decorators import method_decorator
 from rest_framework import mixins, viewsets, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
-from rest_framework.generics import ListAPIView
-from rest_framework.mixins import CreateModelMixin, ListModelMixin, UpdateModelMixin, RetrieveModelMixin
+from rest_framework.mixins import UpdateModelMixin, RetrieveModelMixin
 from rest_framework.generics import ListAPIView, GenericAPIView
-from rest_framework.mixins import CreateModelMixin, ListModelMixin
+from rest_framework.mixins import ListModelMixin
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -43,7 +41,7 @@ from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMate
     BzFinalMixingRubberInventoryLB, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
     MixGumOutInventoryLog, MixGumInInventoryLog, DeliveryPlanFinal, MaterialOutPlan, BarcodeQuality, \
     MaterialOutHistory, FinalGumOutInventoryLog, Depot, \
-    DepotSite, DepotPallt, Sulfur, SulfurDepot, SulfurDepotSite, MaterialInHistory, MaterialInventoryLog, \
+    DepotSite, DepotPallt, Sulfur, SulfurDepot, SulfurDepotSite, MaterialInHistory, \
     CarbonOutPlan, FinalRubberyOutBoundOrder, MixinRubberyOutBoundOrder, FinalGumInInventoryLog, OutBoundDeliveryOrder, \
     OutBoundDeliveryOrderDetail, WMSReleaseLog, WmsInventoryMaterial, WMSMaterialSafetySettings, WmsNucleinManagement, \
     WMSExceptHandle, MaterialOutHistoryOther, MaterialOutboundOrder, MaterialEntrance
@@ -64,7 +62,7 @@ from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
 from mes import settings
-from mes.common_code import SqlClient, OSum
+from mes.common_code import SqlClient
 from mes.conf import WMS_CONF, TH_CONF, WMS_URL, TH_URL, HF_CONF
 from mes.derorators import api_recorder
 from django_filters.rest_framework import DjangoFilterBackend
@@ -72,22 +70,21 @@ from rest_framework import permissions
 
 from mes.paginations import SinglePageNumberPagination
 from mes.permissions import PermissionClass
-from mes.settings import DEBUG
-from plan.models import ProductClassesPlan, ProductBatchingClassesPlan, BatchingClassesPlan
+from mes.settings import DEBUG, DATABASES
+from plan.models import ProductClassesPlan, BatchingClassesPlan
 from production.models import PalletFeedbacks, TrainsFeedbacks
 from quality.deal_result import receive_deal_result
-from quality.models import LabelPrint, Train, MaterialDealResult, LabelPrintLog, ExamineMaterial
+from quality.models import LabelPrint, MaterialDealResult, LabelPrintLog, ExamineMaterial
 from quality.serializers import MaterialDealResultListSerializer
 from quality.utils import update_wms_quality_result
-from recipe.models import Material, MaterialAttribute
-from system.models import User
+from recipe.models import MaterialAttribute
 from terminal.models import LoadMaterialLog, WeightBatchingLog, WeightPackageLog
-from .conf import wms_ip, wms_port, IS_BZ_USING
+from .conf import IS_BZ_USING
 from .conf import wms_ip, wms_port, cb_ip, cb_port
 from .models import MaterialInventory as XBMaterialInventory
 from .models import BzFinalMixingRubberInventory
 from .serializers import XBKMaterialInventorySerializer
-from .utils import export_xls, OUTWORKUploader, OUTWORKUploaderLB, HFSystem
+from .utils import OUTWORKUploader, OUTWORKUploaderLB, HFSystem
 
 logger = logging.getLogger('send_log')
 
@@ -2679,7 +2676,7 @@ class WmsStorageView(ListAPIView):
                 data = serializer.data
             else:
                 data = self.get_serializer(queryset, many=True).data
-            return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
         data = self.get_paginated_response(serializer.data).data
         sum_data = queryset.aggregate(total_weight=Sum('total_weight'),
                                       total_trains=Sum('qty'))
@@ -6020,3 +6017,149 @@ class ProductExpireDetailView(APIView):
         total_quantity = sum([i['qty'] for i in temp])
         return Response(
             {'results': data, "count": count, 'total_weight': total_weight, 'total_quantity': total_quantity})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductInOutHistoryView(APIView):
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'in_out_history'}))
+    EXPORT_FIELDS_DICT = {'质检条码': 'lot_no',
+                          '入库单号': 'inbound_order_no',
+                          '入库发起时间': 'inbound_time',
+                          '出库单号': 'outbound_order_no',
+                          '出库发起人': 'outbound_user',
+                          '出库发起时间': 'outbound_time',
+                          '巷道': 'location',
+                          '托盘号': 'pallet_no',
+                          '物料编码': 'product_no',
+                          '出入库数': 'qty',
+                          '重量(kg)': 'weight'}
+    FILE_NAME = '出入库履历'
+
+    def get(self, request):
+        warehouse_name = self.request.query_params.get('warehouse_name')
+        in_st = self.request.query_params.get('in_st')
+        in_et = self.request.query_params.get('in_et')
+        out_st = self.request.query_params.get('out_st')
+        out_et = self.request.query_params.get('out_et')
+        tunnel = self.request.query_params.get('tunnel')
+        product_no = self.request.query_params.get('product_no')
+        order_no = self.request.query_params.get('order_no')
+        pallet_no = self.request.query_params.get('pallet_no')
+        lot_no = self.request.query_params.get('lot_no')
+        page = int(self.request.query_params.get('page', 1))
+        page_size = int(self.request.query_params.get('page_size', 10))
+        export = self.request.query_params.get('export')
+        if not warehouse_name:
+            raise ValidationError('请选择库区！')
+        if warehouse_name == '混炼胶库':
+            database_conf = {'host': DATABASES['bz']['HOST'],
+                             'user': DATABASES['bz']['USER'],
+                             'password': DATABASES['bz']['PASSWORD'],
+                             'database': DATABASES['bz']['NAME']}
+        else:
+            database_conf = {'host': DATABASES['lb']['HOST'],
+                             'user': DATABASES['lb']['USER'],
+                             'password': DATABASES['lb']['PASSWORD'],
+                             'database': DATABASES['lb']['NAME']}
+        extra_where_str = ""
+        pagination_str = "OFFSET {} ROWS FETCH FIRST {} ROWS ONLY".format((page-1)*page_size, page_size)
+        if in_st:
+            extra_where_str += "where a.LTIME>='{}'".format(in_st)
+        if in_et:
+            if extra_where_str:
+                extra_where_str += " and a.LTIME<='{}'".format(in_et)
+            else:
+                extra_where_str += "where a.LTIME<='{}'".format(in_et)
+        if out_st:
+            if extra_where_str:
+                extra_where_str += " and b.DEALTIME>='{}'".format(out_st)
+            else:
+                extra_where_str += "where b.DEALTIME>='{}'".format(out_st)
+        if out_et:
+            if extra_where_str:
+                extra_where_str += " and b.DEALTIME<='{}'".format(out_et)
+            else:
+                extra_where_str += "where b.DEALTIME<='{}'".format(out_et)
+        if tunnel:
+            if extra_where_str:
+                extra_where_str += " and a.CID like '{}%' or b.CID like '{}%'".format(tunnel, tunnel)
+            else:
+                extra_where_str += "where a.CID like '{}%' or b.CID like '{}%'".format(tunnel, tunnel)
+        if product_no:
+            if extra_where_str:
+                extra_where_str += " and a.MATNAME like '%{}%' or b.MID like '%{}%'".format(product_no, product_no)
+            else:
+                extra_where_str += "where a.MATNAME like '%{}%' or b.MID like '%{}%'".format(product_no, product_no)
+        if order_no:
+            if extra_where_str:
+                extra_where_str += " and a.BILLID like '%{}%' or b.BILLID like '%{}%'".format(order_no, order_no)
+            else:
+                extra_where_str += "where a.BILLID like '%{}%' or b.BILLID like '%{}%'".format(order_no, order_no)
+        if pallet_no:
+            if extra_where_str:
+                extra_where_str += " and a.PALLETID like '%{}%' or b.PALLETID like '%{}%'".format(pallet_no, pallet_no)
+            else:
+                extra_where_str += "where a.PALLETID like '%{}%' or b.PALLETID like '%{}%'".format(pallet_no, pallet_no)
+        if lot_no:
+            if extra_where_str:
+                extra_where_str += " and a.LotNo like '%{}%' or b.Lot_no like '%{}%'".format(lot_no, lot_no)
+            else:
+                extra_where_str += "where a.LotNo like '%{}%' or b.Lot_no like '%{}%'".format(lot_no, lot_no)
+        if export:
+            pagination_str = ""
+        sql = """select
+       a.LotNo,
+       a.BILLID,
+       a.LTIME,
+       b.BILLID,
+       b.OutUser,
+       b.DEALTIME,
+       a.CID,
+       a.PALLETID,
+       a.MATNAME,
+       a.NUM,
+       a.SWEIGHT,
+       b.Lot_no,
+       b.CID,
+       b.PALLETID,
+       b.MID,
+       b.CarNum,
+       b.Weight
+from v_ASRS_LOG_IN_OPREATE_MESVIEW a
+full outer join v_ASRS_TO_MES_RE_MESVIEW b on a.LotNo=b.Lot_no and a.PALLETID=b.PALLETID and a.MATNAME=b.MID
+{} order by a.LTIME desc {}""".format(extra_where_str, pagination_str)
+        sc = SqlClient(sql=sql, **database_conf)
+        temp = sc.all()
+        result = []
+        count_sql = """select 
+        count(*)
+        from v_ASRS_LOG_IN_OPREATE_MESVIEW a 
+        full outer join v_ASRS_TO_MES_RE_MESVIEW b on a.LotNo=b.Lot_no and a.PALLETID=b.PALLETID and a.MATNAME=b.MID {}
+        """.format(extra_where_str)
+        print(sql)
+        sc = SqlClient(sql=count_sql, **database_conf)
+        temp2 = sc.all()
+        count = temp2[0][0]
+        outbound_order_nos = [i[3] for i in temp]
+        outbound_order_dict = dict(OutBoundDeliveryOrderDetail.objects.filter(
+            order_no__in=outbound_order_nos).values_list('order_no', 'created_user__username'))
+        for item in temp:
+            result.append(
+                {
+                    'lot_no': item[0] if item[0] else item[11],
+                    'inbound_order_no': item[1],
+                    'inbound_time': '' if not item[2] else item[2].strftime('%Y-%m-%d %H:%M:%S'),
+                    'outbound_order_no': item[3],
+                    'outbound_user': outbound_order_dict.get(item[3], 'MES'),
+                    'outbound_time': '' if not item[5] else item[5].strftime('%Y-%m-%d %H:%M:%S'),
+                    'location': item[6] if item[6] else item[12],
+                    'pallet_no': item[7] if item[7] else item[13],
+                    'product_no': item[8] if item[8] else item[14],
+                    'qty': item[9] if item[9] else item[15],
+                    'weight': item[10] if item[10] else item[16]
+                }
+            )
+        sc.close()
+        if export:
+            return gen_template_response(self.EXPORT_FIELDS_DICT, result, self.FILE_NAME)
+        return Response({'result': result, 'count': count})
