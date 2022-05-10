@@ -6136,7 +6136,6 @@ full outer join v_ASRS_TO_MES_RE_MESVIEW b on a.LotNo=b.Lot_no and a.PALLETID=b.
         from v_ASRS_LOG_IN_OPREATE_MESVIEW a 
         full outer join v_ASRS_TO_MES_RE_MESVIEW b on a.LotNo=b.Lot_no and a.PALLETID=b.PALLETID and a.MATNAME=b.MID {}
         """.format(extra_where_str)
-        print(sql)
         sc = SqlClient(sql=count_sql, **database_conf)
         temp2 = sc.all()
         count = temp2[0][0]
@@ -6150,7 +6149,7 @@ full outer join v_ASRS_TO_MES_RE_MESVIEW b on a.LotNo=b.Lot_no and a.PALLETID=b.
                     'inbound_order_no': item[1],
                     'inbound_time': '' if not item[2] else item[2].strftime('%Y-%m-%d %H:%M:%S'),
                     'outbound_order_no': item[3],
-                    'outbound_user': outbound_order_dict.get(item[3], 'MES'),
+                    'outbound_user': outbound_order_dict.get(item[3], ''),
                     'outbound_time': '' if not item[5] else item[5].strftime('%Y-%m-%d %H:%M:%S'),
                     'location': item[6] if item[6] else item[12],
                     'pallet_no': item[7] if item[7] else item[13],

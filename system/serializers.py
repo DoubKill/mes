@@ -8,6 +8,7 @@ update_time:
 from django.contrib.auth.hashers import make_password
 
 from django.contrib.auth.models import Permission
+from django.db.models import Q
 from django.db.transaction import atomic
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
@@ -320,12 +321,12 @@ class UserImportSerializer(BaseModelSerializer):
     group_extensions = serializers.CharField(max_length=512, allow_null=True, allow_blank=True)
 
     def validate(self, attrs):
-        username = attrs['username']
-        num = attrs['num']
-        if User.objects.filter(username=username).exists():
-            raise serializers.ValidationError('已存在一位使用该名字的用户：{}'.format(username))
-        if User.objects.filter(num=num).exists():
-            raise serializers.ValidationError('已存在一位使用该工号的用户：{}'.format(num))
+        # username = attrs['username']
+        # num = attrs['num']
+        # if User.objects.filter(username=username).exists():
+        #     raise serializers.ValidationError('已存在一位使用该名字的用户：{}'.format(username))
+        # if User.objects.filter(num=num).exists():
+        #     raise serializers.ValidationError('已存在一位使用该工号的用户：{}'.format(num))
         section_name = attrs.pop('section', None)
         permissions = attrs.pop('group_extensions', None)
         if section_name:
@@ -345,8 +346,14 @@ class UserImportSerializer(BaseModelSerializer):
         return attrs
 
     def create(self, validated_data):
+        username = validated_data['username']
+        num = validated_data['num']
         password = validated_data.get('password')
-        user = super().create(validated_data)
+        user = User.objects.filter(Q(username=username) | Q(num=num)).first()
+        if user:
+            user = super().update(instance=user, validated_data=validated_data)
+        else:
+            user = super().create(validated_data)
         user.set_password(password)
         user.save()
         return user
