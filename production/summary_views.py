@@ -400,7 +400,7 @@ class CutTimeCollect(APIView):
             time_consuming = int((next_st_time - item['et_time']).total_seconds())
             data = dict()
             data['group'] = factory_classes_group_map_dict[key]['group__global_name']
-            if abs(time_consuming) >= 1000:
+            if abs(time_consuming) >= 1000 or time_consuming <= 0:
                 data['err_cut_time_consumer'] = time_consuming
                 data['normal_cut_time_consumer'] = None
             else:
@@ -900,7 +900,7 @@ class CutTimeCollectSummary(APIView):
                             'group': factory_classes_group_map_dict[key]['group__global_name'],
                             }
             avg_cut_time_consume = int(ret[key][item['equip_no']] / ret[key][item['equip_no'] + 'cnt'])
-            if abs(avg_cut_time_consume) >= 1000:
+            if abs(avg_cut_time_consume) >= 1000 or avg_cut_time_consume <= 0:
                 err_cut_time_consumer = avg_cut_time_consume
                 normal_cut_time_consumer = None
             else:
