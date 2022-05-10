@@ -353,7 +353,7 @@ class CutTimeCollect(APIView):
     """规格切换时间汇总"""
     EXPORT_FIELDS_DICT = {'时间': "time", '设备编码': "equip_no", '切换前计划号': "plan_classes_uid_age", '切换后计划号': "plan_classes_uid_later", '切换前胶料编码': "cut_ago_product_no", '切换后胶料编码': "cut_later_product_no", '切换规格耗时（秒）': "normal_cut_time_consumer", '异常时间(秒）': 'err_cut_time_consumer'}
     FILE_NAME = '规格切换时间汇总'
-    permission_classes = (IsAuthenticated, PermissionClass({'view': 'product_exchange_consume'}))
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_product_exchange_consume'}))
 
     def get(self, request, *args, **kwargs):
         # 筛选工厂
@@ -848,7 +848,7 @@ class IndexEquipMaintenanceAnalyze(IndexOverview):
 
 @method_decorator([api_recorder], name="dispatch")
 class CutTimeCollectSummary(APIView):
-    permission_classes = (IsAuthenticated, PermissionClass({'view': 'product_exchange_consume'}))
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_product_exchange_consume'}))
 
     def get(self, request):
         st = self.request.query_params.get('st')
