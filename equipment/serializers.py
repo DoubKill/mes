@@ -1117,8 +1117,8 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
         # 报修图片/视频
         instance_apply = EquipApplyRepair.objects.filter(plan_id=res.get('plan_id')).first()
         if instance_apply:
-            res.update({'apply_repair_graph_url': json.loads(instance_apply.apply_repair_graph_url),
-                        'apply_repair_video_url': json.loads(instance_apply.apply_repair_video_url)})
+            res.update({'apply_repair_graph_url': json.loads(instance_apply.apply_repair_graph_url) if instance_apply.apply_repair_graph_url else [],
+                        'apply_repair_video_url': json.loads(instance_apply.apply_repair_video_url) if instance_apply.apply_repair_video_url else []})
         else:
             res.update({'apply_repair_graph_url': [], 'apply_repair_video_url': []})
         # 区域位置
