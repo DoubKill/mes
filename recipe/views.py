@@ -425,7 +425,7 @@ class ReplaceRecipeMaterialViewSet(ModelViewSet):
                 continue
             # 查询群控配方
             sfj_recipe = ProductBatching.objects.using('SFJ').filter(stage_product_batch_no=mes_recipe.stage_product_batch_no,
-                                                                     dev_type__category_name=mes_recipe.dev_type.category_name,
+                                                                     equip__category__category_no=mes_recipe.dev_type.category_name,
                                                                      batching_type=1)
             if not sfj_recipe:
                 created_data.update({'failed_reason': '未找到群控配方'})

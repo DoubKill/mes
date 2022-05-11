@@ -17,6 +17,7 @@ from rest_framework_jwt.settings import api_settings
 from rest_framework_jwt.views import ObtainJSONWebToken
 
 from equipment.utils import DinDinAPI, gen_template_response
+from basics.models import WorkSchedulePlan
 from mes.common_code import zdy_jwt_payload_handler
 from mes.conf import WMS_URL, TH_URL
 from mes.derorators import api_recorder
@@ -471,6 +472,10 @@ class IdentityCard(APIView):
     def post(self, request):
         user = self.request.user
         id_card = self.request.data.get('id_card')
+        try:
+            id_card = str(id_card)
+        except Exception:
+            raise ValidationError('参数错误！')
         jy = id_card[len(id_card) - 1:len(id_card)]  # 截取校验位
         if len(id_card) == 18:  # 判断输入的身份证号是否为18位
             if not id_card[0:17].isdigit():
@@ -481,7 +486,7 @@ class IdentityCard(APIView):
                 e = id_card[i - 1:i]
                 s = s + int(e) * x[i - 1]
             b = s % 11
-            y = ("1", "O", "X", "9", "8", "7", "6", "5", "4", "3", "2")
+            y = ("1", "0", "X", "9", "8", "7", "6", "5", "4", "3", "2")
             c = y[b]
             if jy == c:  # 判断校验位是否相同
                 user.id_card_num = id_card
@@ -593,11 +598,23 @@ class QRLoginView(APIView):
             raise ValidationError('该账号已被停用！')
         payload = jwt_payload_handler(user)
         token = jwt_encode_handler(payload)
+        # 获取班次班组
+        now = datetime.now()
+        current_work_schedule_plan = WorkSchedulePlan.objects.filter(
+            start_time__lte=now,
+            end_time__gte=now,
+            plan_schedule__work_schedule__work_procedure__global_name='密炼'
+        ).first()
+        if not current_work_schedule_plan:
+            raise ValidationError('获取班次班组失败[未找到排班]')
+        n_class, n_group = current_work_schedule_plan.classes.global_name, current_work_schedule_plan.group.global_name
         return Response({"permissions": user.permissions_list,
                          'section': user.section.name if user.section else None,
                          'id_card_num': user.id_card_num,
                          "username": user.username,
                          "userNo": user.num,
+                         "n_class": n_class,
+                         "n_group": n_group,
                          'id': user.id,
                          "token": token,
                          'wms_url': WMS_URL,
