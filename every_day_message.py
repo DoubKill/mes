@@ -114,8 +114,8 @@ def equip_errors():
 
 
 def send_ding_msg(data=None, isAtAll=True, atMobiles=None,
-                  url="https://oapi.dingtalk.com/robot/send?access_token=7ab5afe7f9982ac5407ec619dfb1dd6a5e2a149fd191557527f027bc131d8635",
-                  secret="SEC3c1de736eed3d8542c8116ebcea98bff51a158f7fc84fde2f4204b972ccc9706"):
+                  url="https://oapi.dingtalk.com/robot/send?access_token=fef788662ec374cdf0fdbf9fbc7445db49a2a3fc7253023e9cd65166c822339c",
+                  secret="SECd3bded6e234e6e98c39e3792bfd9c13e139c711320f392e3d47f9b041af197c4"):
     """
     url:钉钉群机器人的Webhook
     secret:钉钉群机器人安全设置-加签
@@ -192,10 +192,10 @@ if __name__ == '__main__':
     # 检查排班
     class_message = check_classes()
     if settings.DEBUG:
-        send_ding_msg(data=message, url='https://oapi.dingtalk.com/robot/send?access_token=3daeb8d9276b40e29fdba4b6578e39af6c860a7be0f8c75d55040a0bad57aad4', secret='SEC6ac31d2d123d02e32b221f49605f96b8ebeb2e9c5d4776b86c3d49c211fdd6a2')
-        send_ding_msg(data=equip_message, url='https://oapi.dingtalk.com/robot/send?access_token=3daeb8d9276b40e29fdba4b6578e39af6c860a7be0f8c75d55040a0bad57aad4', secret='SEC6ac31d2d123d02e32b221f49605f96b8ebeb2e9c5d4776b86c3d49c211fdd6a2')
+        send_ding_msg(data=message, url='https://oapi.dingtalk.com/robot/send?access_token=7ab5afe7f9982ac5407ec619dfb1dd6a5e2a149fd191557527f027bc131d8635', secret='SEC3c1de736eed3d8542c8116ebcea98bff51a158f7fc84fde2f4204b972ccc9706')
+        send_ding_msg(data=equip_message, url='https://oapi.dingtalk.com/robot/send?access_token=7ab5afe7f9982ac5407ec619dfb1dd6a5e2a149fd191557527f027bc131d8635', secret='SEC3c1de736eed3d8542c8116ebcea98bff51a158f7fc84fde2f4204b972ccc9706')
         if class_message:
-            send_ding_msg(data=class_message, url='https://oapi.dingtalk.com/robot/send?access_token=3daeb8d9276b40e29fdba4b6578e39af6c860a7be0f8c75d55040a0bad57aad4', secret='SEC6ac31d2d123d02e32b221f49605f96b8ebeb2e9c5d4776b86c3d49c211fdd6a2')
+            send_ding_msg(data=class_message, url='https://oapi.dingtalk.com/robot/send?access_token=7ab5afe7f9982ac5407ec619dfb1dd6a5e2a149fd191557527f027bc131d8635', secret='SEC3c1de736eed3d8542c8116ebcea98bff51a158f7fc84fde2f4204b972ccc9706')
     else:
         send_ding_msg(data=message)
         send_ding_msg(data=equip_message)

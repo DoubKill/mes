@@ -868,7 +868,6 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
             # 配方中料包重量
             sfj_recipe = ProductBatching.objects.using('SFJ').filter(delete_flag=False, used_type=4,
                                                                      stage_product_batch_no=product_no_dev,
-                                                                     dev_type__category_name=dev_type,
                                                                      equip__equip_no=ml_equip_no).last()
             # 获取上辅机配料重量(无法获取则从mes配方中获取)
             if sfj_recipe:
@@ -1169,6 +1168,11 @@ class WeightPackageCViewSet(ListModelMixin, UpdateModelMixin, GenericViewSet):
         serializer = []
         if print_data:
             serializer = WeightPackageLogSerializer(print_data, many=True).data
+            # display_manual_info(人工配信息统一格式给终端处理[字符串->[], []不变])
+            for i in serializer:
+                display_manual_info = i.get('display_manual_info')
+                if display_manual_info and isinstance(display_manual_info, str):
+                    i.update({'display_manual_info': []})
         return Response({"results": serializer})
 
     def update(self, request, *args, **kwargs):
