@@ -2340,6 +2340,8 @@ class DailyProductionCompletionReport(APIView):
                         f'{item["factory_date__day"]}_qty', 0) + item['actual_trains']
                     results2[key][f'{item["factory_date__day"]}_weight'] = round(
                         results2[key].get(f'{item["factory_date__day"]}_weight', 0) + weight, 3)
+                    results2[key]['汇总_weight'] += weight
+                    results2[key]['汇总_qty'] += item['actual_trains']
                 else:
                     results2[key] = {'规格': space, '段数': state, '机台': item["equip_no"],
                                      '机型': equip_dic[item["equip_no"]], '班别': item['classes'],
