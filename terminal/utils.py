@@ -338,7 +338,8 @@ def material_out_barcode(bar_code):
             SYQX = (datetime.strptime(SM_CREATE, '%Y-%m-%d %H:%M:%S') + timedelta(days=364)).strftime('%Y-%m-%d')
             ret = {'WLXXID': wms_info.material_no, 'TMH': bar_code, 'BZDW': wms_info.standard_unit, 'SL': wms_info.piece_count,
                    'ZL': wms_info.weight, 'SCRQ': SCRQ, 'TOFAC': 'AJ1', 'SM_CREATE': SM_CREATE, 'WLDWMC': wms_info.supplier,
-                   'WLMC': wms_info.material_name, 'CD': '参见供应商', 'SYQX': SYQX, 'PH': PH, 'DDH': DDH, 'ZSL': wms_info.zc_num}
+                   'WLMC': wms_info.material_name, 'CD': '参见供应商', 'SYQX': SYQX, 'PH': PH, 'DDH': DDH, 'ZSL': wms_info.zc_num,
+                   'ZLDW': wms_info.unit, 'SLDW': wms_info.standard_unit}
         except Exception as e:
             flag = True
     else:

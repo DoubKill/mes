@@ -852,6 +852,7 @@ class EquipApplyRepair(AbstractEntity):
     plan_source = models.CharField(max_length=64, help_text='来源', default='mes')
     status = models.CharField(max_length=64, help_text='状态', default='')
     apply_repair_graph_url = models.TextField(help_text='报修图片', default='')
+    apply_repair_video_url = models.TextField(help_text='报修视频', default='')
 
     class Meta:
         db_table = 'equip_apply_repair'
@@ -895,6 +896,7 @@ class EquipApplyOrder(AbstractEntity):
     result_fault_cause = models.CharField(max_length=512, help_text='故障原因', null=True, blank=True)
     result_repair_desc = models.CharField(max_length=256, help_text='维修备注', null=True, blank=True)
     result_repair_graph_url = models.TextField(help_text='维修图片', null=True, blank=True)
+    result_repair_video_url = models.TextField(help_text='维修视频', null=True, blank=True)
     result_final_fault_cause = models.CharField(max_length=256, help_text='最终故障原因', null=True, blank=True)
     result_material_requisition = models.BooleanField(help_text='是否物料申请', default=False)
     result_need_outsourcing = models.BooleanField(help_text='是否需要外协助', default=False)
@@ -904,6 +906,7 @@ class EquipApplyOrder(AbstractEntity):
     result_accept_desc = models.CharField(max_length=256, help_text='验收备注', null=True, blank=True)
     result_accept_result = models.CharField(max_length=256, help_text='验收结果', null=True, blank=True)
     result_accept_graph_url = models.TextField(help_text='验收图片', null=True, blank=True)
+    result_accept_video_url = models.TextField(help_text='验收视频', null=True, blank=True)
     status = models.CharField(max_length=64, help_text='状态', null=True, blank=True)
     timeout_color = models.CharField(max_length=8, help_text='超期未处理颜色', null=True, blank=True)
     back_order = models.BooleanField(help_text='是否退单', default=False)
@@ -943,6 +946,7 @@ class EquipInspectionOrder(AbstractEntity):
     repair_end_datetime = models.DateTimeField(help_text='巡检结束时间', null=True, blank=True)
     result_repair_desc = models.CharField(max_length=256, help_text='巡检备注', null=True, blank=True)
     result_repair_graph_url = models.TextField(help_text='巡检图片', null=True, blank=True)
+    result_repair_video_url = models.TextField(help_text='巡检视频', null=True, blank=True)
     result_repair_final_result = models.CharField(max_length=256, help_text='巡检结论', null=True, blank=True)
     status = models.CharField(max_length=64, help_text='状态', null=True, blank=True)
     timeout_color = models.CharField(max_length=8, help_text='超期未处理颜色', null=True, blank=True)
@@ -986,12 +990,13 @@ class EquipRegulationRecord(AbstractEntity):
 
 
 class UploadImage(AbstractEntity):
-    source_type = models.CharField(max_length=64, help_text='上传类型: 维修;巡检')
-    image_file_name = models.ImageField(help_text='上传图片', upload_to='equipment/%Y/%m/')
+    source_type = models.CharField(max_length=64, help_text='上传类型: 维修;巡检', default='维修')
+    image_file_name = models.ImageField(upload_to='equipment/%Y/%m/', max_length=256, help_text='上传图片', null=True, blank=True)
+    video_file_name = models.FileField(upload_to='equipment/video/%Y%m/', max_length=256, help_text='上传视频', null=True, blank=True)
 
     class Meta:
         db_table = 'upload_images'
-        verbose_name_plural = verbose_name = '上传图片'
+        verbose_name_plural = verbose_name = '上传图片/视频'
 
 
 class EquipRepairMaterialReq(AbstractEntity):

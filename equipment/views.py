@@ -3347,6 +3347,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
             result_repair_final_result = data.get('result_repair_final_result')  # 维修结论
             work_content = data.pop('work_content', [])
             image_url_list = data.pop('image_url_list', [])
+            video_url_list = data.pop('video_url_list', [])
             work_type = data.pop('work_type')
             work_order_no = data.pop('work_order_no')
             apply_material_list = data.pop('apply_material_list', [])
@@ -3363,7 +3364,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
                 else:
                     data.update({'repair_end_datetime': now_date, 'last_updated_date': datetime.now(), 'status': '已完成',
                                  'accept_user': instance.created_user.username})
-            data['result_repair_graph_url'] = json.dumps(image_url_list)
+            data.update({'result_repair_graph_url': json.dumps(image_url_list), 'result_repair_video_url': json.dumps(video_url_list)})
             # 记录到增减人员履历中
             for plan_id in plan_ids:
                 queryset = EquipRegulationRecord.objects.filter(plan_id=plan_id, status='增')
@@ -3390,6 +3391,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
             if accept_num != 0:
                 raise ValidationError('已完成订单才可验收, 请刷新订单!')
             image_url_list = data.pop('image_url_list', [])
+            video_url_list = data.pop('video_url_list', [])
             result_accept_result = data.get('result_accept_result')
             if result_accept_result == '合格':
                 # 更新巡检中异常报修的工单状态
@@ -3399,12 +3401,13 @@ class EquipApplyOrderViewSet(ModelViewSet):
                     'status': data.get('status'), 'accept_datetime': now_date,
                     'result_accept_result': result_accept_result, 'timeout_color': None,
                     'result_accept_desc': data.get('result_accept_desc'),
-                    'result_accept_graph_url': json.dumps(image_url_list), 'last_updated_date': datetime.now()
+                    'result_accept_graph_url': json.dumps(image_url_list), 'last_updated_date': datetime.now(),
+                    'result_accept_video_url': json.dumps(video_url_list)
                 }
             else:
                 data = {
                     'status': data.get('status'), 'repair_end_datetime': None, 'accept_datetime': now_date,
-                    'result_accept_result': result_accept_result,
+                    'result_accept_result': result_accept_result, 'result_accept_video_url': json.dumps(video_url_list),
                     'result_accept_desc': data.get('result_accept_desc'),
                     'result_accept_graph_url': json.dumps(image_url_list), 'last_updated_date': datetime.now()
                 }
@@ -3749,10 +3752,11 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                 raise ValidationError('未开始订单无法进行处理操作, 请刷新订单!')
             work_content = data.pop('work_content', [])
             image_url_list = data.pop('image_url_list', [])
+            video_url_list = data.pop('video_url_list', [])
             work_order_no = data.pop('work_order_no')
             result = data.get('result_repair_final_result')
             data.update({'repair_end_datetime': now_date if result == '正常' else None,
-                         'last_updated_date': datetime.now(),
+                         'last_updated_date': datetime.now(), 'result_repair_video_url': json.dumps(video_url_list),
                          'status': '已完成' if result == '正常' else '已开始',
                          'result_repair_graph_url': json.dumps(image_url_list)})
             # 记录到增减人员履历中
