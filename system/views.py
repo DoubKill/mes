@@ -16,6 +16,7 @@ from rest_framework.viewsets import ModelViewSet, GenericViewSet
 from rest_framework_jwt.settings import api_settings
 from rest_framework_jwt.views import ObtainJSONWebToken
 
+from basics.models import WorkSchedulePlan
 from equipment.utils import DinDinAPI
 from mes.common_code import zdy_jwt_payload_handler
 from mes.conf import WMS_URL, TH_URL
@@ -583,11 +584,23 @@ class QRLoginView(APIView):
             raise ValidationError('该账号已被停用！')
         payload = jwt_payload_handler(user)
         token = jwt_encode_handler(payload)
+        # 获取班次班组
+        now = datetime.now()
+        current_work_schedule_plan = WorkSchedulePlan.objects.filter(
+            start_time__lte=now,
+            end_time__gte=now,
+            plan_schedule__work_schedule__work_procedure__global_name='密炼'
+        ).first()
+        if not current_work_schedule_plan:
+            raise ValidationError('获取班次班组失败[未找到排班]')
+        n_class, n_group = current_work_schedule_plan.classes.global_name, current_work_schedule_plan.group.global_name
         return Response({"permissions": user.permissions_list,
                          'section': user.section.name if user.section else None,
                          'id_card_num': user.id_card_num,
                          "username": user.username,
                          "userNo": user.num,
+                         "n_class": n_class,
+                         "n_group": n_group,
                          'id': user.id,
                          "token": token,
                          'wms_url': WMS_URL,
