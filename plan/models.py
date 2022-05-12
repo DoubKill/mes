@@ -414,4 +414,4 @@ class SchedulingEquipShutDownPlan(AbstractEntity):
 
     class Meta:
         db_table = 'aps_equip_shutdown_plan'
-        verbose_name_plural = verbose_name = '分厂胶料计划申报'
+        verbose_name_plural = verbose_name = '机台停机计划'

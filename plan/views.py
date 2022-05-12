@@ -472,15 +472,16 @@ class LabelPlanInfo(APIView):
             material_detail = MaterialAttribute.objects.filter(
                 material__material_no=plan.product_batching.stage_product_batch_no).first()
             if material_detail:
-                unit = material_detail.validity_unit
-                if unit in ["天", "days", "day"]:
-                    param = {"days": material_detail.period_of_validity}
-                elif unit in ["小时", "hours", "hour"]:
-                    param = {"hours": material_detail.period_of_validity}
-                else:
-                    param = {"days": material_detail.period_of_validity}
-                expire_time = (produce_time + datetime.timedelta(**param)).strftime('%Y-%m-%d %H:%M:%S')
-                ret['expire_time'] = expire_time
+                if material_detail.period_of_validity:
+                    unit = material_detail.validity_unit
+                    if unit in ["天", "days", "day"]:
+                        param = {"days": material_detail.period_of_validity}
+                    elif unit in ["小时", "hours", "hour"]:
+                        param = {"hours": material_detail.period_of_validity}
+                    else:
+                        param = {"days": material_detail.period_of_validity}
+                    expire_time = (produce_time + datetime.timedelta(**param)).strftime('%Y-%m-%d %H:%M:%S')
+                    ret['expire_time'] = expire_time
         elif produce_time:
             current_work_schedule_plan = WorkSchedulePlan.objects.filter(
                 start_time__lte=produce_time,
