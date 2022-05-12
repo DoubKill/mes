@@ -32,10 +32,15 @@ class MaterialSerializer(BaseModelSerializer):
     period_of_validity = serializers.IntegerField(source='material_attr.period_of_validity', read_only=True,
                                                   default=None)
     validity_unit = serializers.CharField(source='material_attr.validity_unit', read_only=True, default=None)
+    storage_time = serializers.CharField(source='material_attr.storage_time', read_only=True, default=None)
     is_binding = serializers.SerializerMethodField()
+    suppliers = serializers.SerializerMethodField()
 
     def get_is_binding(self, obj):
         return 'Y' if obj.zc_materials.count() >= 1 else 'N'
+
+    def get_suppliers(self, obj):
+        return ','.join(obj.suppliers.values_list('provenance', flat=True))
 
     def update(self, instance, validated_data):
         validated_data['last_updated_user'] = self.context['request'].user
@@ -51,6 +56,7 @@ class MaterialAttributeSerializer(BaseModelSerializer):
 
     def create(self, validated_data):
         material = validated_data['material']
+        validated_data['created_user'] = self.context['request'].user
         if not hasattr(material, 'material_attr'):
             MaterialAttribute.objects.create(**validated_data)
         else:

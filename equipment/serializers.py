@@ -1561,8 +1561,8 @@ class EquipWarehouseOrderSerializer(BaseModelSerializer):
             validated_data['status'] = 5
         elif 6 in state_lst and 5 not in state_lst:
             validated_data['status'] = 6
-        super().update(instance, validated_data)
-        return validated_data
+        instance = super().update(instance, validated_data)
+        return instance
 
 
 class EquipWarehouseInventorySerializer(BaseModelSerializer):

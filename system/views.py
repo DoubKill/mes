@@ -16,8 +16,8 @@ from rest_framework.viewsets import ModelViewSet, GenericViewSet
 from rest_framework_jwt.settings import api_settings
 from rest_framework_jwt.views import ObtainJSONWebToken
 
+from equipment.utils import DinDinAPI, gen_template_response
 from basics.models import WorkSchedulePlan
-from equipment.utils import DinDinAPI
 from mes.common_code import zdy_jwt_payload_handler
 from mes.conf import WMS_URL, TH_URL
 from mes.derorators import api_recorder
@@ -55,13 +55,27 @@ class UserViewSet(ModelViewSet):
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = UserFilter
+    EXPORT_FIELDS_DICT = {
+        '工号': 'num',
+        '用户名': 'username',
+        '身份证': 'id_card_num',
+        '手机号': 'phone_number',
+        '部门': 'section_name',
+        '职务': 'workshop',
+        '班组': 'repair_group',
+        '角色': 'group_names'}
+    FILE_NAME = '用户列表'
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
+        export = self.request.query_params.get('export')
         if self.request.query_params.get('all'):
             data = queryset.values('id', 'username', 'num', 'is_active')
             return Response({'results': data})
         else:
+            if export:
+                data = self.get_serializer(queryset, many=True).data
+                return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
             return super().list(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):

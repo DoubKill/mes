@@ -991,7 +991,10 @@ permission_data = [
     {'id': 1000, 'code': 'xl_report_weight_statics', 'name': '称量机台物料统计', 'parent_id': None},
     {'id': 1001, 'code': 'view_xl_report_weight_statics', 'name': '查看', 'parent_id': 1000},
 
-    # 下一个 1002 开始
+    {'id': 1002, 'code': 'product_expire_query', 'name': '胶料即将超期预警', 'parent_id': None},
+    {'id': 1003, 'code': 'view_product_expire_query', 'name': '查看', 'parent_id': 1002},
+
+    # 下一个 1004 开始
 ]
 
 

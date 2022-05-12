@@ -6,13 +6,12 @@ import math
 import random
 import re
 import time
-from io import BytesIO, StringIO
+from io import BytesIO
 
 import requests
 import xlwt
-from itertools import chain
 from django.core.paginator import Paginator
-from django.db.models import Sum, Count, Q, F, Prefetch
+from django.db.models import Sum, Count, Q, F
 from django.db.transaction import atomic
 from django.forms import model_to_dict
 from django.http import HttpResponse
@@ -21,10 +20,9 @@ from django.utils.decorators import method_decorator
 from rest_framework import mixins, viewsets, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
-from rest_framework.generics import ListAPIView
-from rest_framework.mixins import CreateModelMixin, ListModelMixin, UpdateModelMixin, RetrieveModelMixin
+from rest_framework.mixins import UpdateModelMixin, RetrieveModelMixin
 from rest_framework.generics import ListAPIView, GenericAPIView
-from rest_framework.mixins import CreateModelMixin, ListModelMixin
+from rest_framework.mixins import ListModelMixin
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -43,7 +41,7 @@ from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMate
     BzFinalMixingRubberInventoryLB, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
     MixGumOutInventoryLog, MixGumInInventoryLog, DeliveryPlanFinal, MaterialOutPlan, BarcodeQuality, \
     MaterialOutHistory, FinalGumOutInventoryLog, Depot, \
-    DepotSite, DepotPallt, Sulfur, SulfurDepot, SulfurDepotSite, MaterialInHistory, MaterialInventoryLog, \
+    DepotSite, DepotPallt, Sulfur, SulfurDepot, SulfurDepotSite, MaterialInHistory, \
     CarbonOutPlan, FinalRubberyOutBoundOrder, MixinRubberyOutBoundOrder, FinalGumInInventoryLog, OutBoundDeliveryOrder, \
     OutBoundDeliveryOrderDetail, WMSReleaseLog, WmsInventoryMaterial, WMSMaterialSafetySettings, WmsNucleinManagement, \
     WMSExceptHandle, MaterialOutHistoryOther, MaterialOutboundOrder, MaterialEntrance
@@ -64,7 +62,7 @@ from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
 from mes import settings
-from mes.common_code import SqlClient, OSum
+from mes.common_code import SqlClient
 from mes.conf import WMS_CONF, TH_CONF, WMS_URL, TH_URL, HF_CONF
 from mes.derorators import api_recorder
 from django_filters.rest_framework import DjangoFilterBackend
@@ -72,22 +70,21 @@ from rest_framework import permissions
 
 from mes.paginations import SinglePageNumberPagination
 from mes.permissions import PermissionClass
-from mes.settings import DEBUG
-from plan.models import ProductClassesPlan, ProductBatchingClassesPlan, BatchingClassesPlan
+from mes.settings import DEBUG, DATABASES
+from plan.models import ProductClassesPlan, BatchingClassesPlan
 from production.models import PalletFeedbacks, TrainsFeedbacks
 from quality.deal_result import receive_deal_result
-from quality.models import LabelPrint, Train, MaterialDealResult, LabelPrintLog, ExamineMaterial
+from quality.models import LabelPrint, MaterialDealResult, LabelPrintLog, ExamineMaterial
 from quality.serializers import MaterialDealResultListSerializer
 from quality.utils import update_wms_quality_result
-from recipe.models import Material, MaterialAttribute
-from system.models import User
+from recipe.models import MaterialAttribute
 from terminal.models import LoadMaterialLog, WeightBatchingLog, WeightPackageLog
-from .conf import wms_ip, wms_port, IS_BZ_USING
+from .conf import IS_BZ_USING
 from .conf import wms_ip, wms_port, cb_ip, cb_port
 from .models import MaterialInventory as XBMaterialInventory
 from .models import BzFinalMixingRubberInventory
 from .serializers import XBKMaterialInventorySerializer
-from .utils import export_xls, OUTWORKUploader, OUTWORKUploaderLB, HFSystem
+from .utils import OUTWORKUploader, OUTWORKUploaderLB, HFSystem
 
 logger = logging.getLogger('send_log')
 
@@ -2679,7 +2676,7 @@ class WmsStorageView(ListAPIView):
                 data = serializer.data
             else:
                 data = self.get_serializer(queryset, many=True).data
-            return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
         data = self.get_paginated_response(serializer.data).data
         sum_data = queryset.aggregate(total_weight=Sum('total_weight'),
                                       total_trains=Sum('qty'))
@@ -5895,3 +5892,273 @@ class HFRealStatusView(APIView):
             raise ValidationError(e.args[0])
         else:
             return Response(res)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductExpireListView(APIView):
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_product_expire_query'}))
+
+    def get(self, request):
+        expire_days = self.request.query_params.get('expire_days', 30)
+        warehouse_name = self.request.query_params.get('warehouse_name')
+        stage = self.request.query_params.get('stage')
+        page = self.request.query_params.get('page', 1)
+        page_size = self.request.query_params.get('page_size', 15)
+        st = (int(page) - 1) * int(page_size)
+        et = int(page) * int(page_size)
+        filter_kwargs = {}
+        if stage:
+            filter_kwargs['material_no__icontains'] = '-{}'.format(stage)
+        if warehouse_name == '混炼胶库':
+            product_data = BzFinalMixingRubberInventory.objects.using('bz').filter(**filter_kwargs).values(
+                'material_no', 'in_storage_time', 'qty', 'total_weight', 'quality_level')
+        elif warehouse_name == '终炼胶库':
+            product_data = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(store_name='炼胶库').filter(**filter_kwargs).values(
+                'material_no', 'in_storage_time', 'qty', 'total_weight', 'quality_level')
+        else:
+            m_data = list(BzFinalMixingRubberInventory.objects.using('bz').filter(**filter_kwargs).values(
+                'material_no', 'in_storage_time', 'qty', 'total_weight', 'quality_level'))
+            f_data = list(BzFinalMixingRubberInventoryLB.objects.using('lb').filter(store_name='炼胶库').filter(**filter_kwargs).values(
+                'material_no', 'in_storage_time', 'qty', 'total_weight', 'quality_level'))
+            product_data = m_data + f_data
+
+        product_validity_dict = dict(MaterialAttribute.objects.filter(
+            period_of_validity__isnull=False
+        ).values_list('material__material_no', 'period_of_validity'))
+        ret = {}
+        for m in product_data:
+            material_no = m['material_no']
+            quality_level = m['quality_level']
+            key = material_no + '-' + quality_level
+            period_of_validity = product_validity_dict.get(m['material_no'])
+            if period_of_validity:
+                if (period_of_validity * 24 * 60 * 60 - (
+                        datetime.datetime.now() - m['in_storage_time']).total_seconds()) <= int(
+                        expire_days) * 24 * 60 * 60:
+                    if key in ret:
+                        ret[key]['qty'] += m['qty']
+                        ret[key]['total_weight'] += m['total_weight']
+                    else:
+                        ret[key] = {'material_no': material_no,
+                                    'qty': m['qty'],
+                                    'total_weight': m['total_weight'],
+                                    'quality_status': quality_level}
+        temp = list(ret.values())
+        count = len(temp)
+        data = temp[st:et]
+        total_weight = sum([i['qty'] for i in temp])
+        total_quantity = sum([i['total_weight'] for i in temp])
+        return Response({'results': data, "count": count, 'total_weight': total_weight, 'total_quantity': total_quantity})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductExpireDetailView(APIView):
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_product_expire_query'}))
+    EXPORT_FIELDS_DICT = {'库区': 'store_name',
+                            '胶料名称': 'material_no',
+                            '追踪码': 'lot_no',
+                            '托盘号': 'container_no',
+                            '库存位': 'location',
+                            '车数': 'qty',
+                            '重量（kg）': 'total_weight',
+                            '品质状态': 'quality_level',
+                            '入库时间': 'in_storage_time',
+                            '有效期至': 'expire_time',
+                            '剩余有效天数': 'left_days'}
+    FILE_NAME = '库位明细'
+
+    def get(self, request):
+        expire_days = self.request.query_params.get('expire_days', 30)
+        warehouse_name = self.request.query_params.get('warehouse_name')
+        material_no = self.request.query_params.get('material_no')
+        quality_status = self.request.query_params.get('quality_status')
+        export = self.request.query_params.get('export')
+        page = self.request.query_params.get('page', 1)
+        page_size = self.request.query_params.get('page_size', 15)
+        st = (int(page) - 1) * int(page_size)
+        et = int(page) * int(page_size)
+        filter_kwargs = {}
+        if material_no:
+            filter_kwargs['material_no'] = material_no
+        if quality_status:
+            filter_kwargs['quality_level'] = quality_status
+        if warehouse_name == '混炼胶库':
+            product_data = BzFinalMixingRubberInventory.objects.using('bz').filter(**filter_kwargs).values()
+        elif warehouse_name == '终炼胶库':
+            product_data = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(store_name='炼胶库').filter(
+                **filter_kwargs).values()
+        else:
+            m_data = list(BzFinalMixingRubberInventory.objects.using('bz').filter(**filter_kwargs).values())
+            f_data = list(BzFinalMixingRubberInventoryLB.objects.using('lb').filter(store_name='炼胶库').filter(**filter_kwargs).values())
+            product_data = m_data + f_data
+
+        product_validity_dict = dict(MaterialAttribute.objects.filter(
+            period_of_validity__isnull=False
+        ).values_list('material__material_no', 'period_of_validity'))
+        temp = []
+        now_time = datetime.datetime.now()
+        for m in product_data:
+            period_of_validity = product_validity_dict.get(m['material_no'])
+            in_storage_time = m['in_storage_time']
+            if period_of_validity:
+                if (period_of_validity * 24 * 60 * 60 - (
+                        now_time - m['in_storage_time']).total_seconds()) <= int(
+                        expire_days) * 24 * 60 * 60:
+                    expire_date = in_storage_time + datetime.timedelta(days=period_of_validity)
+                    m['expire_time'] = expire_date.strftime("%Y-%m-%d %H:%M:%S")
+                    m['in_storage_time'] = in_storage_time.strftime("%Y-%m-%d %H:%M:%S")
+                    m['left_days'] = expire_date.__sub__(now_time).days
+                    temp.append(m)
+        if export:
+            return gen_template_response(self.EXPORT_FIELDS_DICT, temp, self.FILE_NAME)
+        count = len(temp)
+        data = temp[st:et]
+        total_weight = sum([i['total_weight'] for i in temp])
+        total_quantity = sum([i['qty'] for i in temp])
+        return Response(
+            {'results': data, "count": count, 'total_weight': total_weight, 'total_quantity': total_quantity})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductInOutHistoryView(APIView):
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'in_out_history'}))
+    EXPORT_FIELDS_DICT = {'质检条码': 'lot_no',
+                          '入库单号': 'inbound_order_no',
+                          '入库发起时间': 'inbound_time',
+                          '出库单号': 'outbound_order_no',
+                          '出库发起人': 'outbound_user',
+                          '出库发起时间': 'outbound_time',
+                          '巷道': 'location',
+                          '托盘号': 'pallet_no',
+                          '物料编码': 'product_no',
+                          '出入库数': 'qty',
+                          '重量(kg)': 'weight'}
+    FILE_NAME = '出入库履历'
+
+    def get(self, request):
+        warehouse_name = self.request.query_params.get('warehouse_name')
+        in_st = self.request.query_params.get('in_st')
+        in_et = self.request.query_params.get('in_et')
+        out_st = self.request.query_params.get('out_st')
+        out_et = self.request.query_params.get('out_et')
+        tunnel = self.request.query_params.get('tunnel')
+        product_no = self.request.query_params.get('product_no')
+        order_no = self.request.query_params.get('order_no')
+        pallet_no = self.request.query_params.get('pallet_no')
+        lot_no = self.request.query_params.get('lot_no')
+        page = int(self.request.query_params.get('page', 1))
+        page_size = int(self.request.query_params.get('page_size', 10))
+        export = self.request.query_params.get('export')
+        if not warehouse_name:
+            raise ValidationError('请选择库区！')
+        if warehouse_name == '混炼胶库':
+            database_conf = {'host': DATABASES['bz']['HOST'],
+                             'user': DATABASES['bz']['USER'],
+                             'password': DATABASES['bz']['PASSWORD'],
+                             'database': DATABASES['bz']['NAME']}
+        else:
+            database_conf = {'host': DATABASES['lb']['HOST'],
+                             'user': DATABASES['lb']['USER'],
+                             'password': DATABASES['lb']['PASSWORD'],
+                             'database': DATABASES['lb']['NAME']}
+        extra_where_str = ""
+        pagination_str = "OFFSET {} ROWS FETCH FIRST {} ROWS ONLY".format((page-1)*page_size, page_size)
+        if in_st:
+            extra_where_str += "where a.LTIME>='{}'".format(in_st)
+        if in_et:
+            if extra_where_str:
+                extra_where_str += " and a.LTIME<='{}'".format(in_et)
+            else:
+                extra_where_str += "where a.LTIME<='{}'".format(in_et)
+        if out_st:
+            if extra_where_str:
+                extra_where_str += " and b.DEALTIME>='{}'".format(out_st)
+            else:
+                extra_where_str += "where b.DEALTIME>='{}'".format(out_st)
+        if out_et:
+            if extra_where_str:
+                extra_where_str += " and b.DEALTIME<='{}'".format(out_et)
+            else:
+                extra_where_str += "where b.DEALTIME<='{}'".format(out_et)
+        if tunnel:
+            if extra_where_str:
+                extra_where_str += " and a.CID like '{}%' or b.CID like '{}%'".format(tunnel, tunnel)
+            else:
+                extra_where_str += "where a.CID like '{}%' or b.CID like '{}%'".format(tunnel, tunnel)
+        if product_no:
+            if extra_where_str:
+                extra_where_str += " and a.MATNAME like '%{}%' or b.MID like '%{}%'".format(product_no, product_no)
+            else:
+                extra_where_str += "where a.MATNAME like '%{}%' or b.MID like '%{}%'".format(product_no, product_no)
+        if order_no:
+            if extra_where_str:
+                extra_where_str += " and a.BILLID like '%{}%' or b.BILLID like '%{}%'".format(order_no, order_no)
+            else:
+                extra_where_str += "where a.BILLID like '%{}%' or b.BILLID like '%{}%'".format(order_no, order_no)
+        if pallet_no:
+            if extra_where_str:
+                extra_where_str += " and a.PALLETID like '%{}%' or b.PALLETID like '%{}%'".format(pallet_no, pallet_no)
+            else:
+                extra_where_str += "where a.PALLETID like '%{}%' or b.PALLETID like '%{}%'".format(pallet_no, pallet_no)
+        if lot_no:
+            if extra_where_str:
+                extra_where_str += " and a.LotNo like '%{}%' or b.Lot_no like '%{}%'".format(lot_no, lot_no)
+            else:
+                extra_where_str += "where a.LotNo like '%{}%' or b.Lot_no like '%{}%'".format(lot_no, lot_no)
+        if export:
+            pagination_str = ""
+        sql = """select
+       a.LotNo,
+       a.BILLID,
+       a.LTIME,
+       b.BILLID,
+       b.OutUser,
+       b.DEALTIME,
+       a.CID,
+       a.PALLETID,
+       a.MATNAME,
+       a.NUM,
+       a.SWEIGHT,
+       b.Lot_no,
+       b.CID,
+       b.PALLETID,
+       b.MID,
+       b.CarNum,
+       b.Weight
+from v_ASRS_LOG_IN_OPREATE_MESVIEW a
+full outer join v_ASRS_TO_MES_RE_MESVIEW b on a.LotNo=b.Lot_no and a.PALLETID=b.PALLETID and a.MATNAME=b.MID
+{} order by a.LTIME desc {}""".format(extra_where_str, pagination_str)
+        sc = SqlClient(sql=sql, **database_conf)
+        temp = sc.all()
+        result = []
+        count_sql = """select 
+        count(*)
+        from v_ASRS_LOG_IN_OPREATE_MESVIEW a 
+        full outer join v_ASRS_TO_MES_RE_MESVIEW b on a.LotNo=b.Lot_no and a.PALLETID=b.PALLETID and a.MATNAME=b.MID {}
+        """.format(extra_where_str)
+        sc = SqlClient(sql=count_sql, **database_conf)
+        temp2 = sc.all()
+        count = temp2[0][0]
+        outbound_order_nos = [i[3] for i in temp]
+        outbound_order_dict = dict(OutBoundDeliveryOrderDetail.objects.filter(
+            order_no__in=outbound_order_nos).values_list('order_no', 'created_user__username'))
+        for item in temp:
+            result.append(
+                {
+                    'lot_no': item[0] if item[0] else item[11],
+                    'inbound_order_no': item[1],
+                    'inbound_time': '' if not item[2] else item[2].strftime('%Y-%m-%d %H:%M:%S'),
+                    'outbound_order_no': item[3],
+                    'outbound_user': outbound_order_dict.get(item[3], ''),
+                    'outbound_time': '' if not item[5] else item[5].strftime('%Y-%m-%d %H:%M:%S'),
+                    'location': item[6] if item[6] else item[12],
+                    'pallet_no': item[7] if item[7] else item[13],
+                    'product_no': item[8] if item[8] else item[14],
+                    'qty': item[9] if item[9] else item[15],
+                    'weight': item[10] if item[10] else item[16]
+                }
+            )
+        sc.close()
+        if export:
+            return gen_template_response(self.EXPORT_FIELDS_DICT, result, self.FILE_NAME)
+        return Response({'result': result, 'count': count})

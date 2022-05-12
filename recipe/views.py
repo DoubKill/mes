@@ -7,6 +7,7 @@ from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, status
+from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
@@ -70,7 +71,13 @@ class MaterialViewSet(CommonDeleteMixin, ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         mc_code = self.request.query_params.get('mc_code')  # 人工配通用条码去除-C、-X尾缀
+        only_storage_flag = self.request.query_params.get('only_storage_flag')  # 仅显示未设定有效期的物料
+        only_safety_flag = self.request.query_params.get('only_safety_flag')  # 仅显示未设定安全库存的物料
         queryset = self.filter_queryset(self.get_queryset())
+        if only_storage_flag:
+            queryset = queryset.filter(material_attr__period_of_validity__isnull=True)
+        if only_safety_flag:
+            queryset = queryset.filter(material_attr__safety_inventory__isnull=True)
         if self.request.query_params.get('all'):
             if self.request.query_params.get('exclude_stage'):
                 stage_names = GlobalCode.objects.filter(
@@ -87,7 +94,13 @@ class MaterialViewSet(CommonDeleteMixin, ModelViewSet):
                                    'package_unit', 'package_unit__global_name', 'use_flag')
             return Response({'results': data})
         else:
-            return super().list(request, *args, **kwargs)
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -115,6 +128,22 @@ class MaterialAttributeViewSet(CommonDeleteMixin, ModelViewSet):
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = MaterialAttributeFilter
+
+    @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated], url_path='batch-set',
+            url_name='batch-set')
+    def batch_set(self, request):
+        req_data = self.request.data
+        if not isinstance(req_data, dict):
+            raise ValidationError('参数错误！')
+        materials = req_data.pop('materials', [])
+        if not isinstance(materials, list):
+            raise ValidationError('参数错误！')
+        for m in materials:
+            req_data.update({'material': m})
+            s = MaterialAttributeSerializer(data=req_data, context={'request': request})
+            s.is_valid(raise_exception=True)
+            s.save()
+        return Response('ok')
 
 
 @method_decorator([api_recorder], name="dispatch")
