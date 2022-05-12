@@ -5896,7 +5896,7 @@ class HFRealStatusView(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class ProductExpireListView(APIView):
-    permission_classes = (IsAuthenticated, PermissionClass({'view': 'product_expire_query'}))
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_product_expire_query'}))
 
     def get(self, request):
         expire_days = self.request.query_params.get('expire_days', 30)
@@ -5953,7 +5953,7 @@ class ProductExpireListView(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class ProductExpireDetailView(APIView):
-    permission_classes = (IsAuthenticated, PermissionClass({'view': 'product_expire_query'}))
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_product_expire_query'}))
     EXPORT_FIELDS_DICT = {'库区': 'store_name',
                             '胶料名称': 'material_no',
                             '追踪码': 'lot_no',
