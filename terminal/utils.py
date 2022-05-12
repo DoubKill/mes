@@ -352,7 +352,10 @@ def material_out_barcode(bar_code):
             data = client.service.FindZcdtmList(json.dumps(json_data))
         except Exception as e:
             raise ValueError('网络异常: 无法获取总厂数据')
-        data = json.loads(data)
+        try:
+            data = json.loads(data)
+        except Exception as e:
+            raise ValueError('原材料中无该条码信息')
         if data.get('Table'):
             ret = data.get('Table')[0]
     return ret
