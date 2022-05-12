@@ -637,15 +637,18 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
         product_time = instance.production_factory_date
         material_detail = MaterialAttribute.objects.filter(material__material_no=pallet_data.product_no).first()
         if material_detail:
-            unit = material_detail.validity_unit
-            if unit in ["天", "days", "day"]:
-                param = {"days": material_detail.period_of_validity}
-            elif unit in ["小时", "hours", "hour"]:
-                param = {"hours": material_detail.period_of_validity}
+            if material_detail.period_of_validity:
+                unit = material_detail.validity_unit
+                if unit in ["天", "days", "day"]:
+                    param = {"days": material_detail.period_of_validity}
+                elif unit in ["小时", "hours", "hour"]:
+                    param = {"hours": material_detail.period_of_validity}
+                else:
+                    param = {"days": material_detail.period_of_validity}
+                expire_time = (product_time + timedelta(**param)).strftime('%Y-%m-%d %H:%M:%S')
+                ret['valid_time'] = expire_time  # 有效期
             else:
-                param = {"days": material_detail.period_of_validity}
-            expire_time = (product_time + timedelta(**param)).strftime('%Y-%m-%d %H:%M:%S')
-            ret['valid_time'] = expire_time  # 有效期
+                ret['valid_time'] = None
         else:
             ret['valid_time'] = None
         ret['range_showed'] = QualifiedRangeDisplay.objects.first().is_showed
