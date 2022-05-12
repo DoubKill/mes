@@ -45,6 +45,7 @@ from equipment.utils import gen_template_response, get_staff_status, get_ding_ui
 from mes.common_code import OMin, OMax, OSum, CommonDeleteMixin
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
+from mes.permissions import PermissionClass
 from quality.utils import get_cur_sheet, get_sheet_data
 from terminal.models import ToleranceDistinguish, ToleranceProject, ToleranceHandle, ToleranceRule
 from system.models import Section, User
@@ -3047,7 +3048,8 @@ class EquipApplyRepairViewSet(ModelViewSet):
     """
     queryset = EquipApplyRepair.objects.all().order_by('-id')
     serializer_class = EquipApplyRepairSerializer
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated, PermissionClass({'view': ['view_equip_apply_repair', 'assign_d_equip_apply_order'],
+                                                            'add': ['add_equip_apply_repair', 'assign_d_equip_apply_order']}))
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipApplyRepairFilter
 
@@ -3059,7 +3061,15 @@ class EquipApplyOrderViewSet(ModelViewSet):
     """
     queryset = EquipApplyOrder.objects.all().order_by('-id')
     serializer_class = EquipApplyOrderSerializer
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated, PermissionClass({'view': ['view_equip_apply_order', 'close_d_equip_apply_order',
+                                                                     'export_equip_apply_order', 'view_d_equip_apply_order',
+                                                                     'close_d_equip_apply_order'],
+                                                            'add': ['close_equip_apply_order', 'assign_equip_apply_order',
+                                                                    'receive_equip_apply_order', 'charge_equip_apply_order',
+                                                                    'begin_equip_apply_order', 'accept_equip_apply_order',
+                                                                    'regulation_equip_apply_order', 'receive_d_equip_apply_order',
+                                                                    'view_d_equip_apply_order'],
+                                                            'change': ['handle_equip_apply_order']}))
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipApplyOrderFilter
     FILE_NAME = '设备维修工单表'
@@ -3454,7 +3464,13 @@ class EquipInspectionOrderViewSet(ModelViewSet):
     """
     queryset = EquipInspectionOrder.objects.all().order_by('-id')
     serializer_class = EquipInspectionOrderSerializer
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated, PermissionClass({'view': ['view_equip_inspection_order', 'export_equip_inspection_order',
+                                                                     'view_d_equip_apply_order', 'close_d_equip_apply_order'],
+                                                            'add': ['close_equip_inspection_order', 'assign_equip_inspection_order',
+                                                                    'receive_equip_inspection_order', 'charge_equip_inspection_order',
+                                                                    'begin_equip_inspection_order', 'regulation_equip_inspection_order',
+                                                                    'view_d_equip_apply_order'],
+                                                            'change': ['handle_equip_inspection_order']}))
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipInspectionOrderFilter
     FILE_NAME = '设备巡检工单表'
@@ -4592,6 +4608,9 @@ class EquipOrderEntrustView(APIView):
     """
     工单查询加委托
     """
+    permission_classes = (IsAuthenticated, PermissionClass({'view': ['charge_d_equip_apply_order', 'begin_d_equip_apply_order'],
+                                                            'add': ['charge_d_equip_apply_order', 'begin_d_equip_apply_order']}))
+
     def get(self, request):
         oper_type = self.request.query_params.get('oper_type')
         user_name = self.request.user.username
