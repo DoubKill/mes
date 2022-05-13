@@ -2435,13 +2435,13 @@ class EquipWarehouseLocationViewSet(ModelViewSet):
 
 @method_decorator([api_recorder], name='dispatch')
 class EquipWarehouseOrderViewSet(ModelViewSet):
-    queryset = EquipWarehouseOrder.objects.filter(delete_flag=False).order_by('-order_id')
+    queryset = EquipWarehouseOrder.objects.filter(delete_flag=False).order_by('-id')
     serializer_class = EquipWarehouseOrderSerializer
     permission_classes = (IsAuthenticated,)
     filter_class = EquipWarehouseOrderFilter
 
     def list(self, request, *args, **kwargs):
-        status = self.request.query_params.get('status')
+        state = self.request.query_params.get('status')
         order = self.request.query_params.get('order', None)
         page = self.request.query_params.get('page', 1)
         page_size = self.request.query_params.get('page_size', 10)
@@ -2461,7 +2461,7 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
                                                                         'created_date', 'plan_name')
             [i.update(created_date=i['created_date'].strftime('%Y-%m-%d %H:%M:%S')) for i in data]
             return Response(data)
-        if status == '入库':
+        if state == '入库':
             data = EquipSpareErp.objects.filter(use_flag=True, **filter_kwargs
                                                 ).values('id', 'spare_code', 'unique_id', 'spare_name',
                                                          'equip_component_type__component_type_name',
@@ -2480,7 +2480,6 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
                 queryset = self.filter_queryset(self.get_queryset().filter(status__in=[4, 5, 6]))
             else:
                 queryset = self.filter_queryset(self.get_queryset())
-            queryset = list(set(queryset))
             page = self.paginate_queryset(queryset)
             if page is not None:
                 serializer = self.get_serializer(page, many=True)
@@ -2499,15 +2498,15 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
 
     @action(methods=['get'], detail=False, url_path='get_order_id', url_name='get_order_id')
     def get_order_id(self, request):
-        status = request.query_params.get('status', '入库')
-        if status == '入库':
+        state = request.query_params.get('status', '入库')
+        if state == '入库':
             res = EquipWarehouseOrder.objects.filter(created_date__gt=dt.date.today(), status__in=[1, 2, 3]).values(
                 'order_id').last()
             if res:
                 return Response(res['order_id'][:10] + str('%04d' % (int(res['order_id'][11:]) + 1)))
             else:
                 return Response('RK' + str(dt.date.today().strftime('%Y%m%d')) + '0001')
-        if status == '出库':
+        if state == '出库':
             res = EquipWarehouseOrder.objects.filter(created_date__gt=dt.date.today(), status__in=[4, 5, 6]).values(
                 'order_id').last()
             if res:
