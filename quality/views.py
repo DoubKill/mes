@@ -1759,10 +1759,13 @@ class WMSMaterialSearchView(APIView):
         try:
             client = Client(url)
             json_data = {"tofac": "AJ1", "tmh": tmh}
-            data = client.service.FindZcdtmList(json.dumps(json_data))
+            resp = client.service.FindZcdtmList(json.dumps(json_data))
         except Exception:
             raise ValidationError('网络异常！')
-        data = json.loads(data)
+        try:
+            data = json.loads(resp)
+        except Exception:
+            raise ValidationError(resp)
         ret = data.get('Table')
         if not ret:
             raise ValidationError('未找到该条码对应物料信息！')
@@ -1775,7 +1778,7 @@ class MaterialInspectionRegistrationViewSet(viewsets.GenericViewSet,
                                             mixins.RetrieveModelMixin,
                                             mixins.CreateModelMixin,
                                             mixins.DestroyModelMixin):
-    queryset = MaterialInspectionRegistration.objects.all()
+    queryset = MaterialInspectionRegistration.objects.order_by('-id')
     serializer_class = MaterialInspectionRegistrationSerializer
     filter_backends = (DjangoFilterBackend,)
     filter_class = MaterialInspectionRegistrationFilter
