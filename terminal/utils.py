@@ -336,9 +336,9 @@ def material_out_barcode(bar_code):
             SM_CREATE = f'{PH[:4]}-{PH[4:6]}-{PH[6:8]} {PH[8:10]}:{PH[10:12]}:00'
             DDH = f'RKD{SCRQ}001'
             SYQX = (datetime.strptime(SM_CREATE, '%Y-%m-%d %H:%M:%S') + timedelta(days=364)).strftime('%Y-%m-%d')
-            ret = {'WLXXID': wms_info.material_no, 'TMH': bar_code, 'BZDW': wms_info.standard_unit, 'SL': wms_info.piece_count,
-                   'ZL': wms_info.weight, 'SCRQ': SCRQ, 'TOFAC': 'AJ1', 'SM_CREATE': SM_CREATE, 'WLDWMC': wms_info.supplier,
-                   'WLMC': wms_info.material_name, 'CD': '参见供应商', 'SYQX': SYQX, 'PH': PH, 'DDH': DDH, 'ZSL': wms_info.zc_num}
+            ret = {'wlxxid': wms_info.material_no, 'tmh': bar_code, 'bzdw': wms_info.standard_unit, 'sl': wms_info.piece_count,
+                   'zl': wms_info.weight, 'scrq': SCRQ, 'tofac': 'AJ1', 'sm_create': SM_CREATE, 'wldwmc': wms_info.supplier,
+                   'wlmc': wms_info.material_name, 'cd': '', 'syqx': SYQX, 'ph': PH, 'ddh': DDH, 'zsl': wms_info.zc_num}
         except Exception as e:
             flag = True
     else:
@@ -351,7 +351,10 @@ def material_out_barcode(bar_code):
             data = client.service.FindZcdtmList(json.dumps(json_data))
         except Exception as e:
             raise ValueError('网络异常: 无法获取总厂数据')
-        data = json.loads(data)
+        try:
+            data = json.loads(data)
+        except Exception as e:
+            raise ValueError('未找到该条码对应物料信息！')
         if data.get('Table'):
             ret = data.get('Table')[0]
     return ret
