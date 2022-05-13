@@ -2212,9 +2212,14 @@ class DailyProductionCompletionReport(APIView):
     def get(self, request):
         params = self.request.query_params
         date = params.get('date')
-        year = int(date.split('-')[0]) if date else datetime.date.today().year
-        month = int(date.split('-')[1]) if date else datetime.date.today().month
-        this_month_start = datetime.datetime(year, month, 1)
+        if not date:
+            raise ValidationError('请选择月份！')
+        try:
+            year = int(date.split('-')[0])
+            month = int(date.split('-')[1])
+        except Exception:
+            raise ValidationError('请输入正确的月份!')
+        # this_month_start = datetime.datetime(year, month, 1)
         if month == 12:
             this_month_end = datetime.datetime(year + 1, 1, 1) - timedelta(days=1)
         else:
@@ -2305,7 +2310,7 @@ class DailyProductionCompletionReport(APIView):
             down_time = sum([shot_down_dic[day].get(e, 0) for e in down_equip]) if shot_down_dic.get(day) else 0
             results['name_6'][f"{day}日"] = round(((24 * len(equip_dic.get(day))) - down_time) / (24 * len(equip_dic.get(day))), 2)
         if len(results['name_6']) - 2 != 0:
-            results['name_6']['weight'] = round(sum([v for k, v in results['name_6'].items() if k[0].isdigit()]) / (len(results['name_6']) - 2), 2)
+            results['name_6']['weight'] = round(sum([v for k, v in results['name_6'].items() if k[0].isdigit()]), 2)
             for key, value in results['name_4'].items():
                 if key[0].isdigit():
                     if results['name_6'].get(key):
@@ -2313,27 +2318,30 @@ class DailyProductionCompletionReport(APIView):
                         results['name_8'][key] = round(results['name_5'][key] / decimal.Decimal(results['name_6'][key]), 2)
             results['name_7']['weight'] = round(results['name_4']['weight'] / decimal.Decimal(results['name_6']['weight']), 2)
             results['name_8']['weight'] = round(results['name_5']['weight'] / decimal.Decimal(results['name_6']['weight']), 2)
+        # 导出
         if self.request.query_params.get('export', None):
             results2 = {}
             equip_query = Equip.objects.filter(category__equip_type__global_name='密炼设备').values('equip_no',
                                                                                                 'category__category_name')
             equip_dic = {item['equip_no']: item['category__category_name'] for item in equip_query}
-            data2 = TrainsFeedbacks.objects.filter(factory_date__year=2022, factory_date__month=4).values(
+            data2 = TrainsFeedbacks.objects.filter(factory_date__year=year, factory_date__month=month).values(
                 'factory_date__day', 'product_no', 'equip_no', 'classes').annotate(actual_trains=Count('actual_trains'),
-                                                                                   weight=Sum('actual_weight'))
+                                                                                   weight=Sum('actual_weight')/100000)
             for item in data2:
                 try:
                     state = item['product_no'].split("-")[1]
                     space = item['product_no'].split("-")[2]
                     key = f'{space}_{state}_{item["equip_no"]}_{item["classes"]}'
                 except:
-                    pass
-                weight = round(float(item['actual_trains'] / 100 / 1000), 3)
+                    continue
+                weight = round(float(item['weight']), 3)
                 if results2.get(key):
                     results2[key][f'{item["factory_date__day"]}_qty'] = results2[key].get(
                         f'{item["factory_date__day"]}_qty', 0) + item['actual_trains']
                     results2[key][f'{item["factory_date__day"]}_weight'] = round(
                         results2[key].get(f'{item["factory_date__day"]}_weight', 0) + weight, 3)
+                    results2[key]['汇总_weight'] += weight
+                    results2[key]['汇总_qty'] += item['actual_trains']
                 else:
                     results2[key] = {'规格': space, '段数': state, '机台': item["equip_no"],
                                      '机型': equip_dic[item["equip_no"]], '班别': item['classes'],
