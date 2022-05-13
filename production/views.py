@@ -2229,7 +2229,7 @@ class DailyProductionCompletionReport(APIView):
             'name_1': {'name': '混炼胶实际完成(吨)', 'weight': 0},  # CMB HMB 1MB~4MB
             'name_2': {'name': '终炼胶实际完成(吨)', 'weight': 0},  # FM + 190E终炼产量
             'name_3': {'name': '外发无硫料(吨)', 'weight': 0},  # 人工输入
-            'name_4': {'name': '实际完成数-1(吨)', 'weight': 0},  # 190E终炼产量 + FM + 外发无硫料
+            'name_4': {'name': '实际完成数-1(吨)', 'weight': 0},  # 190E终炼产量 + FM + 外发无硫料*0.7
             'name_5': {'name': '实际完成数-2(吨)', 'weight': 0},  # 190E终炼产量 + FM + 外发无硫料
             'name_6': {'name': '实际生产工作日数', 'weight': 0},
             'name_7': {'name': '日均完成率1', 'weight': None},
