@@ -4117,35 +4117,54 @@ class EquipOrderListView(APIView):
                 Q(equip_part_new__part_code__icontains=search) | Q(equip_no__icontains=search))
             queryset2 = EquipInspectionOrder.objects.filter(equip_no__icontains=search)
         if my_order:
-            if status == '已完成':
-                queryset1 = EquipApplyOrder.objects.filter(created_user__username__icontains=self.request.user.username,
-                                                           status=status)
-                queryset2 = []
-            elif status == '已验收':
-                queryset1 = EquipApplyOrder.objects.filter(accept_user__icontains=self.request.user.username,
-                                                           status=status)
-                queryset2 = []
-            else:
-                queryset1 = queryset1.filter(Q(assign_user=self.request.user.username) |
-                                             Q(assign_to_user=self.request.user.username) |
-                                             Q(receiving_user=self.request.user.username) |
-                                             Q(accept_user=self.request.user.username) |
-                                             Q(status='已生成'))
-                queryset2 = queryset2.filter(Q(assign_user=self.request.user.username) |
-                                             Q(assign_to_user=self.request.user.username) |
-                                             Q(receiving_user=self.request.user.username) |
-                                             Q(status='已生成'))
+            queryset1 = queryset1.filter(Q(assign_user=self.request.user.username) |
+                                         Q(assign_to_user=self.request.user.username) |
+                                         Q(receiving_user=self.request.user.username) |
+                                         Q(accept_user=self.request.user.username) |
+                                         Q(status='已生成'))
+            queryset2 = queryset2.filter(Q(assign_user=self.request.user.username) |
+                                         Q(assign_to_user=self.request.user.username) |
+                                         Q(receiving_user=self.request.user.username) |
+                                         Q(status='已生成'))
+            if status:
+                queryset1 = queryset1.filter(status__in=status.split(','))
+                queryset2 = queryset2.filter(status__in=status.split(','))
 
         serializer1 = EquipApplyOrderSerializer(instance=queryset1, many=True, context={'request': request}).data
-        serializer = serializer1
-        if queryset2:
-            serializer2 = EquipInspectionOrderSerializer(instance=queryset2, many=True,
-                                                         context={'request': request}).data
-            serializer += serializer2
+        serializer2 = EquipInspectionOrderSerializer(instance=queryset2, many=True, context={'request': request}).data
         st = (int(page) - 1) * int(page_size)
         et = int(page) * int(page_size)
-        data = sorted(serializer, key=lambda x: x['created_date'], reverse=True)
+        data = sorted(serializer1 + serializer2, key=lambda x: x['created_date'], reverse=True)
         return Response({'results': data[st:et], 'count': len(data)})
+
+
+@method_decorator([api_recorder], name='dispatch')
+class FaOrderListView(APIView):
+    """
+    已完成、已验收的维修巡检工单及数量
+    """
+
+    def get(self, request):
+        status = self.request.query_params.get('status')
+        user_name = self.request.user.username
+        finished_order1 = EquipApplyOrder.objects.filter(Q(assign_user=user_name) | Q(receiving_user=user_name) |
+                                                         Q(assign_to_user__icontains=user_name) |
+                                                         Q(repair_user__icontains=user_name) |
+                                                         Q(created_user__username=user_name), status='已完成')
+        finished_order2 = EquipInspectionOrder.objects.filter(Q(assign_user=user_name) | Q(receiving_user=user_name) |
+                                                              Q(assign_to_user__icontains=user_name) |
+                                                              Q(repair_user__icontains=user_name) |
+                                                              Q(created_user__username=user_name), status='已完成')
+        accept_order = EquipApplyOrder.objects.filter(accept_user__icontains=user_name, status='已验收')
+        if status == '已完成':
+            serializer1 = EquipApplyOrderSerializer(instance=finished_order1, many=True, context={'request': request}).data
+            serializer2 = EquipInspectionOrderSerializer(instance=finished_order2, many=True, context={'request': request}).data
+            all_data = serializer1 + serializer2
+        else:
+            serializer1 = EquipApplyOrderSerializer(instance=accept_order, many=True, context={'request': request}).data
+            all_data = serializer1
+        data = sorted(all_data, key=lambda x: x['created_date'], reverse=True)
+        return Response({'results': data, 'finished': len(finished_order1) + len(finished_order2), 'accepted': len(accept_order)})
 
 
 @method_decorator([api_recorder], name='dispatch')

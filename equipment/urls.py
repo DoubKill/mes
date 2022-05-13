@@ -154,6 +154,8 @@ urlpatterns = [
     path('equip-code-print/', EquipCodePrintView.as_view()),
     # 钉钉工单查询
     path('equip-order-list/', EquipOrderListView.as_view()),
+    # 钉钉工单(已完成、已验收)
+    path('fa-order-list/', FaOrderListView.as_view()),
     # MTBF/MTTR分析报表
     path('equip-mtbfmttp-statement/', EquipMTBFMTTPStatementView.as_view()),
     # 工单别 处理时间分析报表
