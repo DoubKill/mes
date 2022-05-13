@@ -4120,7 +4120,7 @@ class EquipOrderListView(APIView):
                                                           Q(equip_no__icontains=search),
                                                           Q(created_user__username=user_name) | Q(accept_user=user_name),
                                                           status__in=['已完成', '已验收'])
-            serializer = queryset
+            serializer = EquipApplyOrderSerializer(instance=queryset, many=True, context={'request': request}).data
         else:
             if lot_no:
                 queryset1 = EquipApplyOrder.objects.filter(Q(equip_part_new__part_code=lot_no) | Q(equip_no=lot_no))
