@@ -665,6 +665,7 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
                                                          is_print=True
                                                          ).values_list('test_method__name', flat=True))
         indicators = []
+        obj_result = obj.test_result
         for test_order in test_orders:
             ret[test_order.actual_trains] = []
             max_result_ids = list(test_order.order_results.values(
@@ -675,20 +676,24 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
                                                              ).order_by('test_indicator_name',
                                                                         'data_point_name')
             for test_result in test_results:
-                if test_result.level == 1:
-                    result = '合格'
-                elif test_result.is_passed:
-                    result = 'pass'
+                if obj_result == '实验':
+                    result = ''
+                    status = ''
                 else:
-                    result = '不合格'
-                if test_order.is_qualified:
-                    status = '1:一等品'
-                elif test_order.is_passed:
-                    status = 'PASS'
-                elif obj.test_result == 'PASS' and obj.deal_user:
-                    status = 'PASS'
-                else:
-                    status = '3:三等品'
+                    if test_result.level == 1:
+                        result = '合格'
+                    elif test_result.is_passed:
+                        result = 'pass'
+                    else:
+                        result = '不合格'
+                    if test_order.is_qualified:
+                        status = '1:一等品'
+                    elif test_order.is_passed:
+                        status = 'PASS'
+                    elif obj.test_result == 'PASS' and obj.deal_user:
+                        status = 'PASS'
+                    else:
+                        status = '3:三等品'
                 if test_result.result == '合格':
                     tag = ""
                 else:

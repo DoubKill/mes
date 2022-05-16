@@ -12,7 +12,7 @@ from django.dispatch import receiver
 
 from production.models import PalletFeedbacks
 from quality.models import MaterialTestResult, MaterialTestOrder, MaterialDealResult, \
-    MaterialDataPointIndicator, DataPointStandardError, IgnoredProductInfo, TestMethod
+    MaterialDataPointIndicator, DataPointStandardError, IgnoredProductInfo, TestMethod, MaterialTestMethod
 import logging
 
 from recipe.models import ProductBatching
@@ -68,118 +68,131 @@ def judge_standard_error_deal_suggestion(data_point_name, product_no, value, tes
 def batching_post_save(sender, instance=None, created=False, update_fields=None, **kwargs):
     # 等级综合判定
     try:
-        if created and instance.is_judged:
+        if created:
             # 取test_order
             material_test_order = instance.material_test_order
-
-            # 该test_order所有数据点最后检测result
-            max_result_ids = list(material_test_order.order_results.values(
-                'test_indicator_name', 'data_point_name'
-            ).annotate(max_id=Max('id')).values_list('max_id', flat=True))
-
-            # 判断该test_order是否合格：根据最后数据点的检测值等级等级大于1判断
-            if max_result_ids:
-                test_results = MaterialTestResult.objects.filter(id__in=max_result_ids, is_judged=True)
-                if test_results.filter(level__gt=1).exists():
-                    material_test_order.is_qualified = False
-                else:
-                    material_test_order.is_qualified = True
-
-            # 判断当前数据点检测值是否在合格区间，存在的话更新改test_result的is_passed字段为true和处理意见
-            if instance.level > 1:
-                ignored_products = IgnoredProductInfo.objects.values_list('product_no', flat=True)
-                test_method = TestMethod.objects.filter(name=instance.test_method_name).first()
-                product_nos = set(ProductBatching.objects.filter(
-                    product_info__product_no__in=ignored_products).values_list('stage_product_batch_no', flat=True))
-                if material_test_order.product_no not in product_nos and test_method:
-                    # 不在失效胶种里面，则做pass判定
-                    deal_suggestion = judge_standard_error_deal_suggestion(instance.data_point_name,
-                                                                           material_test_order.product_no,
-                                                                           instance.value,
-                                                                           test_method.test_type.name,
-                                                                           test_method.name)
-                    if deal_suggestion:
-                        MaterialTestResult.objects.filter(
-                            id=instance.id).update(
-                            is_passed=True, pass_suggestion=deal_suggestion)
-            else:
-                MaterialTestResult.objects.filter(id=instance.id).update(is_passed=False)
-
-            # 判断该test_order是否pass：根据这最新所有数据点通过pass章的数量和不合格的数据点是否都等于1，是的话更新is_passed字段为true
-            test_order_passed_count = MaterialTestResult.objects.filter(id__in=max_result_ids, is_passed=True, is_judged=True).count()
-            test_order_unqualified_count = MaterialTestResult.objects.filter(id__in=max_result_ids, level__gt=1, is_judged=True).count()
-            if test_order_passed_count == test_order_unqualified_count == 1:
-                material_test_order.is_passed = True
-            else:
-                material_test_order.is_passed = False
-            material_test_order.save()
-
-            # 取托盘所有test_order
+            # 取托盘号
             lot_no = material_test_order.lot_no
+
             pfb_obj = PalletFeedbacks.objects.filter(lot_no=lot_no,
                                                      product_no=material_test_order.product_no).first()
             if not pfb_obj:
                 return
-            test_orders = MaterialTestOrder.objects.filter(lot_no=lot_no,
-                                                           product_no=material_test_order.product_no)
 
-            # 取检测车次
-            test_trains_set = set(test_orders.values_list('actual_trains', flat=True))
-            # 取托盘反馈生产车次
-            actual_trains_set = {i for i in range(pfb_obj.begin_trains, pfb_obj.end_trains + 1)}
-
-            common_trains_set = actual_trains_set & test_trains_set
-            # 判断托盘反馈车次都存在检测数据
-            if not len(actual_trains_set) == len(common_trains_set):
-                return
-
-            # 判定所有数据点都是否已检测完成
-            data_points = set(MaterialDataPointIndicator.objects.filter(
-                material_test_method__material__material_no=material_test_order.product_no,
-                material_test_method__is_judged=True,
-                delete_flag=False).values_list('data_point__name', flat=True))
-            tested_data_points = set(MaterialTestResult.objects.filter(
-                material_test_order_id__in=test_orders.values_list('id', flat=True)
-            ).values_list('data_point_name', flat=True))
-            common_data_points = data_points & tested_data_points
-            if not len(data_points) == len(common_data_points):
-                return
-
-            # 判断该托盘所有test_order检测结果
-
-            # 1、不合格车数以及pass章车数相等且大于0，则判定为PASS章
-            passed_order_count = MaterialTestOrder.objects.filter(lot_no=material_test_order.lot_no,
-                                                                  product_no=material_test_order.product_no,
-                                                                  is_passed=True).count()
-            unqualified_order_count = MaterialTestOrder.objects.filter(lot_no=material_test_order.lot_no,
-                                                                       product_no=material_test_order.product_no,
-                                                                       is_qualified=False).count()
-            if 0 < passed_order_count == unqualified_order_count > 0:
+            # 所有项目都不判级
+            if not MaterialTestMethod.objects.filter(delete_flag=False,
+                                                     is_judged=True,
+                                                     material__material_no=material_test_order.product_no
+                                                     ).exists():
                 level = 1
-                test_result = 'PASS'
-                last_result_ids = list(MaterialTestResult.objects.filter(
-                    is_judged=True,
-                    material_test_order__lot_no=lot_no).values(
-                    'material_test_order', 'test_indicator_name', 'data_point_name'
+                test_result = '实验'
+                deal_suggestion = '实验'
+            elif instance.is_judged:
+                # 该test_order所有数据点最后检测result
+                max_result_ids = list(material_test_order.order_results.values(
+                    'test_indicator_name', 'data_point_name'
                 ).annotate(max_id=Max('id')).values_list('max_id', flat=True))
-                # 取该托唯一一个pass章的数据点
-                passed_result = MaterialTestResult.objects.filter(
-                    is_judged=True,
-                    id__in=last_result_ids,
-                    is_passed=True).last()
-                deal_suggestion = getattr(passed_result, 'pass_suggestion', '放行')
-            # 2、所有车次都合格
-            elif not MaterialTestOrder.objects.filter(is_qualified=False,
-                                                      lot_no=material_test_order.lot_no,
-                                                      product_no=material_test_order.product_no).exists():
-                level = 1
-                test_result = '一等品'
-                deal_suggestion = '合格'
-            # 3、不合格
+
+                # 判断该test_order是否合格：根据最后数据点的检测值等级等级大于1判断
+                if max_result_ids:
+                    test_results = MaterialTestResult.objects.filter(id__in=max_result_ids, is_judged=True)
+                    if test_results.filter(level__gt=1).exists():
+                        material_test_order.is_qualified = False
+                    else:
+                        material_test_order.is_qualified = True
+
+                # 判断当前数据点检测值是否在合格区间，存在的话更新改test_result的is_passed字段为true和处理意见
+                if instance.level > 1:
+                    ignored_products = IgnoredProductInfo.objects.values_list('product_no', flat=True)
+                    test_method = TestMethod.objects.filter(name=instance.test_method_name).first()
+                    product_nos = set(ProductBatching.objects.filter(
+                        product_info__product_no__in=ignored_products).values_list('stage_product_batch_no', flat=True))
+                    if material_test_order.product_no not in product_nos and test_method:
+                        # 不在失效胶种里面，则做pass判定
+                        deal_suggestion = judge_standard_error_deal_suggestion(instance.data_point_name,
+                                                                               material_test_order.product_no,
+                                                                               instance.value,
+                                                                               test_method.test_type.name,
+                                                                               test_method.name)
+                        if deal_suggestion:
+                            MaterialTestResult.objects.filter(
+                                id=instance.id).update(
+                                is_passed=True, pass_suggestion=deal_suggestion)
+                else:
+                    MaterialTestResult.objects.filter(id=instance.id).update(is_passed=False)
+
+                # 判断该test_order是否pass：根据这最新所有数据点通过pass章的数量和不合格的数据点是否都等于1，是的话更新is_passed字段为true
+                test_order_passed_count = MaterialTestResult.objects.filter(id__in=max_result_ids, is_passed=True, is_judged=True).count()
+                test_order_unqualified_count = MaterialTestResult.objects.filter(id__in=max_result_ids, level__gt=1, is_judged=True).count()
+                if test_order_passed_count == test_order_unqualified_count == 1:
+                    material_test_order.is_passed = True
+                else:
+                    material_test_order.is_passed = False
+                material_test_order.save()
+
+                test_orders = MaterialTestOrder.objects.filter(lot_no=lot_no,
+                                                               product_no=material_test_order.product_no)
+
+                # 取检测车次
+                test_trains_set = set(test_orders.values_list('actual_trains', flat=True))
+                # 取托盘反馈生产车次
+                actual_trains_set = {i for i in range(pfb_obj.begin_trains, pfb_obj.end_trains + 1)}
+
+                common_trains_set = actual_trains_set & test_trains_set
+                # 判断托盘反馈车次都存在检测数据
+                if not len(actual_trains_set) == len(common_trains_set):
+                    return
+
+                # 判定所有数据点都是否已检测完成
+                data_points = set(MaterialDataPointIndicator.objects.filter(
+                    material_test_method__material__material_no=material_test_order.product_no,
+                    material_test_method__is_judged=True,
+                    delete_flag=False).values_list('data_point__name', flat=True))
+                tested_data_points = set(MaterialTestResult.objects.filter(
+                    material_test_order_id__in=test_orders.values_list('id', flat=True)
+                ).values_list('data_point_name', flat=True))
+                common_data_points = data_points & tested_data_points
+
+                if not len(data_points) == len(common_data_points):
+                    return
+
+                # 判断该托盘所有test_order检测结果
+
+                # 1、不合格车数以及pass章车数相等且大于0，则判定为PASS章
+                passed_order_count = MaterialTestOrder.objects.filter(lot_no=material_test_order.lot_no,
+                                                                      product_no=material_test_order.product_no,
+                                                                      is_passed=True).count()
+                unqualified_order_count = MaterialTestOrder.objects.filter(lot_no=material_test_order.lot_no,
+                                                                           product_no=material_test_order.product_no,
+                                                                           is_qualified=False).count()
+                if 0 < passed_order_count == unqualified_order_count > 0:
+                    level = 1
+                    test_result = 'PASS'
+                    last_result_ids = list(MaterialTestResult.objects.filter(
+                        is_judged=True,
+                        material_test_order__lot_no=lot_no).values(
+                        'material_test_order', 'test_indicator_name', 'data_point_name'
+                    ).annotate(max_id=Max('id')).values_list('max_id', flat=True))
+                    # 取该托唯一一个pass章的数据点
+                    passed_result = MaterialTestResult.objects.filter(
+                        is_judged=True,
+                        id__in=last_result_ids,
+                        is_passed=True).last()
+                    deal_suggestion = getattr(passed_result, 'pass_suggestion', '放行')
+                # 2、所有车次都合格
+                elif not MaterialTestOrder.objects.filter(is_qualified=False,
+                                                          lot_no=material_test_order.lot_no,
+                                                          product_no=material_test_order.product_no).exists():
+                    level = 1
+                    test_result = '一等品'
+                    deal_suggestion = '合格'
+                # 3、不合格
+                else:
+                    level = 3
+                    test_result = '三等品'
+                    deal_suggestion = '不合格'
             else:
-                level = 3
-                test_result = '三等品'
-                deal_suggestion = '不合格'
+                return
 
             deal_result_dict = {
                 'level': level,
@@ -196,11 +209,11 @@ def batching_post_save(sender, instance=None, created=False, update_fields=None,
                 'begin_trains': pfb_obj.begin_trains,
                 'end_trains': pfb_obj.end_trains,
             }
-            instance = MaterialDealResult.objects.filter(lot_no=lot_no,
-                                                         product_no=material_test_order.product_no)
-            if instance:
+            result_instance = MaterialDealResult.objects.filter(lot_no=lot_no,
+                                                                product_no=material_test_order.product_no)
+            if result_instance:
                 deal_result_dict['update_store_test_flag'] = 4
-                instance.update(**deal_result_dict)
+                result_instance.update(**deal_result_dict)
             else:
                 deal_result_dict['lot_no'] = lot_no
                 MaterialDealResult.objects.create(**deal_result_dict)

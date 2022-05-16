@@ -341,7 +341,7 @@ class MaterialDealResult(AbstractEntity):
     level = models.IntegerField(help_text='综合等级，1为一等品，其他为三等品')
     deal_opinion = models.ForeignKey("DealSuggestion", help_text='综合处理意见id',
                                      on_delete=models.CASCADE, related_name='deal_opinions', blank=True, null=True)
-    test_result = models.CharField(max_length=64, help_text="综合检测结果，一等品/三等品/PASS")
+    test_result = models.CharField(max_length=64, help_text="综合检测结果，一等品/三等品/PASS/实验")
     reason = models.TextField(help_text="不合格原因")
     status = models.CharField(max_length=16, help_text="状态", choices=CHOICE)
     deal_result = models.CharField(max_length=64, help_text="处理结果，一等品/三等品")
