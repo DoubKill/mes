@@ -6021,7 +6021,7 @@ class ProductExpireDetailView(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class ProductInOutHistoryView(APIView):
-    permission_classes = (IsAuthenticated, PermissionClass({'view': 'in_out_history'}))
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_in_out_history'}))
     EXPORT_FIELDS_DICT = {'质检条码': 'lot_no',
                           '入库单号': 'inbound_order_no',
                           '入库发起时间': 'inbound_time',

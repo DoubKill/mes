@@ -123,9 +123,8 @@ class SulfurAutoPlanViewSet(GenericViewSet, ListModelMixin, CreateModelMixin):
                 data = client.service.FindZcdtmList(json.dumps(json_data))
             except Exception:
                 return self.results(False, '网络异常')
-            data = json.loads(data)
             try:
-                ret = data.get('Table')[0]
+                ret = json.loads(data).get('Table')[0]
             except:
                 return self.results(False, '未找到该条码对应物料信息！')
             depot_site = serializer.validated_data.get('depot_site')
@@ -133,10 +132,10 @@ class SulfurAutoPlanViewSet(GenericViewSet, ListModelMixin, CreateModelMixin):
             state = serializer.validated_data.get('state')
 
             try:
-                name = ret['WLMC']
-                provider = ret['WLDWMC']
-                ZL = ret['ZL']  # 重量
-                SL = ret['SL']  # 数量
+                name = ret['wlmc']
+                provider = ret['wldwmc']
+                ZL = ret['zl']  # 重量
+                SL = ret['sl']  # 数量
             except:
                 return self.results(False, '原材料数据有误！')
 
