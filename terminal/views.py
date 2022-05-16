@@ -1147,12 +1147,15 @@ class GetXlRecipesInfoView(APIView):
         data = {}
         db_config = [k for k, v in DATABASES.items() if 'YK_XL' in v['NAME']]
         for batching_equip in db_config:
-            all_recipes = RecipePre.objects.using(batching_equip).filter(use_not=0)
-            for i in all_recipes:
-                if i.name not in data:
-                    data[i.name] = {'batching_equip': [batching_equip], 'dev_type': i.ver, 'product_no': i.name}
-                else:
-                    data[i.name]['batching_equip'].append(batching_equip)
+            try:
+                all_recipes = RecipePre.objects.using(batching_equip).filter(use_not=0)
+                for i in all_recipes:
+                    if i.name not in data:
+                        data[i.name] = {'batching_equip': [batching_equip], 'dev_type': i.ver, 'product_no': i.name}
+                    else:
+                        data[i.name]['batching_equip'].append(batching_equip)
+            except:
+                continue
         return Response({'results': data.values()})
 
 

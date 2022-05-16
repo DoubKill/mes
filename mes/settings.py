@@ -360,6 +360,7 @@ DATABASES = {
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',
             'MARS_Connection': True,
+            'connect_timeout': 1
         },
     },
     "F02": {  # 细料称2
@@ -372,6 +373,7 @@ DATABASES = {
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',
             'MARS_Connection': True,
+            'connect_timeout': 1
         },
     },
     "F03": {  # 细料称3
@@ -384,6 +386,7 @@ DATABASES = {
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',
             'MARS_Connection': True,
+            'connect_timeout': 1
         },
     },
     "S01": {  # 硫磺称1
@@ -396,6 +399,7 @@ DATABASES = {
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',
             'MARS_Connection': True,
+            'connect_timeout': 1
         },
     },
     "S02": {  # 硫磺称2
@@ -408,6 +412,7 @@ DATABASES = {
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',
             'MARS_Connection': True,
+            'connect_timeout': 1
         },
     },
 }
