@@ -84,6 +84,20 @@ def batching_post_save(sender, instance=None, created=False, update_fields=None,
                                                      is_judged=True,
                                                      material__material_no=material_test_order.product_no
                                                      ).exists():
+
+                test_orders = MaterialTestOrder.objects.filter(lot_no=lot_no,
+                                                               product_no=material_test_order.product_no)
+
+                # 取检测车次
+                test_trains_set = set(test_orders.values_list('actual_trains', flat=True))
+                # 取托盘反馈生产车次
+                actual_trains_set = {i for i in range(pfb_obj.begin_trains, pfb_obj.end_trains + 1)}
+
+                common_trains_set = actual_trains_set & test_trains_set
+                # 判断托盘反馈车次都存在检测数据
+                if not len(actual_trains_set) == len(common_trains_set):
+                    return
+
                 level = 1
                 test_result = '实验'
                 deal_suggestion = '实验'
