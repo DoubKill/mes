@@ -99,8 +99,8 @@ def batching_post_save(sender, instance=None, created=False, update_fields=None,
                     return
 
                 level = 1
-                test_result = '实验'
-                deal_suggestion = '实验'
+                test_result = '试验'
+                deal_suggestion = '试验'
             elif instance.is_judged:
                 # 该test_order所有数据点最后检测result
                 max_result_ids = list(material_test_order.order_results.values(

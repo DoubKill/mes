@@ -676,7 +676,7 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
                                                              ).order_by('test_indicator_name',
                                                                         'data_point_name')
             for test_result in test_results:
-                if obj_result == '实验':
+                if obj_result == '试验':
                     result = ''
                     status = ''
                 else:
