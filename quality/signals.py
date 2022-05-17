@@ -84,6 +84,12 @@ def batching_post_save(sender, instance=None, created=False, update_fields=None,
                                                      is_judged=True,
                                                      material__material_no=material_test_order.product_no
                                                      ).exists():
+                try:
+                    pn = material_test_order.product_no.split('-')[2]
+                except Exception:
+                    return
+                if not pn.startswith('T'):
+                    return
 
                 test_orders = MaterialTestOrder.objects.filter(lot_no=lot_no,
                                                                product_no=material_test_order.product_no)
