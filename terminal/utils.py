@@ -333,7 +333,7 @@ def material_out_barcode(bar_code):
         try:
             PH = wms_info.batch_no
             SCRQ = wms_info.batch_no[:8]
-            SM_CREATE = f'{PH[:4]}-{PH[4:6]}-{PH[6:8]} {PH[8:10]}:{PH[10:12]}:00'
+            SM_CREATE = f'{PH[:4]}-{PH[4:6]}-{PH[6:8]} {PH[8:10]}:{PH[10:12]}:00' if len(PH) > 8 else f'{PH[:4]}-{PH[4:6]}-{PH[6:8]} 00:00:00'
             DDH = f'RKD{SCRQ}001'
             SYQX = (datetime.strptime(SM_CREATE, '%Y-%m-%d %H:%M:%S') + timedelta(days=364)).strftime('%Y-%m-%d')
             ret = {'wlxxid': wms_info.material_no, 'tmh': bar_code, 'bzdw': wms_info.standard_unit, 'sl': wms_info.piece_count,
