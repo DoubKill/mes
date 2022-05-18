@@ -4,7 +4,7 @@ from rest_framework_jwt.views import obtain_jwt_token, refresh_jwt_token
 
 from system.views import UserViewSet, UserGroupsViewSet, GroupExtensionViewSet, SectionViewSet, \
     GroupAddUserViewSet, LoginView, Synchronization, GroupPermissions, PlanReceive, MaterialReceive, ResetPassword, \
-    DelUser, IdentityCard, DingDingLoginView, DingDingBind, QRLoginView
+    DelUser, IdentityCard, DingDingLoginView, DingDingBind, QRLoginView, DingDingUnBind
 
 # app_name = 'system'
 router = DefaultRouter()
@@ -23,6 +23,7 @@ urlpatterns = [
     path('login/', LoginView.as_view()),
     path('ding-ding-login/', DingDingLoginView.as_view()),
     path('ding-ding-bind/', DingDingBind.as_view()),
+    path('ding-ding-unbind/', DingDingUnBind.as_view()),
     path('api-token-auth/', obtain_jwt_token),
     path('api-token-refresh/', refresh_jwt_token),
     path('synchronization/', Synchronization.as_view()),  # 删除断网后计划数据
