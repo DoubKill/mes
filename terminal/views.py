@@ -189,7 +189,7 @@ class BatchProductBatchingVIew(APIView):
         # 未进料(所有原材料数量均为0);
         if not add_materials:
             list(map(lambda x: x.update({'bra_code': '', 'init_weight': 0, 'used_weight': 0, 'scan_material': '',
-                                         'adjust_left_weight': 0}), material_name_weight))
+                                         'adjust_left_weight': 0, 'scan_finished': False}), material_name_weight))
             # 通用料包数据
             self.common_package(material_name_weight, plan_classes_uid)
             return Response(material_name_weight)
@@ -201,13 +201,15 @@ class BatchProductBatchingVIew(APIView):
             material_name = single_material['material__material_name']
             load_data = material_info.get(material_name)
             single_material.update({'msg': ''})
+            single_material['scan_finished'] = False  # 默认未扫码或扫码不全
             # 不存在则说明当前只完成了一部分的进料,数量置为0
             if not load_data:
                 if material_name in ['细料', '硫磺']:
                     xl_bra = []
+                    detail, xl_detail_count = [], 0
                     if xl:  # [存在料包，但获取不到信息说明是不合包场景]
-                        detail = []
                         for i in xl:
+                            xl_detail_count += 1
                             if i['bra_code'] not in xl_bra:
                                 # 查询重量
                                 if i['scan_material_type'] == '人工配':
@@ -231,20 +233,24 @@ class BatchProductBatchingVIew(APIView):
                                 xl_bra.append(i['bra_code'])
                             else:
                                 continue
-                        # 增加原材料小料显示
-                        wms_material_list = []
-                        wms_xl_material = OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, status=1,
-                                                                          other_type='原材料小料').values('id', 'bra_code', 'material_name')
-                        for j in wms_xl_material:
-                            if j['material_name'] not in wms_xl_material:
-                                wms_data = {'bra_code': j['bra_code'], 'init_weight': Decimal(9999), 'unit': '包',
-                                            'used_weight': Decimal(0), 'single_need': Decimal(1), 'msg': '',
-                                            'scan_material': j['material_name'], 'id': j['id'],
-                                            'adjust_left_weight': Decimal(9999), 'scan_material_type': '人工配'
-                                            }
-                                wms_material_list.append(j['material_name'])
-                                detail.append(wms_data)
-                        single_material.update({'detail': detail})
+                    # 增加原材料小料显示
+                    wms_material_list = []
+                    wms_xl_material = OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, status=1,
+                                                                      other_type='原材料小料').values('id', 'bra_code', 'material_name')
+                    for j in wms_xl_material:
+                        if j['material_name'] not in wms_xl_material:
+                            wms_data = {'bra_code': j['bra_code'], 'init_weight': Decimal(9999), 'unit': '包',
+                                        'used_weight': Decimal(0), 'single_need': Decimal(1), 'msg': '',
+                                        'scan_material': j['material_name'], 'id': j['id'],
+                                        'adjust_left_weight': Decimal(9999), 'scan_material_type': '人工配'
+                                        }
+                            wms_material_list.append(j['material_name'])
+                            detail.append(wms_data)
+                            xl_detail_count += 1
+                    single_material.update({'detail': detail})
+                    # 细料总类齐全则显示ok
+                    if len(cnt_type_details) <= xl_detail_count:
+                        single_material['scan_finished'] = True
                     res.append(single_material)
                     continue
                 else:
@@ -266,7 +272,8 @@ class BatchProductBatchingVIew(APIView):
                     else:
                         single_material.update({
                             'detail': [
-                                {'bra_code': '', 'init_weight': 0, 'used_weight': 0, 'adjust_left_weight': 0, 'scan_material': ''}
+                                {'bra_code': '', 'init_weight': 0, 'used_weight': 0, 'adjust_left_weight': 0,
+                                 'scan_material': ''}
                             ]
                         })
                     res.append(single_material)
@@ -287,6 +294,8 @@ class BatchProductBatchingVIew(APIView):
                 .aggregate(left_weight=Sum('real_weight'))['left_weight']
             if left < load_data['single_need']:
                 single_material['detail'][0].update({'msg': '物料：{}不足, 请扫码添加物料'.format(material_name)})
+            else:
+                single_material['scan_finished'] = True
             res.append(single_material)
         # 通用料包数据
         self.common_package(res, plan_classes_uid)
@@ -307,7 +316,7 @@ class BatchProductBatchingVIew(APIView):
                 if other_xl:  # 防止配方中没有料包但是扫了通用料包条码
                     res.append({
                         "material__material_name": other_xl.material.material_name, "actual_weight": 1,
-                        "standard_error": 1, "msg": "",
+                        "standard_error": 1, "msg": "", "scan_finished": True,
                         "detail": [{
                             "bra_code": common_scan.bra_code, "init_weight": Decimal(9999), "used_weight": Decimal(0),
                             "single_need": Decimal(1), "scan_material": other_xl.material.material_name,
