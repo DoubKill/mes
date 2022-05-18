@@ -1011,6 +1011,7 @@ class EquipApplyRepairSerializer(BaseModelSerializer):
                             'status': '已生成', 'equip_condition': validated_data['equip_condition'],
                             'importance_level': validated_data.get('importance_level', '高'),
                             'created_user': self.context['request'].user,
+                            'fault_datetime': validated_data.get('fault_datetime'),
                             'result_fault_cause': validated_data.get('result_fault_cause'),
                             'planned_repair_date': str(datetime.now().date())}
         if validated_data.get('equip_part_new'):
