@@ -1441,7 +1441,7 @@ class BatchChargeLogListViewSet(ListAPIView):
                     batch_group = record.group.global_name if record else ''
                     data.append({'equip_no': pallet_feedback.equip_no, 'product_no': pallet_feedback.product_no,
                                  'product_time': pallet_feedback.product_time, 'classes': pallet_feedback.classes,
-                                 'trains': f'{pallet_feedback.begin_trains}-{pallet_feedback.end_trians}',
+                                 'trains': f'{pallet_feedback.begin_trains}-{pallet_feedback.end_trains}',
                                  'batch_group': batch_group})
                 else:
                     raise ValidationError('未找到该条码对应物料信息！')
