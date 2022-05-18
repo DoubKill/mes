@@ -1357,7 +1357,7 @@ class UploadImageSerializer(BaseModelSerializer):
         video_file_name = attrs.get('video_file_name')
         if image_file_name and round(image_file_name.size / 1024 / 1024, 2) > 5:
             raise serializers.ValidationError('图片大小不能超过10M')
-        if video_file_name and round(video_file_name.size / 1024 / 1024, 2) > 20:
+        if video_file_name and round(video_file_name.size / 1024 / 1024, 2) > 10:
             raise serializers.ValidationError('视频大小不能超过50M')
         return attrs
 
