@@ -2,7 +2,7 @@ import os
 import time
 
 import django
-
+from django.db.models import Q
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()
@@ -21,7 +21,9 @@ logger = logging.getLogger('send_log')
 
 def send_bz():
     ex_time = datetime.datetime.now() - datetime.timedelta(days=3)
-    deal_results = MaterialDealResult.objects.filter(update_store_test_flag__gt=1, created_date__gte=ex_time)
+    deal_results = MaterialDealResult.objects.filter(
+        Q(update_store_test_flag=4) |
+        Q(update_store_test_flag__in=(2, 3), created_date__gte=ex_time))
     for mdr_obj in deal_results:
         pfb_obj = PalletFeedbacks.objects.filter(lot_no=mdr_obj.lot_no).first()
         bz_obj = BzFinalMixingRubberInventory.objects.using('bz').filter(lot_no=mdr_obj.lot_no).last()
@@ -52,20 +54,20 @@ def send_bz():
                     mdr_obj.update_store_test_flag = 1
                     mdr_obj.save()
                     logger.info("向北自发送数据,发送成功")
-                # else:
-                #     mdr_obj.update_store_test_flag = 2
-                #     temp_count = mdr_obj.send_count + 1
-                #     mdr_obj.send_count = temp_count
-                #     mdr_obj.save()
-                #     logger.error(f"发送失败{res}")
+                else:
+                    mdr_obj.update_store_test_flag = 2
+                    # temp_count = mdr_obj.send_count + 1
+                    # mdr_obj.send_count = temp_count
+                    mdr_obj.save()
+                    logger.error(f"发送失败{res}")
             except Exception as e:
                 logger.error(f"调北自接口发生异常：{e}")
-        # else:  # 两个库都没有
-        #     mdr_obj.update_store_test_flag = 3
-        #     temp_count = mdr_obj.send_count + 1
-        #     mdr_obj.send_count = temp_count
-        #     mdr_obj.save()
-        #     logger.error(f"没有发送，库存和线边库里都没有lot_no:{mdr_obj.lot_no}")
+        else:  # 两个库都没有
+            mdr_obj.update_store_test_flag = 3
+            # temp_count = mdr_obj.send_count + 1
+            # mdr_obj.send_count = temp_count
+            mdr_obj.save()
+            logger.error(f"没有发送，库存和线边库里都没有lot_no:{mdr_obj.lot_no}")
 
 
 if __name__ == '__main__':
