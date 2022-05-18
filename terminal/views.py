@@ -636,9 +636,10 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                     else:
                         # 已经打印数据数据更新(打印时完成了50包, 最终计划完成100包)
                         if k.package_fufil != k.package_plan_count:
-                            get_status = Plan.objects.using(equip_no).filter(planid=k.plan_weight_uid).first()
-                            k.package_fufil = get_status.actno
-                            k.save()
+                            if get_status:
+                                get_status = Plan.objects.using(equip_no).filter(planid=k.plan_weight_uid).first()
+                                k.package_fufil = get_status.actno
+                                k.save()
                         data.append(WeightPackageLogSerializer(k).data)
                 return self.get_paginated_response(data)
             return Response([])
@@ -666,8 +667,9 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         # 已经打印数据数据更新(打印时完成了50包, 最终计划完成100包)
                         if k.package_fufil != k.package_plan_count:
                             get_status = Plan.objects.using(equip_no).filter(planid=k.plan_weight_uid).first()
-                            k.package_fufil = get_status.actno
-                            k.save()
+                            if get_status:
+                                k.package_fufil = get_status.actno
+                                k.save()
                         data.append(WeightPackageLogSerializer(k).data)
                 return self.get_paginated_response(data)
             return Response([])
@@ -681,9 +683,10 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
             for k in already_print:
                 # 已经打印数据数据更新(打印时完成了50包, 最终计划完成100包)
                 if k.package_fufil != k.package_plan_count:
-                    get_status = Plan.objects.using(equip_no).filter(planid=k.plan_weight_uid).first()
-                    k.package_fufil = get_status.actno
-                    k.save()
+                    if get_status:
+                        get_status = Plan.objects.using(equip_no).filter(planid=k.plan_weight_uid).first()
+                        k.package_fufil = get_status.actno
+                        k.save()
             page = self.paginate_queryset(already_print)
             if page is not None:
                 serializer = WeightPackageLogSerializer(page, many=True)
