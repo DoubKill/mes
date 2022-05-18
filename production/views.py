@@ -2253,10 +2253,21 @@ class DailyProductionCompletionReport(APIView):
                                                            factory_date__month=month,
                                                            setup__state='FM').values('factory_date__day').annotate(
                 sum_weight=Sum(F('setup__weight')*F('qty')/1000, output_field=DecimalField()))
+        # 当月190E混炼产量
+        equip_190e_mixin_weight = Equip190EWeight.objects.filter(factory_date__year=year,
+                                                                 factory_date__month=month,
+                                                                 setup__state__in=(
+                                                                     'CMB', 'HMB', '1MB', '2MB', '3MB'
+                                                                 )).values('factory_date__day').annotate(
+            sum_weight=Sum(F('setup__weight') * F('qty') / 1000, output_field=DecimalField()))
         for item in mix_queryset:
             mixin_weight = round(item['weight'] / 100000, 2)
             results['name_1']['weight'] += mixin_weight
             results['name_1'][f"{item['factory_date__day']}日"] = mixin_weight
+        for item in equip_190e_mixin_weight:
+            weight = round(item['sum_weight'], 2)
+            results['name_1']['weight'] += weight
+            results['name_1'][f"{item['factory_date__day']}日"] = results['name_1'].get(f"{item['factory_date__day']}日", 0) + weight
         for item in equip_190e_weight:
             weight = round(item['sum_weight'], 2)
             results['name_2']['weight'] += weight
