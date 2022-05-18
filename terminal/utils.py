@@ -347,7 +347,7 @@ def material_out_barcode(bar_code):
     if flag:
         url = 'http://10.1.10.157:9091/WebService.asmx?wsdl'
         try:
-            client = Client(url)
+            client = Client(url, timeout=2)
             json_data = {"tofac": "AJ1", "tmh": bar_code}
             data = client.service.FindZcdtmList(json.dumps(json_data))
         except Exception as e:

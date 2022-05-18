@@ -304,6 +304,7 @@ DATABASES = {
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',
             'MARS_Connection': True,
+            'connect_timeout': 1
         },
     },
     'wms': {
@@ -316,6 +317,7 @@ DATABASES = {
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',
             'MARS_Connection': True,
+            'connect_timeout': 1
         },
     },
     'cb': {
@@ -328,6 +330,7 @@ DATABASES = {
             'OPTIONS': {
                 'driver': 'ODBC Driver 17 for SQL Server',
                 'MARS_Connection': True,
+                'connect_timeout': 1
             },
     },
     "lb": {  # 帘布库|终炼胶库缩写
@@ -340,6 +343,7 @@ DATABASES = {
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',
             'MARS_Connection': True,
+            'connect_timeout': 1
         },
     },
     'SFJ': {  # 上辅机群控地址
