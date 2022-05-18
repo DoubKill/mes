@@ -31,7 +31,7 @@ from mes.derorators import api_recorder
 from mes.permissions import PermissionClass
 from mes.settings import DATABASES
 from plan.models import ProductClassesPlan, BatchingClassesPlan, BatchingClassesEquipPlan
-from production.models import PlanStatus, MaterialTankStatus, TrainsFeedbacks
+from production.models import PlanStatus, MaterialTankStatus, TrainsFeedbacks, PalletFeedbacks
 from recipe.models import ProductBatchingDetail, ProductBatching, ERPMESMaterialRelation, Material, WeighCntType, \
     WeighBatchingDetail, ProductBatchingEquip
 from terminal.filters import FeedingLogFilter, WeightTankStatusFilter, WeightBatchingLogListFilter, \
@@ -43,7 +43,7 @@ from terminal.models import TerminalLocation, EquipOperationLog, WeightBatchingL
     FeedingOperationLog, CarbonTankFeedingPrompt, OilTankSetting, PowderTankSetting, CarbonTankFeedWeightSet, \
     ReplaceMaterial, ReturnRubber, ToleranceDistinguish, ToleranceProject, ToleranceHandle, ToleranceRule, \
     WeightPackageManual, WeightPackageSingle, WeightPackageWms, OtherMaterialLog, EquipHaltReason, \
-    WeightPackageLogManualDetails
+    WeightPackageLogManualDetails, WmsAddPrint
 from terminal.serializers import LoadMaterialLogCreateSerializer, \
     EquipOperationLogSerializer, BatchingClassesEquipPlanSerializer, WeightBatchingLogSerializer, \
     WeightBatchingLogCreateSerializer, FeedingLogSerializer, WeightTankStatusSerializer, \
@@ -56,7 +56,7 @@ from terminal.serializers import LoadMaterialLogCreateSerializer, \
     CarbonTankSetUpdateSerializer, FeedingOperationLogSerializer, CarbonFeedingPromptSerializer, \
     CarbonFeedingPromptCreateSerializer, PowderTankSettingSerializer, OilTankSettingSerializer, \
     ReplaceMaterialSerializer, ReturnRubberSerializer, ToleranceRuleSerializer, WeightPackageManualSerializer, \
-    WeightPackageSingleSerializer, WeightPackageLogCUpdateSerializer
+    WeightPackageSingleSerializer, WeightPackageLogCUpdateSerializer, WmsAddPrintSerializer
 from terminal.utils import TankStatusSync, CarbonDeliverySystem, out_task_carbon, get_tolerance, material_out_barcode, \
     get_manual_materials, CLSystem, get_common_equip, xl_c_calculate
 
@@ -569,9 +569,17 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         equip_no = self.request.query_params.get('equip_no', 'F01')
         product_no = self.request.query_params.get('product_no')
         status = self.request.query_params.get('status', 'all')
+        s_time = self.request.query_params.get('s_time')
+        e_time = self.request.query_params.get('e_time')
         now_date = datetime.datetime.now().replace(microsecond=0)
-        exp_time = 7 if equip_no.startswith('F') else 5
-        s_time, e_time = now_date.date() - timedelta(days=exp_time), now_date.date()
+        if not s_time or not e_time:
+            exp_time = 7 if equip_no.startswith('F') else 5
+            s_time, e_time = now_date.date() - timedelta(days=exp_time), now_date.date()
+        else:
+            s_time = datetime.datetime.strptime(s_time, '%Y-%m-%d')
+            e_time = datetime.datetime.strptime(e_time, '%Y-%m-%d')
+            if (e_time - s_time).days > 15:
+                raise ValueError('筛选日期不可大于15天')
         db_config = [k for k, v in DATABASES.items() if 'YK_XL' in v['NAME']]
         if equip_no not in db_config:
             return Response([])
@@ -1106,6 +1114,48 @@ class WeightPackageSingleViewSet(ModelViewSet):
 
 
 @method_decorator([api_recorder], name="dispatch")
+class WmsAddPrintViewSet(ModelViewSet):
+    """内部原材料流转卡打印"""
+    queryset = WmsAddPrint.objects.all().order_by('-created_date')
+    serializer_class = WmsAddPrintSerializer
+    # permission_classes = (IsAuthenticated,)
+    filter_backends = [DjangoFilterBackend]
+
+    def get_permissions(self):
+        if self.request.query_params.get('client'):
+            return ()
+        else:
+            return (IsAuthenticated(),)
+
+    def get_queryset(self):
+        query_set = self.queryset
+        material_name = self.request.query_params.get('material_name')
+        bra_code = self.request.query_params.get('bra_code')
+        print_flag = self.request.query_params.get('print_flag')
+        filter_kwargs = {}
+        if material_name:
+            filter_kwargs['material_name__icontains'] = material_name
+        if bra_code:
+            filter_kwargs['bra_code__icontains'] = bra_code
+        if print_flag:
+            if print_flag in ['0', '1']:  # 打印、未打印
+                filter_kwargs['print_flag'] = print_flag
+            elif print_flag == '2':  # 失效
+                bra_codes = list(LoadTankMaterialLog.objects.filter(bra_code__startswith='WMS').values_list('bra_code', flat=True).distinct())
+                filter_kwargs['bra_code__in'] = bra_codes
+            else:
+                pass
+        query_set = query_set.filter(**filter_kwargs)
+        return query_set
+
+    @action(methods=['put'], detail=False, url_path='update_print_flag', url_name='update_print_flag')
+    def update_print_flag(self, request):
+        data = self.request.data
+        self.get_queryset().filter(id=data.get('id')).update(**{'print_flag': data.get('print_flag', False)})
+        return response(success=True, message='重置打印状态成功')
+
+
+@method_decorator([api_recorder], name="dispatch")
 class GetMaterialTolerance(APIView):
     """获取单个物料重量对应公差"""
     permission_classes = (IsAuthenticated,)
@@ -1360,6 +1410,7 @@ class BatchChargeLogListViewSet(ListAPIView):
         queryset = self.filter_queryset(self.get_queryset())
         bra_code = self.request.query_params.get('bra_code')
         opera_type = self.request.query_params.get('opera_type')
+        select_name = self.request.query_params.get('select_name')
         plan_classes_uid = self.request.query_params.get('plan_classes_uid')
         data = []
         if opera_type == '1':  # 物料投入条码信息
@@ -1381,12 +1432,32 @@ class BatchChargeLogListViewSet(ListAPIView):
                     i.update({'split_count': split_count, 'standard_weight': i['actual_weight'], 'standard_error': standard_error})
                 data.append(i)
         elif opera_type == '2':  # 原材料信息
-            try:
-                res = material_out_barcode(bra_code)
-            except Exception as e:
-                raise ValidationError(e.args[0])
-            if res:
-                data.append(res)
+            if bra_code.startswith('AAJ1Z'):
+                pallet_feedback = PalletFeedbacks.objects.filter(lot_no=bra_code).first()
+                if pallet_feedback:
+                    record = WorkSchedulePlan.objects.filter(plan_schedule__day_time=pallet_feedback.factory_date,
+                                                             classes__global_name=pallet_feedback.classes,
+                                                             plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
+                    batch_group = record.group.global_name if record else ''
+                    data.append({'equip_no': pallet_feedback.equip_no, 'product_no': pallet_feedback.product_no,
+                                 'product_time': pallet_feedback.product_time, 'classes': pallet_feedback.classes,
+                                 'trains': f'{pallet_feedback.begin_trains}-{pallet_feedback.end_trians}',
+                                 'batch_group': batch_group})
+                else:
+                    raise ValidationError('未找到该条码对应物料信息！')
+            else:
+                if bra_code[0] in ['F', 'S']:
+                    batch = WeightBatchingLog.objects.filter(equip_no=bra_code[:3], status=1, material_name=select_name.rstrip('-C|-X')).order_by('id').last()
+                    if batch:
+                        bra_code = batch.bra_code
+                    else:
+                        raise ValidationError('未找到该条码对应物料信息！')
+                try:
+                    res = material_out_barcode(bra_code)
+                except Exception as e:
+                    raise ValidationError(e.args[0])
+                if res:
+                    data.append(res)
         else:
             repeat_bra_code = []
             serializer = self.get_serializer(queryset, many=True)
@@ -1781,8 +1852,17 @@ class XLPlanVIewSet(ModelViewSet):
                 raise
             return Response(serializer.data)
         else:
-            e_days = 7 if equip_no.startswith('F') else 5
-            s_time, e_time = now_date - timedelta(days=e_days), now_date
+            s_time = self.request.query_params.get('s_time')
+            e_time = self.request.query_params.get('e_time')
+            now_date = datetime.datetime.now().replace(microsecond=0)
+            if not s_time or not e_time:
+                exp_time = 7 if equip_no.startswith('F') else 5
+                s_time, e_time = now_date.date() - timedelta(days=exp_time), now_date.date()
+            else:
+                s_time = datetime.datetime.strptime(s_time, '%Y-%m-%d')
+                e_time = datetime.datetime.strptime(e_time, '%Y-%m-%d')
+                if (e_time - s_time).days > 15:
+                    raise ValueError('筛选日期不可大于15天')
             filter_kwargs.update({'date_time__gte': s_time, 'date_time__lte': e_time})
             new_queryset = Plan.objects.using(equip_no).filter(**filter_kwargs).values('recipe').distinct()
             serializer = self.get_serializer(new_queryset, many=True)

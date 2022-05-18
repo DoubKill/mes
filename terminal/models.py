@@ -754,6 +754,23 @@ class WeightPackageSingle(AbstractEntity):
         verbose_name_plural = verbose_name = '人工单配(单一物料:配方和通用)'
 
 
+class WmsAddPrint(AbstractEntity):
+    """内部原材料卡片打印"""
+    bra_code = models.CharField(max_length=64, help_text='卡片条码')
+    material_name = models.CharField(max_length=64, help_text='物料名称')
+    single_weight = models.DecimalField(max_digits=6, decimal_places=2, help_text='单配重量')
+    batch_class = models.CharField(max_length=64, help_text='班次')
+    batch_group = models.CharField(max_length=64, help_text='班组')
+    print_datetime = models.DateTimeField(help_text='打印时间', null=True, blank=True)
+    print_count = models.IntegerField(help_text='打印张数', default=1)
+    print_flag = models.IntegerField(help_text='打印状态', default=False)
+    ip_address = models.CharField(max_length=64, help_text='下发打印任务的ip地址', null=True, blank=True)
+
+    class Meta:
+        db_table = 'wms_add_print'
+        verbose_name_plural = verbose_name = '内部原材料卡片打印'
+
+
 class WeightPackageWms(AbstractEntity):
     """wms扫码原材料合包"""
     bra_code = models.CharField(max_length=64, help_text='卡片条码')

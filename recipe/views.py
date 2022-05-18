@@ -71,6 +71,7 @@ class MaterialViewSet(CommonDeleteMixin, ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         mc_code = self.request.query_params.get('mc_code')  # 人工配通用条码去除-C、-X尾缀
+        wms_code = self.request.query_params.get('wms_code')  # 原材料补打通用条码去除-C、-X尾缀
         only_storage_flag = self.request.query_params.get('only_storage_flag')  # 仅显示未设定有效期的物料
         only_safety_flag = self.request.query_params.get('only_safety_flag')  # 仅显示未设定安全库存的物料
         queryset = self.filter_queryset(self.get_queryset())
@@ -85,9 +86,13 @@ class MaterialViewSet(CommonDeleteMixin, ModelViewSet):
                 queryset = queryset.exclude(material_type__global_name__in=stage_names)
             else:
                 queryset = queryset.filter(use_flag=1)
-                if mc_code:  # 通用卡片需排出没有erp绑定关系和物料类型为胶料段次的物料
-                    stages = list(GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='胶料段次').values_list('global_name', flat=True))
-                    erp_materials = set(ERPMESMaterialRelation.objects.filter(~Q(material__material_type__global_name__in=stages), use_flag=True).values_list('material__material_name', flat=True))
+                if mc_code:  # 通用卡片需排除没有erp绑定关系
+                    stages = list(GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_no='化工类别').values_list('global_name', flat=True))
+                    erp_materials = set(ERPMESMaterialRelation.objects.filter(material__material_type__global_name__in=stages, use_flag=True).values_list('material__material_name', flat=True))
+                    queryset = queryset.filter(~Q(Q(material_name__endswith='-C') | Q(material_name__endswith='-X')), material_name__in=erp_materials)
+                if wms_code:  # 原材料补打卡片需排除没有erp绑定关系
+                    stages = list(GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_no='机台补打类别').values_list('global_name', flat=True))
+                    erp_materials = set(ERPMESMaterialRelation.objects.filter(material__material_type__global_name__in=stages, use_flag=True).values_list('material__material_name', flat=True))
                     queryset = queryset.filter(~Q(Q(material_name__endswith='-C') | Q(material_name__endswith='-X')), material_name__in=erp_materials)
             data = queryset.values('id', 'material_no', 'material_name',
                                    'material_type__global_name', 'material_type', 'for_short',
