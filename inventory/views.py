@@ -5658,7 +5658,9 @@ class HFStockDetailView(APIView):
                 ProductNo,
                 RFID,
                 OastInTime,
-                OastOutTime
+                OastOutTime,
+                OastStartTime,
+                OastEntTime
             from dsp_OastTask {} order by OastNo OFFSET {} ROWS FETCH FIRST {} ROWS ONLY
             """.format(extra_where_str, (page-1)*page_size, page_size)
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)
@@ -5669,7 +5671,23 @@ class HFStockDetailView(APIView):
         sc = SqlClient(sql=count_sql, **self.DATABASE_CONF)
         temp2 = sc.all()
         count = temp2[0][0]
+        # 查询历史设定
+        hf_set = HfBakeMaterialSet.objects.filter(delete_flag=False).values('material_name')\
+            .annotate(max_temp=Max('temperature_set'), max_time=Max('bake_time', output_field=FloatField()))
+        handle_hf_set = {i['material_name']: [i['max_temp'], i['max_time']] for i in hf_set}
         for item in temp:
+            # 温度、时长设定值获取
+            temperature_set, bake_time_set = handle_hf_set.get(item[2]) if handle_hf_set.get(item[2]) else ['', '']
+            # 时长计算
+            baking_begin = '' if not item[7] else item[7].strftime('%Y-%m-%d %H:%M:%S')
+            baking_end = '' if not item[8] else item[8].strftime('%Y-%m-%d %H:%M:%S')
+            if not baking_begin:
+                baking_time = ''
+            else:
+                if not baking_end:
+                    baking_time = round((datetime.datetime.now() - item[7]).total_seconds() / 3600, 2)
+                else:
+                    baking_time = round((item[8] - item[7]).total_seconds() / 3600, 2)
             result.append(
                 {
                     'oven_no': item[0],
@@ -5678,7 +5696,12 @@ class HFStockDetailView(APIView):
                     'material_no': item[3],
                     'pallet_no': item[4],
                     'baking_start_time': '' if not item[5] else item[5].strftime('%Y-%m-%d %H:%M:%S'),
-                    'baking_end_time': '' if not item[6] else item[6].strftime('%Y-%m-%d %H:%M:%S')
+                    'baking_end_time': '' if not item[6] else item[6].strftime('%Y-%m-%d %H:%M:%S'),
+                    'baking_begin': baking_begin,
+                    'baking_end': baking_end,
+                    'baking_time': baking_time,
+                    'temperature_set': temperature_set,
+                    'bake_time_set': bake_time_set
                 }
             )
         sc.close()
