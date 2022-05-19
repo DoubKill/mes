@@ -1230,6 +1230,7 @@ class HfBakeMaterialSet(models.Model):
     material_name = models.CharField(max_length=128, help_text='原材料名称', unique=True)
     temperature_set = models.IntegerField(help_text='烘烤温度[0-100]')
     bake_time = models.DecimalField(max_digits=4, decimal_places=1, help_text='烘烤时长[0.0-200.0]')
+    delete_flag = models.BooleanField(default=False, help_text='物料是否删除')
     created_date = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
     opera_username = models.CharField(max_length=16, help_text='操作人')
     last_updated_date = models.DateTimeField(verbose_name='创建时间', auto_now=True)

@@ -5918,7 +5918,7 @@ class HFForceHandleView(APIView):
             elif opera_type == 2:  # 强制烘烤
                 # 查询设定值
                 material_list = data.pop('material_list')
-                bake_set = HfBakeMaterialSet.objects.filter(material_name__in=material_list)\
+                bake_set = HfBakeMaterialSet.objects.filter(material_name__in=material_list, delete_flag=False)\
                     .aggregate(standard_temp=Max('temperature_set'), standard_bake_time=Max('bake_time', output_field=FloatField()))
                 if not bake_set:
                     raise ValueError('未找到物料设置的标准温度与时长')
@@ -5941,14 +5941,19 @@ class HFConfigSetView(APIView):
 
     def get(self, request):
         """获取原材料烘烤温度以及时长设置"""
-        query_set = HfBakeMaterialSet.objects.all().order_by('-created_date')
+        query_set = HfBakeMaterialSet.objects.filter(delete_flag=False).order_by('-created_date')
         return Response({'results': list(query_set.values())})
 
     @atomic
     def post(self, request):
         data = self.request.data.get('set_data')
+        delete_data = self.request.data.get('delete_data')
         user_name = self.request.user.username
         repeat_material_name = []
+        # 删除物料
+        if delete_data:
+            HfBakeMaterialSet.objects.filter(id=delete_data).update(**{'delete_flag': True})
+            return Response('删除设置成功')
         for s_data in data:
             rid, material_name, temperature_set, bake_time = s_data.get('id'),  s_data.get('material_name'), \
                                                              s_data.get('temperature_set'),  s_data.get('bake_time')
@@ -5964,7 +5969,7 @@ class HFConfigSetView(APIView):
                 common_data.update({'last_updated_date': datetime.datetime.now()})
                 HfBakeMaterialSet.objects.filter(id=rid).update(**common_data)
             else:
-                if not HfBakeMaterialSet.objects.filter(material_name=material_name).exists():
+                if not HfBakeMaterialSet.objects.filter(material_name=material_name, delete_flag=False).exists():
                     HfBakeMaterialSet.objects.create(**common_data)
                 else:
                     raise ValueError(f'{material_name}已经存在')
