@@ -1246,7 +1246,7 @@ class HfBakeLog(models.Model):
     temperature_set = models.IntegerField(help_text='设定烘烤温度', null=True, blank=True)
     bake_time = models.DecimalField(max_digits=4, decimal_places=1, help_text='设定烘烤时长', null=True, blank=True)
     actual_temperature = models.IntegerField(help_text='实际烘烤温度', null=True, blank=True)
-    actual_bake_time = models.DecimalField(max_digits=4, decimal_places=1, help_text='实际烘烤时长', null=True, blank=True)
+    actual_bake_time = models.CharField(max_length=16, help_text='实际烘烤时长', null=True, blank=True)
     created_date = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
     opera_username = models.CharField(max_length=16, help_text='操作人')
     last_updated_date = models.DateTimeField(verbose_name='创建时间', auto_now=True)
