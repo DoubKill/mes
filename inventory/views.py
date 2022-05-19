@@ -11,7 +11,7 @@ from io import BytesIO
 import requests
 import xlwt
 from django.core.paginator import Paginator
-from django.db.models import Sum, Count, Q, F
+from django.db.models import Sum, Count, Q, F, Max, FloatField
 from django.db.transaction import atomic
 from django.forms import model_to_dict
 from django.http import HttpResponse
@@ -44,7 +44,7 @@ from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMate
     DepotSite, DepotPallt, Sulfur, SulfurDepot, SulfurDepotSite, MaterialInHistory, \
     CarbonOutPlan, FinalRubberyOutBoundOrder, MixinRubberyOutBoundOrder, FinalGumInInventoryLog, OutBoundDeliveryOrder, \
     OutBoundDeliveryOrderDetail, WMSReleaseLog, WmsInventoryMaterial, WMSMaterialSafetySettings, WmsNucleinManagement, \
-    WMSExceptHandle, MaterialOutHistoryOther, MaterialOutboundOrder, MaterialEntrance
+    WMSExceptHandle, MaterialOutHistoryOther, MaterialOutboundOrder, MaterialEntrance, HfBakeMaterialSet, HfBakeLog
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
@@ -5883,15 +5883,93 @@ class HFRealStatusView(APIView):
             raise ValidationError(e.args[0])
         return Response(response_data)
 
+    @atomic
     def post(self, request):
         """烘箱手动出库 OastNo: '1' """
+        data = self.request.data
         try:
             hf = HFSystem()
-            res = hf.manual_out_hf(self.request.data)
+            res = hf.manual_out_hf(data)
+            # 更新履历
+            hf_log = HfBakeLog.objects.filter(oast_no=data['OastNo'], actual_temperature__isnull=True, actual_bake_time__isnull=True).last()
+            hf_log.actual_temperature = ''
+            hf_log.actual_bake_time = ''
+            hf_log.last_updated_date = datetime.datetime.now()
+            hf_log.save()
         except Exception as e:
             raise ValidationError(e.args[0])
         else:
             return Response(res)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class HFForceHandleView(APIView):
+    # permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_material_hf_real_data'}))
+
+    @atomic
+    def post(self, request):
+        data = self.request.data
+        user_name = self.request.user.username
+        opera_type = data.pop('opera_type', 3)
+        try:
+            hf = HFSystem()
+            if opera_type == 1:  # 强制出料
+                res = hf.force_out(data)
+            elif opera_type == 2:  # 强制烘烤
+                # 查询设定值
+                material_list = data.pop('material_list')
+                bake_set = HfBakeMaterialSet.objects.filter(material_name__in=material_list)\
+                    .aggregate(standard_temp=Max('temperature_set'), standard_bake_time=Max('bake_time', output_field=FloatField()))
+                if not bake_set:
+                    raise ValueError('未找到物料设置的标准温度与时长')
+                res = hf.force_bake(data)
+                # 增加履历
+                HfBakeLog.objects.create(**{'oast_no': data.get('OastNo'), 'material_name': ','.join(material_list),
+                                            'temperature_set': bake_set['standard_temp'], 'opera_username': user_name,
+                                            'bake_time': bake_set['standard_bake_time']})
+            else:
+                raise ValueError('未知操作: 只支持强制出料与强制烘烤')
+        except Exception as e:
+            raise ValueError(e.args[0])
+        else:
+            return Response(f"强制{'出料' if opera_type == 1 else '烘烤'}操作成功")
+
+
+@method_decorator([api_recorder], name="dispatch")
+class HFConfigSetView(APIView):
+    # permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_material_hf_real_data'}))
+
+    def get(self, request):
+        """获取原材料烘烤温度以及时长设置"""
+        query_set = HfBakeMaterialSet.objects.all().order_by('-created_date')
+        return Response({'results': list(query_set.values())})
+
+    @atomic
+    def post(self, request):
+        data = self.request.data.get('set_data')
+        user_name = self.request.user.username
+        repeat_material_name = []
+        for s_data in data:
+            rid, material_name, temperature_set, bake_time = s_data.get('id'),  s_data.get('material_name'), \
+                                                             s_data.get('temperature_set'),  s_data.get('bake_time')
+            if material_name in repeat_material_name:
+                raise ValueError(f'参数异常: {material_name}重复')
+            if not all([material_name, temperature_set, bake_time]):
+                raise ValueError(f'参数异常: 物料名称、烘烤温度、烘烤时长不可为空')
+            if temperature_set < 0 or temperature_set > 100 or bake_time < 0 or bake_time > 200:
+                raise ValueError(f'检查{material_name}设置[烘烤温度[0-100], 烘烤时长[0-200]')
+            common_data = {'material_name': material_name, 'bake_time': bake_time, 'temperature_set': temperature_set,
+                           'opera_username': user_name}
+            if rid:  # 存在id则为修改
+                common_data.update({'last_updated_date': datetime.datetime.now()})
+                HfBakeMaterialSet.objects.filter(id=rid).update(**common_data)
+            else:
+                if not HfBakeMaterialSet.objects.filter(material_name=material_name).exists():
+                    HfBakeMaterialSet.objects.create(**common_data)
+                else:
+                    raise ValueError(f'{material_name}已经存在')
+            repeat_material_name.append(material_name)
+        return Response('设置成功')
 
 
 @method_decorator([api_recorder], name="dispatch")

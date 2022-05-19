@@ -164,7 +164,7 @@ class HFSystem(object):
 
     def __init__(self):
         self.url = 'http://10.4.24.25:3000/StockService?wsdl'
-        self.hf_system = Client(self.url)
+        self.hf_system = Client(self.url, timeout=3)
 
     def get_hf_info(self):
         """获取烘箱信息"""
@@ -181,3 +181,19 @@ class HFSystem(object):
         if res_json.get('Result') == '0':
             raise ValueError(res_json.get('Message'))
         return f"{oast_no.get('OastNo')}号烘箱出库成功"
+
+    def force_out(self, oast_no):
+        """向wcs下发烘箱强制出料指令 oast_no={'OastNo': '1'}"""
+        res = self.hf_system.service.ManualOASTOutTask(json.dumps(oast_no))
+        res_json = json.loads(res)
+        if res_json.get('Result') == '0':
+            raise ValueError(res_json.get('Message'))
+        return f"{oast_no.get('OastNo')}号烘箱强制出料操作成功"
+
+    def force_bake(self, oast_no):
+        """向wcs下发烘箱强制烘烤指令 oast_no={'OastNo': '1'}"""
+        res = self.hf_system.service.ManualOASTOutTask(json.dumps(oast_no))
+        res_json = json.loads(res)
+        if res_json.get('Result') == '0':
+            raise ValueError(res_json.get('Message'))
+        return f"{oast_no.get('OastNo')}号烘箱强制出料操作成功"
