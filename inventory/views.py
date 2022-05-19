@@ -5917,7 +5917,8 @@ class HFForceHandleView(APIView):
                 res = hf.force_out(data)
             elif opera_type == 2:  # 强制烘烤
                 # 查询设定值
-                material_list = data.pop('material_list')
+                OastMatiles = data.pop('OastMatiles')
+                material_list = set([i.get('ProductName') for i in OastMatiles])
                 bake_set = HfBakeMaterialSet.objects.filter(material_name__in=material_list, delete_flag=False)\
                     .aggregate(standard_temp=Max('temperature_set'), standard_bake_time=Max('bake_time', output_field=FloatField()))
                 if not bake_set:
