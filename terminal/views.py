@@ -588,7 +588,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
             s_time = datetime.datetime.strptime(s_time, '%Y-%m-%d')
             e_time = datetime.datetime.strptime(e_time, '%Y-%m-%d')
             if (e_time - s_time).days > 15:
-                raise ValueError('筛选日期不可大于15天')
+                raise ValidationError('筛选日期不可大于15天')
         db_config = [k for k, v in DATABASES.items() if 'YK_XL' in v['NAME']]
         if equip_no not in db_config:
             return Response([])
@@ -1871,7 +1871,7 @@ class XLPlanVIewSet(ModelViewSet):
                 s_time = datetime.datetime.strptime(s_time, '%Y-%m-%d')
                 e_time = datetime.datetime.strptime(e_time, '%Y-%m-%d')
                 if (e_time - s_time).days > 15:
-                    raise ValueError('筛选日期不可大于15天')
+                    raise ValidationError('筛选日期不可大于15天')
             filter_kwargs.update({'date_time__gte': s_time, 'date_time__lte': e_time})
             new_queryset = Plan.objects.using(equip_no).filter(**filter_kwargs).values('recipe').distinct()
             serializer = self.get_serializer(new_queryset, many=True)

@@ -5942,19 +5942,19 @@ class HFForceHandleView(APIView):
                 # 查询设定值
                 OastMatiles = data.pop('OastMatiles')
                 material_list = set([i.get('ProductName') for i in OastMatiles])
-                bake_set = HfBakeMaterialSet.objects.filter(material_name__in=material_list, delete_flag=False)\
-                    .aggregate(standard_temp=Max('temperature_set'), standard_bake_time=Max('bake_time', output_field=FloatField()))
-                if not bake_set:
-                    raise ValueError('未找到物料设置的标准温度与时长')
-                res = hf.force_bake(data)
+                bake_set_target = HfBakeMaterialSet.objects.filter(material_name__in=material_list, delete_flag=False)
+                if not bake_set_target:
+                    raise ValidationError('未找到物料设置的标准温度与时长')
+                bake_set = bake_set_target.aggregate(standard_temp=Max('temperature_set'), standard_bake_time=Max('bake_time', output_field=FloatField()))
+                # res = hf.force_bake(data)
                 # 增加履历
                 HfBakeLog.objects.create(**{'oast_no': data.get('OastNo'), 'material_name': ','.join(material_list),
                                             'temperature_set': bake_set['standard_temp'], 'opera_username': user_name,
                                             'bake_time': bake_set['standard_bake_time']})
             else:
-                raise ValueError('未知操作: 只支持强制出料与强制烘烤')
+                raise ValidationError('未知操作: 只支持强制出料与强制烘烤')
         except Exception as e:
-            raise ValueError(e.args[0])
+            raise ValidationError(e.args[0])
         else:
             return Response(f"强制{'出料' if opera_type == 1 else '烘烤'}操作成功")
 
@@ -5965,7 +5965,7 @@ class HFConfigSetView(APIView):
 
     def get(self, request):
         """获取原材料烘烤温度以及时长设置"""
-        query_set = HfBakeMaterialSet.objects.filter(delete_flag=False).order_by('-created_date')
+        query_set = HfBakeMaterialSet.objects.filter(delete_flag=False).order_by('created_date')
         return Response({'results': list(query_set.values())})
 
     @atomic
@@ -5982,11 +5982,11 @@ class HFConfigSetView(APIView):
             rid, material_name, temperature_set, bake_time = s_data.get('id'),  s_data.get('material_name'), \
                                                              s_data.get('temperature_set'),  s_data.get('bake_time')
             if material_name in repeat_material_name:
-                raise ValueError(f'参数异常: {material_name}重复')
+                raise ValidationError(f'参数异常: {material_name}重复')
             if not all([material_name, temperature_set, bake_time]):
-                raise ValueError(f'参数异常: 物料名称、烘烤温度、烘烤时长不可为空')
+                raise ValidationError(f'参数异常: 物料名称、烘烤温度、烘烤时长不可为空')
             if temperature_set < 0 or temperature_set > 100 or bake_time < 0 or bake_time > 200:
-                raise ValueError(f'检查{material_name}设置[烘烤温度[0-100], 烘烤时长[0-200]')
+                raise ValidationError(f'检查{material_name}设置[烘烤温度[0-100], 烘烤时长[0-200]')
             common_data = {'material_name': material_name, 'bake_time': bake_time, 'temperature_set': temperature_set,
                            'opera_username': user_name}
             if rid:  # 存在id则为修改
@@ -5996,7 +5996,7 @@ class HFConfigSetView(APIView):
                 if not HfBakeMaterialSet.objects.filter(material_name=material_name, delete_flag=False).exists():
                     HfBakeMaterialSet.objects.create(**common_data)
                 else:
-                    raise ValueError(f'{material_name}已经存在')
+                    raise ValidationError(f'{material_name}已经存在')
             repeat_material_name.append(material_name)
         return Response('设置成功')
 
