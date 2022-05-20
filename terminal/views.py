@@ -733,7 +733,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         raise ValidationError(e.args[0])
                 materials = set([i.get('material__material_name') for i in recipe_manual])
                 # ERP绑定关系
-                material_name_set = set(ERPMESMaterialRelation.objects.filter(zc_material__wlxxid=res['wlxxid'], use_flag=True).values_list('material__material_name', flat=True))
+                material_name_set = set(ERPMESMaterialRelation.objects.filter(zc_material__wlxxid=res['WLXXID'], use_flag=True).values_list('material__material_name', flat=True))
                 if not material_name_set:
                     raise ValidationError('该物料未与MES原材料建立绑定关系！')
                 comm_material = list(material_name_set & materials)
@@ -755,7 +755,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                     record = WeightPackageWms.objects.create(**{'bra_code': scan_bra_code, 'material_name': comm_material[0],
                                                                 'single_weight': single_weight, 'split_num': machine_split_count,
                                                                 'package_count': machine_package_count,
-                                                                'batch_time': res.get('sm_create'), 'standard_weight_old': standard_weight,
+                                                                'batch_time': res.get('SM_CREATE'), 'standard_weight_old': standard_weight,
                                                                 'real_count': machine_package_count, 'now_package': 100000})
                     obj = record  # 原材料条码实例
                 else:
@@ -769,7 +769,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         new_record = WeightPackageWms.objects.create(**{'bra_code': scan_bra_code, 'material_name': comm_material[0],
                                                                         'single_weight': single_weight, 'split_num': machine_split_count,
                                                                         'package_count': machine_package_count,
-                                                                        'batch_time': res.get('sm_create'), 'standard_weight_old': standard_weight,
+                                                                        'batch_time': res.get('SM_CREATE'), 'standard_weight_old': standard_weight,
                                                                         'real_count': machine_package_count, 'now_package': record.now_package})
                         record.now_package = 0
                         record.save()
@@ -783,9 +783,9 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                 manual_type = 'manual_single'
                 manual_id = obj.id
                 details = {'material_name': comm_material[0], "single_weight": single_weight, 'batch_class': '',
-                           'batch_group': '', 'created_username': '原材料', 'created_date': res.get('sm_create')[:10],
+                           'batch_group': '', 'created_username': '原材料', 'created_date': res.get('SM_CREATE')[:10],
                            'batch_type': '人工配', 'split_num': machine_split_count, 'package_count': machine_package_count,
-                           'batch_time': res.get('sm_create')[:10]}
+                           'batch_time': res.get('SM_CREATE')[:10]}
             else:
                 raise ValidationError('条码未找到对应信息')
         single_weight = Decimal(details['single_weight'].split('±')[0])
