@@ -2596,7 +2596,7 @@ class CarbonOutCheckView(APIView):
                          a.SpaceId,
                          a.Sn,
                          a.WeightOfActual,
-                         a.WeightUnit,
+                         a.StandardUnit,
                          a.CreaterTime
                         FROM
                          dbo.t_inventory_stock AS a
