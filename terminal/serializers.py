@@ -194,8 +194,8 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             except Exception as e:
                 raise serializers.ValidationError(e)
             if res:
-                scan_material = res.get('wlmc')
-                material_name_set = set(ERPMESMaterialRelation.objects.filter(zc_material__wlxxid=res['wlxxid'], use_flag=True).values_list('material__material_name', flat=True))
+                scan_material = res.get('WLMC')
+                material_name_set = set(ERPMESMaterialRelation.objects.filter(zc_material__wlxxid=res['WLXXID'], use_flag=True).values_list('material__material_name', flat=True))
                 if not material_name_set:
                     raise serializers.ValidationError('该物料未与MES原材料建立绑定关系！')
                 cnt_names = [i.get('material__material_name') for i in cnt_type_details]
@@ -225,8 +225,8 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 else:  # 胶块替代(1、不能通过直接绑定erp替代; 2、增加这段逻辑确保替代胶块能走到下面物料是否在配方中判断)
                     material_name = scan_material
                     material_no = scan_material
-                total_weight = res.get('zl')
-                unit = res.get('bzdw')
+                total_weight = res.get('ZL')
+                unit = res.get('BZDW')
         if not material_name:
             raise serializers.ValidationError('未找到该条形码信息！')
         attrs['equip_no'] = classes_plan.equip.equip_no
@@ -805,14 +805,14 @@ class WeightBatchingLogCreateSerializer(BaseModelSerializer):
                     raise serializers.ValidationError(e)
             if not res:
                 raise serializers.ValidationError('未找到条码对应信息')
-            scan_material = res.get('wlmc')
+            scan_material = res.get('WLMC')
             material_name_set = set(ERPMESMaterialRelation.objects.filter(
-                zc_material__wlxxid=res['wlxxid'],
+                zc_material__wlxxid=res['WLXXID'],
                 use_flag=True
             ).values_list('material__material_name', flat=True))
             if not material_name_set:
                 raise serializers.ValidationError('该物料未与MES原材料建立绑定关系！')
-            init_count = res.get('sl', 0)
+            init_count = res.get('SL', 0)
             # 查看条码数量是否用完
         used_num = WeightBatchingLog.objects.filter(bra_code=bra_code, status=1).count()
         if used_num >= init_count:
