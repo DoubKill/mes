@@ -31,11 +31,11 @@ class BaseUploader(object):
         except Exception:
             raise ValidationError('请求失败，请联系管理员！')
         if resp.status_code != 200:
-            print(resp.text)
+            # print(resp.text)
             raise Exception(resp.text)
         resp_xml = resp.text
         json_data = xmltodict.parse(resp_xml)
-        print(json_data)
+        # print(json_data)
         return self.gen_result(json_data)
 
     def gen_result(self, data):

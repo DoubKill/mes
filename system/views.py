@@ -582,6 +582,19 @@ class DingDingBind(APIView):
 
 
 @method_decorator([api_recorder], name="dispatch")
+class DingDingUnBind(APIView):
+    """解除钉钉账号与MES绑定"""
+    permission_classes = (IsAuthenticated, )
+
+    def post(self, request):
+        user = self.request.user
+        if hasattr(user, 'dingding'):
+            dd_user = user.dingding
+            dd_user.delete()
+        return Response('解绑成功！')
+
+
+@method_decorator([api_recorder], name="dispatch")
 class QRLoginView(APIView):
     """钉钉扫码登录"""
 
