@@ -190,8 +190,8 @@ class BatchProductBatchingVIew(APIView):
         if not add_materials:
             list(map(lambda x: x.update({'bra_code': '', 'init_weight': 0, 'used_weight': 0, 'scan_material': '',
                                          'adjust_left_weight': 0, 'scan_finished': False}), material_name_weight))
-            # 通用料包数据
-            self.common_package(material_name_weight, plan_classes_uid)
+            # 通用料包、掺料、待处理料等数据
+            self.other_display_material(material_name_weight, classes_plan)
             return Response(material_name_weight)
         xl = [i for i in add_materials if i['scan_material_type'] in ['机配', '人工配']]
         # 已扫码进料: 进料部分正常显示,未进料显示为0,同物料多条码显示最新
@@ -297,33 +297,59 @@ class BatchProductBatchingVIew(APIView):
             else:
                 single_material['scan_finished'] = True
             res.append(single_material)
-        # 通用料包数据
-        self.common_package(res, plan_classes_uid)
+        # 通用料包、掺料、待处理料等数据
+        self.other_display_material(res, classes_plan)
         return Response(res)
 
-    def common_package(self, res, plan_classes_uid):
+    def other_display_material(self, res, classes_plan):
+        plan_classes_uid, product_no, equip_no = classes_plan.plan_classes_uid, classes_plan.product_batching.stage_product_batch_no, classes_plan.equip.equip_no
         # 存在通用料包则显示一条空数据
         common_scan = OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, other_type='通用料包',
                                                       status=1).last()
+        sfj_details = ProductBatchingDetail.objects.using('SFJ')\
+            .filter(product_batching__stage_product_batch_no=product_no, product_batching__delete_flag=False, type=1,
+                    product_batching__used_type=4, product_batching__equip__equip_no=equip_no, delete_flag=False)
         if common_scan:
             # 查询上辅机料包重量、误差
-            pcp = ProductClassesPlan.objects.using('SFJ').filter(plan_classes_uid=plan_classes_uid).first()
-            if pcp:
-                other_xl = ProductBatchingDetail.objects.using('SFJ').filter(product_batching=pcp.product_batching,
-                                                                             delete_flag=False, type=1,
-                                                                             material__material_name__in=['细料',
-                                                                                                          '硫磺']).last()
-                if other_xl:  # 防止配方中没有料包但是扫了通用料包条码
-                    res.append({
-                        "material__material_name": other_xl.material.material_name, "actual_weight": 1,
-                        "standard_error": 1, "msg": "", "scan_finished": True,
-                        "detail": [{
-                            "bra_code": common_scan.bra_code, "init_weight": Decimal(9999), "used_weight": Decimal(0),
-                            "single_need": Decimal(1), "scan_material": other_xl.material.material_name,
-                            "unit": "包", "msg": "", "id": 0, "scan_material_type": "机配",
-                            "adjust_left_weight": Decimal(9999)
-                        }]
-                    })
+            other_xl = sfj_details.filter(material__material_name__in=['细料', '硫磺']).last()
+            if other_xl:  # 防止配方中没有料包但是扫了通用料包条码
+                res.append({
+                    "material__material_name": other_xl.material.material_name, "actual_weight": 1,
+                    "standard_error": 1, "msg": "", "scan_finished": True,
+                    "detail": [{
+                        "bra_code": common_scan.bra_code, "init_weight": Decimal(9999), "used_weight": Decimal(0),
+                        "single_need": Decimal(1), "scan_material": other_xl.material.material_name,
+                        "unit": "包", "msg": "", "id": 0, "scan_material_type": "机配",
+                        "adjust_left_weight": Decimal(9999)
+                    }]
+                })
+        # 掺料或待处理料数据
+        index, other_material_name, need_weight, error = -1, '', 0, 0
+        # 群控配方数据
+        other_details = sfj_details.values('material__material_name', 'actual_weight', 'standard_error')
+        for i, v in enumerate(other_details):
+            if '掺料' in v['material__material_name'] or '待处理料' in v['material__material_name']:
+                index, other_material_name, need_weight, error = i, v['material__material_name'], v['actual_weight'], v[
+                    'standard_error']
+                break
+        if index != -1:  # 增加掺料或者待处理料的信息
+            scan_info = OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid,
+                                                        other_type=other_material_name, status=1).last()
+            if not scan_info:
+                data = {'material__material_name': other_material_name, 'actual_weight': need_weight, 'bra_code': '',
+                        'standard_error': error, 'init_weight': 0, 'used_weight': 0, 'scan_material': '',
+                        'adjust_left_weight': 0, 'scan_finished': False}
+            else:
+                data = {
+                    "material__material_name": other_material_name, "actual_weight": need_weight, "scan_finished": True,
+                    "standard_error": error, "msg": "",
+                    "detail": [{
+                        "bra_code": scan_info.bra_code, "init_weight": Decimal(9999), "used_weight": Decimal(0),
+                        "single_need": need_weight, "scan_material": scan_info.material_name, "unit": "KG", "msg": "",
+                        "id": 0, "scan_material_type": "胶块", "adjust_left_weight": Decimal(9999)
+                    }]
+                }
+            res.insert(index, data)
 
 
 @method_decorator([api_recorder], name="dispatch")

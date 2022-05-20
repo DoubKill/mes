@@ -314,7 +314,8 @@ class ProductBatchingViewSet(ModelViewSet):
                 if 'U' in stage_prefix or 'TU' in stage_prefix:  # 车胎类别(UC)与斜胶类别(U)需要区分
                     queryset = queryset.filter(~Q(product_info__product_name__startswith='UC'), ~Q(product_info__product_name__startswith='TUC'))
             if wms_material_name:
-                queryset = queryset.filter(Q(batching_details__material__material_name=wms_material_name) |
+                queryset = queryset.filter(Q(batching_details__material__material_name=wms_material_name,
+                                             batching_details__delete_flag=False) |
                                            Q(weight_cnt_types__delete_flag=False,
                                              weight_cnt_types__weight_details__material__material_name=wms_material_name)).distinct()
                 if export:

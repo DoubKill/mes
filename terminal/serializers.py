@@ -276,40 +276,40 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                 if s_id.id < query_set.first().id:
                                     # 硫磺在前, 只能投加硫料
                                     if add_s:
-                                        other_type, status, scan_material_msg = f'{scan_material_type}掺料', True, f'物料:{scan_material} 扫码成功'
+                                        other_type, status, scan_material_msg = recipe_material_name, True, f'掺料:{scan_material} 扫码成功'
                                     else:
-                                        other_type, scan_material_msg = f'{scan_material_type}掺料', '扫码失败: 请投入加硫料'
+                                        other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入加硫料'
                                 else:
                                     if add_s:
-                                        other_type, scan_material_msg = f'{scan_material_type}掺料', '扫码失败: 请投入无硫料'
+                                        other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入无硫料'
                                     else:
-                                        other_type, status, scan_material_msg = f'{scan_material_type}掺料', True, f'物料:{scan_material} 扫码成功'
+                                        other_type, status, scan_material_msg = recipe_material_name, True, f'掺料:{scan_material} 扫码成功'
                             else:  # 有掺料无硫磺
                                 if add_s:
-                                    other_type, status, scan_material_msg = f'{scan_material_type}掺料', True, f'物料:{scan_material} 扫码成功'
+                                    other_type, status, scan_material_msg = recipe_material_name, True, f'掺料:{scan_material} 扫码成功'
                                 else:
-                                    other_type, scan_material_msg = f'{scan_material_type}掺料', '扫码失败: 请投入加硫料'
+                                    other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入加硫料'
                         else:  # 加硫待处理料、无硫待处理料、前两者都有
                             add_s_wait_s = query_set.filter(material__material_name__icontains='加硫待处理料')
                             no_s_wait_s = query_set.filter(material__material_name__icontains='无硫待处理料')
                             if add_s_wait_s and not no_s_wait_s:
                                 if add_s:
-                                    other_type, status, scan_material_msg = '待处理料', True, f'待处理物料:{scan_material}扫码成功'
+                                    other_type, status, scan_material_msg = recipe_material_name, True, f'待处理物料:{scan_material}扫码成功'
                                 else:
-                                    other_type, scan_material_msg = f'{scan_material_type}待处理料', '扫码失败: 请投入加硫料'
+                                    other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入加硫料'
                             elif no_s_wait_s and not add_s_wait_s:
                                 if add_s:
-                                    other_type, scan_material_msg = f'{scan_material_type}待处理料', '扫码失败: 请投入无硫料'
+                                    other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入无硫料'
                                 else:
-                                    other_type, status, scan_material_msg = '待处理料', True, f'待处理物料:{scan_material}扫码成功'
+                                    other_type, status, scan_material_msg = recipe_material_name, True, f'待处理物料:{scan_material}扫码成功'
                             else:
-                                other_type, status, scan_material_msg = '待处理料', True, f'待处理物料:{scan_material}扫码成功'
+                                other_type, status, scan_material_msg = recipe_material_name, True, f'待处理物料:{scan_material}扫码成功'
                     else:
                         # 加硫禁止投料
                         if add_s:
-                            other_type, scan_material_msg = f'{scan_material_type}{recipe_material_name}', '扫码失败: 请投入无硫料'
+                            other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入无硫料'
                         else:
-                            other_type, status, scan_material_msg = f'{scan_material_type}{recipe_material_name}', True, f'物料:{scan_material} 扫码成功'
+                            other_type, status, scan_material_msg = recipe_material_name, True, f'物料:{scan_material} 扫码成功'
                 else:
                     scan_material_msg = '配方中无掺料, 所投物料不在配方中'
                 if not OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code, status=status, other_type=other_type):
