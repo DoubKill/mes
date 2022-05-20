@@ -330,8 +330,13 @@ class ProductBatchingMaterialListView(ListAPIView):
         factory_date = self.request.query_params.get('factory_date')  # 工厂日期
         equip_no = self.request.query_params.get('equip_no')  # 设备编号
         classes = self.request.query_params.get('classes')  # 班次
+        used_type = self.request.query_params.get('used_type')
 
-        batching_no = set(ProductBatching.objects.values_list('stage_product_batch_no', flat=True))
+        pbs = ProductBatching.objects.all()
+        if used_type:
+            pbs = pbs.filter(used_type=used_type)
+
+        batching_no = set(pbs.values_list('stage_product_batch_no', flat=True))
         if m_type == '1':
             kwargs = {}
             if factory_date:
