@@ -132,7 +132,7 @@ class MaterialInventoryView(GenericViewSet,
         sql = f"""select sum(tis.Quantity) qty, max(tis.MaterialName) material_name,
                        sum(tis.WeightOfActual) weight,tis.MaterialCode material_no,
                        max(tis.ProductionAddress) address, sum(tis.WeightOfActual)/sum(tis.Quantity) unit_weight,
-                       max(tis.WeightUnit) unit, max(tim.MaterialGroupName) material_type,
+                       max(tis.StandardUnit) unit, max(tim.MaterialGroupName) material_type,
                        Row_Number() OVER (order by tis.MaterialCode) sn, tis.StockDetailState status
                             from t_inventory_stock tis left join t_inventory_material tim on tim.MaterialCode=tis.MaterialCode
                         {filter_str}
@@ -2536,7 +2536,7 @@ class WmsStorageSummaryView(APIView):
             temp.MaterialName,
             temp.MaterialCode,
             m.ZCMaterialCode,
-            temp.WeightUnit,
+            temp.StandardUnit,
             m.Pdm,
             temp.quantity,
             temp.WeightOfActual,
@@ -2547,7 +2547,7 @@ class WmsStorageSummaryView(APIView):
             select
                 a.MaterialCode,
                 a.BatchNo,
-                a.WeightUnit,
+                a.StandardUnit,
                 a.StockDetailState,
                 a.MaterialName,
                 SUM ( a.WeightOfActual ) AS WeightOfActual,
@@ -2559,7 +2559,7 @@ class WmsStorageSummaryView(APIView):
                  a.MaterialCode,
                  a.MaterialName,
                  a.BatchNo,
-                 a.WeightUnit,
+                 a.StandardUnit,
                  a.StockDetailState
             ) temp
         left join t_inventory_material m on m.MaterialCode=temp.MaterialCode 
@@ -2721,7 +2721,7 @@ class WmsInventoryStockView(APIView):
                  a.BatchNo,
                  a.SpaceId,
                  a.Sn,
-                 a.WeightUnit,
+                 a.StandardUnit,
                  a.CreaterTime,
                  a.LadenToolNumber
                 FROM
@@ -2799,7 +2799,7 @@ class WmsInStockView(APIView):
                  a.BatchNo,
                  a.SpaceId,
                  a.Sn,
-                 a.WeightUnit,
+                 a.StandardUnit,
                  a.CreaterTime
             FROM 
                  dbo.t_inventory_stock AS a
@@ -3039,7 +3039,7 @@ class WMSExpireDetailView(APIView):
        a.LadenToolNumber,
        a.SpaceId,
        a.Quantity,
-       a.WeightUnit,
+       a.StandardUnit,
        a.WeightOfActual,
        a.StockDetailState,
        a.CreaterTime,
@@ -3308,7 +3308,7 @@ class WMSInventoryView(APIView):
             temp.MaterialName,
             temp.MaterialCode,
             m.ZCMaterialCode,
-            temp.WeightUnit,
+            temp.StandardUnit,
             m.Pdm,
             m.MaterialGroupName,
             temp.TunnelName,
@@ -3321,7 +3321,7 @@ class WMSInventoryView(APIView):
                 a.MaterialName,
                 a.BatchNo,
                 d.TunnelName,
-                a.WeightUnit,
+                a.StandardUnit,
                 SUM ( a.WeightOfActual ) AS WeightOfActual,
                 SUM ( a.Quantity ) AS quantity
             from dbo.t_inventory_stock AS a
@@ -3331,7 +3331,7 @@ class WMSInventoryView(APIView):
                  a.MaterialName,
                  d.TunnelName,
                  a.BatchNo,
-                 a.WeightUnit
+                 a.StandardUnit
             ) temp
         left join t_inventory_material m on m.MaterialCode=temp.MaterialCode {}""".format(extra_where_str)
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)
