@@ -2473,7 +2473,9 @@ class RubberMaxStretchTestResultViewSet(GenericViewSet, mixins.ListModelMixin, m
 @method_decorator([api_recorder], name='dispatch')
 class UnqualifiedPalletFeedBackListView(ListAPIView):
     """不合格收皮数据列表"""
-    queryset = MaterialDealResult.objects.filter(test_result='三等品').order_by('factory_date', 'classes', 'equip_no', 'product_no')
+    queryset = MaterialDealResult.objects.filter(test_result='三等品').order_by('factory_date', 'classes',
+                                                                               'equip_no', 'product_no',
+                                                                               'begin_trains')
     serializer_class = UnqualifiedPalletFeedBackSerializer
     permission_classes = (IsAuthenticated, )
     filter_backends = (DjangoFilterBackend, )
