@@ -720,8 +720,8 @@ class EquipWarehouseOrder(AbstractEntity):
         (3, '已入库'),
         (4, '未出库'),
         (5, '出库中'),
-        (6, '已出库')
-
+        (6, '已出库'),
+        (7, '关闭')
     )
     order_id = models.CharField(max_length=64, help_text='单据条码')
     submission_department = models.CharField(max_length=64, help_text='提交部门')
@@ -751,7 +751,8 @@ class EquipWarehouseOrderDetail(AbstractEntity):
         (3, '已入库'),
         (4, '未出库'),
         (5, '出库中'),
-        (6, '已出库')
+        (6, '已出库'),
+        (7, '关闭'),
     )
     equip_warehouse_order = models.ForeignKey(EquipWarehouseOrder, on_delete=models.CASCADE, help_text='出入库单据', related_name='order_detail')
     equip_spare = models.ForeignKey(EquipSpareErp, on_delete=models.CASCADE, help_text='备件代码')

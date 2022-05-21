@@ -143,7 +143,7 @@ class WmsInventoryStock(models.Model):
     total_weight = models.DecimalField(max_digits=18, decimal_places=2, db_column='WeightOfActual')
     material_no = models.CharField(max_length=64, db_column='MaterialCode')
     location = models.CharField(max_length=255, db_column='SpaceId')
-    unit = models.CharField(max_length=64, db_column='WeightUnit')
+    unit = models.CharField(max_length=64, db_column='StandardUnit')
     quality_status = models.IntegerField(db_column='StockDetailState')
     # material_type = models.CharField(max_length=64)
     batch_no = models.CharField(max_length=64, db_column='BatchNo')
