@@ -229,3 +229,12 @@ class MaterialTestPlanFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = MaterialTestPlan
         fields = '__all__'
+
+
+class UnqualifiedPalletFeedBackListFilter(django_filters.rest_framework.FilterSet):
+    st = django_filters.DateFilter(field_name="factory_date__date", help_text='开始日期', lookup_expr='gte')
+    et = django_filters.DateFilter(field_name="factory_date__date", help_text='结束日期', lookup_expr='lte')
+
+    class Meta:
+        model = MaterialDealResult
+        fields = ('product_no', 'st', 'et', 'classes', 'equip_no', 'is_deal')

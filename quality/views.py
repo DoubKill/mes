@@ -45,7 +45,7 @@ from quality.filters import TestMethodFilter, DataPointFilter, \
     DealSuggestionFilter, PalletFeedbacksTestFilter, UnqualifiedDealOrderFilter, MaterialExamineTypeFilter, \
     ExamineMaterialFilter, MaterialEquipFilter, MaterialExamineResultFilter, MaterialReportEquipFilter, \
     MaterialReportValueFilter, ProductReportEquipFilter, ProductReportValueFilter, ProductTestResumeFilter, \
-    MaterialTestPlanFilter, MaterialInspectionRegistrationFilter
+    MaterialTestPlanFilter, MaterialInspectionRegistrationFilter, UnqualifiedPalletFeedBackListFilter
 from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod, MaterialTestOrder, \
     MaterialTestMethod, TestType, DataPoint, DealSuggestion, MaterialDealResult, LevelResult, MaterialTestResult, \
     LabelPrint, TestDataPoint, BatchMonth, BatchDay, BatchProductNo, BatchEquip, BatchClass, UnqualifiedDealOrder, \
@@ -2477,7 +2477,7 @@ class UnqualifiedPalletFeedBackListView(ListAPIView):
     serializer_class = UnqualifiedPalletFeedBackSerializer
     permission_classes = (IsAuthenticated, )
     filter_backends = (DjangoFilterBackend, )
-    filter_fields = ('product_no', 'factory_date', 'classes', 'equip_no', 'is_deal')
+    filter_class = UnqualifiedPalletFeedBackListFilter
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
