@@ -2492,7 +2492,7 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        if instance.status in [1, 4]:
+        if instance.status in [1, 4, 7]:
             self.perform_destroy(instance)
             return Response({"success": True, "message": '删除成功', "data": None})
         raise ValidationError('单据入库中或已入库不能删除')
