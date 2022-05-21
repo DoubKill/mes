@@ -11,7 +11,7 @@ from suds.client import Client
 from io import BytesIO
 from itertools import chain
 from django.db.models.functions import TruncMonth
-from django.db.models import F, Q, Sum, Count, ExpressionWrapper, DurationField
+from django.db.models import F, Count, ExpressionWrapper, DurationField, Min
 from django.http import HttpResponse
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
@@ -45,8 +45,10 @@ from equipment.utils import gen_template_response, get_staff_status, get_ding_ui
 from mes.common_code import OMin, OMax, OSum, CommonDeleteMixin
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
+from plan.models import ProductClassesPlan
+from production.models import TrainsFeedbacks
 from quality.utils import get_cur_sheet, get_sheet_data
-from terminal.models import ToleranceDistinguish, ToleranceProject, ToleranceHandle, ToleranceRule
+from terminal.models import ToleranceDistinguish, ToleranceProject, ToleranceHandle, ToleranceRule, Plan, ReportBasic
 from system.models import Section, User
 
 
@@ -2475,7 +2477,7 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
             return Response({'results': data[st:et], 'count': count})
         else:
             if order == 'in':
-                queryset = self.filter_queryset(self.get_queryset().filter(status__in=[1, 2, 3]))
+                queryset = self.filter_queryset(self.get_queryset().filter(status__in=[1, 2, 3, 7]))
             elif order == 'out':
                 queryset = self.filter_queryset(self.get_queryset().filter(status__in=[4, 5, 6]))
             else:
@@ -2491,10 +2493,22 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         if instance.status in [1, 4]:
-            EquipWarehouseOrderDetail.objects.filter(equip_warehouse_order=instance).delete()
-            super().destroy(request, *args, **kwargs)
+            self.perform_destroy(instance)
             return Response({"success": True, "message": '删除成功', "data": None})
         raise ValidationError('单据入库中或已入库不能删除')
+
+    @action(methods=['post'], detail=False, url_path='close-order', url_name='close-order', permission_classes=(IsAuthenticated, ))
+    def close_order(self, request):
+        try:
+            order_id = int(self.request.data.get('id'))
+            instance = EquipWarehouseOrder.objects.get(id=order_id)
+        except Exception:
+            raise ValidationError('object does not exist!')
+        instance.status = 7
+        instance.last_updated_user = self.request.user
+        instance.save()
+        instance.order_detail.filter().update(status=7)
+        return Response('OK')
 
     @action(methods=['get'], detail=False, url_path='get_order_id', url_name='get_order_id')
     def get_order_id(self, request):
@@ -4637,3 +4651,172 @@ class EquipOrderEntrustView(APIView):
             ding_api.send_message(user_ids, content, order_id)
 
         return Response('委托操作成功')
+
+
+@method_decorator([api_recorder], name='dispatch')
+class EquipIndexView(APIView):
+
+    @staticmethod
+    def get_current_factory_date():
+        # 获取当前时间的工厂日期，开始、结束时间
+        now = datetime.now()
+        current_work_schedule_plan = WorkSchedulePlan.objects.filter(
+            start_time__lte=now,
+            end_time__gte=now,
+            plan_schedule__work_schedule__work_procedure__global_name='密炼'
+        ).first()
+        date_now = str(now.date())
+        if current_work_schedule_plan:
+            date_now = str(current_work_schedule_plan.plan_schedule.day_time)
+            st = current_work_schedule_plan.plan_schedule.work_schedule_plan.filter(
+                classes__global_name='早班').first()
+            et = current_work_schedule_plan.plan_schedule.work_schedule_plan.filter(
+                classes__global_name='夜班').first()
+            if st:
+                begin_time = str(st.start_time)
+            else:
+                begin_time = date_now + ' 00:00:01'
+            if et:
+                end_time = str(et.end_time)
+            else:
+                end_time = date_now + ' 23:59:59'
+        else:
+            begin_time = date_now + ' 00:00:01'
+            end_time = date_now + ' 23:59:59'
+
+        return date_now, begin_time, end_time
+
+    def get(self, request):
+        factory_date, begin_time, end_time = self.get_current_factory_date()
+
+        # 设备
+        equips = Equip.objects.filter(
+            category__equip_type__global_name__in=("密炼设备", "称量设备")
+        ).order_by('equip_no')
+
+        # 当日理论工作总时间
+        total_time = (datetime.now() - datetime.strptime(begin_time, '%Y-%m-%d %H:%M:%S')).total_seconds()//60
+        # 密炼时间
+        mixin_time_dict = dict(TrainsFeedbacks.objects.filter(
+            factory_date=factory_date
+        ).values('equip_no').annotate(
+            t=OSum(F('end_time') - F('begin_time'))/1000000/60).values_list('equip_no', 't'))
+
+        # 当日计划与实际数据(密炼设备)
+        plan_data = dict(ProductClassesPlan.objects.filter(
+            work_schedule_plan__plan_schedule__day_time=factory_date,
+            delete_flag=False).values('equip__equip_no').annotate(plan_trains=Sum('plan_trains')).values_list(
+            'equip__equip_no', 'plan_trains'))
+        actual_data = dict(TrainsFeedbacks.objects.filter(
+            factory_date=factory_date).values('equip_no').annotate(actual_trains=Count('id')).values_list(
+            'equip_no', 'actual_trains'))
+        # 维修工单数据
+        apply_data = EquipApplyOrder.objects.filter(
+            status__in=('已生成', '已指派', '已接单', '已开始', '已完成')
+        ).values('equip_no', 'status').annotate(num=Count('id'))
+        apply_data_dict = {'{}-{}'.format(i['equip_no'], i['status']): i['num'] for i in apply_data}
+
+        ret = {
+            'equip_data': [],
+            'incharge_user': '',
+            'repair_user': '',
+            'responsor_user': ''
+        }
+        ding_api = DinDinAPI()
+        result = get_staff_status(ding_api, '设备科')
+        if result:
+            ret['incharge_user'] = result[0].get('username')
+            ret['repair_user'] = result[0].get('username')
+            ret['responsor_user'] = result[0].get('username')
+        for equip in equips:
+            equip_no = equip.equip_no
+            equip_cat = equip.category.equip_type.global_name
+            if equip_cat == '密炼设备':
+                # 实际生产车次
+                actual_trains = actual_data.get(equip_no, 0) if equip_no != 'Z04' else actual_data.get(equip_no, 0)//2
+                # 计划车次
+                plan_trains = plan_data.get(equip_no, 0)
+                # 总停机时间：工厂日期开始到当前总时间减去密炼生产时间
+                # TODO 还需减去投料时的间隔时间（生产车次总和*该规格投料间隔时间）
+                halt_time = int(total_time - mixin_time_dict.get('ml_equip_no', 0))
+            else:
+                actual_trains = plan_trains = halt_time = ''
+                try:
+                    plan_actual_data = Plan.objects.using(equip_no).filter(
+                        date_time=factory_date).aggregate(plan_trains=Sum('setno'),
+                                                          actual_trains=Sum('actno'))
+                    # 称量实际车次
+                    actual_trains = plan_actual_data.get('actual_trains', 0)
+                    # 称量计划车次
+                    plan_trains = plan_actual_data.get('plan_trains', 0)
+                    # 计算所有计划开始结束时间累加
+                    plan_list = Plan.objects.using(equip_no).filter(
+                        date_time=factory_date).values('starttime', 'stoptime', 'actno', 'state')
+                    time_consume = 0
+                    for item in plan_list:
+                        try:
+                            finish_no = int(item['actno'])
+                        except Exception:
+                            continue
+                        if not item['starttime']:
+                            continue
+                        if finish_no > 0:
+                            if not item['stoptime'] and item['starttime'] and item['state'] == '运行中':
+                                time_consume += (datetime.now() -
+                                                 datetime.strptime(item['starttime'], '%Y-%m-%d %H:%M:%S')
+                                                 ).total_seconds()
+                            elif all([item['starttime'], item['stoptime']]):
+                                time_consume += (datetime.strptime(item['stoptime'], '%Y-%m-%d %H:%M:%S') -
+                                                 datetime.strptime(item['starttime'], '%Y-%m-%d %H:%M:%S')
+                                                 ).total_seconds()
+                    halt_time = int(total_time - time_consume/60)
+                except Exception:
+                    pass
+            # 待指派数量
+            unassigned_order_num = apply_data_dict.get('{}-{}'.format(equip_no, '已生成'), 0)
+            # 待接单数量
+            assigned_order_num = apply_data_dict.get('{}-{}'.format(equip_no, '已指派'), 0)
+            # 待执行数量
+            to_executed_order_num = apply_data_dict.get('{}-{}'.format(equip_no, '已接单'), 0)
+            # 待验收数量
+            to_check_order_num = apply_data_dict.get('{}-{}'.format(equip_no, '已开始'), 0) + \
+                                 apply_data_dict.get('{}-{}'.format(equip_no, '已完成'), 0)
+            is_repairing = False
+
+            # 取最后一条报修单
+            last_apply_order = EquipApplyOrder.objects.filter(
+                equip_condition='停机',
+                work_type='维修',
+                status__in=('已生成', '已指派', '已接单', '已开始'),
+                equip_no=equip_no).order_by('-id').first()
+            if not last_apply_order:
+                state = '运行中'
+                error_reason = ''
+                breakdown_time = 0
+            else:
+                state = '设备故障'
+                if last_apply_order.fault_datetime <= datetime.strptime(begin_time, '%Y-%m-%d %H:%M:%S'):
+                    down_st = datetime.strptime(begin_time, '%Y-%m-%d %H:%M:%S')
+                else:
+                    down_st = last_apply_order.fault_datetime
+                # 设备故障停机时间
+                # TODO 现在这样计算不对
+                breakdown_time = (datetime.now() - down_st).total_seconds() // 60
+                if last_apply_order.status == '已开始':
+                    is_repairing = True
+                error_reason = last_apply_order.result_fault_cause
+            data = {
+                'equip_no': equip_no,
+                'equip_catetory': equip_cat,
+                'downtime': '{}/{}'.format(breakdown_time, halt_time),
+                'plan_actual_data': '{}/{}'.format(actual_trains, plan_trains),
+                'apply_orders': '{}-{}-{}-{}'.format(unassigned_order_num,
+                                                     assigned_order_num,
+                                                     to_executed_order_num,
+                                                     to_check_order_num),
+                'state': state,
+                'error_reason': error_reason,
+                'is_repairing': is_repairing
+            }
+            ret['equip_data'].append(data)
+        return Response(ret)

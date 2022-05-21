@@ -175,6 +175,8 @@ urlpatterns = [
     # 委托工单与查询
     path('equip-order-entrust/', EquipOrderEntrustView.as_view()),
 
+    path('index/', EquipIndexView.as_view())
+
 ]
 
 
