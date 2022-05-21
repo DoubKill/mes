@@ -45,7 +45,7 @@ from quality.filters import TestMethodFilter, DataPointFilter, \
     DealSuggestionFilter, PalletFeedbacksTestFilter, UnqualifiedDealOrderFilter, MaterialExamineTypeFilter, \
     ExamineMaterialFilter, MaterialEquipFilter, MaterialExamineResultFilter, MaterialReportEquipFilter, \
     MaterialReportValueFilter, ProductReportEquipFilter, ProductReportValueFilter, ProductTestResumeFilter, \
-    MaterialTestPlanFilter, MaterialInspectionRegistrationFilter
+    MaterialTestPlanFilter, MaterialInspectionRegistrationFilter, UnqualifiedPalletFeedBackListFilter
 from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod, MaterialTestOrder, \
     MaterialTestMethod, TestType, DataPoint, DealSuggestion, MaterialDealResult, LevelResult, MaterialTestResult, \
     LabelPrint, TestDataPoint, BatchMonth, BatchDay, BatchProductNo, BatchEquip, BatchClass, UnqualifiedDealOrder, \
@@ -2478,11 +2478,13 @@ class RubberMaxStretchTestResultViewSet(GenericViewSet, mixins.ListModelMixin, m
 @method_decorator([api_recorder], name='dispatch')
 class UnqualifiedPalletFeedBackListView(ListAPIView):
     """不合格收皮数据列表"""
-    queryset = MaterialDealResult.objects.filter(test_result='三等品').order_by('factory_date', 'classes', 'equip_no', 'product_no')
+    queryset = MaterialDealResult.objects.filter(test_result='三等品').order_by('factory_date', 'classes',
+                                                                               'equip_no', 'product_no',
+                                                                               'begin_trains')
     serializer_class = UnqualifiedPalletFeedBackSerializer
     permission_classes = (IsAuthenticated, )
     filter_backends = (DjangoFilterBackend, )
-    filter_fields = ('product_no', 'factory_date', 'classes', 'equip_no', 'is_deal')
+    filter_class = UnqualifiedPalletFeedBackListFilter
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())

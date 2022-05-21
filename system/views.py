@@ -85,6 +85,7 @@ class UserViewSet(ModelViewSet):
             instance.is_active = 0
         else:
             instance.is_active = 1
+        instance.last_updated_user = self.request.user
         instance.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
