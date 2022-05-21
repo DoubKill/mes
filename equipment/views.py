@@ -2514,7 +2514,7 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
     def get_order_id(self, request):
         state = request.query_params.get('status', '入库')
         if state == '入库':
-            res = EquipWarehouseOrder.objects.filter(created_date__gt=dt.date.today(), status__in=[1, 2, 3]).values(
+            res = EquipWarehouseOrder.objects.filter(created_date__gt=dt.date.today(), status__in=[1, 2, 3, 7]).values(
                 'order_id').last()
             if res:
                 return Response(res['order_id'][:10] + str('%04d' % (int(res['order_id'][11:]) + 1)))
