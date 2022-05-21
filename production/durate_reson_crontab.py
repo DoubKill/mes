@@ -24,7 +24,7 @@ EQUIP_CONFIG = {
     "Z01": {"HOST": "10.4.23.61", "USER": "sa", "NAME": "GZSFJ", "PASSWORD": "123"},
     "Z02": {"HOST": "10.4.23.62", "USER": "sa", "NAME": "GZSFJ", "PASSWORD": "123"},
     "Z03": {"HOST": "10.4.23.63", "USER": "sa", "NAME": "GZSFJ", "PASSWORD": "123"},
-    "Z04": {"HOST": "10.4.23.64", "USER": "sa", "NAME": "GZSFJ", "PASSWORD": "123"},
+    "Z04": {"HOST": "10.4.23.174", "USER": "sa", "NAME": "GZSFJ", "PASSWORD": "123"},
     "Z05": {"HOST": "10.4.23.65", "USER": "sa", "NAME": "GZSFJ", "PASSWORD": "123"},
     "Z06": {"HOST": "10.4.23.66", "USER": "sa", "NAME": "GZSFJ", "PASSWORD": "123"},
     "Z07": {"HOST": "10.4.23.67", "USER": "sa", "NAME": "GZSFJ", "PASSWORD": "123"},
