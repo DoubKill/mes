@@ -24,7 +24,7 @@ EQUIP_CONFIG = {
     "Z01": {"HOST": "10.4.23.61", "USER": "sa", "NAME": "GZSFJ", "PASSWORD": "123"},
     "Z02": {"HOST": "10.4.23.62", "USER": "sa", "NAME": "GZSFJ", "PASSWORD": "123"},
     "Z03": {"HOST": "10.4.23.63", "USER": "sa", "NAME": "GZSFJ", "PASSWORD": "123"},
-    "Z04": {"HOST": "10.4.23.64", "USER": "sa", "NAME": "GZSFJ", "PASSWORD": "123"},
+    "Z04": {"HOST": "10.4.23.174", "USER": "sa", "NAME": "GZSFJ", "PASSWORD": "123"},
     "Z05": {"HOST": "10.4.23.65", "USER": "sa", "NAME": "GZSFJ", "PASSWORD": "123"},
     "Z06": {"HOST": "10.4.23.66", "USER": "sa", "NAME": "GZSFJ", "PASSWORD": "123"},
     "Z07": {"HOST": "10.4.23.67", "USER": "sa", "NAME": "GZSFJ", "PASSWORD": "123"},
@@ -47,7 +47,7 @@ def main():
         if obj:
             last_time = obj.input_datetime.strftime('%Y-%m-%d %H:%M:%S')
         else:
-            last_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            last_time = '2022-04-01 00:00:00'
         sql = f"""
                     SELECT
                     a.cause,
@@ -77,14 +77,14 @@ def main():
         sc.close()
         for item in temp:
             RubberCannotPutinReason.objects.create(
-                reason_name=item[0].strip(),
-                factory_date=item[1],
-                machine_no='Z%.2d' % item[2],
-                pallet_no=item[3].strip(),
-                lot_no=item[4].strip(),
-                production_no=item[5].strip(),
-                actual_weight=item[6],
-                input_datetime=item[7],
+                reason_name=item[0].strip() if item[0] else '未知',
+                factory_date=item[1] if item[1] else datetime.datetime.now().date(),
+                machine_no=equip,
+                pallet_no=item[3].strip() if item[3] else '888888',
+                lot_no=item[4].strip() if item[4] else '99999999',
+                production_no=item[5].strip() if item[5] else '未知',
+                actual_weight=item[6] if item[6] else 0,
+                input_datetime=item[7]
             )
 
 
