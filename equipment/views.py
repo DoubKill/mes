@@ -45,6 +45,7 @@ from equipment.utils import gen_template_response, get_staff_status, get_ding_ui
 from mes.common_code import OMin, OMax, OSum, CommonDeleteMixin
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
+from mes.permissions import PermissionClass
 from plan.models import ProductClassesPlan
 from production.models import TrainsFeedbacks
 from quality.utils import get_cur_sheet, get_sheet_data
@@ -3061,7 +3062,8 @@ class EquipApplyRepairViewSet(ModelViewSet):
     """
     queryset = EquipApplyRepair.objects.all().order_by('-id')
     serializer_class = EquipApplyRepairSerializer
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated, PermissionClass({'view': ['view_equip_apply_repair', 'assign_d_equip_apply_order'],
+                                                            'add': ['add_equip_apply_repair', 'assign_d_equip_apply_order']}))
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipApplyRepairFilter
 
@@ -3073,7 +3075,15 @@ class EquipApplyOrderViewSet(ModelViewSet):
     """
     queryset = EquipApplyOrder.objects.all().order_by('-id')
     serializer_class = EquipApplyOrderSerializer
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated, PermissionClass({'view': ['view_equip_apply_order', 'close_d_equip_apply_order',
+                                                                     'export_equip_apply_order', 'view_d_equip_apply_order',
+                                                                     'close_d_equip_apply_order'],
+                                                            'add': ['close_equip_apply_order', 'assign_equip_apply_order',
+                                                                    'receive_equip_apply_order', 'charge_equip_apply_order',
+                                                                    'begin_equip_apply_order', 'accept_equip_apply_order',
+                                                                    'regulation_equip_apply_order', 'receive_d_equip_apply_order',
+                                                                    'view_d_equip_apply_order'],
+                                                            'change': ['handle_equip_apply_order']}))
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipApplyOrderFilter
     FILE_NAME = '设备维修工单表'
@@ -3360,6 +3370,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
             result_repair_final_result = data.get('result_repair_final_result')  # 维修结论
             work_content = data.pop('work_content', [])
             image_url_list = data.pop('image_url_list', [])
+            video_url_list = data.pop('video_url_list', [])
             work_type = data.pop('work_type')
             work_order_no = data.pop('work_order_no')
             apply_material_list = data.pop('apply_material_list', [])
@@ -3376,7 +3387,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
                 else:
                     data.update({'repair_end_datetime': now_date, 'last_updated_date': datetime.now(), 'status': '已完成',
                                  'accept_user': instance.created_user.username})
-            data['result_repair_graph_url'] = json.dumps(image_url_list)
+            data.update({'result_repair_graph_url': json.dumps(image_url_list), 'result_repair_video_url': json.dumps(video_url_list)})
             # 记录到增减人员履历中
             for plan_id in plan_ids:
                 queryset = EquipRegulationRecord.objects.filter(plan_id=plan_id, status='增')
@@ -3403,6 +3414,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
             if accept_num != 0:
                 raise ValidationError('已完成订单才可验收, 请刷新订单!')
             image_url_list = data.pop('image_url_list', [])
+            video_url_list = data.pop('video_url_list', [])
             result_accept_result = data.get('result_accept_result')
             if result_accept_result == '合格':
                 # 更新巡检中异常报修的工单状态
@@ -3412,12 +3424,13 @@ class EquipApplyOrderViewSet(ModelViewSet):
                     'status': data.get('status'), 'accept_datetime': now_date,
                     'result_accept_result': result_accept_result, 'timeout_color': None,
                     'result_accept_desc': data.get('result_accept_desc'),
-                    'result_accept_graph_url': json.dumps(image_url_list), 'last_updated_date': datetime.now()
+                    'result_accept_graph_url': json.dumps(image_url_list), 'last_updated_date': datetime.now(),
+                    'result_accept_video_url': json.dumps(video_url_list)
                 }
             else:
                 data = {
                     'status': data.get('status'), 'repair_end_datetime': None, 'accept_datetime': now_date,
-                    'result_accept_result': result_accept_result,
+                    'result_accept_result': result_accept_result, 'result_accept_video_url': json.dumps(video_url_list),
                     'result_accept_desc': data.get('result_accept_desc'),
                     'result_accept_graph_url': json.dumps(image_url_list), 'last_updated_date': datetime.now()
                 }
@@ -3465,7 +3478,13 @@ class EquipInspectionOrderViewSet(ModelViewSet):
     """
     queryset = EquipInspectionOrder.objects.all().order_by('-id')
     serializer_class = EquipInspectionOrderSerializer
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated, PermissionClass({'view': ['view_equip_inspection_order', 'export_equip_inspection_order',
+                                                                     'view_d_equip_apply_order', 'close_d_equip_apply_order'],
+                                                            'add': ['close_equip_inspection_order', 'assign_equip_inspection_order',
+                                                                    'receive_equip_inspection_order', 'charge_equip_inspection_order',
+                                                                    'begin_equip_inspection_order', 'regulation_equip_inspection_order',
+                                                                    'view_d_equip_apply_order'],
+                                                            'change': ['handle_equip_inspection_order']}))
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipInspectionOrderFilter
     FILE_NAME = '设备巡检工单表'
@@ -3762,10 +3781,11 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                 raise ValidationError('未开始订单无法进行处理操作, 请刷新订单!')
             work_content = data.pop('work_content', [])
             image_url_list = data.pop('image_url_list', [])
+            video_url_list = data.pop('video_url_list', [])
             work_order_no = data.pop('work_order_no')
             result = data.get('result_repair_final_result')
             data.update({'repair_end_datetime': now_date if result == '正常' else None,
-                         'last_updated_date': datetime.now(),
+                         'last_updated_date': datetime.now(), 'result_repair_video_url': json.dumps(video_url_list),
                          'status': '已完成' if result == '正常' else '已开始',
                          'result_repair_graph_url': json.dumps(image_url_list)})
             # 记录到增减人员履历中
@@ -4095,34 +4115,46 @@ class EquipOrderListView(APIView):
     """
     根据机台和部位条码进行查询
     """
+
     def get(self, request):
         lot_no = self.request.query_params.get('lot_no')  # 扫描的条码
         search = self.request.query_params.get('search')
         my_order = self.request.query_params.get('my_order')
+        accept_flag = self.request.query_params.get('accept_flag')
         page = self.request.query_params.get('page', 1)
         page_size = self.request.query_params.get('page_size', 10)
-        if lot_no:
-            queryset1 = EquipApplyOrder.objects.filter(Q(equip_part_new__part_code=lot_no) | Q(equip_no=lot_no))
-            queryset2 = EquipInspectionOrder.objects.filter(equip_no=lot_no)
+        user_name = self.request.user.username
+        if accept_flag:
+            if lot_no:
+                queryset = EquipApplyOrder.objects.filter(Q(equip_part_new__part_code=lot_no) | Q(equip_no=lot_no),
+                                                          Q(created_user__username=user_name) | Q(accept_user=user_name),
+                                                          status__in=['已完成', '已验收'])
+            else:
+                queryset = EquipApplyOrder.objects.filter(Q(equip_part_new__part_code__icontains=search) |
+                                                          Q(equip_no__icontains=search),
+                                                          Q(created_user__username=user_name) | Q(accept_user=user_name),
+                                                          status__in=['已完成', '已验收'])
+            serializer = EquipApplyOrderSerializer(instance=queryset, many=True, context={'request': request}).data
         else:
-            queryset1 = EquipApplyOrder.objects.filter(Q(equip_part_new__part_code__icontains=search) | Q(equip_no__icontains=search))
-            queryset2 = EquipInspectionOrder.objects.filter(equip_no__icontains=search)
-        if my_order:
-            queryset1 = queryset1.filter(Q(assign_user=self.request.user.username) |
-                                    Q(assign_to_user=self.request.user.username) |
-                                    Q(receiving_user=self.request.user.username) |
-                                    Q(accept_user=self.request.user.username) |
-                                    Q(status='已生成'))
-            queryset2 = queryset2.filter(Q(assign_user=self.request.user.username) |
-                                    Q(assign_to_user=self.request.user.username) |
-                                    Q(receiving_user=self.request.user.username) |
-                                    Q(status='已生成'))
+            if lot_no:
+                queryset1 = EquipApplyOrder.objects.filter(Q(equip_part_new__part_code=lot_no) | Q(equip_no=lot_no))
+                queryset2 = EquipInspectionOrder.objects.filter(equip_no=lot_no)
+            else:
+                queryset1 = EquipApplyOrder.objects.filter(Q(equip_part_new__part_code__icontains=search) |
+                                                           Q(equip_no__icontains=search))
+                queryset2 = EquipInspectionOrder.objects.filter(equip_no__icontains=search)
+            if my_order:
+                queryset1 = queryset1.filter(Q(assign_user=user_name) | Q(assign_to_user=user_name) | Q(status='已生成') |
+                                             Q(receiving_user=user_name) | Q(accept_user=user_name))
+                queryset2 = queryset2.filter(Q(assign_user=user_name) | Q(assign_to_user=user_name) | Q(status='已生成') |
+                                             Q(receiving_user=user_name))
 
-        serializer1 = EquipApplyOrderSerializer(instance=queryset1, many=True, context={'request': request}).data
-        serializer2 = EquipInspectionOrderSerializer(instance=queryset2, many=True, context={'request': request}).data
+            serializer1 = EquipApplyOrderSerializer(instance=queryset1, many=True, context={'request': request}).data
+            serializer2 = EquipInspectionOrderSerializer(instance=queryset2, many=True, context={'request': request}).data
+            serializer = serializer1 + serializer2
         st = (int(page) - 1) * int(page_size)
         et = int(page) * int(page_size)
-        data = sorted(serializer1 + serializer2, key=lambda x: x['created_date'], reverse=True)
+        data = sorted(serializer, key=lambda x: x['created_date'], reverse=True)
         return Response({'results': data[st:et], 'count': len(data)})
 
 
@@ -4602,6 +4634,9 @@ class EquipOrderEntrustView(APIView):
     """
     工单查询加委托
     """
+    permission_classes = (IsAuthenticated, PermissionClass({'view': ['charge_d_equip_apply_order', 'begin_d_equip_apply_order'],
+                                                            'add': ['charge_d_equip_apply_order', 'begin_d_equip_apply_order']}))
+
     def get(self, request):
         oper_type = self.request.query_params.get('oper_type')
         user_name = self.request.user.username

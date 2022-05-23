@@ -11,7 +11,7 @@ from io import BytesIO
 import requests
 import xlwt
 from django.core.paginator import Paginator
-from django.db.models import Sum, Count, Q, F
+from django.db.models import Sum, Count, Q, F, Max, FloatField
 from django.db.transaction import atomic
 from django.forms import model_to_dict
 from django.http import HttpResponse
@@ -44,7 +44,7 @@ from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMate
     DepotSite, DepotPallt, Sulfur, SulfurDepot, SulfurDepotSite, MaterialInHistory, \
     CarbonOutPlan, FinalRubberyOutBoundOrder, MixinRubberyOutBoundOrder, FinalGumInInventoryLog, OutBoundDeliveryOrder, \
     OutBoundDeliveryOrderDetail, WMSReleaseLog, WmsInventoryMaterial, WMSMaterialSafetySettings, WmsNucleinManagement, \
-    WMSExceptHandle, MaterialOutHistoryOther, MaterialOutboundOrder, MaterialEntrance
+    WMSExceptHandle, MaterialOutHistoryOther, MaterialOutboundOrder, MaterialEntrance, HfBakeMaterialSet, HfBakeLog
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
@@ -62,7 +62,7 @@ from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
 from mes import settings
-from mes.common_code import SqlClient
+from mes.common_code import SqlClient, response
 from mes.conf import WMS_CONF, TH_CONF, WMS_URL, TH_URL, HF_CONF
 from mes.derorators import api_recorder
 from django_filters.rest_framework import DjangoFilterBackend
@@ -5658,7 +5658,9 @@ class HFStockDetailView(APIView):
                 ProductNo,
                 RFID,
                 OastInTime,
-                OastOutTime
+                OastOutTime,
+                OastStartTime,
+                OastEntTime
             from dsp_OastTask {} order by OastNo OFFSET {} ROWS FETCH FIRST {} ROWS ONLY
             """.format(extra_where_str, (page-1)*page_size, page_size)
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)
@@ -5669,7 +5671,23 @@ class HFStockDetailView(APIView):
         sc = SqlClient(sql=count_sql, **self.DATABASE_CONF)
         temp2 = sc.all()
         count = temp2[0][0]
+        # 查询历史设定
+        hf_set = HfBakeMaterialSet.objects.filter(delete_flag=False).values('material_name')\
+            .annotate(max_temp=Max('temperature_set'), max_time=Max('bake_time', output_field=FloatField()))
+        handle_hf_set = {i['material_name']: [i['max_temp'], i['max_time']] for i in hf_set}
         for item in temp:
+            # 温度、时长设定值获取
+            temperature_set, bake_time_set = handle_hf_set.get(item[2]) if handle_hf_set.get(item[2]) else ['', '']
+            # 时长计算
+            baking_begin = '' if not item[7] else item[7].strftime('%Y-%m-%d %H:%M:%S')
+            baking_end = '' if not item[8] else item[8].strftime('%Y-%m-%d %H:%M:%S')
+            if not baking_begin:
+                baking_time = ''
+            else:
+                if not baking_end:
+                    baking_time = round((datetime.datetime.now() - item[7]).total_seconds() / 3600, 2)
+                else:
+                    baking_time = round((item[8] - item[7]).total_seconds() / 3600, 2)
             result.append(
                 {
                     'oven_no': item[0],
@@ -5678,7 +5696,12 @@ class HFStockDetailView(APIView):
                     'material_no': item[3],
                     'pallet_no': item[4],
                     'baking_start_time': '' if not item[5] else item[5].strftime('%Y-%m-%d %H:%M:%S'),
-                    'baking_end_time': '' if not item[6] else item[6].strftime('%Y-%m-%d %H:%M:%S')
+                    'baking_end_time': '' if not item[6] else item[6].strftime('%Y-%m-%d %H:%M:%S'),
+                    'baking_begin': baking_begin,
+                    'baking_end': baking_end,
+                    'baking_time': baking_time,
+                    'temperature_set': temperature_set,
+                    'bake_time_set': bake_time_set
                 }
             )
         sc.close()
@@ -5815,7 +5838,8 @@ class HFInventoryLogView(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class HFRealStatusView(APIView):
-    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_material_hf_real_data'}))
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_material_hf_real_data',
+                                                            'add': 'outbound_material_hf_real_data'}))
     DATABASE_CONF = HF_CONF
 
     def get(self, request):
@@ -5883,15 +5907,113 @@ class HFRealStatusView(APIView):
             raise ValidationError(e.args[0])
         return Response(response_data)
 
+    @atomic
     def post(self, request):
         """烘箱手动出库 OastNo: '1' """
+        data = self.request.data
         try:
             hf = HFSystem()
-            res = hf.manual_out_hf(self.request.data)
+            res = hf.manual_out_hf(data)
+            # 更新履历
+            hf_log = HfBakeLog.objects.filter(oast_no=data['OastNo'], actual_temperature__isnull=True, actual_bake_time__isnull=True).last()
+            hf_log.actual_temperature = res.get('ShiJiT')
+            hf_log.actual_bake_time = res.get('ShiJiTime')
+            hf_log.last_updated_date = datetime.datetime.now()
+            hf_log.save()
         except Exception as e:
             raise ValidationError(e.args[0])
         else:
             return Response(res)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class HFForceHandleView(APIView):
+
+    @atomic
+    def post(self, request):
+        data = self.request.data
+        user_name = self.request.user.username
+        opera_type = data.pop('opera_type', 3)
+        client = data.pop('client', False)
+        try:
+            hf = HFSystem()
+            if opera_type == 1:  # 强制出料
+                data['OastType'] = 'E'
+                res = hf.force_bake(data)
+            elif opera_type == 2:  # 强制烘烤
+                # 查询设定值
+                OastMatiles = data.pop('OastMatiles')
+                material_list = set([i.get('ProductName') for i in OastMatiles])
+                bake_set_target = HfBakeMaterialSet.objects.filter(material_name__in=material_list, delete_flag=False)
+                if not bake_set_target:
+                    if client:
+                        return response(success=False, message='未找到物料设置的标准温度与时长')
+                    else:
+                        raise ValidationError('未找到物料设置的标准温度与时长')
+                bake_set = bake_set_target.aggregate(standard_temp=Max('temperature_set'), standard_bake_time=Max('bake_time', output_field=FloatField()))
+                standard_temp, standard_bake_time = bake_set.get('standard_temp'), bake_set.get('standard_bake_time')
+                data.update({'OastType': 'S', 'Temperature': standard_temp, 'Duration': standard_bake_time})
+                if client:
+                    data['client'] = client
+                res = hf.force_bake(data)
+                # 增加履历
+                HfBakeLog.objects.create(**{'oast_no': data.get('OastNo'), 'material_name': ','.join(material_list),
+                                            'temperature_set': bake_set['standard_temp'], 'opera_username': user_name if user_name else 'wcs',
+                                            'bake_time': bake_set['standard_bake_time']})
+            else:
+                raise ValidationError('未知操作: 只支持强制出料与强制烘烤')
+        except Exception as e:
+            if client:
+                return response(success=False, message=e.args[0])
+            else:
+                raise ValidationError(e.args[0])
+        else:
+            if client:
+                return response(success=True, message='请求成功')
+            else:
+                return Response({"results": f"强制{'出料' if opera_type == 1 else '烘烤'}操作成功"})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class HFConfigSetView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        """获取原材料烘烤温度以及时长设置"""
+        query_set = HfBakeMaterialSet.objects.filter(delete_flag=False).order_by('created_date')
+        return Response({'results': list(query_set.values())})
+
+    @atomic
+    def post(self, request):
+        data = self.request.data.get('set_data')
+        delete_data = self.request.data.get('delete_data')
+        user_name = self.request.user.username
+        repeat_material_name = []
+        # 删除物料
+        if delete_data:
+            HfBakeMaterialSet.objects.filter(id=delete_data).update(**{'delete_flag': True})
+            return Response('删除设置成功')
+        for s_data in data:
+            rid, material_name, temperature_set, bake_time = s_data.get('id'),  s_data.get('material_name'), \
+                                                             s_data.get('temperature_set'),  s_data.get('bake_time')
+            if material_name in repeat_material_name:
+                raise ValidationError(f'参数异常: {material_name}重复')
+            if not all([material_name, temperature_set, bake_time]):
+                raise ValidationError(f'参数异常: 物料名称、烘烤温度、烘烤时长不可为空')
+            if temperature_set < 0 or temperature_set > 100 or bake_time < 0 or bake_time > 200:
+                raise ValidationError(f'检查{material_name}设置[烘烤温度[0-100], 烘烤时长[0-200]')
+            common_data = {'material_name': material_name, 'bake_time': bake_time, 'temperature_set': temperature_set,
+                           'opera_username': user_name}
+            if rid:  # 存在id则为修改
+                common_data.update({'last_updated_date': datetime.datetime.now()})
+                HfBakeMaterialSet.objects.filter(id=rid).update(**common_data)
+            else:
+                if not HfBakeMaterialSet.objects.filter(material_name=material_name, delete_flag=False).exists():
+                    HfBakeMaterialSet.objects.create(**common_data)
+                else:
+                    raise ValidationError(f'{material_name}已经存在')
+            repeat_material_name.append(material_name)
+        return Response('设置成功')
 
 
 @method_decorator([api_recorder], name="dispatch")

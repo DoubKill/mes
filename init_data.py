@@ -994,7 +994,18 @@ permission_data = [
     {'id': 1002, 'code': 'product_expire_query', 'name': '胶料即将超期预警', 'parent_id': None},
     {'id': 1003, 'code': 'view_product_expire_query', 'name': '查看', 'parent_id': 1002},
 
-    # 下一个 1004 开始
+    {'id': 1004, 'code': 'd_equip_apply_order', 'name': '钉钉小程序权限', 'parent_id': None},
+    {'id': 1005, 'code': 'view_d_equip_apply_order', 'name': '我的工单', 'parent_id': 1004},
+    {'id': 1006, 'code': 'close_d_equip_apply_order', 'name': '工单大厅', 'parent_id': 1004},
+    {'id': 1007, 'code': 'assign_d_equip_apply_order', 'name': '申请维修', 'parent_id': 1004},
+    {'id': 1008, 'code': 'receive_d_equip_apply_order', 'name': '工单验收', 'parent_id': 1004},
+    {'id': 1009, 'code': 'charge_d_equip_apply_order', 'name': '维修交班', 'parent_id': 1004},
+    {'id': 1010, 'code': 'begin_d_equip_apply_order', 'name': '验收交班', 'parent_id': 1004},
+    {'id': 1011, 'code': 'handle_d_equip_apply_order', 'name': '考勤打卡', 'parent_id': 1004},
+    {'id': 1012, 'code': 'accept_d_equip_apply_order', 'name': '补卡申请', 'parent_id': 1004},
+    {'id': 1013, 'code': 'export_d_equip_apply_order', 'name': '加班申请', 'parent_id': 1004},
+
+    # 下一个 1014 开始
 ]
 
 
