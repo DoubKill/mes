@@ -4795,19 +4795,36 @@ class EquipIndexView(APIView):
                 breakdown_time = 0
             else:
                 state = '设备故障'
-                # if last_apply_order.fault_datetime <= datetime.strptime(begin_time, '%Y-%m-%d %H:%M:%S'):
-                #     down_st = datetime.strptime(begin_time, '%Y-%m-%d %H:%M:%S')
-                # else:
-                #     down_st = last_apply_order.fault_datetime
-                # 设备故障停机时间
-                # TODO 现在这样计算不对
-                # breakdown_time = (datetime.now() - down_st).total_seconds() // 60
                 breakdown_time = 0
                 if last_apply_order.status == '已开始':
                     is_repairing = True
                 if last_apply_order.equip_condition == '停机':
                     state = '停机'
                 error_reason = last_apply_order.result_fault_cause
+
+                # 设备故障停机时间
+                orders = EquipApplyOrder.objects.filter(
+                    equip_no=equip_no,
+                    equip_condition='停机',
+                    repair_start_datetime__isnull=False).filter(
+                    Q(repair_end_datetime__isnull=True) |
+                    Q(repair_end_datetime__gt=begin_time)
+                )
+                bk_st = []
+                bk_et = []
+                for order in orders:
+                    if order.repair_start_datetime <= datetime.strptime(begin_time, '%Y-%m-%d %H:%M:%S'):
+                        down_st = datetime.strptime(begin_time, '%Y-%m-%d %H:%M:%S')
+                    else:
+                        down_st = last_apply_order.repair_start_datetime
+                    if not order.repair_end_datetime:
+                        down_et = datetime.now()
+                    else:
+                        down_et = order.repair_end_datetime
+                    bk_st.append(down_st)
+                    bk_et.append(down_et)
+                if bk_st and bk_et:
+                    breakdown_time = int((max(bk_et) - min(bk_st)).total_seconds()/60)
             data = {
                 'equip_no': equip_no,
                 'equip_catetory': equip_cat,
