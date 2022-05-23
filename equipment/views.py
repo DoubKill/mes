@@ -4722,8 +4722,9 @@ class EquipIndexView(APIView):
             'repair_user': '',
             'responsor_user': ''
         }
-        ding_api = DinDinAPI()
-        result = get_staff_status(ding_api, '设备科')
+        # ding_api = DinDinAPI()
+        # result = get_staff_status(ding_api, '设备科')
+        result = []
         if result:
             ret['incharge_user'] = result[0].get('username')
             ret['repair_user'] = result[0].get('username')
