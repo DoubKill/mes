@@ -19,7 +19,7 @@ from terminal.views import BatchBasicInfoView, BatchProductionInfoView, BatchPro
     MaterialInfoIssue, ReplaceMaterialViewSet, ReturnRubberViewSet, ToleranceKeyword, ToleranceRuleViewSet, \
     WeightPackageManualViewSet, GetManualInfo, WeightPackageSingleViewSet, GetMaterialTolerance, UpdateFlagCountView, \
     MaterialDetailsAux, GetXlRecipesInfoView, XlRecipeNoticeView, ApplyHaltEquipView, FormulaPreparationView, \
-    ReportWeightViewStaticsView
+    ReportWeightViewStaticsView, WmsAddPrintViewSet
 
 router = DefaultRouter()
 router.register('batch-log', LoadMaterialLogViewSet)  # 终端投料履历管理
@@ -30,6 +30,7 @@ router.register('weighting-log', WeightBatchingLogViewSet)  # 称量履历管理
 router.register('weighting-package-log', WeightPackageLogViewSet)  # 称量打包履历
 router.register('weighting-package-manual', WeightPackageManualViewSet)  # 人工单配(配方)
 router.register('weighting-package-single', WeightPackageSingleViewSet)  # 人工单配(单一物料:配方和通用)
+router.register('wms-add-print', WmsAddPrintViewSet)  # 内部原材料卡片打印
 router.register('weighting-tack-status', WeightTankStatusViewSet)  # 料管信息
 router.register('weighting-package-c', WeightPackageCViewSet)  # 打印数据获取以及状态更新(C#端)
 router.register('carbon-tank-set', CarbonTankSetViewSet)  # 炭黑罐投料重量设定
