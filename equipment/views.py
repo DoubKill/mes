@@ -4740,15 +4740,15 @@ class EquipIndexView(APIView):
                 # TODO 还需减去投料时的间隔时间（生产车次总和*该规格投料间隔时间）
                 halt_time = int(total_time - mixin_time_dict.get('ml_equip_no', 0))
             else:
-                actual_trains = plan_trains = halt_time = ''
+                actual_trains = plan_trains = halt_time = 0
                 try:
                     plan_actual_data = Plan.objects.using(equip_no).filter(
                         date_time=factory_date).aggregate(plan_trains=Sum('setno'),
                                                           actual_trains=Sum('actno'))
                     # 称量实际车次
-                    actual_trains = plan_actual_data.get('actual_trains', 0)
+                    actual_trains = plan_actual_data['actual_trains'] if plan_actual_data['actual_trains'] else 0
                     # 称量计划车次
-                    plan_trains = plan_actual_data.get('plan_trains', 0)
+                    plan_trains = plan_actual_data['plan_trains'] if plan_actual_data['plan_trains'] else 0
                     # 计算所有计划开始结束时间累加
                     plan_list = Plan.objects.using(equip_no).filter(
                         date_time=factory_date).values('starttime', 'stoptime', 'actno', 'state')
@@ -4779,14 +4779,13 @@ class EquipIndexView(APIView):
             # 待执行数量
             to_executed_order_num = apply_data_dict.get('{}-{}'.format(equip_no, '已接单'), 0)
             # 待验收数量
-            to_check_order_num = apply_data_dict.get('{}-{}'.format(equip_no, '已开始'), 0) + \
-                                 apply_data_dict.get('{}-{}'.format(equip_no, '已完成'), 0)
+            to_check_order_num = apply_data_dict.get('{}-{}'.format(equip_no, '已完成'), 0)
             is_repairing = False
 
             # 取最后一条报修单
             last_apply_order = EquipApplyOrder.objects.filter(
-                equip_condition='停机',
-                work_type='维修',
+                # equip_condition='停机',
+                # work_type='维修',
                 status__in=('已生成', '已指派', '已接单', '已开始'),
                 equip_no=equip_no).order_by('-id').first()
             if not last_apply_order:
@@ -4795,15 +4794,18 @@ class EquipIndexView(APIView):
                 breakdown_time = 0
             else:
                 state = '设备故障'
-                if last_apply_order.fault_datetime <= datetime.strptime(begin_time, '%Y-%m-%d %H:%M:%S'):
-                    down_st = datetime.strptime(begin_time, '%Y-%m-%d %H:%M:%S')
-                else:
-                    down_st = last_apply_order.fault_datetime
+                # if last_apply_order.fault_datetime <= datetime.strptime(begin_time, '%Y-%m-%d %H:%M:%S'):
+                #     down_st = datetime.strptime(begin_time, '%Y-%m-%d %H:%M:%S')
+                # else:
+                #     down_st = last_apply_order.fault_datetime
                 # 设备故障停机时间
                 # TODO 现在这样计算不对
-                breakdown_time = (datetime.now() - down_st).total_seconds() // 60
+                # breakdown_time = (datetime.now() - down_st).total_seconds() // 60
+                breakdown_time = 0
                 if last_apply_order.status == '已开始':
                     is_repairing = True
+                if last_apply_order.equip_condition == '停机':
+                    state = '停机'
                 error_reason = last_apply_order.result_fault_cause
             data = {
                 'equip_no': equip_no,
