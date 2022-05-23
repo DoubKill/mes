@@ -853,7 +853,7 @@ class EquipApplyRepair(AbstractEntity):
     plan_source = models.CharField(max_length=64, help_text='来源', default='mes')
     status = models.CharField(max_length=64, help_text='状态', default='')
     apply_repair_graph_url = models.TextField(help_text='报修图片', default='')
-    apply_repair_video_url = models.TextField(help_text='报修视频', default='')
+    apply_repair_video_url = models.TextField(help_text='报修视频', null=True, blank=True)
 
     class Meta:
         db_table = 'equip_apply_repair'
