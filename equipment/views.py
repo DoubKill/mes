@@ -4699,8 +4699,7 @@ class EquipIndexView(APIView):
         # 密炼时间
         mixin_time_dict = dict(TrainsFeedbacks.objects.filter(
             factory_date=factory_date
-        ).values('equip_no').annotate(
-            t=OSum(F('end_time') - F('begin_time'))/1000000/60).values_list('equip_no', 't'))
+        ).values('equip_no').annotate(t=OSum((F('end_time') - F('begin_time')))).values_list('equip_no', 't'))
 
         # 当日计划与实际数据(密炼设备)
         plan_data = dict(ProductClassesPlan.objects.filter(
@@ -4739,7 +4738,8 @@ class EquipIndexView(APIView):
                 plan_trains = plan_data.get(equip_no, 0)
                 # 总停机时间：工厂日期开始到当前总时间减去密炼生产时间
                 # TODO 还需减去投料时的间隔时间（生产车次总和*该规格投料间隔时间）
-                halt_time = int(total_time - mixin_time_dict.get('ml_equip_no', 0))
+                t0 = int(mixin_time_dict.get(equip_no).total_seconds() / 60) if mixin_time_dict.get(equip_no) else 0
+                halt_time = int(total_time - t0)
             else:
                 actual_trains = plan_trains = halt_time = 0
                 try:
@@ -4793,13 +4793,19 @@ class EquipIndexView(APIView):
                 state = '运行中'
                 error_reason = ''
                 breakdown_time = 0
+                last_trains_feedback = TrainsFeedbacks.objects.filter(equip_no=equip_no).order_by('-end_time').first()
+                if last_trains_feedback:
+                    if (datetime.now() - last_trains_feedback.end_time).total_seconds() / 60 > 30:
+                        state = '生产停机'
+                else:
+                    state = '生产停机'
             else:
                 state = '设备故障'
                 breakdown_time = 0
                 if last_apply_order.status == '已开始':
                     is_repairing = True
                 if last_apply_order.equip_condition == '停机':
-                    state = '停机'
+                    state = '故障停机'
                 error_reason = last_apply_order.result_fault_cause
 
                 # 设备故障停机时间
@@ -4825,6 +4831,9 @@ class EquipIndexView(APIView):
                     bk_et.append(down_et)
                 if bk_st and bk_et:
                     breakdown_time = int((max(bk_et) - min(bk_st)).total_seconds()/60)
+            if halt_time < 0:
+                halt_time = 0
+                breakdown_time = 0
             data = {
                 'equip_no': equip_no,
                 'equip_catetory': equip_cat,
