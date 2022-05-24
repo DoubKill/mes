@@ -4777,7 +4777,7 @@ class EquipIndexView(APIView):
                 # TODO 还需减去投料时的间隔时间（生产车次总和*该规格投料间隔时间）
                 t0 = int(mixin_time_dict.get(equip_no).total_seconds() / 60) if mixin_time_dict.get(equip_no) else 0
                 halt_time = int(total_time - t0)
-                last_trains_feedback = TrainsFeedbacks.objects.filter(equip_no=equip_no).order_by('id').last()
+                last_trains_feedback = TrainsFeedbacks.objects.filter(equip_no=equip_no, factory_date=factory_date).order_by('id').last()
                 if last_trains_feedback:
                     last_running_time = last_trains_feedback.end_time
             else:
