@@ -666,9 +666,9 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                             if get_status:
                                 k.package_fufil = get_status.actno
                                 # 更新未打印数量
-                                already_print = WeightPackageLog.objects.filter(plan_weight_uid=k.plan_weight_uid).aggregate(already_print=Sum('package_count'))['already_print']
-                                already_print = 0 if not already_print else already_print
-                                k.noprint_count = k.package_fufil - already_print if k.package_fufil - already_print > 0 else 0
+                                prints = WeightPackageLog.objects.filter(plan_weight_uid=k.plan_weight_uid).aggregate(prints=Sum('package_count'))['prints']
+                                prints = 0 if not prints else prints
+                                k.noprint_count = k.package_fufil - prints if k.package_fufil - prints > 0 else 0
                                 k.save()
                         data.append(WeightPackageLogSerializer(k).data)
                 return self.get_paginated_response(data)
@@ -700,9 +700,9 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                             if get_status:
                                 k.package_fufil = get_status.actno
                                 # 更新未打印数量
-                                already_print = WeightPackageLog.objects.filter(plan_weight_uid=k.plan_weight_uid).aggregate(already_print=Sum('package_count'))['already_print']
-                                already_print = 0 if not already_print else already_print
-                                k.noprint_count = k.package_fufil - already_print if k.package_fufil - already_print > 0 else 0
+                                prints = WeightPackageLog.objects.filter(plan_weight_uid=k.plan_weight_uid).aggregate(prints=Sum('package_count'))['prints']
+                                prints = 0 if not prints else prints
+                                k.noprint_count = k.package_fufil - prints if k.package_fufil - prints > 0 else 0
                                 k.save()
                         data.append(WeightPackageLogSerializer(k).data)
                 return self.get_paginated_response(data)
@@ -721,9 +721,9 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                     if get_status:
                         k.package_fufil = get_status.actno
                         # 更新未打印数量
-                        already_print = WeightPackageLog.objects.filter(plan_weight_uid=k.plan_weight_uid).aggregate(already_print=Sum('package_count'))['already_print']
-                        already_print = 0 if not already_print else already_print
-                        k.noprint_count = k.package_fufil - already_print if k.package_fufil - already_print > 0 else 0
+                        prints = WeightPackageLog.objects.filter(plan_weight_uid=k.plan_weight_uid).aggregate(prints=Sum('package_count'))['prints']
+                        prints = 0 if not prints else prints
+                        k.noprint_count = k.package_fufil - prints if k.package_fufil - prints > 0 else 0
                         k.save()
             page = self.paginate_queryset(already_print)
             if page is not None:
