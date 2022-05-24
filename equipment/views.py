@@ -4722,6 +4722,7 @@ class EquipIndexView(APIView):
         return date_now, begin_time, end_time
 
     def get(self, request):
+        now_time = datetime.now()
         factory_date, begin_time, end_time = self.get_current_factory_date()
 
         # 设备
@@ -4730,7 +4731,7 @@ class EquipIndexView(APIView):
         ).order_by('equip_no')
 
         # 当日理论工作总时间
-        total_time = (datetime.now() - datetime.strptime(begin_time, '%Y-%m-%d %H:%M:%S')).total_seconds()//60
+        total_time = (now_time - datetime.strptime(begin_time, '%Y-%m-%d %H:%M:%S')).total_seconds()//60
         # 密炼时间
         mixin_time_dict = dict(TrainsFeedbacks.objects.filter(
             factory_date=factory_date
@@ -4764,6 +4765,7 @@ class EquipIndexView(APIView):
             ret['repair_user'] = result[0].get('username')
             ret['responsor_user'] = result[0].get('username')
         for equip in equips:
+            last_running_time = None
             equip_no = equip.equip_no
             equip_cat = equip.category.equip_type.global_name
             if equip_cat == '密炼设备':
@@ -4775,6 +4777,9 @@ class EquipIndexView(APIView):
                 # TODO 还需减去投料时的间隔时间（生产车次总和*该规格投料间隔时间）
                 t0 = int(mixin_time_dict.get(equip_no).total_seconds() / 60) if mixin_time_dict.get(equip_no) else 0
                 halt_time = int(total_time - t0)
+                last_trains_feedback = TrainsFeedbacks.objects.filter(equip_no=equip_no).order_by('id').last()
+                if last_trains_feedback:
+                    last_running_time = last_trains_feedback.end_time
             else:
                 actual_trains = plan_trains = halt_time = 0
                 try:
@@ -4790,6 +4795,8 @@ class EquipIndexView(APIView):
                         date_time=factory_date).values('starttime', 'stoptime', 'actno', 'state')
                     time_consume = 0
                     for item in plan_list:
+                        if item['state'] == '运行中':
+                            last_running_time = now_time
                         try:
                             finish_no = int(item['actno'])
                         except Exception:
@@ -4798,7 +4805,7 @@ class EquipIndexView(APIView):
                             continue
                         if finish_no > 0:
                             if not item['stoptime'] and item['starttime'] and item['state'] == '运行中':
-                                time_consume += (datetime.now() -
+                                time_consume += (now_time -
                                                  datetime.strptime(item['starttime'], '%Y-%m-%d %H:%M:%S')
                                                  ).total_seconds()
                             elif all([item['starttime'], item['stoptime']]):
@@ -4823,14 +4830,13 @@ class EquipIndexView(APIView):
                 # equip_condition='停机',
                 # work_type='维修',
                 status__in=('已生成', '已指派', '已接单', '已开始'),
-                equip_no=equip_no).order_by('-id').first()
+                equip_no=equip_no).order_by('id').last()
             if not last_apply_order:
                 state = '运行中'
                 error_reason = ''
                 breakdown_time = 0
-                last_trains_feedback = TrainsFeedbacks.objects.filter(equip_no=equip_no).order_by('-end_time').first()
-                if last_trains_feedback:
-                    if (datetime.now() - last_trains_feedback.end_time).total_seconds() / 60 > 30:
+                if last_running_time:
+                    if (now_time - last_running_time).total_seconds() / 60 > 30:
                         state = '生产停机'
                 else:
                     state = '生产停机'
@@ -4859,7 +4865,7 @@ class EquipIndexView(APIView):
                     else:
                         down_st = last_apply_order.repair_start_datetime
                     if not order.repair_end_datetime:
-                        down_et = datetime.now()
+                        down_et = now_time
                     else:
                         down_et = order.repair_end_datetime
                     bk_st.append(down_st)
