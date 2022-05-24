@@ -726,7 +726,7 @@ class EquipWarehouseOrder(AbstractEntity):
     order_id = models.CharField(max_length=64, help_text='单据条码')
     submission_department = models.CharField(max_length=64, help_text='提交部门')
     status = models.PositiveIntegerField(choices=ORDER_STATUS, help_text='状态', default=1)
-    desc = models.TextField(help_text='描述', null=True, blank=True)
+    desc = models.CharField(max_length=256, help_text='描述', null=True, blank=True)
     work_order_no = models.CharField(max_length=64, help_text='工单编号', null=True, blank=True)
     barcode = models.CharField(max_length=64, help_text='领料单据', null=True, blank=True)
     processing_time = models.DateTimeField(help_text='处理时间', null=True, blank=True)

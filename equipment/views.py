@@ -2493,7 +2493,7 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        if instance.status in [1, 4]:
+        if instance.status in [1, 4, 7]:
             self.perform_destroy(instance)
             return Response({"success": True, "message": '删除成功', "data": None})
         raise ValidationError('单据入库中或已入库不能删除')
@@ -2515,7 +2515,7 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
     def get_order_id(self, request):
         state = request.query_params.get('status', '入库')
         if state == '入库':
-            res = EquipWarehouseOrder.objects.filter(created_date__gt=dt.date.today(), status__in=[1, 2, 3]).values(
+            res = EquipWarehouseOrder.objects.filter(created_date__gt=dt.date.today(), status__in=[1, 2, 3, 7]).values(
                 'order_id').last()
             if res:
                 return Response(res['order_id'][:10] + str('%04d' % (int(res['order_id'][11:]) + 1)))
@@ -4734,8 +4734,7 @@ class EquipIndexView(APIView):
         # 密炼时间
         mixin_time_dict = dict(TrainsFeedbacks.objects.filter(
             factory_date=factory_date
-        ).values('equip_no').annotate(
-            t=OSum(F('end_time') - F('begin_time'))/1000000/60).values_list('equip_no', 't'))
+        ).values('equip_no').annotate(t=OSum((F('end_time') - F('begin_time')))).values_list('equip_no', 't'))
 
         # 当日计划与实际数据(密炼设备)
         plan_data = dict(ProductClassesPlan.objects.filter(
@@ -4757,8 +4756,9 @@ class EquipIndexView(APIView):
             'repair_user': '',
             'responsor_user': ''
         }
-        ding_api = DinDinAPI()
-        result = get_staff_status(ding_api, '设备科')
+        # ding_api = DinDinAPI()
+        # result = get_staff_status(ding_api, '设备科')
+        result = []
         if result:
             ret['incharge_user'] = result[0].get('username')
             ret['repair_user'] = result[0].get('username')
@@ -4773,17 +4773,18 @@ class EquipIndexView(APIView):
                 plan_trains = plan_data.get(equip_no, 0)
                 # 总停机时间：工厂日期开始到当前总时间减去密炼生产时间
                 # TODO 还需减去投料时的间隔时间（生产车次总和*该规格投料间隔时间）
-                halt_time = int(total_time - mixin_time_dict.get('ml_equip_no', 0))
+                t0 = int(mixin_time_dict.get(equip_no).total_seconds() / 60) if mixin_time_dict.get(equip_no) else 0
+                halt_time = int(total_time - t0)
             else:
-                actual_trains = plan_trains = halt_time = ''
+                actual_trains = plan_trains = halt_time = 0
                 try:
                     plan_actual_data = Plan.objects.using(equip_no).filter(
                         date_time=factory_date).aggregate(plan_trains=Sum('setno'),
                                                           actual_trains=Sum('actno'))
                     # 称量实际车次
-                    actual_trains = plan_actual_data.get('actual_trains', 0)
+                    actual_trains = plan_actual_data['actual_trains'] if plan_actual_data['actual_trains'] else 0
                     # 称量计划车次
-                    plan_trains = plan_actual_data.get('plan_trains', 0)
+                    plan_trains = plan_actual_data['plan_trains'] if plan_actual_data['plan_trains'] else 0
                     # 计算所有计划开始结束时间累加
                     plan_list = Plan.objects.using(equip_no).filter(
                         date_time=factory_date).values('starttime', 'stoptime', 'actno', 'state')
@@ -4814,32 +4815,60 @@ class EquipIndexView(APIView):
             # 待执行数量
             to_executed_order_num = apply_data_dict.get('{}-{}'.format(equip_no, '已接单'), 0)
             # 待验收数量
-            to_check_order_num = apply_data_dict.get('{}-{}'.format(equip_no, '已开始'), 0) + \
-                                 apply_data_dict.get('{}-{}'.format(equip_no, '已完成'), 0)
+            to_check_order_num = apply_data_dict.get('{}-{}'.format(equip_no, '已完成'), 0)
             is_repairing = False
 
             # 取最后一条报修单
             last_apply_order = EquipApplyOrder.objects.filter(
-                equip_condition='停机',
-                work_type='维修',
+                # equip_condition='停机',
+                # work_type='维修',
                 status__in=('已生成', '已指派', '已接单', '已开始'),
                 equip_no=equip_no).order_by('-id').first()
             if not last_apply_order:
                 state = '运行中'
                 error_reason = ''
                 breakdown_time = 0
+                last_trains_feedback = TrainsFeedbacks.objects.filter(equip_no=equip_no).order_by('-end_time').first()
+                if last_trains_feedback:
+                    if (datetime.now() - last_trains_feedback.end_time).total_seconds() / 60 > 30:
+                        state = '生产停机'
+                else:
+                    state = '生产停机'
             else:
                 state = '设备故障'
-                if last_apply_order.fault_datetime <= datetime.strptime(begin_time, '%Y-%m-%d %H:%M:%S'):
-                    down_st = datetime.strptime(begin_time, '%Y-%m-%d %H:%M:%S')
-                else:
-                    down_st = last_apply_order.fault_datetime
-                # 设备故障停机时间
-                # TODO 现在这样计算不对
-                breakdown_time = (datetime.now() - down_st).total_seconds() // 60
+                breakdown_time = 0
                 if last_apply_order.status == '已开始':
                     is_repairing = True
+                if last_apply_order.equip_condition == '停机':
+                    state = '故障停机'
                 error_reason = last_apply_order.result_fault_cause
+
+                # 设备故障停机时间
+                orders = EquipApplyOrder.objects.filter(
+                    equip_no=equip_no,
+                    equip_condition='停机',
+                    repair_start_datetime__isnull=False).filter(
+                    Q(repair_end_datetime__isnull=True) |
+                    Q(repair_end_datetime__gt=begin_time)
+                )
+                bk_st = []
+                bk_et = []
+                for order in orders:
+                    if order.repair_start_datetime <= datetime.strptime(begin_time, '%Y-%m-%d %H:%M:%S'):
+                        down_st = datetime.strptime(begin_time, '%Y-%m-%d %H:%M:%S')
+                    else:
+                        down_st = last_apply_order.repair_start_datetime
+                    if not order.repair_end_datetime:
+                        down_et = datetime.now()
+                    else:
+                        down_et = order.repair_end_datetime
+                    bk_st.append(down_st)
+                    bk_et.append(down_et)
+                if bk_st and bk_et:
+                    breakdown_time = int((max(bk_et) - min(bk_st)).total_seconds()/60)
+            if halt_time < 0:
+                halt_time = 0
+                breakdown_time = 0
             data = {
                 'equip_no': equip_no,
                 'equip_catetory': equip_cat,
