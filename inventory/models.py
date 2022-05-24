@@ -143,7 +143,7 @@ class WmsInventoryStock(models.Model):
     total_weight = models.DecimalField(max_digits=18, decimal_places=2, db_column='WeightOfActual')
     material_no = models.CharField(max_length=64, db_column='MaterialCode')
     location = models.CharField(max_length=255, db_column='SpaceId')
-    unit = models.CharField(max_length=64, db_column='WeightUnit')
+    unit = models.CharField(max_length=64, db_column='StandardUnit')
     quality_status = models.IntegerField(db_column='StockDetailState')
     # material_type = models.CharField(max_length=64)
     batch_no = models.CharField(max_length=64, db_column='BatchNo')
@@ -1224,3 +1224,33 @@ class MaterialOutboundOrder(models.Model):
     class Meta:
         db_table = 'material_outbound_order'
         verbose_name_plural = verbose_name = '胶片库存每日统计'
+
+
+class HfBakeMaterialSet(models.Model):
+    material_name = models.CharField(max_length=128, help_text='原材料名称', unique=True)
+    temperature_set = models.IntegerField(help_text='烘烤温度[0-100]')
+    bake_time = models.DecimalField(max_digits=4, decimal_places=1, help_text='烘烤时长[0.0-200.0]')
+    delete_flag = models.BooleanField(default=False, help_text='物料是否删除')
+    created_date = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
+    opera_username = models.CharField(max_length=16, help_text='操作人')
+    last_updated_date = models.DateTimeField(verbose_name='创建时间', auto_now=True)
+
+    class Meta:
+        db_table = 'hf_bake_material_set'
+        verbose_name_plural = verbose_name = '原材料烘烤温度以及时长设置'
+
+
+class HfBakeLog(models.Model):
+    oast_no = models.CharField(max_length=8, help_text='烘箱编号')
+    material_name = models.CharField(max_length=512, help_text='烘烤物料')
+    temperature_set = models.IntegerField(help_text='设定烘烤温度', null=True, blank=True)
+    bake_time = models.DecimalField(max_digits=4, decimal_places=1, help_text='设定烘烤时长', null=True, blank=True)
+    actual_temperature = models.IntegerField(help_text='实际烘烤温度', null=True, blank=True)
+    actual_bake_time = models.CharField(max_length=16, help_text='实际烘烤时长', null=True, blank=True)
+    created_date = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
+    opera_username = models.CharField(max_length=16, help_text='操作人')
+    last_updated_date = models.DateTimeField(verbose_name='创建时间', auto_now=True)
+
+    class Meta:
+        db_table = 'hf_bake_log'
+        verbose_name_plural = verbose_name = '烘房烘烤履历'

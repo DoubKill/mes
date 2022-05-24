@@ -333,12 +333,12 @@ def material_out_barcode(bar_code):
         try:
             PH = wms_info.batch_no
             SCRQ = wms_info.batch_no[:8]
-            SM_CREATE = f'{PH[:4]}-{PH[4:6]}-{PH[6:8]} {PH[8:10]}:{PH[10:12]}:00'
+            SM_CREATE = f'{PH[:4]}-{PH[4:6]}-{PH[6:8]} {PH[8:10]}:{PH[10:12]}:00' if len(PH) > 8 else f'{PH[:4]}-{PH[4:6]}-{PH[6:8]} 00:00:00'
             DDH = f'RKD{SCRQ}001'
             SYQX = (datetime.strptime(SM_CREATE, '%Y-%m-%d %H:%M:%S') + timedelta(days=364)).strftime('%Y-%m-%d')
-            ret = {'wlxxid': wms_info.material_no, 'tmh': bar_code, 'bzdw': wms_info.standard_unit, 'sl': wms_info.piece_count,
-                   'zl': wms_info.weight, 'scrq': SCRQ, 'tofac': 'AJ1', 'sm_create': SM_CREATE, 'wldwmc': wms_info.supplier,
-                   'wlmc': wms_info.material_name, 'cd': '', 'syqx': SYQX, 'ph': PH, 'ddh': DDH, 'zsl': wms_info.zc_num}
+            ret = {'WLXXID': wms_info.material_no, 'TMH': bar_code, 'BZDW': wms_info.standard_unit, 'SL': wms_info.piece_count,
+                   'ZL': wms_info.weight, 'SCRQ': SCRQ, 'TOFAC': 'AJ1', 'SM_CREATE': SM_CREATE, 'WLDWMC': wms_info.supplier,
+                   'WLMC': wms_info.material_name, 'CD': '', 'SYQX': SYQX, 'PH': PH, 'DDH': DDH, 'ZSL': wms_info.zc_num}
         except Exception as e:
             flag = True
     else:
@@ -346,7 +346,7 @@ def material_out_barcode(bar_code):
     if flag:
         url = 'http://10.1.10.157:9091/WebService.asmx?wsdl'
         try:
-            client = Client(url)
+            client = Client(url, timeout=2)
             json_data = {"tofac": "AJ1", "tmh": bar_code}
             data = client.service.FindZcdtmList(json.dumps(json_data))
         except Exception as e:

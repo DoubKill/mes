@@ -27,7 +27,7 @@ from terminal.models import EquipOperationLog, WeightBatchingLog, FeedingLog, We
     ReportWeight, LoadTankMaterialLog, PackageExpire, RecipeMaterial, CarbonTankFeedWeightSet, \
     FeedingOperationLog, CarbonTankFeedingPrompt, PowderTankSetting, OilTankSetting, ReplaceMaterial, ReturnRubber, \
     ToleranceRule, WeightPackageManual, WeightPackageManualDetails, WeightPackageSingle, OtherMaterialLog, \
-    WeightPackageWms, MachineManualRelation, WeightPackageLogDetails, WeightPackageLogManualDetails
+    WeightPackageWms, MachineManualRelation, WeightPackageLogDetails, WeightPackageLogManualDetails, WmsAddPrint
 from terminal.utils import TankStatusSync, CLSystem, material_out_barcode, get_tolerance, get_common_equip
 
 logger = logging.getLogger('send_log')
@@ -188,14 +188,24 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 material_no = material_name
                 total_weight = single.package_count * single.split_num if single.batching_type == '配方' else single.package_count
                 unit = '包'
+        elif bra_code.startswith('WMS'):
+            wms = WmsAddPrint.objects.filter(bra_code=bra_code).first()
+            if wms:
+                scan_material = wms.material_name
+                # 查询配方中对应名称[扫码:环保型塑解剂, 群控: 环保型塑解剂-C]
+                mes_recipe = {i[:-2]: i for i in materials if i.endswith('-C') or i.endswith('-X')}
+                material_name = mes_recipe[wms.material_name] if wms.material_name in mes_recipe else wms.material_name
+                material_no = material_name
+                total_weight = wms.single_weight
+                unit = 'KG'
         else:  # 总厂胶块:查原材料出库履历查到原材料物料编码
             try:
                 res = material_out_barcode(bra_code) if not settings.DEBUG else None
             except Exception as e:
                 raise serializers.ValidationError(e)
             if res:
-                scan_material = res.get('wlmc')
-                material_name_set = set(ERPMESMaterialRelation.objects.filter(zc_material__wlxxid=res['wlxxid'], use_flag=True).values_list('material__material_name', flat=True))
+                scan_material = res.get('WLMC')
+                material_name_set = set(ERPMESMaterialRelation.objects.filter(zc_material__wlxxid=res['WLXXID'], use_flag=True).values_list('material__material_name', flat=True))
                 if not material_name_set:
                     raise serializers.ValidationError('该物料未与MES原材料建立绑定关系！')
                 cnt_names = [i.get('material__material_name') for i in cnt_type_details]
@@ -225,8 +235,8 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 else:  # 胶块替代(1、不能通过直接绑定erp替代; 2、增加这段逻辑确保替代胶块能走到下面物料是否在配方中判断)
                     material_name = scan_material
                     material_no = scan_material
-                total_weight = res.get('zl')
-                unit = res.get('bzdw')
+                total_weight = res.get('ZL')
+                unit = res.get('BZDW')
         if not material_name:
             raise serializers.ValidationError('未找到该条形码信息！')
         attrs['equip_no'] = classes_plan.equip.equip_no
@@ -266,40 +276,40 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                 if s_id.id < query_set.first().id:
                                     # 硫磺在前, 只能投加硫料
                                     if add_s:
-                                        other_type, status, scan_material_msg = f'{scan_material_type}掺料', True, f'物料:{scan_material} 扫码成功'
+                                        other_type, status, scan_material_msg = recipe_material_name, True, f'掺料:{scan_material} 扫码成功'
                                     else:
-                                        other_type, scan_material_msg = f'{scan_material_type}掺料', '扫码失败: 请投入加硫料'
+                                        other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入加硫料'
                                 else:
                                     if add_s:
-                                        other_type, scan_material_msg = f'{scan_material_type}掺料', '扫码失败: 请投入无硫料'
+                                        other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入无硫料'
                                     else:
-                                        other_type, status, scan_material_msg = f'{scan_material_type}掺料', True, f'物料:{scan_material} 扫码成功'
+                                        other_type, status, scan_material_msg = recipe_material_name, True, f'掺料:{scan_material} 扫码成功'
                             else:  # 有掺料无硫磺
                                 if add_s:
-                                    other_type, status, scan_material_msg = f'{scan_material_type}掺料', True, f'物料:{scan_material} 扫码成功'
+                                    other_type, status, scan_material_msg = recipe_material_name, True, f'掺料:{scan_material} 扫码成功'
                                 else:
-                                    other_type, scan_material_msg = f'{scan_material_type}掺料', '扫码失败: 请投入加硫料'
+                                    other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入加硫料'
                         else:  # 加硫待处理料、无硫待处理料、前两者都有
                             add_s_wait_s = query_set.filter(material__material_name__icontains='加硫待处理料')
                             no_s_wait_s = query_set.filter(material__material_name__icontains='无硫待处理料')
                             if add_s_wait_s and not no_s_wait_s:
                                 if add_s:
-                                    other_type, status, scan_material_msg = '待处理料', True, f'待处理物料:{scan_material}扫码成功'
+                                    other_type, status, scan_material_msg = recipe_material_name, True, f'待处理物料:{scan_material}扫码成功'
                                 else:
-                                    other_type, scan_material_msg = f'{scan_material_type}待处理料', '扫码失败: 请投入加硫料'
+                                    other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入加硫料'
                             elif no_s_wait_s and not add_s_wait_s:
                                 if add_s:
-                                    other_type, scan_material_msg = f'{scan_material_type}待处理料', '扫码失败: 请投入无硫料'
+                                    other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入无硫料'
                                 else:
-                                    other_type, status, scan_material_msg = '待处理料', True, f'待处理物料:{scan_material}扫码成功'
+                                    other_type, status, scan_material_msg = recipe_material_name, True, f'待处理物料:{scan_material}扫码成功'
                             else:
-                                other_type, status, scan_material_msg = '待处理料', True, f'待处理物料:{scan_material}扫码成功'
+                                other_type, status, scan_material_msg = recipe_material_name, True, f'待处理物料:{scan_material}扫码成功'
                     else:
                         # 加硫禁止投料
                         if add_s:
-                            other_type, scan_material_msg = f'{scan_material_type}{recipe_material_name}', '扫码失败: 请投入无硫料'
+                            other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入无硫料'
                         else:
-                            other_type, status, scan_material_msg = f'{scan_material_type}{recipe_material_name}', True, f'物料:{scan_material} 扫码成功'
+                            other_type, status, scan_material_msg = recipe_material_name, True, f'物料:{scan_material} 扫码成功'
                 else:
                     scan_material_msg = '配方中无掺料, 所投物料不在配方中'
                 if not OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code, status=status, other_type=other_type):
@@ -805,14 +815,14 @@ class WeightBatchingLogCreateSerializer(BaseModelSerializer):
                     raise serializers.ValidationError(e)
             if not res:
                 raise serializers.ValidationError('未找到条码对应信息')
-            scan_material = res.get('wlmc')
+            scan_material = res.get('WLMC')
             material_name_set = set(ERPMESMaterialRelation.objects.filter(
-                zc_material__wlxxid=res['wlxxid'],
+                zc_material__wlxxid=res['WLXXID'],
                 use_flag=True
             ).values_list('material__material_name', flat=True))
             if not material_name_set:
                 raise serializers.ValidationError('该物料未与MES原材料建立绑定关系！')
-            init_count = res.get('sl', 0)
+            init_count = res.get('SL', 0)
             # 查看条码数量是否用完
         used_num = WeightBatchingLog.objects.filter(bra_code=bra_code, status=1).count()
         if used_num >= init_count:
@@ -1179,7 +1189,12 @@ class WeightPackageLogSerializer(BaseModelSerializer):
         # 最新打印数据
         last_instance = WeightPackageLog.objects.filter(plan_weight_uid=instance.plan_weight_uid).last()
         res['order_flag'] = True if last_instance.bra_code == res['bra_code'] and res['noprint_count'] != 0 else False
-        res.update({'next_package_count': last_instance.package_count})
+        # 已使用数量
+        used_trains = 0
+        load_tank = LoadTankMaterialLog.objects.filter(bra_code=res['bra_code']).order_by('id').last()
+        if load_tank:
+            used_trains = res['package_count'] if load_tank.useup_time.year == 1970 or load_tank.actual_weight >= res['package_count'] else load_tank.actual_weight
+        res.update({'next_package_count': last_instance.package_count, 'used_trains': used_trains})
         return res
 
     class Meta:
@@ -1352,6 +1367,42 @@ class WeightPackageSingleSerializer(BaseModelSerializer):
         read_only_fields = ['bra_code', 'batch_group', 'batch_class']
 
 
+class WmsAddPrintSerializer(BaseModelSerializer):
+
+    @atomic
+    def create(self, validated_data):
+        map_list = {"早班": '1', "中班": '2', "夜班": '3'}
+        now_date = datetime.now().replace(microsecond=0)
+        # 班次, 班组
+        batch_class = '早班' if '08:00:00' <= str(now_date)[-8:] < '20:00:00' else '夜班'
+        record = WorkSchedulePlan.objects.filter(plan_schedule__day_time=str(now_date.date()),
+                                                 classes__global_name=batch_class,
+                                                 plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
+        batch_group = record.group.global_name if record else ''
+        prefix = f"WMS{now_date.date().strftime('%Y%m%d')}{map_list.get(batch_class)}"
+        max_code = WmsAddPrint.objects.filter(bra_code__startswith=prefix).aggregate(max_code=Max('bra_code'))['max_code']
+        bra_code = prefix + ('%04d' % (int(max_code[-4:]) + 1) if max_code else '0001')
+        validated_data.update({'batch_class': batch_class, 'batch_group': batch_group, 'bra_code': bra_code,
+                               'print_datetime': now_date, 'print_flag': True,
+                               'ip_address': self.context['request'].META.get('REMOTE_ADDR')})
+        return super().create(validated_data)
+
+    @atomic
+    def update(self, instance, validated_data):
+        now_date = datetime.now().replace(microsecond=0)
+        if instance.print_flag == 1:
+            raise serializers.ValidationError('打印尚未完成, 请稍后重试')
+        validated_data.update({'print_flag': True, 'last_updated_date': now_date, 'print_datetime': now_date,
+                               'ip_address': self.context['request'].META.get('REMOTE_ADDR'),
+                               'last_updated_user': self.context['request'].user, })
+        return super().update(instance, validated_data)
+
+    class Meta:
+        model = WmsAddPrint
+        fields = '__all__'
+        read_only_fields = ['bra_code', 'batch_group', 'batch_class']
+
+
 class WeightPackagePlanSerializer(BaseModelSerializer):
     plan_weight_uid = serializers.ReadOnlyField(source='planid')
     product_no = serializers.ReadOnlyField(source='recipe')
@@ -1372,6 +1423,7 @@ class WeightPackagePlanSerializer(BaseModelSerializer):
     begin_trains = serializers.ReadOnlyField(default='')
     end_trains = serializers.ReadOnlyField(default='')
     batch_classes = serializers.ReadOnlyField(source='grouptime')
+    used_trains = serializers.ReadOnlyField(default=0)
 
     def to_representation(self, instance):
         res = super().to_representation(instance)
@@ -1393,7 +1445,7 @@ class WeightPackagePlanSerializer(BaseModelSerializer):
         fields = ['id', 'plan_weight_uid', 'product_no', 'plan_weight', 'batch_time', 'noprint_count', 'package_fufil',
                   'print_flag', 'package_plan_count', 'dev_type', 'bra_code', 'record', 'package_count', 'status',
                   'print_begin_trains', 'equip_no', 'batch_group', 'begin_trains', 'end_trains', 'batch_classes', 'oper',
-                  'merge_flag', 'starttime']
+                  'merge_flag', 'starttime', 'used_trains']
 
 
 class WeightPackageRetrieveLogSerializer(BaseModelSerializer):

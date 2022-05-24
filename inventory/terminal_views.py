@@ -132,10 +132,10 @@ class SulfurAutoPlanViewSet(GenericViewSet, ListModelMixin, CreateModelMixin):
             state = serializer.validated_data.get('state')
 
             try:
-                name = ret['wlmc']
-                provider = ret['wldwmc']
-                ZL = ret['zl']  # 重量
-                SL = ret['sl']  # 数量
+                name = ret['WLMC']
+                provider = ret['WLDWMC']
+                ZL = ret['ZL']  # 重量
+                SL = ret['SL']  # 数量
             except:
                 return self.results(False, '原材料数据有误！')
 

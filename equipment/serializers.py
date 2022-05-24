@@ -22,6 +22,7 @@ from equipment.models import EquipDownType, EquipDownReason, EquipCurrentStatus,
 
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
+from system.models import User
 
 
 class EquipRealtimeSerializer(BaseModelSerializer):
@@ -968,12 +969,15 @@ class EquipApplyRepairSerializer(BaseModelSerializer):
     part_name = serializers.ReadOnlyField(source='equip_part_new.part_name', help_text='部位名称')
     result_fault_cause_name = serializers.ReadOnlyField(source='result_fault_cause', help_text='故障原因名称')
     image_url_list = serializers.ListField(help_text='报修图片地址列表', write_only=True, default=[])
+    video_url_list = serializers.ListField(help_text='报修视频地址列表', write_only=True, default=[])
     inspection_order = serializers.IntegerField(default=None)
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
         apply_repair_graph_url = ret.get('apply_repair_graph_url') if ret.get('apply_repair_graph_url') else '[]'
-        ret.update({'apply_repair_graph_url': json.loads(apply_repair_graph_url)})
+        apply_repair_video_url = ret.get('apply_repair_video_url') if ret.get('apply_repair_video_url') else '[]'
+        ret.update({'apply_repair_graph_url': json.loads(apply_repair_graph_url),
+                    'apply_repair_video_url': json.loads(apply_repair_video_url)})
         return ret
 
     @atomic
@@ -985,6 +989,7 @@ class EquipApplyRepairSerializer(BaseModelSerializer):
         validated_data.update({
             'plan_id': f'BX{now_time}{sequence}', 'status': '已生成',
             'apply_repair_graph_url': json.dumps(validated_data.pop('image_url_list')),
+            'apply_repair_video_url': json.dumps(validated_data.pop('video_url_list')),
             'plan_name': f"{validated_data['plan_department']}{f'BX{now_time}{sequence}'}"
         })
         # 生成维修计划
@@ -1006,6 +1011,7 @@ class EquipApplyRepairSerializer(BaseModelSerializer):
                             'status': '已生成', 'equip_condition': validated_data['equip_condition'],
                             'importance_level': validated_data.get('importance_level', '高'),
                             'created_user': self.context['request'].user,
+                            'fault_datetime': validated_data.get('fault_datetime'),
                             'result_fault_cause': validated_data.get('result_fault_cause'),
                             'planned_repair_date': str(datetime.now().date())}
         if validated_data.get('equip_part_new'):
@@ -1061,6 +1067,7 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
     equip_type = serializers.SerializerMethodField(help_text='设备机型')
     work_content = serializers.ListField(help_text='实际维修标准列表', write_only=True, default=[])
     image_url_list = serializers.ListField(help_text='图片列表', write_only=True, default=[])
+    video_url_list = serializers.ListField(help_text='视频列表', write_only=True, default=[])
     apply_material_list = EquipRepairMaterialReqSerializer(help_text='申请物料列表', write_only=True, many=True, default=[])
     repair_users = serializers.SerializerMethodField(help_text='维修人')
 
@@ -1081,8 +1088,12 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
         work_content = []
         result_repair_graph_url = res.get('result_repair_graph_url') if res.get('result_repair_graph_url') else '[]'
         result_accept_graph_url = res.get('result_accept_graph_url') if res.get('result_accept_graph_url') else '[]'
+        result_repair_video_url = res.get('result_repair_video_url') if res.get('result_repair_video_url') else '[]'
+        result_accept_video_url = res.get('result_accept_video_url') if res.get('result_accept_video_url') else '[]'
         res.update({'result_repair_graph_url': json.loads(result_repair_graph_url),
-                    'result_accept_graph_url': json.loads(result_accept_graph_url)})
+                    'result_accept_graph_url': json.loads(result_accept_graph_url),
+                    'result_repair_video_url': json.loads(result_repair_video_url),
+                    'result_accept_video_url': json.loads(result_accept_video_url)})
         # 是否申请物料
         is_applyed = EquipRepairMaterialReq.objects.filter(work_order_no=res['work_order_no']).first()
         res['is_applyed'] = True if is_applyed else False
@@ -1104,9 +1115,13 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
         res['work_content'] = work_content
         out_order = EquipRepairMaterialReq.objects.filter(work_order_no=res['work_order_no']).first()
         res['warehouse_out_no'] = out_order.warehouse_out_no if out_order else ''
-        # 报修图片
+        # 报修图片/视频
         instance_apply = EquipApplyRepair.objects.filter(plan_id=res.get('plan_id')).first()
-        res['apply_repair_graph_url'] = json.loads(instance_apply.apply_repair_graph_url) if instance_apply else []
+        if instance_apply:
+            res.update({'apply_repair_graph_url': json.loads(instance_apply.apply_repair_graph_url) if instance_apply.apply_repair_graph_url else [],
+                        'apply_repair_video_url': json.loads(instance_apply.apply_repair_video_url) if instance_apply.apply_repair_video_url else []})
+        else:
+            res.update({'apply_repair_graph_url': [], 'apply_repair_video_url': []})
         # 区域位置
         bom_obj = EquipBom.objects.filter(equip_info__equip_no=res.get('equip_no')).first()
         res['are_name'] = bom_obj.equip_area_define.area_name if bom_obj and bom_obj.equip_area_define else ''
@@ -1114,6 +1129,9 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
         prod = GlobalCode.objects.filter(delete_flag=False, global_type__use_flag=1,
                                          global_type__type_name='设备部门组织名称').first()
         res['product_name'] = prod.global_name if prod else ''
+        # 增加接单人电话
+        receive_user = User.objects.filter(username=res.get('receiving_user')).last()
+        res['receiving_user_phone'] = receive_user.phone_number if receive_user else ''
         # 判读这个单的接单人是不是本人
         status = res['status']
         username = self.context['request'].user.username
@@ -1133,6 +1151,7 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
         work_type = instance.work_type
         work_content = validated_data.pop('work_content')
         image_url_list = validated_data.pop('image_url_list')
+        video_url_list = validated_data.pop('video_url_list')
         apply_material_list = validated_data.pop('apply_material_list')
         # 更新作业内容
         if work_type == "维修":
@@ -1148,7 +1167,8 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
             for item in work_content:
                 item.update({'work_type': instance.work_type, 'work_order_no': instance.work_order_no})
                 EquipResultDetail.objects.create(**item)
-        validated_data['result_repair_graph_url'] = json.dumps(image_url_list)
+        validated_data.update({'result_repair_graph_url': json.dumps(image_url_list),
+                               'result_repair_video_url': json.dumps(video_url_list)})
         for apply_material in apply_material_list:
             EquipRepairMaterialReq.objects.create(**apply_material)
         # 更新报修申请工单状态
@@ -1177,7 +1197,8 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
     class Meta:
         model = EquipApplyOrder
         fields = '__all__'
-        read_only_fields = ['result_repair_graph_url', 'result_accept_graph_url']
+        read_only_fields = ['result_repair_graph_url', 'result_accept_graph_url', 'result_repair_video_url',
+                            'result_accept_video_url']
 
 
 class EquipApplyOrderExportSerializer(BaseModelSerializer):
@@ -1213,6 +1234,7 @@ class EquipInspectionOrderSerializer(BaseModelSerializer):
     equip_type = serializers.SerializerMethodField(help_text='设备机型')
     work_content = serializers.ListField(help_text='实际巡检标准列表', write_only=True, default=[])
     image_url_list = serializers.ListField(help_text='图片列表', write_only=True, default=[])
+    video_url_list = serializers.ListField(help_text='视频列表', write_only=True, default=[])
     plan_name = serializers.CharField(max_length=64, help_text='巡检计划名称', validators=[
         UniqueValidator(queryset=EquipInspectionOrder.objects.all(), message='巡检计划名称已存在')
     ])
@@ -1234,7 +1256,9 @@ class EquipInspectionOrderSerializer(BaseModelSerializer):
         res = super().to_representation(instance)
         work_content = []
         result_repair_graph_url = res.get('result_repair_graph_url') if res.get('result_repair_graph_url') else '[]'
-        res.update({'result_repair_graph_url': json.loads(result_repair_graph_url)})
+        result_repair_video_url = res.get('result_repair_video_url') if res.get('result_repair_video_url') else '[]'
+        res.update({'result_repair_graph_url': json.loads(result_repair_graph_url),
+                    'result_repair_video_url': json.loads(result_repair_video_url)})
         instance = EquipMaintenanceStandardWork.objects.filter(id=res.get('equip_maintenance_standard_work')).first()
 
         if instance:
@@ -1277,6 +1301,9 @@ class EquipInspectionOrderSerializer(BaseModelSerializer):
         prod = GlobalCode.objects.filter(delete_flag=False, global_type__use_flag=1,
                                          global_type__type_name='设备部门组织名称').first()
         res['product_name'] = prod.global_name if prod else ''
+        # 增加接单人电话
+        receive_user = User.objects.filter(username=res.get('receiving_user')).last()
+        res['receiving_user_phone'] = receive_user.phone_number if receive_user else ''
         # 判读这个单的接单人是不是本人
         status = res['status']
         username = self.context['request'].user.username
@@ -1292,7 +1319,6 @@ class EquipInspectionOrderSerializer(BaseModelSerializer):
     @atomic
     def create(self, validated_data):
         work_content = validated_data.pop('work_content')
-        image_url_list = validated_data.pop('image_url_list')
         # 生成巡检计划号
         now_time = ''.join(str(datetime.now().date()).split('-'))
         max_code = EquipInspectionOrder.objects.aggregate(max_code=Max('plan_id'))['max_code']
@@ -1321,8 +1347,20 @@ class UploadImageSerializer(BaseModelSerializer):
 
     def to_representation(self, instance):
         res = super().to_representation(instance)
-        res['image_file_name'] = instance.image_file_name.url
+        if res.get('image_file_name'):
+            res['image_file_name'] = instance.image_file_name.url
+        else:
+            res['video_file_name'] = instance.video_file_name.url
         return res
+
+    def validate(self, attrs):
+        image_file_name = attrs.get('image_file_name')
+        video_file_name = attrs.get('video_file_name')
+        if image_file_name and round(image_file_name.size / 1024 / 1024, 2) > 5:
+            raise serializers.ValidationError('图片大小不能超过10M')
+        if video_file_name and round(video_file_name.size / 1024 / 1024, 2) > 10:
+            raise serializers.ValidationError('视频大小不能超过50M')
+        return attrs
 
     class Meta:
         model = UploadImage

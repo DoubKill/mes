@@ -336,17 +336,18 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
                             's_feed_name': stage_product_batch_no.replace(instance.stage.global_name, feeds['s_feed']),
                             'f_ratio': ratios['f_ratio'], 's_ratio': ratios['s_ratio'], 'f_weight': f_weight, 's_weight': s_weight}
             ProductBatchingMixed.objects.create(**created_data)
-        try:
-            material_type = GlobalCode.objects.filter(global_type__type_name='原材料类别',
-                                                      global_name=instance.stage.global_name).first()
-            Material.objects.get_or_create(
-                material_no=instance.stage_product_batch_no,
-                material_name=instance.stage_product_batch_no,
-                material_type=material_type,
-                created_user=self.context['request'].user
-            )
-        except Exception as e:
-            pass
+        if not mes_recipe_name.endswith('_NEW'):
+            try:
+                material_type = GlobalCode.objects.filter(global_type__type_name='原材料类别',
+                                                          global_name=instance.stage.global_name).first()
+                Material.objects.get_or_create(
+                    material_no=instance.stage_product_batch_no,
+                    material_name=instance.stage_product_batch_no,
+                    material_type=material_type,
+                    created_user=self.context['request'].user
+                )
+            except Exception as e:
+                pass
         instance.save()
         return instance
 
