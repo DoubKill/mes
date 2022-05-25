@@ -28,7 +28,7 @@ from terminal.models import EquipOperationLog, WeightBatchingLog, FeedingLog, We
     FeedingOperationLog, CarbonTankFeedingPrompt, PowderTankSetting, OilTankSetting, ReplaceMaterial, ReturnRubber, \
     ToleranceRule, WeightPackageManual, WeightPackageManualDetails, WeightPackageSingle, OtherMaterialLog, \
     WeightPackageWms, MachineManualRelation, WeightPackageLogDetails, WeightPackageLogManualDetails, WmsAddPrint
-from terminal.utils import TankStatusSync, CLSystem, material_out_barcode, get_tolerance, get_common_equip
+from terminal.utils import TankStatusSync, CLSystem, material_out_barcode, get_tolerance, get_common_equip, get_real_ip
 
 logger = logging.getLogger('send_log')
 
@@ -983,7 +983,7 @@ class WeightPackageLogCreateSerializer(serializers.ModelSerializer):
         attrs.update({'bra_code': bra_code, 'begin_trains': print_begin_trains, 'material_no': product_no,
                       'material_name': product_no, 'noprint_count': package_fufil - package_count, 'expire_days': days,
                       'end_trains': print_begin_trains + package_count - 1, 'print_flag': 1, 'already_print': already_print,
-                      'batch_time': str(batch_time), 'ip_address': self.context['request'].META.get('REMOTE_ADDR')})
+                      'batch_time': str(batch_time), 'ip_address': get_real_ip(self.context['request'].META)})
         return attrs
 
     @atomic
@@ -1209,7 +1209,7 @@ class WeightPackageLogSerializer(BaseModelSerializer):
 class WeightPackageLogUpdateSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
-        validated_data.update({'print_flag': True, 'last_updated_date': datetime.now(), 'ip_address': self.context['request'].META.get('REMOTE_ADDR'),
+        validated_data.update({'print_flag': True, 'last_updated_date': datetime.now(), 'ip_address': get_real_ip(self.context['request'].META),
                                'last_updated_user': self.context['request'].user, 'print_datetime': datetime.now()})
         return super().update(instance, validated_data)
 
@@ -1282,7 +1282,7 @@ class WeightPackageManualSerializer(BaseModelSerializer):
                                'end_trains': validated_data['begin_trains'] + validated_data['package_count'] - 1,
                                'print_flag': True, 'print_datetime': now_date, 'expire_day': expire_day,
                                'expire_datetime': expire_datetime,
-                               'ip_address': self.context['request'].META.get('REMOTE_ADDR')})
+                               'ip_address': get_real_ip(self.context['request'].META)})
         instance = super().create(validated_data)
         # 添加单配物料详情
         for item in manual_details:
@@ -1296,7 +1296,7 @@ class WeightPackageManualSerializer(BaseModelSerializer):
     def update(self, instance, validated_data):
         if instance.print_flag == 1:
             raise serializers.ValidationError('打印尚未完成, 请稍后重试')
-        validated_data.update({'print_flag': True, 'last_updated_date': datetime.now(), 'ip_address': self.context['request'].META.get('REMOTE_ADDR'),
+        validated_data.update({'print_flag': True, 'last_updated_date': datetime.now(), 'ip_address': get_real_ip(self.context['request'].META),
                                'last_updated_user': self.context['request'].user, 'print_datetime': datetime.now()})
         return super().update(instance, validated_data)
 
@@ -1351,13 +1351,13 @@ class WeightPackageSingleSerializer(BaseModelSerializer):
                                'end_trains': validated_data['begin_trains'] + validated_data['package_count'] - 1,
                                'print_flag': True, 'print_datetime': now_date,
                                'expire_datetime': now_date + timedelta(days=expire_day),
-                               'ip_address': self.context['request'].META.get('REMOTE_ADDR')})
+                               'ip_address': get_real_ip(self.context['request'].META)})
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
         if instance.print_flag == 1:
             raise serializers.ValidationError('打印尚未完成, 请稍后重试')
-        validated_data.update({'print_flag': True, 'last_updated_date': datetime.now(), 'ip_address': self.context['request'].META.get('REMOTE_ADDR'),
+        validated_data.update({'print_flag': True, 'last_updated_date': datetime.now(), 'ip_address': get_real_ip(self.context['request'].META),
                                'last_updated_user': self.context['request'].user, 'print_datetime': datetime.now()})
         return super().update(instance, validated_data)
 
@@ -1384,7 +1384,7 @@ class WmsAddPrintSerializer(BaseModelSerializer):
         bra_code = prefix + ('%04d' % (int(max_code[-4:]) + 1) if max_code else '0001')
         validated_data.update({'batch_class': batch_class, 'batch_group': batch_group, 'bra_code': bra_code,
                                'print_datetime': now_date, 'print_flag': True,
-                               'ip_address': self.context['request'].META.get('REMOTE_ADDR')})
+                               'ip_address': get_real_ip(self.context['request'].META)})
         return super().create(validated_data)
 
     @atomic
@@ -1393,7 +1393,7 @@ class WmsAddPrintSerializer(BaseModelSerializer):
         if instance.print_flag == 1:
             raise serializers.ValidationError('打印尚未完成, 请稍后重试')
         validated_data.update({'print_flag': True, 'last_updated_date': now_date, 'print_datetime': now_date,
-                               'ip_address': self.context['request'].META.get('REMOTE_ADDR'),
+                               'ip_address': get_real_ip(self.context['request'].META),
                                'last_updated_user': self.context['request'].user, })
         return super().update(instance, validated_data)
 
