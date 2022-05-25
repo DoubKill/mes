@@ -946,7 +946,7 @@ permission_data = [
     {'id': 958, 'code': 'view_material_hf_real_data', 'name': '查看', 'parent_id': 957},
     {'id': 959, 'code': 'outbound_material_hf_real_data', 'name': '出库', 'parent_id': 957},
 
-    {'id': 960, 'code': 'material_add_print', 'name': '通用及原材料卡片补打', 'parent_id': None},
+    {'id': 960, 'code': 'material_add_print', 'name': '(内部)原材料流转卡', 'parent_id': None},
     {'id': 961, 'code': 'view_material_add_print', 'name': '查看', 'parent_id': 960},
     {'id': 962, 'code': 'add_material_add_print', 'name': '新建', 'parent_id': 960},
     {'id': 963, 'code': 'print_material_add_print', 'name': '打印', 'parent_id': 960},
