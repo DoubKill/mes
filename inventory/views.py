@@ -74,7 +74,8 @@ from mes.settings import DEBUG, DATABASES
 from plan.models import ProductClassesPlan, BatchingClassesPlan
 from production.models import PalletFeedbacks, TrainsFeedbacks
 from quality.deal_result import receive_deal_result
-from quality.models import LabelPrint, MaterialDealResult, LabelPrintLog, ExamineMaterial
+from quality.models import LabelPrint, MaterialDealResult, LabelPrintLog, ExamineMaterial, \
+    MaterialSingleTypeExamineResult
 from quality.serializers import MaterialDealResultListSerializer
 from quality.utils import update_wms_quality_result
 from recipe.models import MaterialAttribute
@@ -2690,6 +2691,7 @@ class WmsInventoryStockView(APIView):
     """WMS库存货位信息，参数：material_name=原材料名称&material_no=原材料编号&quality_status=品质状态1合格3不合格&entrance_name=出库口名称"""
     DATABASE_CONF = WMS_CONF
     permission_classes = (IsAuthenticated, )
+    DB = 'WMS'
 
     def get(self, request, *args, **kwargs):
         material_name = self.request.query_params.get('material_name')
@@ -2701,6 +2703,8 @@ class WmsInventoryStockView(APIView):
         batch_no = self.request.query_params.get('batch_no')
         page = self.request.query_params.get('page', 1)
         page_size = self.request.query_params.get('page_size', 15)
+        st_value = self.request.query_params.get('st_value')
+        et_value = self.request.query_params.get('et_value')
         st = (int(page) - 1) * int(page_size)
         et = int(page) * int(page_size)
         extra_where_str = ""
@@ -2752,10 +2756,62 @@ class WmsInventoryStockView(APIView):
             temp = list(filter(lambda x: x[8].startswith('5'), temp))
         elif is_entering == 'N':
             temp = list(filter(lambda x: not x[8].startswith('5'), temp))
+        examine_data = []
+        if st_value or et_value:
+            if all([st_value, et_value]):
+                stock_batch_nos = set([i[3] for i in temp])
+                st_value = float(st_value)
+                et_value = float(et_value)
+                examine_data = MaterialSingleTypeExamineResult.objects.filter(
+                    type__name__icontains='门尼',
+                    value__gte=st_value,
+                    value__lte=et_value,
+                    material_examine_result__material__batch__in=stock_batch_nos
+                ).values('material_examine_result__material__batch',
+                         'material_examine_result__material__wlxxid',
+                         'value')
+            elif st_value:
+                stock_batch_nos = set([i[3] for i in temp])
+                st_value = float(st_value)
+                examine_data = MaterialSingleTypeExamineResult.objects.filter(
+                    type__name__icontains='门尼',
+                    value__gte=st_value,
+                    material_examine_result__material__batch__in=stock_batch_nos
+                ).values('material_examine_result__material__batch',
+                         'material_examine_result__material__wlxxid',
+                         'value')
+            elif et_value:
+                stock_batch_nos = set([i[3] for i in temp])
+                et_value = float(et_value)
+                examine_data = MaterialSingleTypeExamineResult.objects.filter(
+                    type__name__icontains='门尼',
+                    value__lte=et_value,
+                    material_examine_result__material__batch__in=stock_batch_nos
+                ).values('material_examine_result__material__batch',
+                         'material_examine_result__material__wlxxid',
+                         'value')
+            batch_value_dict = {}
+            for i in examine_data:
+                k = '{}+{}'.format(i['material_examine_result__material__batch'],
+                                   i['material_examine_result__material__wlxxid'])
+                batch_value_dict[k] = i['value']
+            temp = list(filter(lambda x: '{}+{}'.format(x[3], x[1]) in batch_value_dict, temp))
         count = len(temp)
         temp = temp[st:et]
         result = []
         for item in temp:
+            ml_test_value = ''
+            if self.DB == 'WMS':
+                if st_value or et_value:
+                    ml_test_value = batch_value_dict.get('{}+{}'.format(item[3], item[1]))
+                else:
+                    examine_result = MaterialSingleTypeExamineResult.objects.filter(
+                        material_examine_result__material__wlxxid=item[1],
+                        material_examine_result__material__batch=item[3],
+                        type__name__icontains='门尼'
+                    ).order_by('id').last()
+                    if examine_result:
+                        ml_test_value = examine_result.value
             result.append(
                 {'StockDetailState': item[0],
                  'MaterialCode': item[1],
@@ -2766,7 +2822,8 @@ class WmsInventoryStockView(APIView):
                  'unit': item[6],
                  'inventory_time': item[7],
                  'position': '内' if item[4][6] in ('1', '2') else '外',
-                 'RFID': item[8]
+                 'RFID': item[8],
+                 'ml_test_value': ml_test_value
                  })
         sc.close()
         return Response({'results': result, "count": count})
@@ -3411,6 +3468,7 @@ class THStorageView(WmsStorageView):
 class THInventoryStockView(WmsInventoryStockView):
     """炭黑库存货位信息，参数：material_name=原材料名称&material_no=原材料编号&quality_status=品质状态1合格3不合格&entrance_name=出库口名称"""
     DATABASE_CONF = TH_CONF
+    DB = 'CB'
 
 
 @method_decorator([api_recorder], name="dispatch")
