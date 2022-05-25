@@ -330,7 +330,8 @@ class UnqualifiedDealOrderCreateSerializer(BaseModelSerializer):
                 }
             else:
                 deal_items[item['ordering']]['trains'].append({"id": item['id'], "train": item['trains'], 'pallet_test_data': pallet_test_data})
-        ret['deal_details'] = list(deal_items.values())
+        details = sorted(list(deal_items.values()), key=lambda x: x['ordering'])
+        ret['deal_details'] = details
         return ret
 
     @atomic()
