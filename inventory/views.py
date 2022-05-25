@@ -2732,7 +2732,20 @@ class WmsInventoryStockView(APIView):
                  dbo.t_inventory_stock AS a
                  INNER JOIN t_inventory_space b ON b.Id = a.StorageSpaceEntityId
                  INNER JOIN t_inventory_material c ON c.MaterialCode= a.MaterialCode
-                 INNER JOIN t_inventory_tunnel d ON d.TunnelCode= a.TunnelId"""
+                 INNER JOIN t_inventory_tunnel d ON d.TunnelCode= a.TunnelId 
+                WHERE
+                 NOT EXISTS ( 
+                     SELECT 
+                            tp.TrackingNumber 
+                     FROM t_inventory_space_plan tp 
+                     WHERE tp.TrackingNumber = a.TrackingNumber ) 
+                 AND d.State= 1 
+                 AND b.SpaceState= 1 
+                 AND a.TunnelId IN ( 
+                     SELECT 
+                            ab.TunnelCode 
+                     FROM t_inventory_entrance_tunnel ab INNER JOIN t_inventory_entrance ac ON ac.Id= ab.EntranceEntityId 
+                     WHERE ac.name= '{}' ) {} order by a.CreaterTime""".format(entrance_name, extra_where_str)
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)
         temp = sc.all()
         if position == '内':
