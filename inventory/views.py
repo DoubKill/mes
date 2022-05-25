@@ -2756,18 +2756,40 @@ class WmsInventoryStockView(APIView):
             temp = list(filter(lambda x: x[8].startswith('5'), temp))
         elif is_entering == 'N':
             temp = list(filter(lambda x: not x[8].startswith('5'), temp))
-        if all([st_value, et_value]):
-            stock_batch_nos = set([i[3] for i in temp])
-            st_value = float(st_value)
-            et_value = float(et_value)
-            examine_data = MaterialSingleTypeExamineResult.objects.filter(
-                type__name__icontains='门尼',
-                value__gte=st_value,
-                value__lte=et_value,
-                material_examine_result__material__batch__in=stock_batch_nos
-            ).values('material_examine_result__material__batch',
-                     'material_examine_result__material__wlxxid',
-                     'value')
+        examine_data = []
+        if st_value or et_value:
+            if all([st_value, et_value]):
+                stock_batch_nos = set([i[3] for i in temp])
+                st_value = float(st_value)
+                et_value = float(et_value)
+                examine_data = MaterialSingleTypeExamineResult.objects.filter(
+                    type__name__icontains='门尼',
+                    value__gte=st_value,
+                    value__lte=et_value,
+                    material_examine_result__material__batch__in=stock_batch_nos
+                ).values('material_examine_result__material__batch',
+                         'material_examine_result__material__wlxxid',
+                         'value')
+            elif st_value:
+                stock_batch_nos = set([i[3] for i in temp])
+                st_value = float(st_value)
+                examine_data = MaterialSingleTypeExamineResult.objects.filter(
+                    type__name__icontains='门尼',
+                    value__gte=st_value,
+                    material_examine_result__material__batch__in=stock_batch_nos
+                ).values('material_examine_result__material__batch',
+                         'material_examine_result__material__wlxxid',
+                         'value')
+            elif et_value:
+                stock_batch_nos = set([i[3] for i in temp])
+                et_value = float(et_value)
+                examine_data = MaterialSingleTypeExamineResult.objects.filter(
+                    type__name__icontains='门尼',
+                    value__lte=et_value,
+                    material_examine_result__material__batch__in=stock_batch_nos
+                ).values('material_examine_result__material__batch',
+                         'material_examine_result__material__wlxxid',
+                         'value')
             batch_value_dict = {}
             for i in examine_data:
                 k = '{}+{}'.format(i['material_examine_result__material__batch'],
@@ -2780,7 +2802,7 @@ class WmsInventoryStockView(APIView):
         for item in temp:
             ml_test_value = ''
             if self.DB == 'WMS':
-                if all([st_value, et_value]):
+                if st_value or et_value:
                     ml_test_value = batch_value_dict.get('{}+{}'.format(item[3], item[1]))
                 else:
                     examine_result = MaterialSingleTypeExamineResult.objects.filter(
