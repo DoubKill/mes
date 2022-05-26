@@ -41,7 +41,8 @@ from equipment.models import EquipTargetMTBFMTTRSetting, EquipWarehouseAreaCompo
 from equipment.serializers import *
 from equipment.serializers import EquipRealtimeSerializer
 from equipment.task import property_template, property_import
-from equipment.utils import gen_template_response, get_staff_status, get_ding_uids, DinDinAPI, get_maintenance_status
+from equipment.utils import gen_template_response, get_staff_status, get_ding_uids, DinDinAPI, get_maintenance_status, \
+    get_children_section
 from mes.common_code import OMin, OMax, OSum, CommonDeleteMixin
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
@@ -2546,6 +2547,8 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
         out_quantity = data.get('out_quantity', 1)
         enter_time = data.get('enter_time', None)
         outer_time = data.get('enter_time', None)
+        receive_user = data.get('receive_user', None)
+        purpose = data.get('purpose', None)
         status = data.get('status')  # 1 入库 2 出库
         instance = self.queryset.filter(equip_warehouse_order_id=data['equip_warehouse_order'], equip_spare_id=data['equip_spare']).first()
         query = EquipWarehouseInventory.objects.filter(equip_spare_id=data['equip_spare'], delete_flag=False,
@@ -2608,6 +2611,9 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
             query.quantity -= out_quantity
             query.save()
             instance.outer_time = outer_time
+            # 记录领用人和用途
+            instance.receive_user = receive_user
+            instance.purpose = purpose
             instance.save()
 
             # 判断出库单据是否完成
@@ -2948,15 +2954,18 @@ class EquipAutoPlanView(APIView):
         get_code = self.request.query_params.get('get_code')
         spare_code = self.request.query_params.get('spare_code')
         order_id = self.request.query_params.get('order_id')
-        if get_code:  # 获取入出库单据接口  1, 入库单据   2, 出库单据
-            if get_code == "1":
-                order = EquipWarehouseOrder.objects.filter(status__in=[1, 2]).values('id', 'order_id')
-            else:
-                order = EquipWarehouseOrder.objects.filter(status__in=[4, 5]).values('id', 'order_id')
-            return Response({"success": True, "message": None, "data": order})
-        if spare_code and order_id:  # 获取入库/出库备件信息
-                order = EquipWarehouseOrderDetail.objects.filter(equip_spare__spare_code=spare_code,
-                                                                 equip_warehouse_order__order_id=order_id, delete_flag=False).first()
+        default_staff = self.request.query_params.get('default_staff')  # 保养组名单
+        if default_staff:
+            init_section = Section.objects.filter(name='保养组').last()
+            if not init_section:
+                return Response({"success": False, "message": "未找到保养组", "data": []})
+            section_list = get_children_section(init_section, include_self=True)
+            res = list(set(User.objects.filter(section__name__in=section_list, is_active=True).values_list('username', flat=True)))
+            return Response({"success": True, "message": "获取保养组成员信息成功", "data": res})
+        if spare_code:  # 获取入库/出库备件信息
+            if order_id:
+                order = EquipWarehouseOrderDetail.objects.filter(equip_spare__spare_code=spare_code, delete_flag=False,
+                                                                 equip_warehouse_order__order_id=order_id).first()
                 if not order:
                     return Response({"success": False, "message": '条码扫描有误', "data": None})
                 obj = EquipSpareErp.objects.filter(spare_code=spare_code).first()
@@ -3022,6 +3031,16 @@ class EquipAutoPlanView(APIView):
                     'equip_spare': order.equip_spare.id
                 }
                 return Response({"success": True, "message": None, "data": data})
+            else:
+                if get_code == "1":
+                    order_list = EquipWarehouseOrder.objects.filter(status__in=[1, 2], order_detail__delete_flag=False,
+                                                                    order_detail__equip_spare__spare_code=spare_code)\
+                        .values('id', 'order_id')
+                else:
+                    order_list = EquipWarehouseOrder.objects.filter(status__in=[4, 5], order_detail__delete_flag=False,
+                                                                    order_detail__equip_spare__spare_code=spare_code)\
+                        .values('id', 'order_id')
+                return Response({"success": True, "message": None, "data": order_list})
         else:  # 备件移库/盘库
             data = EquipWarehouseInventory.objects.filter(equip_spare__spare_code=spare_code, quantity__gt=0)\
                 .values('equip_spare', 'equip_warehouse_location').annotate(
