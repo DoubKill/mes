@@ -18,6 +18,7 @@ from basics.models import GlobalCode
 from mes import settings
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import STATION_LOCATION_MAP, COMMON_READ_ONLY_FIELDS
+from quality.models import UnqualifiedDealOrderDetail
 from quality.utils import update_wms_quality_result
 from recipe.models import MaterialAttribute
 from .conf import wms_ip, wms_port, cb_ip, cb_port
@@ -667,26 +668,31 @@ class BzFinalMixingRubberInventorySerializer(serializers.ModelSerializer):
         return unit_weight
 
     def get_product_info(self, obj):
-        if not obj.lot_no:
-            return {
-                "equip_no": "",
-                "classes": "",
-                "product_time": ""
-            }
-        else:
-            pf = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).last()
-            if not pf:
-                return {
-                    "equip_no": "",
-                    "classes": "",
-                    "product_time": ""
-                }
-            else:
-                return {
-                    "equip_no": pf.equip_no,
-                    "classes": pf.classes,
-                    "product_time": pf.product_time.strftime('%Y-%m-%d %H:%M:%S')
-                }
+        return {
+            "equip_no": "",
+            "classes": "",
+            "product_time": ""
+        }
+        # if not obj.lot_no:
+        #     return {
+        #         "equip_no": "",
+        #         "classes": "",
+        #         "product_time": ""
+        #     }
+        # else:
+        #     pf = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).last()
+        #     if not pf:
+        #         return {
+        #             "equip_no": "",
+        #             "classes": "",
+        #             "product_time": ""
+        #         }
+        #     else:
+        #         return {
+        #             "equip_no": pf.equip_no,
+        #             "classes": pf.classes,
+        #             "product_time": pf.product_time.strftime('%Y-%m-%d %H:%M:%S')
+        #         }
 
     def get_equip_no(self, obj):
         try:
@@ -698,6 +704,21 @@ class BzFinalMixingRubberInventorySerializer(serializers.ModelSerializer):
     class Meta:
         model = BzFinalMixingRubberInventory
         fields = "__all__"
+
+
+class BzMixingRubberInventorySearchSerializer(BzFinalMixingRubberInventorySerializer):
+    deal_suggestion = serializers.SerializerMethodField(read_only=True)
+
+    def get_deal_suggestion(self, obj):
+        if obj.lot_no:
+            instance = UnqualifiedDealOrderDetail.objects.filter(lot_no=obj.lot_no).order_by('id').last()
+            if instance:
+                if instance.unqualified_deal_order.c_agreed:
+                    return instance.suggestion
+                else:
+                    return ""
+            return ""
+        return ''
 
 
 class BzFinalMixingRubberLBInventorySerializer(serializers.ModelSerializer):
@@ -727,26 +748,31 @@ class BzFinalMixingRubberLBInventorySerializer(serializers.ModelSerializer):
         return unit_weight
 
     def get_product_info(self, obj):
-        if not obj.lot_no:
-            return {
-                "equip_no": "",
-                "classes": "",
-                "product_time": ""
-            }
-        else:
-            pf = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).last()
-            if not pf:
-                return {
-                    "equip_no": "",
-                    "classes": "",
-                    "product_time": ""
-                }
-            else:
-                return {
-                    "equip_no": pf.equip_no,
-                    "classes": pf.classes,
-                    "product_time": pf.product_time.strftime('%Y-%m-%d %H:%M:%S')
-                }
+        return {
+            "equip_no": "",
+            "classes": "",
+            "product_time": ""
+        }
+        # if not obj.lot_no:
+        #     return {
+        #         "equip_no": "",
+        #         "classes": "",
+        #         "product_time": ""
+        #     }
+        # else:
+        #     pf = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).last()
+        #     if not pf:
+        #         return {
+        #             "equip_no": "",
+        #             "classes": "",
+        #             "product_time": ""
+        #         }
+        #     else:
+        #         return {
+        #             "equip_no": pf.equip_no,
+        #             "classes": pf.classes,
+        #             "product_time": pf.product_time.strftime('%Y-%m-%d %H:%M:%S')
+        #         }
 
     def get_equip_no(self, obj):
         try:
@@ -763,10 +789,24 @@ class BzFinalMixingRubberLBInventorySerializer(serializers.ModelSerializer):
             return {"一等品": "合格品",
                     "三等品": "不合格品"}.get(temp, temp)
 
-
     class Meta:
         model = BzFinalMixingRubberInventoryLB
         fields = "__all__"
+
+
+class BzFinalRubberInventorySearchSerializer(BzFinalMixingRubberLBInventorySerializer):
+    deal_suggestion = serializers.SerializerMethodField(read_only=True)
+
+    def get_deal_suggestion(self, obj):
+        if obj.lot_no:
+            instance = UnqualifiedDealOrderDetail.objects.filter(lot_no=obj.lot_no).order_by('id').last()
+            if instance:
+                if instance.unqualified_deal_order.c_agreed:
+                    return instance.suggestion
+                else:
+                    return ""
+            return ""
+        return ''
 
 
 class WmsInventoryStockSerializer(serializers.ModelSerializer):

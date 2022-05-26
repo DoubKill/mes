@@ -57,7 +57,8 @@ from inventory.serializers import PutPlanManagementSerializer, \
     SulfurDepotModelSerializer, SulfurDepotSiteModelSerializer, SulfurDataModelSerializer, DepotSulfurModelSerializer, \
     DepotPalltInfoModelSerializer, OutBoundDeliveryOrderSerializer, OutBoundDeliveryOrderDetailSerializer, \
     OutBoundTasksSerializer, WmsInventoryMaterialSerializer, WmsNucleinManagementSerializer, \
-    MaterialOutHistoryOtherSerializer, MaterialOutHistorySerializer, WMSExceptHandleSerializer
+    MaterialOutHistoryOtherSerializer, MaterialOutHistorySerializer, WMSExceptHandleSerializer, \
+    BzMixingRubberInventorySearchSerializer, BzFinalRubberInventorySearchSerializer
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
@@ -3966,7 +3967,7 @@ class BzMixingRubberInventory(ListAPIView):
                             &tunnel=巷道&quality_status=品质状态&lot_existed=收皮条码有无（1：有，0：无）
                             &station=出库口名称&st=入库开始时间&et=入库结束时间
     """
-    serializer_class = BzFinalMixingRubberInventorySerializer
+    serializer_class = BzMixingRubberInventorySearchSerializer
     permission_classes = (IsAuthenticated,)
     queryset = BzFinalMixingRubberInventory.objects.all()
 
@@ -4024,6 +4025,7 @@ class BzMixingRubberInventory(ListAPIView):
         location_status = self.request.query_params.get('location_status')  # 货位状态
         st = self.request.query_params.get('st')  # 入库开始时间
         et = self.request.query_params.get('et')  # 入库结束时间
+        equip_no = self.request.query_params.get('equip_no')  # 1：当前页面  2：所有
         export = self.request.query_params.get('export')  # 1：当前页面  2：所有
         queryset = BzFinalMixingRubberInventory.objects.using('bz').all().order_by('in_storage_time')
         if material_no:
@@ -4044,6 +4046,8 @@ class BzMixingRubberInventory(ListAPIView):
             queryset = queryset.filter(in_storage_time__gte=st)
         if et:
             queryset = queryset.filter(in_storage_time__lte=et)
+        if equip_no:
+            queryset = queryset.filter(bill_id__iendswith=equip_no)
         if lot_existed:
             if lot_existed == '1':
                 queryset = queryset.exclude(lot_no__isnull=True)
@@ -4116,7 +4120,7 @@ class BzMixingRubberInventorySummary(APIView):
 class BzMixingRubberInventorySearch(ListAPIView):
     """根据出库口、搜索指定数量的混炼胶库存信息.参数：?material_no=物料编码&quality_status=品质状态&station=出库口名称&need_qty=出库数量"""
     queryset = BzFinalMixingRubberInventory.objects.all()
-    serializer_class = BzFinalMixingRubberInventorySerializer
+    serializer_class = BzMixingRubberInventorySearchSerializer
     permission_classes = (IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):
@@ -4127,6 +4131,7 @@ class BzMixingRubberInventorySearch(ListAPIView):
         tunnel = self.request.query_params.get('tunnel')  # 巷道
         st = self.request.query_params.get('st')  # 入库开始时间
         et = self.request.query_params.get('et')  # 入库结束时间
+        equip_no = self.request.query_params.get('equip_no')  # 入库结束时间
         if not all([material_no, need_qty]):
             raise ValidationError('参数缺失！')
         try:
@@ -4152,6 +4157,8 @@ class BzMixingRubberInventorySearch(ListAPIView):
             queryset = queryset.filter(in_storage_time__lte=et)
         if tunnel:
             queryset = queryset.filter(location__istartswith=tunnel)
+        if equip_no:
+            queryset = queryset.filter(bill_id__iendswith=equip_no)
         storage_quantity = 0
         ret = []
         for item in queryset:
@@ -4169,7 +4176,7 @@ class BzFinalRubberInventory(ListAPIView):
     """
         终炼胶、帘布库存列表
     """
-    serializer_class = BzFinalMixingRubberLBInventorySerializer
+    serializer_class = BzFinalRubberInventorySearchSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     queryset = BzFinalMixingRubberInventoryLB.objects.all()
@@ -4231,6 +4238,7 @@ class BzFinalRubberInventory(ListAPIView):
         st = self.request.query_params.get('st')  # 入库开始时间
         et = self.request.query_params.get('et')  # 入库结束时间
         export = self.request.query_params.get('export')  # 1：当前页面  2：所有
+        equip_no = self.request.query_params.get('equip_no')
         if store_name:
             if store_name == '终炼胶库':
                 store_name = "炼胶库"
@@ -4260,6 +4268,8 @@ class BzFinalRubberInventory(ListAPIView):
             filter_kwargs['in_storage_time__gte'] = st
         if et:
             filter_kwargs['in_storage_time__lte'] = et
+        if equip_no:
+            filter_kwargs['bill_id__iendswith'] = equip_no
         queryset = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(**filter_kwargs).order_by(
             'in_storage_time')
 
@@ -4316,7 +4326,7 @@ class BzFinalRubberInventorySummary(APIView):
 class BzFinalRubberInventorySearch(ListAPIView):
     """根据出库口、搜索指定数量的终炼胶库存信息.参数：?material_no=物料编码&quality_status=品质状态&need_qty=出库数量"""
     queryset = BzFinalMixingRubberInventoryLB.objects.all()
-    serializer_class = BzFinalMixingRubberLBInventorySerializer
+    serializer_class = BzFinalRubberInventorySearchSerializer
     permission_classes = (IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):
@@ -4326,6 +4336,7 @@ class BzFinalRubberInventorySearch(ListAPIView):
         tunnel = self.request.query_params.get('tunnel')  # 巷道
         st = self.request.query_params.get('st')  # 入库开始时间
         et = self.request.query_params.get('et')  # 入库结束时间
+        equip_no = self.request.query_params.get('equip_no')  # 入库结束时间
         if not all([material_no, need_qty]):
             raise ValidationError('参数缺失！')
         try:
@@ -4344,6 +4355,8 @@ class BzFinalRubberInventorySearch(ListAPIView):
             queryset = queryset.filter(in_storage_time__lte=et)
         if tunnel:
             queryset = queryset.filter(location__istartswith=tunnel)
+        if equip_no:
+            queryset = queryset.filter(bill_id__iendswith=equip_no)
         storage_quantity = 0
         ret = []
         for item in queryset:
@@ -6091,15 +6104,15 @@ class ProductExpireListView(APIView):
             filter_kwargs['material_no__icontains'] = '-{}'.format(stage)
         if warehouse_name == '混炼胶库':
             product_data = BzFinalMixingRubberInventory.objects.using('bz').filter(**filter_kwargs).values(
-                'material_no', 'in_storage_time', 'qty', 'total_weight', 'quality_level')
+                'material_no', 'in_storage_time', 'qty', 'total_weight', 'quality_level', 'store_name')
         elif warehouse_name == '终炼胶库':
             product_data = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(store_name='炼胶库').filter(**filter_kwargs).values(
-                'material_no', 'in_storage_time', 'qty', 'total_weight', 'quality_level')
+                'material_no', 'in_storage_time', 'qty', 'total_weight', 'quality_level', 'store_name')
         else:
             m_data = list(BzFinalMixingRubberInventory.objects.using('bz').filter(**filter_kwargs).values(
-                'material_no', 'in_storage_time', 'qty', 'total_weight', 'quality_level'))
+                'material_no', 'in_storage_time', 'qty', 'total_weight', 'quality_level', 'store_name'))
             f_data = list(BzFinalMixingRubberInventoryLB.objects.using('lb').filter(store_name='炼胶库').filter(**filter_kwargs).values(
-                'material_no', 'in_storage_time', 'qty', 'total_weight', 'quality_level'))
+                'material_no', 'in_storage_time', 'qty', 'total_weight', 'quality_level', 'store_name'))
             product_data = m_data + f_data
 
         product_validity_dict = dict(MaterialAttribute.objects.filter(
@@ -6109,7 +6122,8 @@ class ProductExpireListView(APIView):
         for m in product_data:
             material_no = m['material_no']
             quality_level = m['quality_level']
-            key = material_no + '-' + quality_level
+            store_name = '混炼胶库' if m['store_name'] == '立体库' else '终炼胶库'
+            key = material_no + '-' + quality_level + store_name
             period_of_validity = product_validity_dict.get(m['material_no'])
             if period_of_validity:
                 if (period_of_validity * 24 * 60 * 60 - (
@@ -6122,7 +6136,9 @@ class ProductExpireListView(APIView):
                         ret[key] = {'material_no': material_no,
                                     'qty': m['qty'],
                                     'total_weight': m['total_weight'],
-                                    'quality_status': quality_level}
+                                    'quality_status': quality_level,
+                                    'warehouse_name': store_name,
+                                    'period_of_validity': period_of_validity}
         temp = list(ret.values())
         count = len(temp)
         data = temp[st:et]
@@ -6188,6 +6204,8 @@ class ProductExpireDetailView(APIView):
                     m['expire_time'] = expire_date.strftime("%Y-%m-%d %H:%M:%S")
                     m['in_storage_time'] = in_storage_time.strftime("%Y-%m-%d %H:%M:%S")
                     m['left_days'] = expire_date.__sub__(now_time).days
+                    store_name = '混炼胶库' if m['store_name'] == '立体库' else '终炼胶库'
+                    m['store_name'] = store_name
                     temp.append(m)
         if export:
             return gen_template_response(self.EXPORT_FIELDS_DICT, temp, self.FILE_NAME)
@@ -6202,17 +6220,19 @@ class ProductExpireDetailView(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class ProductInOutHistoryView(APIView):
     permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_in_out_history'}))
-    EXPORT_FIELDS_DICT = {'质检条码': 'lot_no',
+    EXPORT_FIELDS_DICT = {'胶料名称': 'product_no',
+                          '机台号': 'equip_no',
+                          '车次': 'memo',
+                          '重量(kg)': 'weight',
+                          '托盘号': 'pallet_no',
+                          '巷道': 'location',
+                          '质检条码': 'lot_no',
                           '入库单号': 'inbound_order_no',
                           '入库发起时间': 'inbound_time',
                           '出库单号': 'outbound_order_no',
-                          '出库发起人': 'outbound_user',
                           '出库发起时间': 'outbound_time',
-                          '巷道': 'location',
-                          '托盘号': 'pallet_no',
-                          '物料编码': 'product_no',
-                          '出入库数': 'qty',
-                          '重量(kg)': 'weight'}
+                          '出库发起人': 'outbound_user',
+                          }
     FILE_NAME = '出入库履历'
 
     def get(self, request):
@@ -6226,11 +6246,19 @@ class ProductInOutHistoryView(APIView):
         order_no = self.request.query_params.get('order_no')
         pallet_no = self.request.query_params.get('pallet_no')
         lot_no = self.request.query_params.get('lot_no')
+        equip_no = self.request.query_params.get('equip_no')
         page = int(self.request.query_params.get('page', 1))
         page_size = int(self.request.query_params.get('page_size', 10))
         export = self.request.query_params.get('export')
         if not warehouse_name:
             raise ValidationError('请选择库区！')
+        if export:
+            if not all([out_st, out_et]):
+                raise ValidationError('请选择出库时间范围不超过一周进行导出！')
+            st = datetime.datetime.strptime(out_st, "%Y-%m-%d %H:%M:%S")
+            et = datetime.datetime.strptime(out_et, "%Y-%m-%d %H:%M:%S")
+            if (et - st).total_seconds() / 60 / 60 / 24 > 7:
+                raise ValidationError('出库时间范围不得超过一周！')
         if warehouse_name == '混炼胶库':
             database_conf = {'host': DATABASES['bz']['HOST'],
                              'user': DATABASES['bz']['USER'],
@@ -6285,6 +6313,11 @@ class ProductInOutHistoryView(APIView):
                 extra_where_str += " and a.LotNo like '%{}%' or b.Lot_no like '%{}%'".format(lot_no, lot_no)
             else:
                 extra_where_str += "where a.LotNo like '%{}%' or b.Lot_no like '%{}%'".format(lot_no, lot_no)
+        if equip_no:
+            if extra_where_str:
+                extra_where_str += " and a.LotNo like '%{}%' or b.Lot_no like '%{}%'".format(equip_no, equip_no)
+            else:
+                extra_where_str += "where a.LotNo like '%{}%' or b.Lot_no like '%{}%'".format(equip_no, equip_no)
         if export:
             pagination_str = ""
         sql = """select
@@ -6322,10 +6355,19 @@ full outer join v_ASRS_TO_MES_RE_MESVIEW b on a.LotNo=b.Lot_no and a.PALLETID=b.
         outbound_order_nos = [i[3] for i in temp]
         outbound_order_dict = dict(OutBoundDeliveryOrderDetail.objects.filter(
             order_no__in=outbound_order_nos).values_list('order_no', 'created_user__username'))
+        lot_nos = [i[0] for i in temp]
+        lot_nos_data = PalletFeedbacks.objects.filter(lot_no__in=lot_nos).values('lot_no', 'begin_trains', 'end_trains')
+        lot_nos_dict = {i['lot_no']: '{}-{}'.format(i['begin_trains'], i['end_trains']) for i in lot_nos_data}
         for item in temp:
+            try:
+                lot_no = item[0].strip() if item[0] else item[11].strip()
+                equip = lot_no[4:7]
+            except Exception:
+                equip = ""
+                lot_no = ""
             result.append(
                 {
-                    'lot_no': item[0] if item[0] else item[11],
+                    'lot_no': lot_no,
                     'inbound_order_no': item[1],
                     'inbound_time': '' if not item[2] else item[2].strftime('%Y-%m-%d %H:%M:%S'),
                     'outbound_order_no': item[3],
@@ -6335,7 +6377,9 @@ full outer join v_ASRS_TO_MES_RE_MESVIEW b on a.LotNo=b.Lot_no and a.PALLETID=b.
                     'pallet_no': item[7] if item[7] else item[13],
                     'product_no': item[8] if item[8] else item[14],
                     'qty': item[9] if item[9] else item[15],
-                    'weight': item[10] if item[10] else item[16]
+                    'weight': item[10] if item[10] else item[16],
+                    'equip_no': equip,
+                    'memo': lot_nos_dict.get(lot_no, '')
                 }
             )
         sc.close()
