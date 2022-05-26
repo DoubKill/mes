@@ -36,7 +36,7 @@ def update_inspection_registration():
     """更新送检原材料的总部检测结果"""
     ex_time = datetime.now() - timedelta(days=10)
     inspection_materials = MaterialInspectionRegistration.objects.filter(quality_status='待检',
-                                                                         create_time__gte=ex_time)
+                                                                         created_date__gte=ex_time)
     inspection_url = 'http://10.1.10.136/zcxjws_web/zcxjws/pc/zc/getCkdtm.io'
     for inspection_material in inspection_materials:
         try:
