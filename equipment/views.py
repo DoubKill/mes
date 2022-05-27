@@ -2960,7 +2960,7 @@ class EquipAutoPlanView(APIView):
             if not init_section:
                 return Response({"success": False, "message": "未找到保养组", "data": []})
             section_list = get_children_section(init_section, include_self=True)
-            res = list(set(User.objects.filter(section__name__in=section_list, is_active=True).values_list('username', flat=True)))
+            res = list(User.objects.filter(section__name__in=section_list, is_active=True).annotate(order_id=F('username')).values('id', 'order_id').distinct())
             return Response({"success": True, "message": "获取保养组成员信息成功", "data": res})
         if spare_code:  # 获取入库/出库备件信息
             if order_id:
