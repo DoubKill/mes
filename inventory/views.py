@@ -4072,7 +4072,7 @@ class BzMixingRubberInventory(ListAPIView):
                 for item in pallet_data:
                     if max(order.begin_trains, item.begin_trains) <= min(order.end_trains, item.end_trains):
                         lot_nos.append(item.lot_no)
-                queryset = queryset.filter(lot_no__in=lot_nos)
+                queryset = queryset.filter(lot_no__in=lot_nos, material_no=order.product_no)
             elif order.order_type == 3:  # 指定托盘出库
                 queryset = queryset.filter(container_no=order.pallet_no)
         if station:
@@ -4213,7 +4213,7 @@ class BzMixingRubberInventorySearch(ListAPIView):
                 for item in pallet_data:
                     if max(order.begin_trains, item.begin_trains) <= min(order.end_trains, item.end_trains):
                         lot_nos.append(item.lot_no)
-                queryset = queryset.filter(lot_no__in=lot_nos)
+                queryset = queryset.filter(lot_no__in=lot_nos, material_no=order.product_no)
             elif order.order_type == 3:  # 指定托盘出库
                 queryset = queryset.filter(container_no=order.pallet_no)
         storage_quantity = 0
@@ -4359,6 +4359,7 @@ class BzFinalRubberInventory(ListAPIView):
                     if max(order.begin_trains, item.begin_trains) <= min(order.end_trains, item.end_trains):
                         lot_nos.append(item.lot_no)
                 filter_kwargs['lot_no__in'] = lot_nos
+                filter_kwargs['material_no'] = order.product_no
             elif order.order_type == 3:  # 指定托盘出库
                 filter_kwargs['container_no'] = order.pallet_no
         queryset = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(**filter_kwargs).order_by(
@@ -4482,7 +4483,7 @@ class BzFinalRubberInventorySearch(ListAPIView):
                 for item in pallet_data:
                     if max(order.begin_trains, item.begin_trains) <= min(order.end_trains, item.end_trains):
                         lot_nos.append(item.lot_no)
-                queryset = queryset.filter(lot_no__in=lot_nos)
+                queryset = queryset.filter(lot_no__in=lot_nos, material_no=order.product_no)
             elif order.order_type == 3:  # 指定托盘出库
                 queryset = queryset.filter(container_no=order.pallet_no)
         storage_quantity = 0
