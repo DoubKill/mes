@@ -4063,15 +4063,11 @@ class BzMixingRubberInventory(ListAPIView):
             except Exception:
                 raise ValidationError('参数错误！')
             if order.order_type == 2:  # 指定生产信息出库
-                lot_nos = []
-                pallet_data = PalletFeedbacks.objects.filter(
+                lot_nos = list(PalletFeedbacks.objects.filter(
                     factory_date=order.factory_date,
                     equip_no=order.equip_no,
                     classes=order.classes,
-                    product_no=order.product_no)
-                for item in pallet_data:
-                    if max(order.begin_trains, item.begin_trains) <= min(order.end_trains, item.end_trains):
-                        lot_nos.append(item.lot_no)
+                    product_no=order.product_no).values_list('lot_no', flat=True))
                 queryset = queryset.filter(lot_no__in=lot_nos, material_no=order.product_no)
             elif order.order_type == 3:  # 指定托盘出库
                 queryset = queryset.filter(container_no=order.pallet_no)
@@ -4204,15 +4200,11 @@ class BzMixingRubberInventorySearch(ListAPIView):
             except Exception:
                 raise ValidationError('参数错误！')
             if order.order_type == 2:  # 指定生产信息出库
-                lot_nos = []
-                pallet_data = PalletFeedbacks.objects.filter(
+                lot_nos = list(PalletFeedbacks.objects.filter(
                     factory_date=order.factory_date,
                     equip_no=order.equip_no,
                     classes=order.classes,
-                    product_no=order.product_no)
-                for item in pallet_data:
-                    if max(order.begin_trains, item.begin_trains) <= min(order.end_trains, item.end_trains):
-                        lot_nos.append(item.lot_no)
+                    product_no=order.product_no).values_list('lot_no', flat=True))
                 queryset = queryset.filter(lot_no__in=lot_nos, material_no=order.product_no)
             elif order.order_type == 3:  # 指定托盘出库
                 queryset = queryset.filter(container_no=order.pallet_no)
@@ -4349,15 +4341,11 @@ class BzFinalRubberInventory(ListAPIView):
             except Exception:
                 raise ValidationError('参数错误！')
             if order.order_type == 2:  # 指定生产信息出库
-                lot_nos = []
-                pallet_data = PalletFeedbacks.objects.filter(
+                lot_nos = list(PalletFeedbacks.objects.filter(
                     factory_date=order.factory_date,
                     equip_no=order.equip_no,
                     classes=order.classes,
-                    product_no=order.product_no)
-                for item in pallet_data:
-                    if max(order.begin_trains, item.begin_trains) <= min(order.end_trains, item.end_trains):
-                        lot_nos.append(item.lot_no)
+                    product_no=order.product_no).values_list('lot_no', flat=True))
                 filter_kwargs['lot_no__in'] = lot_nos
                 filter_kwargs['material_no'] = order.product_no
             elif order.order_type == 3:  # 指定托盘出库
@@ -4474,15 +4462,11 @@ class BzFinalRubberInventorySearch(ListAPIView):
             except Exception:
                 raise ValidationError('参数错误！')
             if order.order_type == 2:  # 指定生产信息出库
-                lot_nos = []
-                pallet_data = PalletFeedbacks.objects.filter(
+                lot_nos = list(PalletFeedbacks.objects.filter(
                     factory_date=order.factory_date,
                     equip_no=order.equip_no,
                     classes=order.classes,
-                    product_no=order.product_no)
-                for item in pallet_data:
-                    if max(order.begin_trains, item.begin_trains) <= min(order.end_trains, item.end_trains):
-                        lot_nos.append(item.lot_no)
+                    product_no=order.product_no).values_list('lot_no', flat=True))
                 queryset = queryset.filter(lot_no__in=lot_nos, material_no=order.product_no)
             elif order.order_type == 3:  # 指定托盘出库
                 queryset = queryset.filter(container_no=order.pallet_no)
