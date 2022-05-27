@@ -630,7 +630,7 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
             [str(i) for i in range(pallet_data.begin_trains, pallet_data.end_trains + 1)])  # 托盘车次
         ret['classes_group'] = instance.classes + '/' + group  # 班次班组
         last_test_result = test_results.last()
-        ret['test'] = {'test_status': '复检' if test_results.filter(test_times__gt=1).exists() else '正常',
+        ret['test'] = {'test_status': '正常',
                        'test_factory_date': last_test_result.test_factory_date.strftime('%Y-%m-%d %H:%M:%S'),
                        'test_class': instance.classes,
                        'pallet_no': pallet_data.pallet_no,
@@ -1235,7 +1235,7 @@ class MaterialDealResultListSerializer1(serializers.ModelSerializer):
         pallet_data = PalletFeedbacks.objects.filter(lot_no=instance.lot_no,
                                                      product_no=instance.product_no).first()
         # test_order_data = MaterialTestOrder.objects.filter(lot_no=instance.lot_no).first()
-        test_results = MaterialTestResult.objects.filter(material_test_order__lot_no=instance.lot_no)
+        test_results = MaterialTestResult.objects.filter(material_test_order__lot_no=instance.lot_no).order_by('id')
         plan = ProductClassesPlan.objects.filter(plan_classes_uid=pallet_data.plan_classes_uid).first()
         if not plan:
             # classes = pallet_data.classes
@@ -1250,7 +1250,7 @@ class MaterialDealResultListSerializer1(serializers.ModelSerializer):
         ret['actual_weight'] = pallet_data.actual_weight
         ret['classes_group'] = instance.classes + '/' + group  # 班次班组
         last_test_result = test_results.last()
-        ret['test'] = {'test_status': '复检' if test_results.filter(test_times__gt=1).exists() else '正常',
+        ret['test'] = {'test_status': '正常',
                        'test_factory_date': last_test_result.test_factory_date,
                        'test_class': instance.classes,
                        'test_user': None if not last_test_result.created_user else last_test_result.created_user.username}

@@ -80,8 +80,8 @@ def main():
                 reason_name=item[0].strip() if item[0] else '未知',
                 factory_date=item[1] if item[1] else datetime.datetime.now().date(),
                 machine_no=equip,
-                pallet_no=item[3].strip() if item[3] else '888888',
-                lot_no=item[4].strip() if item[4] else '99999999',
+                pallet_no=item[4].strip() if item[4] else '888888',
+                lot_no=item[3].strip() if item[3] else '99999999',
                 production_no=item[5].strip() if item[5] else '未知',
                 actual_weight=item[6] if item[6] else 0,
                 input_datetime=item[7]
