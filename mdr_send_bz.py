@@ -44,7 +44,7 @@ def send_bz():
                 item_dict = {"WORKID": str(int(msg_ids) + 1),
                              "MID": pfb_obj.product_no,
                              "PICI": str(bz_obj.bill_id),
-                             "RFID": pfb_obj.pallet_no,
+                             "RFID": bz_obj.container_no,
                              "DJJG": zjzt,
                              "SENDDATE": datetime.datetime.now().strftime('%Y%m%d %H:%M:%S')}
                 item.append(item_dict)
