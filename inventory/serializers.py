@@ -649,20 +649,33 @@ class BzFinalMixingRubberInventorySerializer(serializers.ModelSerializer):
     unit_weight = serializers.SerializerMethodField(read_only=True)
     material_type = serializers.SerializerMethodField(read_only=True)
     quality_status = serializers.CharField(read_only=True, source='quality_level')
+    begin_end_trains = serializers.SerializerMethodField(read_only=True)
 
-    def get_material_type(self, object):
+    def get_material_type(self, obj):
         try:
-            mt = object.material_no.split("-")[1]
+            mt = obj.material_no.split("-")[1]
         except:
-            mt = object.material_no
+            mt = obj.material_no
         return mt
 
-    def get_unit(self, object):
+    def get_begin_end_trains(self, obj):
+        try:
+            trains = obj.memo.split(",")
+            if len(trains) == 1:
+                return [int(trains[0]), int(trains[0])]
+            elif len(trains) == 2:
+                return [int(trains[0]), int(trains[1])]
+            else:
+                return [0, 0]
+        except:
+            return [0, 0]
+
+    def get_unit(self, obj):
         return 'kg'
 
-    def get_unit_weight(self, object):
+    def get_unit_weight(self, obj):
         try:
-            unit_weight = round(object.total_weight / object.qty,3)
+            unit_weight = round(obj.total_weight / obj.qty,3)
         except:
             unit_weight = "数据异常"
         return unit_weight
@@ -729,6 +742,19 @@ class BzFinalMixingRubberLBInventorySerializer(serializers.ModelSerializer):
     product_info = serializers.SerializerMethodField(read_only=True)
     equip_no = serializers.SerializerMethodField(read_only=True)
     quality_status = serializers.SerializerMethodField(read_only=True)
+    begin_end_trains = serializers.SerializerMethodField(read_only=True)
+
+    def get_begin_end_trains(self, obj):
+        try:
+            trains = obj.memo.split(",")
+            if len(trains) == 1:
+                return [int(trains[0]), int(trains[0])]
+            elif len(trains) == 2:
+                return [int(trains[0]), int(trains[1])]
+            else:
+                return [0, 0]
+        except:
+            return [0, 0]
 
     def get_material_type(self, object):
         try:
@@ -1732,6 +1758,40 @@ class OutBoundDeliveryOrderSerializer(BaseModelSerializer):
     def get_finished_qty(self, obj):
         finished_qty = obj.outbound_delivery_details.filter(status=3).aggregate(finished_qty=Sum('qty'))['finished_qty']
         return finished_qty if finished_qty else 0
+
+    def validate(self, attrs):
+        order_type = attrs.get('order_type')
+        if order_type == 3:  # 指定托盘出库
+            attrs.pop('factory_date', '')
+            attrs.pop('product_no', '')
+            attrs.pop('equip_no', '')
+            attrs.pop('classes', '')
+            attrs.pop('begin_trains', '')
+            attrs.pop('end_trains', '')
+            attrs.pop('quality_status', '')
+            attrs['order_qty'] = 99999
+            if not attrs.get('pallet_no'):
+                raise serializers.ValidationError('请填写托盘号！')
+        elif order_type == 2:  # 指定胶料生产信息
+            attrs.pop('pallet_no', '')
+            attrs.pop('quality_status', '')
+            if not all([attrs.get('factory_date'),
+                        attrs.get('product_no'),
+                        attrs.get('equip_no'),
+                        attrs.get('classes'),
+                        attrs.get('begin_trains'),
+                        attrs.get('end_trains')]):
+                raise serializers.ValidationError('请输入完整的的胶料生产信息！')
+            attrs['order_qty'] = attrs.get('end_trains') - attrs.get('begin_trains') + 1
+        else:  # 普通出库
+            if not all([attrs.get('product_no'), attrs['quality_status']]):
+                raise serializers.ValidationError('参数缺失！')
+            return {'order_qty': attrs.get('order_qty', 0),
+                    'product_no': attrs['product_no'],
+                    'quality_status': attrs['quality_status'],
+                    'station': attrs['station'],
+                    'warehouse': attrs['warehouse']}
+        return attrs
 
     def create(self, validated_data):
         warehouse = validated_data.get('warehouse')

@@ -11,7 +11,7 @@ from io import BytesIO
 import requests
 import xlwt
 from django.core.paginator import Paginator
-from django.db.models import Sum, Count, Q, F, Max, FloatField
+from django.db.models import Sum, Count, Q, F, Max, FloatField, Min
 from django.db.transaction import atomic
 from django.forms import model_to_dict
 from django.http import HttpResponse
@@ -3983,8 +3983,8 @@ class BzMixingRubberInventory(ListAPIView):
 
         style = xlwt.XFStyle()
         style.alignment.wrap = 1
-        columns = ['No', '胶料类型', '胶料编码', '质检条码', '货位状态', '生产机台', '生产班次',
-                   '托盘号', '库位地址', '数库存量', '单位', '单位重量', '总重量', '品质状态']
+        columns = ['No', '胶料类型', '胶料编码', '质检条码', '托盘号', '库存位', '车数',
+                   '总重量', '品质状态', '入库时间', '机台号', '车号', '货位状态']
         for col_num in range(len(columns)):
             sheet.write(0, col_num, columns[col_num])
             # 写入数据
@@ -3994,16 +3994,15 @@ class BzMixingRubberInventory(ListAPIView):
             sheet.write(data_row, 1, i['material_type'])
             sheet.write(data_row, 2, i['material_no'])
             sheet.write(data_row, 3, i['lot_no'])
-            sheet.write(data_row, 4, i['location_status'])
-            sheet.write(data_row, 5, i['product_info']['equip_no'])
-            sheet.write(data_row, 6, i['product_info']['classes'])
-            sheet.write(data_row, 7, i['container_no'])
-            sheet.write(data_row, 8, i['location'])
-            sheet.write(data_row, 9, i['qty'])
-            sheet.write(data_row, 10, 'kg')
-            sheet.write(data_row, 11, i['unit_weight'])
-            sheet.write(data_row, 12, i['total_weight'])
-            sheet.write(data_row, 13, i['quality_status'])
+            sheet.write(data_row, 4, i['container_no'])
+            sheet.write(data_row, 5, i['location'])
+            sheet.write(data_row, 6, i['qty'])
+            sheet.write(data_row, 7, i['total_weight'])
+            sheet.write(data_row, 8, i['quality_status'])
+            sheet.write(data_row, 9, i['in_storage_time'])
+            sheet.write(data_row, 10, i['equip_no'])
+            sheet.write(data_row, 11, i['memo'])
+            sheet.write(data_row, 12, i['location_status'])
             data_row = data_row + 1
         # 写出到IO
         output = BytesIO()
@@ -4025,8 +4024,11 @@ class BzMixingRubberInventory(ListAPIView):
         location_status = self.request.query_params.get('location_status')  # 货位状态
         st = self.request.query_params.get('st')  # 入库开始时间
         et = self.request.query_params.get('et')  # 入库结束时间
-        equip_no = self.request.query_params.get('equip_no')  # 1：当前页面  2：所有
+        equip_no = self.request.query_params.get('equip_no')  # 机台
         export = self.request.query_params.get('export')  # 1：当前页面  2：所有
+        outbound_order_id = self.request.query_params.get('outbound_order_id')  # 指定托盘和指定生产信息出库时使用
+        begin_trains = self.request.query_params.get('begin_trains')  # 开始车次
+        end_trains = self.request.query_params.get('end_trains')  # 结束车次
         queryset = BzFinalMixingRubberInventory.objects.using('bz').all().order_by('in_storage_time')
         if material_no:
             queryset = queryset.filter(material_no=material_no)
@@ -4053,6 +4055,26 @@ class BzMixingRubberInventory(ListAPIView):
                 queryset = queryset.exclude(lot_no__isnull=True)
             else:
                 queryset = queryset.filter(lot_no__isnull=True)
+
+        # 指定托盘和指定生产信息出库查询
+        if outbound_order_id:
+            try:
+                order = OutBoundDeliveryOrder.objects.get(id=outbound_order_id)
+            except Exception:
+                raise ValidationError('参数错误！')
+            if order.order_type == 2:  # 指定生产信息出库
+                lot_nos = []
+                pallet_data = PalletFeedbacks.objects.filter(
+                    factory_date=order.factory_date,
+                    equip_no=order.equip_no,
+                    classes=order.classes,
+                    product_no=order.product_no)
+                for item in pallet_data:
+                    if max(order.begin_trains, item.begin_trains) <= min(order.end_trains, item.end_trains):
+                        lot_nos.append(item.lot_no)
+                queryset = queryset.filter(lot_no__in=lot_nos)
+            elif order.order_type == 3:  # 指定托盘出库
+                queryset = queryset.filter(container_no=order.pallet_no)
         if station:
             if station == '一层前端':
                 queryset = queryset.filter(Q(location__startswith='3') | Q(location__startswith='4'))
@@ -4062,19 +4084,30 @@ class BzMixingRubberInventory(ListAPIView):
                 # queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (1, 2)"])
             elif station == '一层后端':
                 raise ValidationError('该出库口不可用！')
-        page = self.paginate_queryset(queryset)
-        serializer = self.get_serializer(page, many=True)
+        if all([begin_trains, end_trains]):
+            b_e_range = [int(begin_trains), int(end_trains)]
+        elif begin_trains:
+            b_e_range = [int(begin_trains), 99999]
+        elif end_trains:
+            b_e_range = [0, int(end_trains)]
+        else:
+            b_e_range = []
+        ret = self.get_serializer(queryset, many=True).data
+        if b_e_range:
+            ret = list(filter(lambda x: max(x['begin_end_trains'][0], b_e_range[0]) <= min(x['begin_end_trains'][1], b_e_range[1]), ret))
+
+        page = self.paginate_queryset(ret)
+        # serializer = self.get_serializer(page, many=True)
+        resp_data = self.get_paginated_response(page).data
+
         if export:
             if export == '1':
-                return self.export_xls(serializer.data)
+                return self.export_xls(page)
             elif export == '2':
-                return self.export_xls(self.get_serializer(queryset, many=True).data)
-        data = self.get_paginated_response(serializer.data).data
-        sum_data = queryset.aggregate(total_weight=Sum('total_weight'),
-                                      total_trains=Sum('qty'))
-        data['total_weight'] = sum_data['total_weight']
-        data['total_trains'] = sum_data['total_trains']
-        return Response(data)
+                return self.export_xls(ret)
+        resp_data['total_weight'] = round(sum(float(i['total_weight']) for i in ret), 2)
+        resp_data['total_trains'] = round(sum(float(i['qty']) for i in ret), 1)
+        return Response(resp_data)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -4131,16 +4164,20 @@ class BzMixingRubberInventorySearch(ListAPIView):
         tunnel = self.request.query_params.get('tunnel')  # 巷道
         st = self.request.query_params.get('st')  # 入库开始时间
         et = self.request.query_params.get('et')  # 入库结束时间
-        equip_no = self.request.query_params.get('equip_no')  # 入库结束时间
-        if not all([material_no, need_qty]):
-            raise ValidationError('参数缺失！')
+        equip_no = self.request.query_params.get('equip_no')  # 机台
+        outbound_order_id = self.request.query_params.get('outbound_order_id')  # 指定托盘和指定生产信息出库时使用
+        begin_trains = self.request.query_params.get('begin_trains')  # 开始车次
+        end_trains = self.request.query_params.get('end_trains')  # 结束车次
+        if not need_qty:
+            raise ValidationError('请输入正确的需求数量！')
         try:
             need_qty = int(need_qty)
         except Exception:
             raise ValidationError('参数错误！')
         queryset = BzFinalMixingRubberInventory.objects.using('bz').filter(
-            material_no=material_no,
             location_status="有货货位").order_by('in_storage_time')
+        if material_no:
+            queryset = queryset.filter(material_no=material_no,)
         if station == '一层前端':
             queryset = queryset.filter(Q(location__startswith='3') | Q(location__startswith='4'))
             # queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (3, 4)"])
@@ -4159,16 +4196,49 @@ class BzMixingRubberInventorySearch(ListAPIView):
             queryset = queryset.filter(location__istartswith=tunnel)
         if equip_no:
             queryset = queryset.filter(bill_id__iendswith=equip_no)
+
+        # 指定托盘和指定生产信息出库查询
+        if outbound_order_id:
+            try:
+                order = OutBoundDeliveryOrder.objects.get(id=outbound_order_id)
+            except Exception:
+                raise ValidationError('参数错误！')
+            if order.order_type == 2:  # 指定生产信息出库
+                lot_nos = []
+                pallet_data = PalletFeedbacks.objects.filter(
+                    factory_date=order.factory_date,
+                    equip_no=order.equip_no,
+                    classes=order.classes,
+                    product_no=order.product_no)
+                for item in pallet_data:
+                    if max(order.begin_trains, item.begin_trains) <= min(order.end_trains, item.end_trains):
+                        lot_nos.append(item.lot_no)
+                queryset = queryset.filter(lot_no__in=lot_nos)
+            elif order.order_type == 3:  # 指定托盘出库
+                queryset = queryset.filter(container_no=order.pallet_no)
         storage_quantity = 0
         ret = []
-        for item in queryset:
-            storage_quantity += item.qty
+        if all([begin_trains, end_trains]):
+            b_e_range = [int(begin_trains), int(end_trains)]
+        elif begin_trains:
+            b_e_range = [int(begin_trains), 99999]
+        elif end_trains:
+            b_e_range = [0, int(end_trains)]
+        else:
+            b_e_range = []
+        serializer_data = list(self.get_serializer(queryset, many=True).data)
+        if b_e_range:
+            serializer_data = list(filter(
+                lambda x: max(x['begin_end_trains'][0], b_e_range[0]) <= min(x['begin_end_trains'][1], b_e_range[1]),
+                serializer_data))
+
+        for item in serializer_data:
+            qty = round(float(item['qty']), 1)
+            storage_quantity += qty
             ret.append(item)
             if storage_quantity >= need_qty:
                 break
-        serializer = self.get_serializer(ret, many=True)
-        total_trains = queryset.aggregate(total_count=Sum('qty'))['total_count']
-        return Response({'data': serializer.data, 'total_trains': total_trains if total_trains else 0})
+        return Response({'data': ret, 'total_trains': storage_quantity})
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -4193,8 +4263,8 @@ class BzFinalRubberInventory(ListAPIView):
 
         style = xlwt.XFStyle()
         style.alignment.wrap = 1
-        columns = ['No', '胶料类型', '胶料编码', '质检条码', '货位状态', '生产机台', '生产班次',
-                   '托盘号', '库位地址', '数库存量', '单位', '单位重量', '总重量', '品质状态']
+        columns = ['No', '胶料类型', '胶料编码', '质检条码', '托盘号', '库存位', '车数',
+                   '总重量', '品质状态', '入库时间', '机台号', '车号', '货位状态']
         for col_num in range(len(columns)):
             sheet.write(0, col_num, columns[col_num])
             # 写入数据
@@ -4204,16 +4274,15 @@ class BzFinalRubberInventory(ListAPIView):
             sheet.write(data_row, 1, i['material_type'])
             sheet.write(data_row, 2, i['material_no'])
             sheet.write(data_row, 3, i['lot_no'])
-            sheet.write(data_row, 4, i['location_status'])
-            sheet.write(data_row, 5, i['product_info']['equip_no'])
-            sheet.write(data_row, 6, i['product_info']['classes'])
-            sheet.write(data_row, 7, i['container_no'])
-            sheet.write(data_row, 8, i['location'])
-            sheet.write(data_row, 9, i['qty'])
-            sheet.write(data_row, 10, 'kg')
-            sheet.write(data_row, 11, i['unit_weight'])
-            sheet.write(data_row, 12, i['total_weight'])
-            sheet.write(data_row, 13, i['quality_status'])
+            sheet.write(data_row, 4, i['container_no'])
+            sheet.write(data_row, 5, i['location'])
+            sheet.write(data_row, 6, i['qty'])
+            sheet.write(data_row, 7, i['total_weight'])
+            sheet.write(data_row, 8, i['quality_status'])
+            sheet.write(data_row, 9, i['in_storage_time'])
+            sheet.write(data_row, 10, i['equip_no'])
+            sheet.write(data_row, 11, i['memo'])
+            sheet.write(data_row, 12, i['location_status'])
             data_row = data_row + 1
         # 写出到IO
         output = BytesIO()
@@ -4238,7 +4307,10 @@ class BzFinalRubberInventory(ListAPIView):
         st = self.request.query_params.get('st')  # 入库开始时间
         et = self.request.query_params.get('et')  # 入库结束时间
         export = self.request.query_params.get('export')  # 1：当前页面  2：所有
-        equip_no = self.request.query_params.get('equip_no')
+        equip_no = self.request.query_params.get('equip_no')  # 机台
+        outbound_order_id = self.request.query_params.get('outbound_order_id')  # 指定托盘和指定生产信息出库时使用
+        begin_trains = self.request.query_params.get('begin_trains')  # 开始车次
+        end_trains = self.request.query_params.get('end_trains')  # 结束车次
         if store_name:
             if store_name == '终炼胶库':
                 store_name = "炼胶库"
@@ -4270,22 +4342,54 @@ class BzFinalRubberInventory(ListAPIView):
             filter_kwargs['in_storage_time__lte'] = et
         if equip_no:
             filter_kwargs['bill_id__iendswith'] = equip_no
+        # 指定托盘和指定生产信息出库查询
+        if outbound_order_id:
+            try:
+                order = OutBoundDeliveryOrder.objects.get(id=outbound_order_id)
+            except Exception:
+                raise ValidationError('参数错误！')
+            if order.order_type == 2:  # 指定生产信息出库
+                lot_nos = []
+                pallet_data = PalletFeedbacks.objects.filter(
+                    factory_date=order.factory_date,
+                    equip_no=order.equip_no,
+                    classes=order.classes,
+                    product_no=order.product_no)
+                for item in pallet_data:
+                    if max(order.begin_trains, item.begin_trains) <= min(order.end_trains, item.end_trains):
+                        lot_nos.append(item.lot_no)
+                filter_kwargs['lot_no__in'] = lot_nos
+            elif order.order_type == 3:  # 指定托盘出库
+                filter_kwargs['container_no'] = order.pallet_no
         queryset = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(**filter_kwargs).order_by(
             'in_storage_time')
 
-        page = self.paginate_queryset(queryset)
-        serializer = self.get_serializer(page, many=True)
+        if all([begin_trains, end_trains]):
+            b_e_range = [int(begin_trains), int(end_trains)]
+        elif begin_trains:
+            b_e_range = [int(begin_trains), 99999]
+        elif end_trains:
+            b_e_range = [0, int(end_trains)]
+        else:
+            b_e_range = []
+        ret = self.get_serializer(queryset, many=True).data
+        if b_e_range:
+            ret = list(filter(
+                lambda x: max(x['begin_end_trains'][0], b_e_range[0]) <= min(x['begin_end_trains'][1], b_e_range[1]),
+                ret))
+
+        page = self.paginate_queryset(ret)
+        # serializer = self.get_serializer(page, many=True)
+        resp_data = self.get_paginated_response(page).data
+
         if export:
             if export == '1':
-                return self.export_xls(serializer.data)
+                return self.export_xls(page)
             elif export == '2':
-                return self.export_xls(self.get_serializer(queryset, many=True).data)
-        data = self.get_paginated_response(serializer.data).data
-        sum_data = queryset.aggregate(total_weight=Sum('total_weight'),
-                                      total_trains=Sum('qty'))
-        data['total_weight'] = sum_data['total_weight']
-        data['total_trains'] = sum_data['total_trains']
-        return Response(data)
+                return self.export_xls(ret)
+        resp_data['total_weight'] = round(sum(float(i['total_weight']) for i in ret), 2)
+        resp_data['total_trains'] = round(sum(float(i['qty']) for i in ret), 1)
+        return Response(resp_data)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -4336,17 +4440,21 @@ class BzFinalRubberInventorySearch(ListAPIView):
         tunnel = self.request.query_params.get('tunnel')  # 巷道
         st = self.request.query_params.get('st')  # 入库开始时间
         et = self.request.query_params.get('et')  # 入库结束时间
-        equip_no = self.request.query_params.get('equip_no')  # 入库结束时间
-        if not all([material_no, need_qty]):
-            raise ValidationError('参数缺失！')
+        equip_no = self.request.query_params.get('equip_no')  # 机台
+        outbound_order_id = self.request.query_params.get('outbound_order_id')  # 指定托盘和指定生产信息出库时使用
+        begin_trains = self.request.query_params.get('begin_trains')  # 开始车次
+        end_trains = self.request.query_params.get('end_trains')  # 结束车次
+        if not need_qty:
+            raise ValidationError('请输入正确的需求数量！')
         try:
             need_qty = int(need_qty)
         except Exception:
             raise ValidationError('参数错误！')
         queryset = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(
             store_name="炼胶库",
-            material_no=material_no,
             location_status="有货货位").order_by('in_storage_time')
+        if material_no:
+            queryset = queryset.filter(material_no=material_no,)
         if quality_status:
             queryset = queryset.filter(quality_level=quality_status)
         if st:
@@ -4357,16 +4465,47 @@ class BzFinalRubberInventorySearch(ListAPIView):
             queryset = queryset.filter(location__istartswith=tunnel)
         if equip_no:
             queryset = queryset.filter(bill_id__iendswith=equip_no)
+
+        # 指定托盘和指定生产信息出库查询
+        if outbound_order_id:
+            try:
+                order = OutBoundDeliveryOrder.objects.get(id=outbound_order_id)
+            except Exception:
+                raise ValidationError('参数错误！')
+            if order.order_type == 2:  # 指定生产信息出库
+                lot_nos = []
+                pallet_data = PalletFeedbacks.objects.filter(
+                    factory_date=order.factory_date,
+                    equip_no=order.equip_no,
+                    classes=order.classes,
+                    product_no=order.product_no)
+                for item in pallet_data:
+                    if max(order.begin_trains, item.begin_trains) <= min(order.end_trains, item.end_trains):
+                        lot_nos.append(item.lot_no)
+                queryset = queryset.filter(lot_no__in=lot_nos)
+            elif order.order_type == 3:  # 指定托盘出库
+                queryset = queryset.filter(container_no=order.pallet_no)
         storage_quantity = 0
         ret = []
-        for item in queryset:
-            storage_quantity += item.qty
+        if all([begin_trains, end_trains]):
+            b_e_range = [int(begin_trains), int(end_trains)]
+        elif begin_trains:
+            b_e_range = [int(begin_trains), 99999]
+        elif end_trains:
+            b_e_range = [0, int(end_trains)]
+        else:
+            b_e_range = []
+        serializer_data = list(self.get_serializer(queryset, many=True).data)
+        if b_e_range:
+            serializer_data = list(filter(lambda x: max(x['begin_end_trains'][0], b_e_range[0]) <= min(x['begin_end_trains'][1], b_e_range[1]), serializer_data))
+
+        for item in serializer_data:
+            qty = round(float(item['qty']), 1)
+            storage_quantity += qty
             ret.append(item)
             if storage_quantity >= need_qty:
                 break
-        serializer = self.get_serializer(ret, many=True)
-        total_trains = queryset.aggregate(total_count=Sum('qty'))['total_count']
-        return Response({'data': serializer.data, 'total_trains': total_trains if total_trains else 0})
+        return Response({'data': ret, 'total_trains': storage_quantity})
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -6378,7 +6517,7 @@ full outer join v_ASRS_TO_MES_RE_MESVIEW b on a.LotNo=b.Lot_no and a.PALLETID=b.
                     'product_no': item[8] if item[8] else item[14],
                     'qty': item[9] if item[9] else item[15],
                     'weight': item[10] if item[10] else item[16],
-                    'equip_no': equip,
+                    'equip_no': equip if equip.startswith('Z') else '',
                     'memo': lot_nos_dict.get(lot_no, '')
                 }
             )
@@ -6386,3 +6525,20 @@ full outer join v_ASRS_TO_MES_RE_MESVIEW b on a.LotNo=b.Lot_no and a.PALLETID=b.
         if export:
             return gen_template_response(self.EXPORT_FIELDS_DICT, result, self.FILE_NAME)
         return Response({'result': result, 'count': count})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class OutboundProductInfo(APIView):
+
+    def get(self, request):
+        factory_date = self.request.query_params.get('factory_date')
+        classes = self.request.query_params.get('classes')
+        equip_no = self.request.query_params.get('equip_no')
+        if not all([factory_date, classes, equip_no]):
+            raise ValidationError('必填参数缺失！')
+        pallet_info = list(PalletFeedbacks.objects.filter(
+            factory_date=factory_date,
+            classes=classes,
+            equip_no=equip_no).values('product_no').annotate(max_trains=Max('end_trains'),
+                                                             min_trains=Min('begin_trains')))
+        return Response(pallet_info)
