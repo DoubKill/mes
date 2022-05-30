@@ -763,6 +763,8 @@ class EquipWarehouseOrderDetail(AbstractEntity):
     enter_time = models.DateTimeField(help_text='入库时间', null=True, blank=True)
     outer_time = models.DateTimeField(help_text='出库时间', null=True, blank=True)
     status = models.PositiveIntegerField(choices=ORDER_STATUS, help_text='状态', default=1)
+    receive_user = models.CharField(max_length=16, help_text='领用人', null=True, blank=True)
+    purpose = models.CharField(max_length=256, help_text='用途', null=True, blank=True)
 
     class Meta:
         db_table = 'equip_warehouse_order_detail'

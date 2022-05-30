@@ -756,3 +756,12 @@ def xl_c_calculate(equip_no, planid, queryset):
         i.update({'package_count': package_count})
     return data
 
+
+def get_real_ip(meta_data):
+    if meta_data.get('HTTP_X_FORWARDED_FOR'):
+        real_ip = meta_data.get('HTTP_X_FORWARDED_FOR')
+    elif meta_data.get('HTTP_X_REAL_IP'):
+        real_ip = meta_data.get('HTTP_X_REAL_IP')
+    else:
+        real_ip = meta_data.get('REMOTE_ADDR')
+    return real_ip
