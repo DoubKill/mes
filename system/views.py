@@ -116,11 +116,11 @@ class UserViewSet(ModelViewSet):
         user_list = []
         for item in data:
             user_data = {
-                "username": item[0],
-                "password": item[1],
-                "num": str(item[2]).split('.')[0] if item[2] else item[2],
-                "phone_number": str(item[3]).split('.')[0] if item[3] else item[3],
-                "id_card_num": str(item[4]).split('.')[0] if item[4] else item[4],
+                "username": item[1],
+                "password": item[2],
+                "num": str(item[0]).split('.')[0] if item[0] else item[0],
+                "phone_number": str(item[4]).split('.')[0] if item[4] else item[4],
+                "id_card_num": str(item[3]).split('.')[0] if item[3] else item[3],
                 "section": item[5],
                 "group_extensions": item[6]
             }
