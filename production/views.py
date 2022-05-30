@@ -3564,7 +3564,16 @@ class AttendanceClockViewSet(ModelViewSet):
         id_card_num = self.request.user.id_card_num
         apply = self.request.query_params.get('apply', None)
         time_now = datetime.datetime.now()
-        attendance_group_obj, section_list, equip_list, date_now, group_list = self.get_user_group(self.request.user)
+        try:
+            attendance_group_obj, section_list, equip_list, date_now, group_list = self.get_user_group(self.request.user)
+        except Exception as e:
+            # 查询审批不返回异常
+            if apply:
+                group_list, equip_list, section_list, principal = [], [], [], ''
+            else:
+                raise ValidationError(e)
+        else:
+            group_list, equip_list, section_list, principal = group_list, equip_list, section_list, attendance_group_obj.principal
         equip_list.sort()
         results = {
             # 'ids': ids,  # 进行中的id，前端打卡传这个过来
@@ -3573,7 +3582,7 @@ class AttendanceClockViewSet(ModelViewSet):
             'group_list': group_list,
             'equip_list': equip_list,
             'section_list': section_list,
-            'principal': attendance_group_obj.principal,  # 前端根据这个判断是否显示审批
+            'principal': principal,  # 前端根据这个判断是否显示审批
         }
         if apply:  # 补卡/加班
             return Response({'results': results})
