@@ -1760,7 +1760,7 @@ class OutBoundDeliveryOrderSerializer(BaseModelSerializer):
         return finished_qty if finished_qty else 0
 
     def validate(self, attrs):
-        order_type = attrs.get('order_type')
+        order_type = attrs.get('order_type', 1)
         if order_type == 3:  # 指定托盘出库
             attrs.pop('factory_date', '')
             attrs.pop('product_no', '')
