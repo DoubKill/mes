@@ -7,6 +7,7 @@ import random
 import re
 import time
 from io import BytesIO
+from operator import itemgetter
 
 import requests
 import xlwt
@@ -4782,8 +4783,12 @@ class InOutBoundSummaryView(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class LIBRARYINVENTORYView(ListAPIView):
     permission_classes = (IsAuthenticated, )
+    PRODUCT_VALIDITY_DICT = dict(MaterialAttribute.objects.filter(
+        period_of_validity__isnull=False
+    ).values_list('material__material_no', 'period_of_validity'))
 
     def get_result(self, model, db, store_name, warehouse_name, location_status, **kwargs):
+        now_time = datetime.datetime.now()
         # 各胶料封闭货位数据
         fb = model.objects.using(db).filter(**kwargs).filter(location_status='封闭货位').values('material_no').annotate(
             qty=Sum('qty'),
@@ -4798,11 +4803,18 @@ class LIBRARYINVENTORYView(ListAPIView):
                 query_set = query_set.exclude(location_status='封闭货位')
                 fb = []
         result = query_set.values('material_no', 'quality_level').annotate(qty=Sum('qty'),
-                                                                           total_weight=Sum('total_weight')).values(
-            'material_no', 'quality_level', 'qty', 'total_weight').order_by('material_no')
+                                                                           total_weight=Sum('total_weight'),
+                                                                           min_inventory_time=Min('in_storage_time')
+                                                                           ).values(
+            'material_no', 'quality_level', 'qty', 'total_weight', 'min_inventory_time').order_by('material_no')
 
         res = {}
         for i in result:
+            validity_days = self.PRODUCT_VALIDITY_DICT.get(i['material_no'], 0)
+            expire_flag = False
+            if validity_days:
+                if (now_time - i['min_inventory_time']).total_seconds() / 60 / 60 / 24 > validity_days:
+                    expire_flag = True
             if i['material_no'] not in res:
                 try:
                     stage = i['material_no'].split('-')[1]
@@ -4815,12 +4827,15 @@ class LIBRARYINVENTORYView(ListAPIView):
                     'stage': stage,
                     'all_qty': i['qty'],
                     'total_weight': i['total_weight'],
-                    i['quality_level']: {'qty': i['qty'], 'total_weight': i['total_weight']},
+                    i['quality_level']: {'qty': i['qty'], 'total_weight': i['total_weight'], 'expire_flag': expire_flag},
+                    'expire_flag': expire_flag
                 }
             else:
                 res[i['material_no']][i['quality_level']] = {
                     'qty': i['qty'],
-                    'total_weight': i['total_weight']}
+                    'total_weight': i['total_weight'],
+                    'expire_flag': expire_flag
+                }
                 res[i['material_no']]['all_qty'] += i['qty']
                 res[i['material_no']]['total_weight'] += i['total_weight']
             res[i['material_no']]['active_qty'] = res[i['material_no']]['all_qty']
@@ -4853,34 +4868,34 @@ class LIBRARYINVENTORYView(ListAPIView):
         for col_num in range(len(columns)):
             sheet.write(0, col_num, columns[col_num])
             # 写入数据
-            data_row = 1
-            for i in result:
-                try:
-                    product_no_split_list = i['material_no'].split('-')
-                    if product_no_split_list[1] in ('RE', 'FM', 'RFM'):
-                        product_no = product_no_split_list[2]
-                    else:
-                        product_no = '-'.join(product_no_split_list[1:3])
-                except Exception:
-                    product_no = i['material_no']
-                sheet.write(data_row, 0, result.index(i) + 1)
-                sheet.write(data_row, 1, i['stage'])
-                sheet.write(data_row, 2, product_no)
-                sheet.write(data_row, 3, product_no)
-                sheet.write(data_row, 4, i['warehouse_name'])
-                sheet.write(data_row, 5, i['location'])
-                sheet.write(data_row, 6, i['一等品']['qty'] if i.get('一等品') else None)
-                sheet.write(data_row, 7, i['一等品']['total_weight'] if i.get('一等品') else None)
-                sheet.write(data_row, 8, i['三等品']['qty'] if i.get('三等品') else None)
-                sheet.write(data_row, 9, i['三等品']['total_weight'] if i.get('三等品') else None)
-                sheet.write(data_row, 10, i['待检品']['qty'] if i.get('待检品') else None)
-                sheet.write(data_row, 11, i['待检品']['total_weight'] if i.get('待检品') else None)
-                sheet.write(data_row, 12, i['all_qty'])
-                sheet.write(data_row, 13, i['total_weight'])
-                sheet.write(data_row, 14, i['封闭']['qty'] if i.get('封闭') else None)
-                sheet.write(data_row, 15, i['封闭']['total_weight'] if i.get('封闭') else None)
-                sheet.write(data_row, 16, i['active_qty'])
-                data_row = data_row + 1
+        data_row = 1
+        for i in result:
+            try:
+                product_no_split_list = i['material_no'].split('-')
+                if product_no_split_list[1] in ('RE', 'FM', 'RFM'):
+                    product_no = product_no_split_list[2]
+                else:
+                    product_no = '-'.join(product_no_split_list[1:3])
+            except Exception:
+                product_no = i['material_no']
+            sheet.write(data_row, 0, result.index(i) + 1)
+            sheet.write(data_row, 1, i['stage'])
+            sheet.write(data_row, 2, product_no)
+            sheet.write(data_row, 3, product_no)
+            sheet.write(data_row, 4, i['warehouse_name'])
+            sheet.write(data_row, 5, i['location'])
+            sheet.write(data_row, 6, i['一等品']['qty'] if i.get('一等品') else None)
+            sheet.write(data_row, 7, i['一等品']['total_weight'] if i.get('一等品') else None)
+            sheet.write(data_row, 8, i['三等品']['qty'] if i.get('三等品') else None)
+            sheet.write(data_row, 9, i['三等品']['total_weight'] if i.get('三等品') else None)
+            sheet.write(data_row, 10, i['待检品']['qty'] if i.get('待检品') else None)
+            sheet.write(data_row, 11, i['待检品']['total_weight'] if i.get('待检品') else None)
+            sheet.write(data_row, 12, i['all_qty'])
+            sheet.write(data_row, 13, i['total_weight'])
+            sheet.write(data_row, 14, i['封闭']['qty'] if i.get('封闭') else None)
+            sheet.write(data_row, 15, i['封闭']['total_weight'] if i.get('封闭') else None)
+            sheet.write(data_row, 16, i['active_qty'])
+            data_row = data_row + 1
         # 写出到IO
         output = BytesIO()
         wb.save(output)
@@ -4898,6 +4913,7 @@ class LIBRARYINVENTORYView(ListAPIView):
         material_no = params.get("material_no", '')  # 物料编码
         location = params.get('location', '')  # 巷道
         location_status = params.get('location_status', '')  # 有无封闭货位
+        quality_level = params.get('quality_level')
         export = params.get("export", None)
 
         try:
@@ -4918,7 +4934,8 @@ class LIBRARYINVENTORYView(ListAPIView):
             filter_kwargs['material_no__contains'] = f'-{stage}'
         if location:
             filter_kwargs['location__startswith'] = location
-
+        if quality_level:
+            filter_kwargs['quality_level'] = quality_level
         if warehouse_name == '混炼胶库':
             model = BzFinalMixingRubberInventory
             store_name = '立体库'
@@ -4939,8 +4956,7 @@ class LIBRARYINVENTORYView(ListAPIView):
             warehouse_name2 = '终炼胶库'
             temp2 = self.get_result(model2, 'lb', store_name2, warehouse_name2, location_status, **filter_kwargs)
             temp = list(temp1) + list(temp2)
-        temp = sorted(temp, key=lambda x: x['material_no'])
-
+        temp = sorted(temp, key=itemgetter('expire_flag', 'material_no'), reverse=True)  # 按多个字段排序
         weight_1 = qty_1 = weight_3 = qty_3 = weight_dj = qty_dj = weight_fb = qty_fb = 0
 
         for i in temp:
@@ -6216,16 +6232,20 @@ class ProductExpireListView(APIView):
     permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_product_expire_query'}))
 
     def get(self, request):
-        expire_days = self.request.query_params.get('expire_days', 30)
+        expire_days = int(self.request.query_params.get('expire_days', 30))
         warehouse_name = self.request.query_params.get('warehouse_name')
         stage = self.request.query_params.get('stage')
+        quality_level = self.request.query_params.get('quality_level')
         page = self.request.query_params.get('page', 1)
         page_size = self.request.query_params.get('page_size', 15)
         st = (int(page) - 1) * int(page_size)
         et = int(page) * int(page_size)
         filter_kwargs = {}
+        now_time = datetime.datetime.now()
         if stage:
             filter_kwargs['material_no__icontains'] = '-{}'.format(stage)
+        if quality_level:
+            filter_kwargs['quality_level'] = quality_level
         if warehouse_name == '混炼胶库':
             product_data = BzFinalMixingRubberInventory.objects.using('bz').filter(**filter_kwargs).values(
                 'material_no', 'in_storage_time', 'qty', 'total_weight', 'quality_level', 'store_name')
@@ -6248,12 +6268,16 @@ class ProductExpireListView(APIView):
             quality_level = m['quality_level']
             store_name = '混炼胶库' if m['store_name'] == '立体库' else '终炼胶库'
             key = material_no + '-' + quality_level + store_name
-            period_of_validity = product_validity_dict.get(m['material_no'])
+            period_of_validity = product_validity_dict.get(m['material_no'], 0)
             if period_of_validity:
-                if (period_of_validity * 24 * 60 * 60 - (
-                        datetime.datetime.now() - m['in_storage_time']).total_seconds()) <= int(
-                        expire_days) * 24 * 60 * 60:
+                already_inventory_days = (now_time - m['in_storage_time']).total_seconds() / 60 / 60 / 24
+                if period_of_validity - already_inventory_days <= expire_days:
+                    expire_flag = False
+                    if already_inventory_days > period_of_validity:
+                        expire_flag = True
                     if key in ret:
+                        if not ret[key]['expire_flag']:
+                            ret['key']['expire_flag'] = expire_flag
                         ret[key]['qty'] += m['qty']
                         ret[key]['total_weight'] += m['total_weight']
                     else:
@@ -6262,7 +6286,8 @@ class ProductExpireListView(APIView):
                                     'total_weight': m['total_weight'],
                                     'quality_status': quality_level,
                                     'warehouse_name': store_name,
-                                    'period_of_validity': period_of_validity}
+                                    'period_of_validity': period_of_validity,
+                                    'expire_flag': expire_flag}
         temp = list(ret.values())
         count = len(temp)
         data = temp[st:et]

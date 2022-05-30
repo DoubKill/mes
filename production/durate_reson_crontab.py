@@ -57,7 +57,9 @@ def main():
                     b.palletno,
                     b.producecode,
                     b.actual_weight,
-                    a.lasttime
+                    a.lasttime,
+                    b.startno,
+                    b.finishno
                 FROM
                     collect_ploy_cause AS a
                     LEFT JOIN collect_ploy AS b ON a.LotNO = b.LotNO 
@@ -84,7 +86,9 @@ def main():
                 lot_no=item[3].strip() if item[3] else '99999999',
                 production_no=item[5].strip() if item[5] else '未知',
                 actual_weight=item[6] if item[6] else 0,
-                input_datetime=item[7]
+                input_datetime=item[7],
+                begin_trains=item[8],
+                end_trains=item[9],
             )
 
 
