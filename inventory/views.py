@@ -6279,7 +6279,8 @@ class ProductExpireDetailView(APIView):
                             '追踪码': 'lot_no',
                             '托盘号': 'container_no',
                             '库存位': 'location',
-                            '车数': 'qty',
+                            '机台': 'equip_no',
+                            '车次': 'memo',
                             '重量（kg）': 'total_weight',
                             '品质状态': 'quality_level',
                             '入库时间': 'in_storage_time',
@@ -6330,6 +6331,7 @@ class ProductExpireDetailView(APIView):
                     m['left_days'] = expire_date.__sub__(now_time).days
                     store_name = '混炼胶库' if m['store_name'] == '立体库' else '终炼胶库'
                     m['store_name'] = store_name
+                    m['equip_no'] = m['bill_id'][-3:]
                     temp.append(m)
         if export:
             return gen_template_response(self.EXPORT_FIELDS_DICT, temp, self.FILE_NAME)
