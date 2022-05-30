@@ -2546,7 +2546,7 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
         in_quantity = data.get('in_quantity', 1)
         out_quantity = data.get('out_quantity', 1)
         enter_time = data.get('enter_time', None)
-        outer_time = data.get('enter_time', None)
+        outer_time = data.get('outer_time', None)
         receive_user = data.get('receive_user', None)
         purpose = data.get('purpose', None)
         status = data.get('status')  # 1 入库 2 出库
@@ -2630,9 +2630,7 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
                                                 equip_spare=instance.equip_spare,
                                                 quantity=out_quantity,
                                                 equip_warehouse_order_detail=instance,
-                                                created_user=self.request.user,
-                                                receive_user=receive_user,
-                                                purpose=purpose
+                                                created_user=self.request.user
                                                 )
             return Response({"success": True, "message": '出库成功', "data": data})
 
