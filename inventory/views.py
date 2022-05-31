@@ -6543,7 +6543,7 @@ full outer join v_ASRS_TO_MES_RE_MESVIEW b on a.LotNo=b.Lot_no and a.PALLETID=b.
 class OutboundProductInfo(APIView):
 
     def get(self, request):
-        warehouse = self.request.query_params.get('warehouse', '混炼胶库')
+        warehouse = self.request.query_params.get('warehouse')
         factory_date = self.request.query_params.get('factory_date')
         classes = self.request.query_params.get('classes')
         equip_no = self.request.query_params.get('equip_no')
