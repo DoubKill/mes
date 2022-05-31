@@ -710,12 +710,15 @@ class ReturnRubberSerializer(BaseModelSerializer):
         max_code = ReturnRubber.objects.filter(bra_code__startswith=prefix_code).aggregate(max_code=Max('bra_code'))['max_code']
         bra_code = prefix_code + ("%04d" % (int(max_code[-4:]) + 1) if max_code else '0001')
         validated_data.update({'batch_class': batch_class, 'batch_group': batch_group, 'bra_code': bra_code,
-                               'created_user': self.context['request'].user})
+                               'created_user': self.context['request'].user, 'last_updated_user': self.context['request'].user,
+                               'ip_address': get_real_ip(self.context['request'].META)})
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
-        validated_data.update({'status': 1, 'last_updated_user': self.context['request'].user,
-                               'last_updated_date': datetime.now()})
+        if instance.print_flag == 1:
+            raise serializers.ValidationError('打印尚未完成, 请稍后重试')
+        validated_data.update({'print_flag': 1, 'last_updated_user': self.context['request'].user,
+                               'last_updated_date': datetime.now(), 'ip_address': get_real_ip(self.context['request'].META)})
         return super().update(instance, validated_data)
 
     class Meta:

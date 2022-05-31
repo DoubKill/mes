@@ -277,6 +277,7 @@ class ProductBatchingViewSet(ModelViewSet):
         filter_type = self.request.query_params.get('filter_type')  # 1 表示部分发送(蓝色) 2 表示未设置可用机台
         recipe_type = self.request.query_params.get('recipe_type')  # 配方类别(车胎胶料、斜交胎胶料...)
         wms_material_name = self.request.query_params.get('wms_material_name')  # 原材料名称过滤
+        print_type = self.request.query_params.get('print_type')  # 胶皮补打[加硫、无硫]过滤
         export = self.request.query_params.get('export')  # 导出涉及上述原材料的配方名称
         if exclude_used_type:
             queryset = queryset.exclude(used_type=exclude_used_type)
@@ -287,6 +288,8 @@ class ProductBatchingViewSet(ModelViewSet):
                                    'used_type',
                                    'dev_type',
                                    'dev_type__category_name')
+            if print_type:
+                data = data.filter(stage__global_name__in=['FM', 'RFM', 'RE']) if print_type == '加硫' else data.exclude(stage__global_name__in=['FM', 'RFM', 'RE'])
             return Response({'results': data})
         else:
             if filter_type:
