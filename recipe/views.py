@@ -289,7 +289,10 @@ class ProductBatchingViewSet(ModelViewSet):
                                    'dev_type',
                                    'dev_type__category_name')
             if print_type:
-                data = data.filter(stage__global_name__in=['FM', 'RFM', 'RE']) if print_type == '加硫' else data.exclude(stage__global_name__in=['FM', 'RFM', 'RE'])
+                data = list(set(data.filter(stage__global_name__in=['FM', 'RFM', 'RE'])
+                                .values_list('stage_product_batch_no', flat=True))) if print_type == '加硫' else \
+                    list(set(data.exclude(stage__global_name__in=['FM', 'RFM', 'RE'])
+                             .values_list('stage_product_batch_no', flat=True)))
             return Response({'results': data})
         else:
             if filter_type:
