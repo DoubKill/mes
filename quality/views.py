@@ -637,7 +637,11 @@ class LabelPrintViewSet(mixins.CreateModelMixin,
             "帘布#出库口#0": 10
         }
         station = request.query_params.get("station")
-        instance = self.get_queryset().filter(label_type=station_dict.get(station), status=0).order_by('id').first()
+        ip_address = request.query_params.get("ip_address")
+        if ip_address:
+            instance = self.get_queryset().filter(label_type=station_dict.get(station), status=0, ip_address=ip_address).order_by('id').first()
+        else:
+            instance = self.get_queryset().filter(label_type=station_dict.get(station), status=0).order_by('id').first()
         if instance:
             instance.status = 2
             instance.save()
