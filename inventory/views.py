@@ -6543,14 +6543,24 @@ full outer join v_ASRS_TO_MES_RE_MESVIEW b on a.LotNo=b.Lot_no and a.PALLETID=b.
 class OutboundProductInfo(APIView):
 
     def get(self, request):
+        warehouse = self.request.query_params.get('warehouse', '混炼胶库')
         factory_date = self.request.query_params.get('factory_date')
         classes = self.request.query_params.get('classes')
         equip_no = self.request.query_params.get('equip_no')
-        if not all([factory_date, classes, equip_no]):
+        if not all([factory_date, classes, equip_no, warehouse]):
             raise ValidationError('必填参数缺失！')
-        pallet_info = list(PalletFeedbacks.objects.filter(
+        lot_nos = list(PalletFeedbacks.objects.filter(
             factory_date=factory_date,
             classes=classes,
-            equip_no=equip_no).values('product_no').annotate(max_trains=Max('end_trains'),
-                                                             min_trains=Min('begin_trains')))
+            equip_no=equip_no).values_list('lot_no', flat=True))
+        if warehouse == '混炼胶库':
+            stock_lot_nos = list(
+                BzFinalMixingRubberInventory.objects.using('bz').filter(
+                    lot_no__in=lot_nos).values_list('lot_no', flat=True))
+        else:
+            stock_lot_nos = list(
+                BzFinalMixingRubberInventoryLB.objects.using('lb').filter(lot_no__in=lot_nos).values_list('lot_no', flat=True))
+
+        pallet_info = list(PalletFeedbacks.objects.filter(lot_no__in=stock_lot_nos).values('product_no').annotate(max_trains=Max('end_trains'),
+                                                          min_trains=Min('begin_trains')))
         return Response(pallet_info)

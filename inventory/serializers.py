@@ -1772,6 +1772,25 @@ class OutBoundDeliveryOrderSerializer(BaseModelSerializer):
             attrs['order_qty'] = 99999
             if not attrs.get('pallet_no'):
                 raise serializers.ValidationError('请填写托盘号！')
+            if attrs['warehouse'] == '混炼胶库':
+                station = attrs['station']
+                bz_obj = BzFinalMixingRubberInventory.objects.using('bz').filter(container_no=attrs['pallet_no']).last()
+                if not bz_obj:
+                    raise serializers.ValidationError('此托盘不存在该库区内！')
+                if station == '一层前端':
+                    if bz_obj.location[0] not in ('3', '4'):
+                        raise serializers.ValidationError('此托盘无法从该出库口出库！')
+                elif station == '二层前端':
+                    if bz_obj.location[0] not in ('1', '2'):
+                        raise serializers.ValidationError('此托盘无法从该出库口出库！')
+                elif station == '一层后端':
+                    raise serializers.ValidationError('该出库口不可用！')
+            else:
+                bz_obj = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(container_no=attrs['pallet_no']).last()
+                if not bz_obj:
+                    raise serializers.ValidationError('此托盘不存在该库区内！')
+                if bz_obj.store_name != '炼胶库':
+                    raise serializers.ValidationError('非承放胶块托盘！')
         elif order_type == 2:  # 指定胶料生产信息
             attrs.pop('pallet_no', '')
             attrs.pop('quality_status', '')
