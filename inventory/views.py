@@ -80,6 +80,7 @@ from quality.serializers import MaterialDealResultListSerializer
 from quality.utils import update_wms_quality_result
 from recipe.models import MaterialAttribute
 from terminal.models import LoadMaterialLog, WeightBatchingLog, WeightPackageLog
+from terminal.utils import get_real_ip
 from .conf import IS_BZ_USING
 from .conf import wms_ip, wms_port, cb_ip, cb_port
 from .models import MaterialInventory as XBMaterialInventory
@@ -789,7 +790,7 @@ class AdditionalPrintView(APIView):
                     label.update({"equip_no": data.equip_no, "classes_group": f"{data.classes}/{group}",
                                   "actual_trains": f"{data.begin_trains}/{data.end_trains}"})
                 label = json.dumps(label)
-            LabelPrint.objects.create(label_type=station_dict.get(station), lot_no=lot_no, status=0, data=label)
+            LabelPrint.objects.create(label_type=station_dict.get(station), lot_no=lot_no, status=0, data=label, ip_address=get_real_ip(self.request.META))
         return Response('下发打印完成')
 
 
