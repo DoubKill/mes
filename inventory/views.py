@@ -4815,6 +4815,10 @@ class LIBRARYINVENTORYView(ListAPIView):
             if validity_days:
                 if (now_time - i['min_inventory_time']).total_seconds() / 60 / 60 / 24 > validity_days:
                     expire_flag = True
+            dj_flag = False
+            if i['quality_level'] == '待检品':
+                if (now_time - i['min_inventory_time']).total_seconds() / 60 / 60 / 24 > 3:
+                    dj_flag = True
             if i['material_no'] not in res:
                 try:
                     stage = i['material_no'].split('-')[1]
@@ -4827,14 +4831,16 @@ class LIBRARYINVENTORYView(ListAPIView):
                     'stage': stage,
                     'all_qty': i['qty'],
                     'total_weight': i['total_weight'],
-                    i['quality_level']: {'qty': i['qty'], 'total_weight': i['total_weight'], 'expire_flag': expire_flag},
-                    'expire_flag': expire_flag
+                    i['quality_level']: {'qty': i['qty'], 'total_weight': i['total_weight'], 'expire_flag': expire_flag, 'dj_flag': dj_flag},
+                    'expire_flag': expire_flag,
+                    'dj_flag': dj_flag
                 }
             else:
                 res[i['material_no']][i['quality_level']] = {
                     'qty': i['qty'],
                     'total_weight': i['total_weight'],
-                    'expire_flag': expire_flag
+                    'expire_flag': expire_flag,
+                    'dj_flag': dj_flag
                 }
                 res[i['material_no']]['all_qty'] += i['qty']
                 res[i['material_no']]['total_weight'] += i['total_weight']
@@ -4956,7 +4962,7 @@ class LIBRARYINVENTORYView(ListAPIView):
             warehouse_name2 = '终炼胶库'
             temp2 = self.get_result(model2, 'lb', store_name2, warehouse_name2, location_status, **filter_kwargs)
             temp = list(temp1) + list(temp2)
-        temp = sorted(temp, key=itemgetter('expire_flag', 'material_no'), reverse=True)  # 按多个字段排序
+        temp = sorted(temp, key=itemgetter('expire_flag', 'dj_flag', 'material_no'), reverse=True)  # 按多个字段排序
         weight_1 = qty_1 = weight_3 = qty_3 = weight_dj = qty_dj = weight_fb = qty_fb = 0
 
         for i in temp:
@@ -6275,9 +6281,15 @@ class ProductExpireListView(APIView):
                     expire_flag = False
                     if already_inventory_days > period_of_validity:
                         expire_flag = True
+                    dj_flag = False
+                    if quality_level == '待检品':
+                        if already_inventory_days > 3:
+                            dj_flag = True
                     if key in ret:
                         if not ret[key]['expire_flag']:
                             ret['key']['expire_flag'] = expire_flag
+                        if not ret[key]['dj_flag']:
+                            ret['key']['dj_flag'] = dj_flag
                         ret[key]['qty'] += m['qty']
                         ret[key]['total_weight'] += m['total_weight']
                     else:
@@ -6287,7 +6299,9 @@ class ProductExpireListView(APIView):
                                     'quality_status': quality_level,
                                     'warehouse_name': store_name,
                                     'period_of_validity': period_of_validity,
-                                    'expire_flag': expire_flag}
+                                    'expire_flag': expire_flag,
+                                    'dj_flag': dj_flag,
+                                    }
         temp = list(ret.values())
         count = len(temp)
         data = temp[st:et]
