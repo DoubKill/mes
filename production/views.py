@@ -3210,7 +3210,7 @@ class PerformanceSummaryView(APIView):
                 results_sort[i] = results.pop(i)
             # 是否定岗
             a = float(coefficient_dic.get('是'))
-            if independent.get(name_d, 1) == False:
+            if not independent.get(name_d) or independent.get(name_d).get('status') != 1:
                 a = float(coefficient_dic.get('否'))
 
             # 计算超产奖励
@@ -3262,7 +3262,7 @@ class PerformanceSummaryView(APIView):
             key = f"{name}_{day}_{section}"
             a = float(coefficient_dic.get('是'))
             aa = '是'
-            if independent.get(name, 1) == False:
+            if not independent.get(name) or independent.get(name).get('status') != 1:
                 a = float(coefficient_dic.get('否'))
                 aa = '否'
             coefficient = section_info[section]['coefficient'] / 100
@@ -3564,7 +3564,16 @@ class AttendanceClockViewSet(ModelViewSet):
         id_card_num = self.request.user.id_card_num
         apply = self.request.query_params.get('apply', None)
         time_now = datetime.datetime.now()
-        attendance_group_obj, section_list, equip_list, date_now, group_list = self.get_user_group(self.request.user)
+        try:
+            attendance_group_obj, section_list, equip_list, date_now, group_list = self.get_user_group(self.request.user)
+        except Exception as e:
+            # 查询审批不返回异常
+            if apply:
+                group_list, equip_list, section_list, principal = [], [], [], ''
+            else:
+                raise ValidationError(e)
+        else:
+            group_list, equip_list, section_list, principal = group_list, equip_list, section_list, attendance_group_obj.principal
         equip_list.sort()
         results = {
             # 'ids': ids,  # 进行中的id，前端打卡传这个过来
@@ -3573,7 +3582,7 @@ class AttendanceClockViewSet(ModelViewSet):
             'group_list': group_list,
             'equip_list': equip_list,
             'section_list': section_list,
-            'principal': attendance_group_obj.principal,  # 前端根据这个判断是否显示审批
+            'principal': principal,  # 前端根据这个判断是否显示审批
         }
         if apply:  # 补卡/加班
             return Response({'results': results})
@@ -3669,13 +3678,14 @@ class AttendanceClockViewSet(ModelViewSet):
                 )
                 results['ids'].append(obj.id)
         elif status == '离岗':  # 可重复打卡
-            attendance_st = datetime.datetime.strptime(f"{date_now} {str(attendance_group_obj.attendance_st)}", '%Y-%m-%d %H:%M:%S')
             range_time = datetime.timedelta(minutes=attendance_group_obj.range_time)
-            # if time_now < attendance_st + range_time:
-            #     raise ValidationError('未到可打卡时间')
             begin_date = EmployeeAttendanceRecords.objects.filter(id__in=ids).first().begin_date
             if time_now < begin_date + range_time:
                 raise ValidationError(f'上班{attendance_group_obj.range_time}分钟内不能打下班卡')
+            # 下班半小时后不能再打卡
+            attendance_et = datetime.datetime.strptime(f"{date_now} {str(attendance_group_obj.attendance_et)}", '%Y-%m-%d %H:%M:%S')
+            if time_now > attendance_et + datetime.timedelta(minutes=30):
+                raise ValidationError('下班超过半小时不可在打卡')
             end_date = time_now
             work_time = round((end_date - begin_date).seconds / 3600, 2)
             EmployeeAttendanceRecords.objects.filter(id__in=ids).update(
