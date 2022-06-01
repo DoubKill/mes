@@ -4064,11 +4064,15 @@ class BzMixingRubberInventory(ListAPIView):
             except Exception:
                 raise ValidationError('参数错误！')
             if order.order_type == 2:  # 指定生产信息出库
-                lot_nos = list(PalletFeedbacks.objects.filter(
+                pallet_data = PalletFeedbacks.objects.filter(
                     factory_date=order.factory_date,
                     equip_no=order.equip_no,
                     classes=order.classes,
-                    product_no=order.product_no).values_list('lot_no', flat=True))
+                    product_no=order.product_no).values('lot_no', 'begin_trains', 'end_trains')
+                common_pallet = list(filter(lambda x: max(x['begin_trains'], order.begin_trains)
+                                                      <= min(x['end_trains'], order.end_trains),
+                                            pallet_data))
+                lot_nos = [i['lot_no'] for i in common_pallet]
                 queryset = queryset.filter(lot_no__in=lot_nos, material_no=order.product_no)
             elif order.order_type == 3:  # 指定托盘出库
                 queryset = queryset.filter(container_no=order.pallet_no)
@@ -4201,11 +4205,15 @@ class BzMixingRubberInventorySearch(ListAPIView):
             except Exception:
                 raise ValidationError('参数错误！')
             if order.order_type == 2:  # 指定生产信息出库
-                lot_nos = list(PalletFeedbacks.objects.filter(
+                pallet_data = PalletFeedbacks.objects.filter(
                     factory_date=order.factory_date,
                     equip_no=order.equip_no,
                     classes=order.classes,
-                    product_no=order.product_no).values_list('lot_no', flat=True))
+                    product_no=order.product_no).values('lot_no', 'begin_trains', 'end_trains')
+                common_pallet = list(filter(lambda x: max(x['begin_trains'], order.begin_trains)
+                                                      <= min(x['end_trains'], order.end_trains),
+                                            pallet_data))
+                lot_nos = [i['lot_no'] for i in common_pallet]
                 queryset = queryset.filter(lot_no__in=lot_nos, material_no=order.product_no)
             elif order.order_type == 3:  # 指定托盘出库
                 queryset = queryset.filter(container_no=order.pallet_no)
@@ -4342,11 +4350,15 @@ class BzFinalRubberInventory(ListAPIView):
             except Exception:
                 raise ValidationError('参数错误！')
             if order.order_type == 2:  # 指定生产信息出库
-                lot_nos = list(PalletFeedbacks.objects.filter(
+                pallet_data = PalletFeedbacks.objects.filter(
                     factory_date=order.factory_date,
                     equip_no=order.equip_no,
                     classes=order.classes,
-                    product_no=order.product_no).values_list('lot_no', flat=True))
+                    product_no=order.product_no).values('lot_no', 'begin_trains', 'end_trains')
+                common_pallet = list(filter(lambda x: max(x['begin_trains'], order.begin_trains)
+                                                      <= min(x['end_trains'], order.end_trains),
+                                            pallet_data))
+                lot_nos = [i['lot_no'] for i in common_pallet]
                 filter_kwargs['lot_no__in'] = lot_nos
                 filter_kwargs['material_no'] = order.product_no
             elif order.order_type == 3:  # 指定托盘出库
@@ -4463,11 +4475,15 @@ class BzFinalRubberInventorySearch(ListAPIView):
             except Exception:
                 raise ValidationError('参数错误！')
             if order.order_type == 2:  # 指定生产信息出库
-                lot_nos = list(PalletFeedbacks.objects.filter(
+                pallet_data = PalletFeedbacks.objects.filter(
                     factory_date=order.factory_date,
                     equip_no=order.equip_no,
                     classes=order.classes,
-                    product_no=order.product_no).values_list('lot_no', flat=True))
+                    product_no=order.product_no).values('lot_no', 'begin_trains', 'end_trains')
+                common_pallet = list(filter(lambda x: max(x['begin_trains'], order.begin_trains)
+                                                      <= min(x['end_trains'], order.end_trains),
+                                            pallet_data))
+                lot_nos = [i['lot_no'] for i in common_pallet]
                 queryset = queryset.filter(lot_no__in=lot_nos, material_no=order.product_no)
             elif order.order_type == 3:  # 指定托盘出库
                 queryset = queryset.filter(container_no=order.pallet_no)
