@@ -4825,22 +4825,24 @@ class LIBRARYINVENTORYView(ListAPIView):
 
         res = {}
         for i in result:
-            validity_days = self.PRODUCT_VALIDITY_DICT.get(i['material_no'], 0)
+            material_no = i['material_no'].strip()
+            quality_level = i['quality_level'].strip()
+            validity_days = self.PRODUCT_VALIDITY_DICT.get(material_no, 0)
             expire_flag = False
             if validity_days:
                 if (now_time - i['min_inventory_time']).total_seconds() / 60 / 60 / 24 > validity_days:
                     expire_flag = True
             dj_flag = False
-            if i['quality_level'] == '待检品':
+            if quality_level == '待检品':
                 if (now_time - i['min_inventory_time']).total_seconds() / 60 / 60 / 24 > 3:
                     dj_flag = True
-            if i['material_no'] not in res:
+            if material_no not in res:
                 try:
-                    stage = i['material_no'].split('-')[1]
+                    stage = material_no.split('-')[1]
                 except Exception:
-                    stage = i['material_no']
-                res[i['material_no']] = {
-                    'material_no': i['material_no'],
+                    stage = material_no
+                res[material_no] = {
+                    'material_no': material_no,
                     'warehouse_name': warehouse_name,
                     'location': kwargs.get('location__startswith'),
                     'stage': stage,
@@ -4851,20 +4853,23 @@ class LIBRARYINVENTORYView(ListAPIView):
                     'dj_flag': dj_flag
                 }
             else:
-                res[i['material_no']][i['quality_level']] = {
+                res[material_no][quality_level] = {
                     'qty': i['qty'],
                     'total_weight': i['total_weight'],
                     'expire_flag': expire_flag,
                     'dj_flag': dj_flag
                 }
-                res[i['material_no']]['all_qty'] += i['qty']
-                res[i['material_no']]['total_weight'] += i['total_weight']
-            res[i['material_no']]['active_qty'] = res[i['material_no']]['all_qty']
+                if not res[material_no]['dj_flag']:
+                    res[material_no]['dj_flag'] = dj_flag
+                res[material_no]['all_qty'] += i['qty']
+                res[material_no]['total_weight'] += i['total_weight']
+            res[material_no]['active_qty'] = res[material_no]['all_qty']
 
         for i in fb:
-            if res.get(i['material_no']):
-                res[i['material_no']].update({'封闭': {'qty': i['qty'], 'total_weight': i['total_weight']}})
-                res[i['material_no']]['active_qty'] -= res[i['material_no']]['封闭']['qty']
+            material_no = i['material_no']
+            if res.get(material_no):
+                res[material_no].update({'封闭': {'qty': i['qty'], 'total_weight': i['total_weight']}})
+                res[material_no]['active_qty'] -= res[material_no]['封闭']['qty']
 
         return list(res.values())
 
@@ -6286,11 +6291,11 @@ class ProductExpireListView(APIView):
         ).values_list('material__material_no', 'period_of_validity'))
         ret = {}
         for m in product_data:
-            material_no = m['material_no']
-            quality_level = m['quality_level']
+            material_no = m['material_no'].strip()
+            quality_level = m['quality_level'].strip()
             store_name = '混炼胶库' if m['store_name'] == '立体库' else '终炼胶库'
             key = material_no + '-' + quality_level + store_name
-            period_of_validity = product_validity_dict.get(m['material_no'], 0)
+            period_of_validity = product_validity_dict.get(material_no, 0)
             if period_of_validity:
                 already_inventory_days = (now_time - m['in_storage_time']).total_seconds() / 60 / 60 / 24
                 if period_of_validity - already_inventory_days <= expire_days:
@@ -6374,7 +6379,8 @@ class ProductExpireDetailView(APIView):
         temp = []
         now_time = datetime.datetime.now()
         for m in product_data:
-            period_of_validity = product_validity_dict.get(m['material_no'])
+            material_no = m['material_no'].strip()
+            period_of_validity = product_validity_dict.get(material_no)
             in_storage_time = m['in_storage_time']
             if period_of_validity:
                 if (period_of_validity * 24 * 60 * 60 - (
