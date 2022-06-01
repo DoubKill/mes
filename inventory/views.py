@@ -6303,9 +6303,9 @@ class ProductExpireListView(APIView):
                             dj_flag = True
                     if key in ret:
                         if not ret[key]['expire_flag']:
-                            ret['key']['expire_flag'] = expire_flag
+                            ret[key]['expire_flag'] = expire_flag
                         if not ret[key]['dj_flag']:
-                            ret['key']['dj_flag'] = dj_flag
+                            ret[key]['dj_flag'] = dj_flag
                         ret[key]['qty'] += m['qty']
                         ret[key]['total_weight'] += m['total_weight']
                     else:
