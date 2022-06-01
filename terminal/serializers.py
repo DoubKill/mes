@@ -245,7 +245,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 else:  # 胶块替代(1、不能通过直接绑定erp替代; 2、增加这段逻辑确保替代胶块能走到下面物料是否在配方中判断)
                     material_name = scan_material
                     material_no = scan_material
-                total_weight = res.get('ZL')
+                total_weight = Decimal(res.get('ZL'))
                 unit = res.get('BZDW')
         if not material_name:
             raise serializers.ValidationError('未找到该条形码信息！')
