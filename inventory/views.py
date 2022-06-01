@@ -5219,7 +5219,7 @@ class WMSStockSummaryView(APIView):
                 data_dict[item[1]]['weight_{}'.format(quality_status)] = item[7]
         result = []
         for item in data_dict.values():
-            weighting = safety_data.get(item['code'])
+            weighting = safety_data.get(item['code'].strip())
             if weighting:
                 if weighting < item['weight_1'] + item['weight_5']:
                     item['flag'] = 'H'
@@ -6130,10 +6130,10 @@ class ProductExpireListView(APIView):
         ).values_list('material__material_no', 'period_of_validity'))
         ret = {}
         for m in product_data:
-            material_no = m['material_no']
-            quality_level = m['quality_level']
+            material_no = m['material_no'].strip()
+            quality_level = m['quality_level'].strip()
             key = material_no + '-' + quality_level
-            period_of_validity = product_validity_dict.get(m['material_no'])
+            period_of_validity = product_validity_dict.get(material_no)
             if period_of_validity:
                 if (period_of_validity * 24 * 60 * 60 - (
                         datetime.datetime.now() - m['in_storage_time']).total_seconds()) <= int(
@@ -6201,7 +6201,8 @@ class ProductExpireDetailView(APIView):
         temp = []
         now_time = datetime.datetime.now()
         for m in product_data:
-            period_of_validity = product_validity_dict.get(m['material_no'])
+            material_no = m['material_no'].strip()
+            period_of_validity = product_validity_dict.get(material_no)
             in_storage_time = m['in_storage_time']
             if period_of_validity:
                 if (period_of_validity * 24 * 60 * 60 - (

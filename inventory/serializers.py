@@ -808,7 +808,10 @@ class WmsInventoryStockSerializer(serializers.ModelSerializer):
             return 'N'
 
     def get_in_charged_tag(self, obj):
-        return self.context['ncm_data'].get(obj.batch_no, '未管控')
+        try:
+            return self.context['ncm_data'].get(obj.batch_no.strip(), '未管控')
+        except Exception:
+            return "未管控"
 
     def get_unit_weight(self, obj):
         try:
