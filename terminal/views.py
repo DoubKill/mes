@@ -3008,7 +3008,7 @@ class ReturnRubberViewSet(ModelViewSet):
     def print_return_rubber(self, request):
         rid = self.request.data.get('id')
         status = self.request.data.get('print_flag')
-        self.get_queryset().filter(id=rid).update(status=status)
+        self.get_queryset().filter(id=rid).update(print_flag=status)
         return response(success=True, message='回正打印状态成功')
 
 
