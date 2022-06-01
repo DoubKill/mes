@@ -1321,7 +1321,7 @@ class PackageExpireView(APIView):
         if set_product_no:
             # 获取公共代码定义的天数
             s_day, f_day = 5, 7
-            day_info = GlobalCode.objects.filter(global_type__use_flag=True, global_type__type_no='料包默认有效期', delete_flag=False)
+            day_info = GlobalCode.objects.filter(global_type__use_flag=True, global_type__type_name='料包默认有效期', delete_flag=False)
             if day_info:
                 s_days_info = day_info.filter(global_no='硫磺包有效期').first()
                 f_days_info = day_info.filter(global_no='细料包有效期').first()
