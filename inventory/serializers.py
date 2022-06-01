@@ -18,6 +18,7 @@ from basics.models import GlobalCode
 from mes import settings
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import STATION_LOCATION_MAP, COMMON_READ_ONLY_FIELDS
+from quality.models import WMSMooneyLevel, MaterialSingleTypeExamineResult
 from quality.utils import update_wms_quality_result
 from recipe.models import MaterialAttribute
 from .conf import wms_ip, wms_port, cb_ip, cb_port
@@ -774,30 +775,51 @@ class WmsInventoryStockSerializer(serializers.ModelSerializer):
     quality_status = serializers.SerializerMethodField(read_only=True)
     is_entering = serializers.SerializerMethodField(read_only=True)
     in_charged_tag = serializers.SerializerMethodField(read_only=True)
+    mn_level = serializers.SerializerMethodField()
 
-    def get_is_entering(self, object):
-        if object.container_no.startswith('5'):
+    def get_mn_level(self, obj):
+        # 门尼等级信息
+        wms_mooney_level = WMSMooneyLevel.objects.filter(
+            h_upper_limit_value__isnull=False,
+            material_no=obj.material_no).first()
+        if not wms_mooney_level:
+            return ""
+        # 物料检测信息
+        examine_data = MaterialSingleTypeExamineResult.objects.filter(
+            type__name__icontains='门尼',
+            material_examine_result__material__batch=obj.batch_no,
+            material_examine_result__material__wlxxid=obj.material_no).first()
+        if not examine_data:
+            return ""
+        ml_test_value = examine_data.value
+        if wms_mooney_level.h_lower_limit_value <= ml_test_value <= wms_mooney_level.h_upper_limit_value:
+            return '高级'
+        elif wms_mooney_level.m_lower_limit_value <= ml_test_value <= wms_mooney_level.m_upper_limit_value:
+            return '中级'
+        elif wms_mooney_level.l_lower_limit_value <= ml_test_value <= wms_mooney_level.l_upper_limit_value:
+            return '低级'
+        else:
+            return ""
+
+    def get_is_entering(self, obj):
+        if obj.container_no.startswith('5'):
             return 'Y'
         else:
             return 'N'
 
-    def get_in_charged_tag(self, object):
-        ins = WmsNucleinManagement.objects.filter(batch_no=object.batch_no).first()
-        if ins:
-            return ins.locked_status
-        else:
-            return '未管控'
+    def get_in_charged_tag(self, obj):
+        return self.context['ncm_data'].get(obj.batch_no, '未管控')
 
-    def get_unit_weight(self, object):
+    def get_unit_weight(self, obj):
         try:
-            unit_weight = object.total_weight / object.qty
+            unit_weight = obj.total_weight / obj.qty
         except:
             unit_weight = "数据异常"
         return unit_weight
 
-    def get_quality_status(self, object):
+    def get_quality_status(self, obj):
         status_map = {1: "合格品", 2: "抽检中", 3: "不合格品", 4: "过期", 5: "待检"}
-        return status_map.get(object.quality_status, "不合格品")
+        return status_map.get(obj.quality_status, "不合格品")
 
     class Meta:
         model = WmsInventoryStock
