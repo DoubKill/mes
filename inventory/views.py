@@ -4787,8 +4787,7 @@ class LIBRARYINVENTORYView(ListAPIView):
         period_of_validity__isnull=False
     ).values_list('material__material_no', 'period_of_validity'))
 
-    def get_result(self, model, db, store_name, warehouse_name, location_status, **kwargs):
-        now_time = datetime.datetime.now()
+    def get_result(self, model, db, store_name, warehouse_name, location_status, now_time, **kwargs):
         # 各胶料封闭货位数据
         fb = model.objects.using(db).filter(**kwargs).filter(location_status='封闭货位').values('material_no').annotate(
             qty=Sum('qty'),
@@ -4921,6 +4920,7 @@ class LIBRARYINVENTORYView(ListAPIView):
         location_status = params.get('location_status', '')  # 有无封闭货位
         quality_level = params.get('quality_level')
         export = params.get("export", None)
+        now_time = datetime.datetime.now()
 
         try:
             st = (int(page) - 1) * int(page_size)
@@ -4945,22 +4945,22 @@ class LIBRARYINVENTORYView(ListAPIView):
         if warehouse_name == '混炼胶库':
             model = BzFinalMixingRubberInventory
             store_name = '立体库'
-            temp = self.get_result(model, 'bz', store_name, warehouse_name, location_status, **filter_kwargs)
+            temp = self.get_result(model, 'bz', store_name, warehouse_name, location_status, now_time, **filter_kwargs)
 
         elif warehouse_name == '终炼胶库':
             model = BzFinalMixingRubberInventoryLB
             store_name = '炼胶库'
-            temp = self.get_result(model, 'lb', store_name, warehouse_name, location_status, **filter_kwargs)
+            temp = self.get_result(model, 'lb', store_name, warehouse_name, location_status, now_time, **filter_kwargs)
 
         else:
             model1 = BzFinalMixingRubberInventory
             store_name1 = '立体库'
             warehouse_name1 = '混炼胶库'
-            temp1 = self.get_result(model1, 'bz', store_name1, warehouse_name1, location_status, **filter_kwargs)
+            temp1 = self.get_result(model1, 'bz', store_name1, warehouse_name1, location_status, now_time, **filter_kwargs)
             model2 = BzFinalMixingRubberInventoryLB
             store_name2 = '炼胶库'
             warehouse_name2 = '终炼胶库'
-            temp2 = self.get_result(model2, 'lb', store_name2, warehouse_name2, location_status, **filter_kwargs)
+            temp2 = self.get_result(model2, 'lb', store_name2, warehouse_name2, location_status, now_time, **filter_kwargs)
             temp = list(temp1) + list(temp2)
         temp = sorted(temp, key=itemgetter('expire_flag', 'dj_flag', 'material_no'), reverse=True)  # 按多个字段排序
         weight_1 = qty_1 = weight_3 = qty_3 = weight_dj = qty_dj = weight_fb = qty_fb = 0
