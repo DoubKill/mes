@@ -264,6 +264,12 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                            'product_no': classes_plan.product_batching.stage_product_batch_no,
                            'material_name': scan_material, 'plan_weight': total_weight}
             other_type, status = scan_material_type, False
+            # 添加到工艺放行表中的数据
+            replace_material_data = {"plan_classes_uid": plan_classes_uid, "equip_no": classes_plan.equip.equip_no,
+                                     "product_no": classes_plan.product_batching.stage_product_batch_no,
+                                     "real_material": scan_material, "bra_code": bra_code, "status": "未处理",
+                                     "created_user": self.context['request'].user, "real_material_no": scan_material,
+                                     "last_updated_date": now_date, "material_type": scan_material_type}
             # 胶皮
             if scan_material_type == '胶皮':
                 flag, send_flag = False, False
@@ -325,14 +331,11 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 if not OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code, status=status, other_type=other_type):
                     record_data.update({'other_type': other_type, 'status': status})
                     OtherMaterialLog.objects.create(**record_data)
+                if not ReplaceMaterial.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code, reason_type='物料名不一致'):
+                    replace_material_data.update({'reason_type': '物料名不一致'})
+                    ReplaceMaterial.objects.create(**replace_material_data)
             # 胶块/细料
             else:
-                # 添加到工艺放行表中的数据
-                replace_material_data = {"plan_classes_uid": plan_classes_uid, "equip_no": classes_plan.equip.equip_no,
-                                         "product_no": classes_plan.product_batching.stage_product_batch_no,
-                                         "real_material": scan_material, "bra_code": bra_code, "status": "未处理",
-                                         "created_user": self.context['request'].user, "real_material_no": scan_material,
-                                         "last_updated_date": now_date, "material_type": scan_material_type}
                 if scan_material_type == '胶块':
                     res = self.material_pass(plan_classes_uid, scan_material, material_type=scan_material_type)
                     if not res[0]:
