@@ -4791,6 +4791,7 @@ class EquipIndexView(APIView):
             ret['responsor_user'] = result[0].get('username')
         for equip in equips:
             last_running_time = None
+            current_product = ''
             equip_no = equip.equip_no
             equip_cat = equip.category.equip_type.global_name
             if equip_cat == '密炼设备':
@@ -4805,6 +4806,9 @@ class EquipIndexView(APIView):
                 last_trains_feedback = TrainsFeedbacks.objects.filter(equip_no=equip_no, factory_date=factory_date).order_by('id').last()
                 if last_trains_feedback:
                     last_running_time = last_trains_feedback.end_time
+                    current_product = '({}/{}) {}'.format(last_trains_feedback.actual_trains,
+                                                          last_trains_feedback.plan_trains,
+                                                          last_trains_feedback.product_no)
             else:
                 actual_trains = plan_trains = halt_time = 0
                 try:
@@ -4817,15 +4821,19 @@ class EquipIndexView(APIView):
                     plan_trains = plan_actual_data['plan_trains'] if plan_actual_data['plan_trains'] else 0
                     # 计算所有计划开始结束时间累加
                     plan_list = Plan.objects.using(equip_no).filter(
-                        date_time=factory_date).values('starttime', 'stoptime', 'actno', 'state')
+                        date_time=factory_date).values('starttime', 'stoptime', 'actno', 'state', 'recipe', 'setno')
                     time_consume = 0
                     for item in plan_list:
-                        if item['state'] == '运行中':
-                            last_running_time = now_time
                         try:
                             finish_no = int(item['actno'])
                         except Exception:
                             continue
+                        if item['state'] == '运行中':
+                            last_running_time = now_time
+                            if finish_no > 0:
+                                current_product = '({}/{}) {}'.format(item['actno'],
+                                                                     item['setno'],
+                                                                     item['recipe'])
                         if not item['starttime']:
                             continue
                         if finish_no > 0:
@@ -4857,15 +4865,21 @@ class EquipIndexView(APIView):
                 status__in=('已生成', '已指派', '已接单', '已开始'),
                 equip_no=equip_no).order_by('id').last()
             if not last_apply_order:
+                repair_plan_id = ""
                 state = '运行中'
                 error_reason = ''
                 breakdown_time = 0
+                error_continue_minutes = 0
                 if last_running_time:
-                    if (now_time - last_running_time).total_seconds() / 60 > 30:
+                    lt_time = (now_time - last_running_time).total_seconds() / 60
+                    if lt_time > 30:
                         state = '生产停机'
+                        error_continue_minutes = int(lt_time)
                 else:
                     state = '生产停机'
+                    error_continue_minutes = 0
             else:
+                repair_plan_id = last_apply_order.plan_id
                 state = '设备故障'
                 breakdown_time = 0
                 if last_apply_order.status == '已开始':
@@ -4873,6 +4887,8 @@ class EquipIndexView(APIView):
                 if last_apply_order.equip_condition == '停机':
                     state = '故障停机'
                 error_reason = last_apply_order.result_fault_cause
+                fault_time = last_apply_order.fault_datetime or last_apply_order.created_date
+                error_continue_minutes = int((now_time - fault_time).total_seconds() / 60)
 
                 # 设备故障停机时间
                 orders = EquipApplyOrder.objects.filter(
@@ -4911,7 +4927,10 @@ class EquipIndexView(APIView):
                                                      to_check_order_num),
                 'state': state,
                 'error_reason': error_reason,
-                'is_repairing': is_repairing
+                'is_repairing': is_repairing,
+                'error_minutes': error_continue_minutes,
+                'current_product': current_product,
+                'repair_plan_id': repair_plan_id
             }
             ret['equip_data'].append(data)
         return Response(ret)
