@@ -352,6 +352,8 @@ class RubberCannotPutinReason(models.Model):
     pallet_no = models.CharField(max_length=64, help_text='收皮条码')
     actual_weight = models.FloatField(help_text='实际重量')
     input_datetime = models.DateTimeField(help_text='录入时间')
+    begin_trains = models.IntegerField(help_text='开始车次', blank=True, null=True)
+    end_trains = models.IntegerField(help_text='结束车次', blank=True, null=True)
 
     class Meta:
         db_table = 'rubber_cannot_putin_reason'

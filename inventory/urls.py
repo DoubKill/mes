@@ -222,5 +222,7 @@ urlpatterns = [
     path('product-expires-list/', ProductExpireListView.as_view()),  # 胶料即将超期预警
     path('product-expires-details/', ProductExpireDetailView.as_view()),  # 胶料即将超期预警详情
 
-    path('product-in-out-history/', ProductInOutHistoryView.as_view())
+    path('product-in-out-history/', ProductInOutHistoryView.as_view()),
+
+    path('outbound-product-info/', OutboundProductInfo.as_view())
 ]
