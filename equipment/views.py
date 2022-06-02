@@ -4832,8 +4832,8 @@ class EquipIndexView(APIView):
                             last_running_time = now_time
                             if finish_no > 0:
                                 current_product = '({}/{}) {}'.format(item['actno'],
-                                                                     item['setno'],
-                                                                     item['recipe'])
+                                                                      item['setno'],
+                                                                      item['recipe'])
                         if not item['starttime']:
                             continue
                         if finish_no > 0:
@@ -4858,79 +4858,85 @@ class EquipIndexView(APIView):
             to_check_order_num = apply_data_dict.get('{}-{}'.format(equip_no, '已完成'), 0)
             is_repairing = False
 
-            # 取最后一条报修单
-            last_apply_order = EquipApplyOrder.objects.filter(
-                # equip_condition='停机',
-                # work_type='维修',
-                status__in=('已生成', '已指派', '已接单', '已开始'),
-                equip_no=equip_no).order_by('id').last()
-            if not last_apply_order:
-                repair_plan_id = ""
-                state = '运行中'
+            if last_running_time:
+                lt_time = (now_time - last_running_time).total_seconds() / 60
+                if lt_time > 20:  # 最后一条车次的生产时间与当前时间对比，大于20分钟则判定为生产停机
+                    state = '生产停机'
+                    error_reason = ''
+                    breakdown_time = 0
+                    error_continue_minutes = int(lt_time)
+                    repair_plan_id = ''
+                    last_apply_order = EquipApplyOrder.objects.filter(
+                        status__in=('已生成', '已指派', '已接单', '已开始'),
+                        equip_no=equip_no).order_by('id').last()
+                    if last_apply_order:
+                        repair_plan_id = (last_apply_order.id, last_apply_order.plan_id)
+                        state = '设备故障'
+                        breakdown_time = 0
+                        if last_apply_order.status == '已开始':
+                            is_repairing = True
+                        if last_apply_order.equip_condition == '停机':
+                            state = '故障停机'
+                        error_reason = last_apply_order.result_fault_cause
+                        fault_time = last_apply_order.fault_datetime or last_apply_order.created_date
+                        error_continue_minutes = int((now_time - fault_time).total_seconds() / 60)
+
+                        # 设备故障停机时间
+                        orders = EquipApplyOrder.objects.filter(
+                            equip_no=equip_no,
+                            equip_condition='停机',
+                            repair_start_datetime__isnull=False).filter(
+                            Q(repair_end_datetime__isnull=True) |
+                            Q(repair_end_datetime__gt=begin_time)
+                        )
+                        bk_st = []
+                        bk_et = []
+                        for order in orders:
+                            if order.repair_start_datetime <= datetime.strptime(begin_time, '%Y-%m-%d %H:%M:%S'):
+                                down_st = datetime.strptime(begin_time, '%Y-%m-%d %H:%M:%S')
+                            else:
+                                down_st = last_apply_order.repair_start_datetime
+                            if not order.repair_end_datetime:
+                                down_et = now_time
+                            else:
+                                down_et = order.repair_end_datetime
+                            bk_st.append(down_st)
+                            bk_et.append(down_et)
+                        if bk_st and bk_et:
+                            breakdown_time = int((max(bk_et) - min(bk_st)).total_seconds() / 60)
+                else:
+                    state = '运行中'
+                    error_reason = ''
+                    breakdown_time = 0
+                    error_continue_minutes = 0
+                    repair_plan_id = ''
+            else:
+                state = '生产停机'
                 error_reason = ''
                 breakdown_time = 0
                 error_continue_minutes = 0
-                if last_running_time:
-                    lt_time = (now_time - last_running_time).total_seconds() / 60
-                    if lt_time > 30:
-                        state = '生产停机'
-                        error_continue_minutes = int(lt_time)
-                else:
-                    state = '生产停机'
-                    error_continue_minutes = 0
-            else:
-                repair_plan_id = (last_apply_order.id, last_apply_order.plan_id)
-                state = '设备故障'
-                breakdown_time = 0
-                if last_apply_order.status == '已开始':
-                    is_repairing = True
-                if last_apply_order.equip_condition == '停机':
-                    state = '故障停机'
-                error_reason = last_apply_order.result_fault_cause
-                fault_time = last_apply_order.fault_datetime or last_apply_order.created_date
-                error_continue_minutes = int((now_time - fault_time).total_seconds() / 60)
+                repair_plan_id = ''
 
-                # 设备故障停机时间
-                orders = EquipApplyOrder.objects.filter(
-                    equip_no=equip_no,
-                    equip_condition='停机',
-                    repair_start_datetime__isnull=False).filter(
-                    Q(repair_end_datetime__isnull=True) |
-                    Q(repair_end_datetime__gt=begin_time)
-                )
-                bk_st = []
-                bk_et = []
-                for order in orders:
-                    if order.repair_start_datetime <= datetime.strptime(begin_time, '%Y-%m-%d %H:%M:%S'):
-                        down_st = datetime.strptime(begin_time, '%Y-%m-%d %H:%M:%S')
-                    else:
-                        down_st = last_apply_order.repair_start_datetime
-                    if not order.repair_end_datetime:
-                        down_et = now_time
-                    else:
-                        down_et = order.repair_end_datetime
-                    bk_st.append(down_st)
-                    bk_et.append(down_et)
-                if bk_st and bk_et:
-                    breakdown_time = int((max(bk_et) - min(bk_st)).total_seconds()/60)
             if halt_time < 0:
                 halt_time = 0
                 breakdown_time = 0
             data = {
-                'equip_no': equip_no,
-                'equip_catetory': equip_cat,
-                'downtime': '{}/{}'.format(breakdown_time, halt_time),
-                'plan_actual_data': '{}/{}'.format(actual_trains, plan_trains),
+                'equip_no': equip_no,  # 机台
+                'equip_catetory': equip_cat,  # 设备类型
+                'breakdown_time': breakdown_time,  # 故障时间
+                'halt_time': halt_time,  # 停机时间
+                'downtime': '{}/{}'.format(breakdown_time, halt_time),  # 故障时间/停机时间
+                'plan_actual_data': '{}/{}'.format(actual_trains, plan_trains),  # 实际/计划车次
                 'apply_orders': '{}-{}-{}-{}'.format(unassigned_order_num,
                                                      assigned_order_num,
                                                      to_executed_order_num,
-                                                     to_check_order_num),
-                'state': state,
-                'error_reason': error_reason,
-                'is_repairing': is_repairing,
-                'error_minutes': error_continue_minutes,
-                'current_product': current_product,
-                'repair_plan_id': repair_plan_id
+                                                     to_check_order_num),  # 未指派/已指派/待执行/待验收工单数量
+                'state': state,  # 运行状态（运行中、生产停机、故障停机、设备故障）
+                'error_reason': error_reason,  # 故障原因
+                'is_repairing': is_repairing,  # 是否正在维修
+                'error_minutes': error_continue_minutes,  # 故障/停机持续时间
+                'current_product': current_product,  # 当前生产物料
+                'repair_plan_id': repair_plan_id  # 工单编号（查看维修工单详情时使用）
             }
             ret['equip_data'].append(data)
         return Response(ret)
