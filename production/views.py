@@ -1911,11 +1911,58 @@ class ProductBatchInfo(APIView):
 class RubberCannotPutinReasonView(APIView):
     permission_classes = (IsAuthenticated,)
 
+    def export_xls(self, columns, result, details):
+        response = HttpResponse(content_type='application/vnd.ms-excel')
+        filename = '不入库原因统计'
+        response['Content-Disposition'] = u'attachment;filename= ' + filename.encode('gbk').decode(
+            'ISO-8859-1') + '.xls'
+        # 创建一个文件对象
+        wb = xlwt.Workbook(encoding='utf8')
+        # 创建一个sheet对象
+        sheet = wb.add_sheet('统计', cell_overwrite_ok=True)
+        sheet2 = wb.add_sheet('明细', cell_overwrite_ok=True)
+        style = xlwt.XFStyle()
+        style.alignment.wrap = 1
+        columns.insert(0, '不入库原因')
+        # columns.append('合计')
+        # 写入文件标题
+        for idx, sheet_head in enumerate(columns):
+            sheet.write(0, idx, sheet_head)
+        for idx, sheet_head in enumerate(['不入库原因','工厂日期','机台','配方名','车次','收皮条码','托盘号', '登录时间']):
+            sheet2.write(0, idx, sheet_head)
+        # 写入数据
+        data_row = 1
+        for i in result:
+            for col_num, data_key in enumerate(columns):
+                sheet.write(data_row, col_num, i[data_key])
+            data_row += 1
+
+        data_row2 = 1
+        for item in details:
+            sheet2.write(data_row2, 0, item['reason_name'])
+            sheet2.write(data_row2, 1, item['factory_date'])
+            sheet2.write(data_row2, 2, item['machine_no'])
+            sheet2.write(data_row2, 3, item['production_no'])
+            sheet2.write(data_row2, 4, item['trains'])
+            sheet2.write(data_row2, 5, item['lot_no'])
+            sheet2.write(data_row2, 6, item['pallet_no'])
+            sheet2.write(data_row2, 7, item['input_datetime'])
+            data_row2 += 1
+
+        # 写出到IO
+        output = BytesIO()
+        wb.save(output)
+        # 重新定位到开始
+        output.seek(0)
+        response.write(output.getvalue())
+        return response
+
     def get(self, request):
         s_time = self.request.query_params.get('s_time')
         e_time = self.request.query_params.get('e_time')
         factory_date = self.request.query_params.get('factory_date')
         equip = self.request.query_params.get('equip')
+        export = self.request.query_params.get('export')
         equip_list = ['Z%.2d' % i for i in range(1, 16)]
         queryset = RubberCannotPutinReason.objects.all()
         if equip:
@@ -1927,7 +1974,8 @@ class RubberCannotPutinReasonView(APIView):
             delta = end - start
             time_list = [(start + timedelta(days=i)).strftime("%Y年%m月%d日") for i in range(delta.days + 1)]
             dic = {}
-            temp = queryset.filter(factory_date__date__range=(s_time, e_time)).values('reason_name', 'factory_date__date').annotate(
+            queryset = queryset.filter(factory_date__date__range=(s_time, e_time))
+            temp = queryset.values('reason_name', 'factory_date__date').annotate(
                 num=Count('id'))
             for item in temp:
                 t = item['factory_date__date'].strftime("%Y年%m月%d日")
@@ -1944,6 +1992,9 @@ class RubberCannotPutinReasonView(APIView):
                     dic[item['reason_name']][t] = item['num']
                     dic[item['reason_name']]['count'] += item['num']
             result = dic.values()
+            details = RubberCannotPutinReasonSerializer(queryset, many=True).data
+            if export:
+                return self.export_xls(time_list, result, details)
             # count = {}  # 底部数量统计
             # for i in result:
             #     for key, value in i.items():

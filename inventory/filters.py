@@ -321,7 +321,7 @@ class OutBoundDeliveryOrderFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = OutBoundDeliveryOrder
-        fields = ['order_no', 'product_no', 'warehouse', 'station', 'st', 'et', 'status']
+        fields = ['order_no', 'product_no', 'warehouse', 'station', 'st', 'et', 'status', 'order_type']
 
 
 class OutBoundDeliveryOrderDetailFilter(django_filters.rest_framework.FilterSet):

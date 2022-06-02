@@ -204,11 +204,11 @@ def export_xls(export_filed_dict, data, file_name):
     for col_num in range(len(export_filed_dict)):
         sheet.write(0, col_num, list(export_filed_dict.keys())[col_num])
         # 写入数据
-        data_row = 1
-        for i in data:
-            # sheet.write(data_row, 0, data_row)
-            sheet.write(data_row, col_num, i[list(export_filed_dict.values())[col_num]])
-            data_row += 1
+    data_row = 1
+    for col_num, i in enumerate(data):
+        # sheet.write(data_row, 0, data_row)
+        sheet.write(data_row, col_num, i[list(export_filed_dict.values())[col_num]])
+        data_row += 1
 
     # 写出到IO
     output = BytesIO()
