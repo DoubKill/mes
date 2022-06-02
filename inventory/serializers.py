@@ -18,7 +18,7 @@ from basics.models import GlobalCode
 from mes import settings
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import STATION_LOCATION_MAP, COMMON_READ_ONLY_FIELDS
-from quality.models import WMSMooneyLevel, MaterialSingleTypeExamineResult
+from quality.models import WMSMooneyLevel, MaterialSingleTypeExamineResult, UnqualifiedDealOrderDetail
 from quality.utils import update_wms_quality_result
 from recipe.models import MaterialAttribute
 from .conf import wms_ip, wms_port, cb_ip, cb_port
@@ -649,45 +649,63 @@ class BzFinalMixingRubberInventorySerializer(serializers.ModelSerializer):
     unit_weight = serializers.SerializerMethodField(read_only=True)
     material_type = serializers.SerializerMethodField(read_only=True)
     quality_status = serializers.CharField(read_only=True, source='quality_level')
+    begin_end_trains = serializers.SerializerMethodField(read_only=True)
 
-    def get_material_type(self, object):
+    def get_material_type(self, obj):
         try:
-            mt = object.material_no.split("-")[1]
+            mt = obj.material_no.split("-")[1]
         except:
-            mt = object.material_no
+            mt = obj.material_no
         return mt
 
-    def get_unit(self, object):
+    def get_begin_end_trains(self, obj):
+        try:
+            trains = obj.memo.split(",")
+            if len(trains) == 1:
+                return [int(trains[0]), int(trains[0])]
+            elif len(trains) == 2:
+                return [int(trains[0]), int(trains[1])]
+            else:
+                return [0, 0]
+        except:
+            return [0, 0]
+
+    def get_unit(self, obj):
         return 'kg'
 
-    def get_unit_weight(self, object):
+    def get_unit_weight(self, obj):
         try:
-            unit_weight = round(object.total_weight / object.qty,3)
+            unit_weight = round(obj.total_weight / obj.qty,3)
         except:
             unit_weight = "数据异常"
         return unit_weight
 
     def get_product_info(self, obj):
-        if not obj.lot_no:
-            return {
-                "equip_no": "",
-                "classes": "",
-                "product_time": ""
-            }
-        else:
-            pf = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).last()
-            if not pf:
-                return {
-                    "equip_no": "",
-                    "classes": "",
-                    "product_time": ""
-                }
-            else:
-                return {
-                    "equip_no": pf.equip_no,
-                    "classes": pf.classes,
-                    "product_time": pf.product_time.strftime('%Y-%m-%d %H:%M:%S')
-                }
+        return {
+            "equip_no": "",
+            "classes": "",
+            "product_time": ""
+        }
+        # if not obj.lot_no:
+        #     return {
+        #         "equip_no": "",
+        #         "classes": "",
+        #         "product_time": ""
+        #     }
+        # else:
+        #     pf = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).last()
+        #     if not pf:
+        #         return {
+        #             "equip_no": "",
+        #             "classes": "",
+        #             "product_time": ""
+        #         }
+        #     else:
+        #         return {
+        #             "equip_no": pf.equip_no,
+        #             "classes": pf.classes,
+        #             "product_time": pf.product_time.strftime('%Y-%m-%d %H:%M:%S')
+        #         }
 
     def get_equip_no(self, obj):
         try:
@@ -701,6 +719,21 @@ class BzFinalMixingRubberInventorySerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class BzMixingRubberInventorySearchSerializer(BzFinalMixingRubberInventorySerializer):
+    deal_suggestion = serializers.SerializerMethodField(read_only=True)
+
+    def get_deal_suggestion(self, obj):
+        if obj.lot_no:
+            instance = UnqualifiedDealOrderDetail.objects.filter(lot_no=obj.lot_no).order_by('id').last()
+            if instance:
+                if instance.unqualified_deal_order.c_agreed:
+                    return instance.suggestion
+                else:
+                    return ""
+            return ""
+        return ''
+
+
 class BzFinalMixingRubberLBInventorySerializer(serializers.ModelSerializer):
     """终炼胶|帘布库共用序列化器"""
     material_type = serializers.SerializerMethodField(read_only=True)
@@ -709,6 +742,19 @@ class BzFinalMixingRubberLBInventorySerializer(serializers.ModelSerializer):
     product_info = serializers.SerializerMethodField(read_only=True)
     equip_no = serializers.SerializerMethodField(read_only=True)
     quality_status = serializers.SerializerMethodField(read_only=True)
+    begin_end_trains = serializers.SerializerMethodField(read_only=True)
+
+    def get_begin_end_trains(self, obj):
+        try:
+            trains = obj.memo.split(",")
+            if len(trains) == 1:
+                return [int(trains[0]), int(trains[0])]
+            elif len(trains) == 2:
+                return [int(trains[0]), int(trains[1])]
+            else:
+                return [0, 0]
+        except:
+            return [0, 0]
 
     def get_material_type(self, object):
         try:
@@ -728,26 +774,31 @@ class BzFinalMixingRubberLBInventorySerializer(serializers.ModelSerializer):
         return unit_weight
 
     def get_product_info(self, obj):
-        if not obj.lot_no:
-            return {
-                "equip_no": "",
-                "classes": "",
-                "product_time": ""
-            }
-        else:
-            pf = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).last()
-            if not pf:
-                return {
-                    "equip_no": "",
-                    "classes": "",
-                    "product_time": ""
-                }
-            else:
-                return {
-                    "equip_no": pf.equip_no,
-                    "classes": pf.classes,
-                    "product_time": pf.product_time.strftime('%Y-%m-%d %H:%M:%S')
-                }
+        return {
+            "equip_no": "",
+            "classes": "",
+            "product_time": ""
+        }
+        # if not obj.lot_no:
+        #     return {
+        #         "equip_no": "",
+        #         "classes": "",
+        #         "product_time": ""
+        #     }
+        # else:
+        #     pf = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).last()
+        #     if not pf:
+        #         return {
+        #             "equip_no": "",
+        #             "classes": "",
+        #             "product_time": ""
+        #         }
+        #     else:
+        #         return {
+        #             "equip_no": pf.equip_no,
+        #             "classes": pf.classes,
+        #             "product_time": pf.product_time.strftime('%Y-%m-%d %H:%M:%S')
+        #         }
 
     def get_equip_no(self, obj):
         try:
@@ -764,10 +815,24 @@ class BzFinalMixingRubberLBInventorySerializer(serializers.ModelSerializer):
             return {"一等品": "合格品",
                     "三等品": "不合格品"}.get(temp, temp)
 
-
     class Meta:
         model = BzFinalMixingRubberInventoryLB
         fields = "__all__"
+
+
+class BzFinalRubberInventorySearchSerializer(BzFinalMixingRubberLBInventorySerializer):
+    deal_suggestion = serializers.SerializerMethodField(read_only=True)
+
+    def get_deal_suggestion(self, obj):
+        if obj.lot_no:
+            instance = UnqualifiedDealOrderDetail.objects.filter(lot_no=obj.lot_no).order_by('id').last()
+            if instance:
+                if instance.unqualified_deal_order.c_agreed:
+                    return instance.suggestion
+                else:
+                    return ""
+            return ""
+        return ''
 
 
 class WmsInventoryStockSerializer(serializers.ModelSerializer):
@@ -1717,6 +1782,59 @@ class OutBoundDeliveryOrderSerializer(BaseModelSerializer):
     def get_finished_qty(self, obj):
         finished_qty = obj.outbound_delivery_details.filter(status=3).aggregate(finished_qty=Sum('qty'))['finished_qty']
         return finished_qty if finished_qty else 0
+
+    def validate(self, attrs):
+        order_type = attrs.get('order_type', 1)
+        if order_type == 3:  # 指定托盘出库
+            attrs.pop('factory_date', '')
+            attrs.pop('product_no', '')
+            attrs.pop('equip_no', '')
+            attrs.pop('classes', '')
+            attrs.pop('begin_trains', '')
+            attrs.pop('end_trains', '')
+            attrs.pop('quality_status', '')
+            attrs['order_qty'] = 99999
+            if not attrs.get('pallet_no'):
+                raise serializers.ValidationError('请填写托盘号！')
+            if attrs['warehouse'] == '混炼胶库':
+                station = attrs['station']
+                bz_obj = BzFinalMixingRubberInventory.objects.using('bz').filter(container_no=attrs['pallet_no']).last()
+                if not bz_obj:
+                    raise serializers.ValidationError('此托盘不存在该库区内！')
+                if station == '一层前端':
+                    if bz_obj.location[0] not in ('3', '4'):
+                        raise serializers.ValidationError('此托盘无法从该出库口出库！')
+                elif station == '二层前端':
+                    if bz_obj.location[0] not in ('1', '2'):
+                        raise serializers.ValidationError('此托盘无法从该出库口出库！')
+                elif station == '一层后端':
+                    raise serializers.ValidationError('该出库口不可用！')
+            else:
+                bz_obj = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(container_no=attrs['pallet_no']).last()
+                if not bz_obj:
+                    raise serializers.ValidationError('此托盘不存在该库区内！')
+                if bz_obj.store_name != '炼胶库':
+                    raise serializers.ValidationError('非承放胶块托盘！')
+        elif order_type == 2:  # 指定胶料生产信息
+            attrs.pop('pallet_no', '')
+            attrs.pop('quality_status', '')
+            if not all([attrs.get('factory_date'),
+                        attrs.get('product_no'),
+                        attrs.get('equip_no'),
+                        attrs.get('classes'),
+                        attrs.get('begin_trains'),
+                        attrs.get('end_trains')]):
+                raise serializers.ValidationError('请输入完整的的胶料生产信息！')
+            attrs['order_qty'] = attrs.get('end_trains') - attrs.get('begin_trains') + 1
+        else:  # 普通出库
+            if not all([attrs.get('product_no'), attrs['quality_status']]):
+                raise serializers.ValidationError('参数缺失！')
+            return {'order_qty': attrs.get('order_qty', 0),
+                    'product_no': attrs['product_no'],
+                    'quality_status': attrs['quality_status'],
+                    'station': attrs['station'],
+                    'warehouse': attrs['warehouse']}
+        return attrs
 
     def create(self, validated_data):
         warehouse = validated_data.get('warehouse')
