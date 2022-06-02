@@ -4860,7 +4860,7 @@ class EquipIndexView(APIView):
 
             if last_running_time:
                 lt_time = (now_time - last_running_time).total_seconds() / 60
-                if lt_time > 20:  # 最后一条车次的生产时间与当前时间对比，大于20分钟则判定为生产停机
+                if lt_time > 15:  # 最后一条车次的生产时间与当前时间对比，大于10分钟则判定为生产停机
                     state = '生产停机'
                     error_reason = ''
                     breakdown_time = 0

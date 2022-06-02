@@ -460,6 +460,23 @@ class MaterialTestResultListSerializer(BaseModelSerializer):
 
 class MaterialTestOrderListSerializer(BaseModelSerializer):
     order_results = MaterialTestResultListSerializer(many=True)
+    deal_info = serializers.SerializerMethodField(read_only=True)
+
+    def get_deal_info(self, obj):
+        result = MaterialDealResult.objects.filter(lot_no=obj.lot_no).first()
+        if result:
+            return {
+                'test_result': result.test_result,
+                'deal_user': result.deal_user,
+                'deal_suggestion': '' if not result.deal_user else result.deal_suggestion,
+                'deal_time': '' if not result.deal_time else datetime.strftime(result.deal_time, '%Y-%m-%d %H:%M:%S')
+            }
+        return {
+            'test_result': '',
+            'deal_user': '',
+            'deal_suggestion': '',
+            'deal_time': '',
+        }
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
