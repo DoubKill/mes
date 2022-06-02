@@ -374,13 +374,13 @@ class CommonCodeView(APIView):
     def get(self, request):
         code = self.request.query_params.get('code')
         if code == '1':
-            prefix, model_name = ['t', GlobalCodeType]
+            prefix, model_name = ['T', GlobalCodeType]
             max_code = model_name.objects.filter(type_no__startswith=prefix).aggregate(max_code=Max('type_no'))['max_code']
         elif code == '2':
-            prefix, model_name = ['c', GlobalCode]
+            prefix, model_name = ['C', GlobalCode]
             max_code = model_name.objects.filter(global_no__startswith=prefix).aggregate(max_code=Max('global_no'))['max_code']
         elif code == '3':
-            prefix, model_name = ['r', GroupExtension]
+            prefix, model_name = ['R', GroupExtension]
             max_code = model_name.objects.filter(group_code__startswith=prefix).aggregate(max_code=Max('group_code'))['max_code']
         else:
             raise ValidationError('参数错误')
