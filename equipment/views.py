@@ -4879,7 +4879,7 @@ class EquipIndexView(APIView):
                     state = '生产停机'
                     error_continue_minutes = 0
             else:
-                repair_plan_id = last_apply_order.plan_id
+                repair_plan_id = (last_apply_order.id, last_apply_order.plan_id)
                 state = '设备故障'
                 breakdown_time = 0
                 if last_apply_order.status == '已开始':
