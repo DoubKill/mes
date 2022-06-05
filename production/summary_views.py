@@ -60,6 +60,16 @@ class ClassesBanBurySummaryView(ListAPIView):
         product_no = self.request.query_params.get('product_no')  # 胶料编码
 
         where_str = """not(CLASSES=' ') """
+        if not all([st, et]):
+            raise ValidationError('请选择开始和结束日期查询！')
+        try:
+            e_time = datetime.datetime.strptime(et, '%Y-%m-%d')
+            s_time = datetime.datetime.strptime(st, '%Y-%m-%d')
+        except Exception:
+            raise ValidationError('日期错误！')
+        diff = e_time - s_time
+        if diff.days > 7:
+            raise ValidationError('搜索日期跨度不得超过一周！')
 
         if day_type == '1':  # 按照自然日
             group_date_field = 'end_time'
@@ -185,6 +195,17 @@ class EquipBanBurySummaryView(ClassesBanBurySummaryView):
         dimension = self.request.query_params.get('dimension', '2')  # 维度 1：班次  2：日 3：月
         day_type = self.request.query_params.get('day_type', '2')  # 日期类型 1：自然日  2：工厂日
         equip_no = self.request.query_params.get('equip_no')  # 设备编号
+
+        if not all([st, et]):
+            raise ValidationError('请选择开始和结束日期查询！')
+        try:
+            e_time = datetime.datetime.strptime(et, '%Y-%m-%d')
+            s_time = datetime.datetime.strptime(st, '%Y-%m-%d')
+        except Exception:
+            raise ValidationError('日期错误！')
+        diff = e_time - s_time
+        if diff.days > 7:
+            raise ValidationError('搜索日期跨度不得超过一周！')
 
         where_str = """not(CLASSES=' ') """
 

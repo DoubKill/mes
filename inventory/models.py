@@ -243,10 +243,15 @@ class OutBoundDeliveryOrder(AbstractEntity):
         (4, '关闭'),
         (5, '失败')
     )
+    ORDER_TYPE_CHOICE = (
+        (1, '普通'),
+        (2, '指定胶料信息'),
+        (3, '指定托盘号'),
+    )
     warehouse = models.CharField(max_length=64, verbose_name='库区', help_text='库区(混炼胶库/终炼胶库)', choices=WAREHOUSE_CHOICE)
     order_no = models.CharField(max_length=64, verbose_name='出库单号', help_text='出库单号', unique=True)
     status = models.PositiveIntegerField(verbose_name='状态', help_text='状态', choices=STATUS_CHOICE, default=1)
-    product_no = models.CharField(max_length=64, help_text='胶料名称')
+    product_no = models.CharField(max_length=64, help_text='胶料名称', blank=True, null=True)
     station = models.CharField(max_length=64, help_text='出库口名称')
     order_qty = models.IntegerField(help_text='订单数量', default=0)
     # need_qty = models.IntegerField(help_text='需求数量', default=0)
@@ -257,6 +262,13 @@ class OutBoundDeliveryOrder(AbstractEntity):
     inventory_type = models.CharField(max_length=32, verbose_name='出库类型', help_text='出库类型', blank=True, null=True)
     inventory_reason = models.CharField(max_length=32, verbose_name='出库原因', help_text='出库原因', blank=True, null=True)
     quality_status = models.CharField(max_length=64, help_text='品质状态', blank=True, null=True)
+    order_type = models.PositiveIntegerField(choices=ORDER_TYPE_CHOICE, default=1, help_text='类型')
+    pallet_no = models.CharField(max_length=32, verbose_name='托盘号', help_text='托盘号', blank=True, null=True)
+    factory_date = models.DateField(verbose_name='工厂日期', help_text='工厂日期', blank=True, null=True)
+    equip_no = models.CharField(max_length=32, verbose_name='机台号', help_text='机台号', blank=True, null=True)
+    classes = models.CharField(max_length=32, verbose_name='班次', help_text='班次', blank=True, null=True)
+    begin_trains = models.IntegerField(verbose_name='开始车次', help_text='开始车次', blank=True, null=True)
+    end_trains = models.IntegerField(verbose_name='结束车次', help_text='结束车次', blank=True, null=True)
 
     class Meta:
         db_table = 'outbound_delivery_order'

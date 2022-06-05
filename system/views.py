@@ -15,6 +15,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
 from rest_framework_jwt.settings import api_settings
 from rest_framework_jwt.views import ObtainJSONWebToken
+from rest_framework.filters import OrderingFilter
 
 from equipment.utils import DinDinAPI, gen_template_response
 from basics.models import WorkSchedulePlan
@@ -53,8 +54,9 @@ class UserViewSet(ModelViewSet):
                                    is_superuser=False).order_by('num').prefetch_related('group_extensions')
     serializer_class = UserSerializer
     permission_classes = (IsAuthenticated,)
-    filter_backends = (DjangoFilterBackend,)
+    filter_backends = (DjangoFilterBackend, OrderingFilter)
     filter_class = UserFilter
+    ordering_fields = ['last_updated_date']
     EXPORT_FIELDS_DICT = {
         '工号': 'num',
         '用户名': 'username',
@@ -63,6 +65,12 @@ class UserViewSet(ModelViewSet):
         '部门': 'section_name',
         '职务': 'workshop',
         '班组': 'repair_group',
+        '技术资格': 'technology',
+        '使用': 'active_flag',
+        '创建人': 'created_username',
+        '创建日期': 'created_date',
+        '修改人': 'last_update_username',
+        '修改日期': 'last_updated_date',
         '角色': 'group_names'}
     FILE_NAME = '用户列表'
 
@@ -108,11 +116,11 @@ class UserViewSet(ModelViewSet):
         user_list = []
         for item in data:
             user_data = {
-                "username": item[0],
-                "password": item[1],
-                "num": str(item[2]).split('.')[0] if item[2] else item[2],
-                "phone_number": str(item[3]).split('.')[0] if item[3] else item[3],
-                "id_card_num": str(item[4]).split('.')[0] if item[4] else item[4],
+                "username": item[1],
+                "password": item[2],
+                "num": str(item[0]).split('.')[0] if item[0] else item[0],
+                "phone_number": str(item[4]).split('.')[0] if item[4] else item[4],
+                "id_card_num": str(item[3]).split('.')[0] if item[3] else item[3],
                 "section": item[5],
                 "group_extensions": item[6]
             }

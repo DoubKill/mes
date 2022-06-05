@@ -382,6 +382,19 @@ class ProductPlanRealViewSerializer(serializers.ModelSerializer):
 class RubberCannotPutinReasonSerializer(serializers.ModelSerializer):
     input_datetime = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', read_only=True)
     factory_date = serializers.DateTimeField(format='%Y-%m-%d', read_only=True)
+    trains = serializers.SerializerMethodField()
+
+    def get_trains(self, obj):
+        if all([obj.begin_trains, obj.end_trains]):
+            if obj.begin_trains == obj.end_trains:
+                return obj.begin_trains
+            return '{}-{}'.format(obj.begin_trains, obj.end_trains)
+        elif obj.begin_trains:
+            return obj.begin_trains
+        elif obj.end_trains:
+            return obj.end_trains
+        else:
+            return ''
 
     class Meta:
         model = RubberCannotPutinReason
