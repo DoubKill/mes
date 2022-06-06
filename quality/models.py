@@ -555,7 +555,7 @@ class ProductTestPlanDetail(models.Model):
     production_classes = models.CharField(max_length=64, help_text='生产班次')
     production_group = models.CharField(max_length=64, help_text='生产班组')
     actual_trains = models.PositiveIntegerField(help_text='生产车次')
-    value = models.CharField(max_length=200, help_text="检测结果值json格式,{'ML(1+4)': 12}", null=True, blank=True)
+    value = models.CharField(max_length=512, help_text="检测结果值json格式,{'ML(1+4)': 12}", null=True, blank=True)
     raw_value = models.TextField(help_text='检测原数据', null=True,  blank=True)
     test_time = models.DateTimeField(auto_now=True)
     status = models.PositiveIntegerField(help_text='状态', choices=STATUS_CHOICE, default=1)

@@ -89,11 +89,7 @@ def main():
                 data = cur.fetchall()
 
                 # 更新当前检测任务结果值
-                test_results = {item[1].strip(' '): item[0] for item in data}
-                current_test_detail.value = json.dumps(test_results)
-                current_test_detail.status = 2
-                current_test_detail.save()
-
+                test_results = {item[1].strip(' '): {"name": item[1].strip(' '), "value": item[0], "flag": ""} for item in data}
                 # 卡片判级
                 product_no = current_test_detail.product_no  # 胶料编码
                 production_class = current_test_detail.production_classes  # 班次
@@ -108,61 +104,69 @@ def main():
                     continue
                 test_data_points = material_test_method.data_point.values_list('name', flat=True)
 
-                for train in range(current_test_detail.actual_trains,
-                                   current_test_detail.actual_trains + equip_test_plan.test_interval):
-                    pallets = PalletFeedbacks.objects.filter(
-                        equip_no=equip_no,
-                        product_no=product_no,
-                        classes=production_class,
-                        factory_date=factory_date,
-                        begin_trains__lte=train,
-                        end_trains__gte=train
-                    )
-                    if not pallets:
+                is_qualified = True
+                # 对数据点进行判级
+                for item in data:
+                    value = Decimal(item[0]).quantize(Decimal('0.000'))
+                    data_point_name = item[1].strip(' ')
+                    if data_point_name not in test_data_points:
                         continue
-                    for pallet in pallets:
-                        lot_no = pallet.lot_no
 
-                        # 车次检测单
-                        test_order = MaterialTestOrder.objects.filter(
-                            lot_no=lot_no, actual_trains=train).first()
-                        if not test_order:
-                            test_order = MaterialTestOrder.objects.create(
-                                lot_no=lot_no,
-                                material_test_order_uid=uuid.uuid1(),
-                                actual_trains=train,
-                                product_no=product_no,
-                                plan_classes_uid=pallet.plan_classes_uid,
-                                production_class=production_class,
-                                production_group=production_group,
-                                production_equip_no=equip_no,
-                                production_factory_date=factory_date
-                            )
+                    # 获取判级标准
+                    indicator = MaterialDataPointIndicator.objects.filter(
+                        material_test_method=material_test_method,
+                        data_point__name=data_point_name,
+                        data_point__test_type__test_indicator__name=indicator_name,
+                        level=1).first()
+                    if indicator:
+                        if indicator.lower_limit <= value <= indicator.upper_limit:
+                            mes_result = '一等品'
+                            level = 1
+                            test_results[data_point_name]['flag'] = 'N'
+                        else:
+                            mes_result = '三等品'
+                            level = 2
+                            if value > indicator.upper_limit:
+                                test_results[data_point_name]['flag'] = 'H'
+                            elif value < indicator.lower_limit:
+                                test_results[data_point_name]['flag'] = 'L'
+                            is_qualified = False
+                    else:
+                        continue
+                        # mes_result = '三等品'
+                        # level = 2
 
-                        # 对数据点进行判级
-                        for item in data:
-                            value = Decimal(item[0]).quantize(Decimal('0.000'))
-                            data_point_name = item[1].strip(' ')
-                            if data_point_name not in test_data_points:
-                                continue
+                    for train in range(current_test_detail.actual_trains,
+                                       current_test_detail.actual_trains + equip_test_plan.test_interval):
+                        pallets = PalletFeedbacks.objects.filter(
+                            equip_no=equip_no,
+                            product_no=product_no,
+                            classes=production_class,
+                            factory_date=factory_date,
+                            begin_trains__lte=train,
+                            end_trains__gte=train
+                        )
+                        if not pallets:
+                            continue
 
-                            # 获取判级标准
-                            indicator = MaterialDataPointIndicator.objects.filter(
-                                material_test_method=material_test_method,
-                                data_point__name=data_point_name,
-                                data_point__test_type__test_indicator__name=indicator_name,
-                                level=1).first()
-                            if indicator:
-                                if indicator.lower_limit <= value <= indicator.upper_limit:
-                                    mes_result = '一等品'
-                                    level = 1
-                                else:
-                                    mes_result = '三等品'
-                                    level = 2
-                            else:
-                                continue
-                                # mes_result = '三等品'
-                                # level = 2
+                        for pallet in pallets:
+                            lot_no = pallet.lot_no
+
+                            # 车次检测单
+                            test_order = MaterialTestOrder.objects.filter(
+                                lot_no=lot_no, actual_trains=train).first()
+                            if not test_order:
+                                test_order = MaterialTestOrder.objects.create(
+                                    lot_no=lot_no,
+                                    material_test_order_uid=uuid.uuid1(),
+                                    actual_trains=train,
+                                    product_no=product_no,
+                                    plan_classes_uid=pallet.plan_classes_uid,
+                                    production_class=production_class,
+                                    production_group=production_group,
+                                    production_equip_no=equip_no,
+                                    production_factory_date=factory_date
+                                )
 
                             # 创建数据点检测结果
                             MaterialTestResult.objects.create(
@@ -185,18 +189,22 @@ def main():
                                 judged_lower_limit=indicator.lower_limit
                             )
 
-                test_indicator_name = current_test_detail.test_plan.test_indicator_name
-                mto = MaterialTestOrder.objects.filter(lot_no=current_test_detail.lot_no,
-                                                       actual_trains=current_test_detail.actual_trains).first()
-                if mto:
-                    max_result_ids = list(mto.order_results.filter(
-                        test_indicator_name=test_indicator_name
-                    ).values('data_point_name').annotate(max_id=Max('id')).values_list('max_id', flat=True))
-                    if mto.order_results.filter(id__in=max_result_ids, level__gt=1).exists():
-                        current_test_detail.is_qualified = False
-                    else:
-                        current_test_detail.is_qualified = True
-                    current_test_detail.save()
+                current_test_detail.value = json.dumps(list(test_results.values()))
+                current_test_detail.is_qualified = is_qualified
+                current_test_detail.status = 2
+                current_test_detail.save()
+                # test_indicator_name = current_test_detail.test_plan.test_indicator_name
+                # mto = MaterialTestOrder.objects.filter(lot_no=current_test_detail.lot_no,
+                #                                        actual_trains=current_test_detail.actual_trains).first()
+                # if mto:
+                #     max_result_ids = list(mto.order_results.filter(
+                #         test_indicator_name=test_indicator_name
+                #     ).values('data_point_name').annotate(max_id=Max('id')).values_list('max_id', flat=True))
+                #     if mto.order_results.filter(id__in=max_result_ids, level__gt=1).exists():
+                #         current_test_detail.is_qualified = False
+                #     else:
+                #         current_test_detail.is_qualified = True
+                #     current_test_detail.save()
             # 判断该机台计划是否全部检测完成
             # if equip_test_plan.product_test_plan_detail.filter(
             #         value__isnull=False).count() == equip_test_plan.product_test_plan_detail.count():

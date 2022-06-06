@@ -2287,7 +2287,10 @@ class ReportValueView(APIView):
             data_point_list = ['扯断强度', '伸长率%', 'M300']
         else:
             data_point_list = []
-
+        is_qualified = True
+        test_results = {}
+        for k, v in json.loads(current_test_detail.value).items():
+            test_results[k] = {"name": k, "value": v, "flag": ""}
         # 根据检测间隔，补充车次相关test_order和test_result表数据
         for train in range(current_test_detail.actual_trains,
                            current_test_detail.actual_trains + equip_test_plan.test_interval):
@@ -2346,6 +2349,14 @@ class ReportValueView(APIView):
                         else:
                             mes_result = '三等品'
                             level = 2
+                            try:
+                                if test_value > indicator.upper_limit:
+                                    test_results[data_point_name]['flag'] = 'H'
+                                elif test_value < indicator.lower_limit:
+                                    test_results[data_point_name]['flag'] = 'L'
+                            except Exception:
+                                pass
+                            is_qualified = False
                     else:
                         # mes_result = '三等品'
                         # level = 2
@@ -2371,18 +2382,22 @@ class ReportValueView(APIView):
                         judged_lower_limit=indicator.lower_limit
                     )
 
-        test_indicator_name = current_test_detail.test_plan.test_indicator_name
-        mto = MaterialTestOrder.objects.filter(lot_no=current_test_detail.lot_no,
-                                               actual_trains=current_test_detail.actual_trains).first()
-        if mto:
-            max_result_ids = list(mto.order_results.filter(
-                test_indicator_name=test_indicator_name
-            ).values('data_point_name').annotate(max_id=Max('id')).values_list('max_id', flat=True))
-            if mto.order_results.filter(id__in=max_result_ids, level__gt=1).exists():
-                current_test_detail.is_qualified = False
-            else:
-                current_test_detail.is_qualified = True
-            current_test_detail.save()
+        # test_indicator_name = current_test_detail.test_plan.test_indicator_name
+        # mto = MaterialTestOrder.objects.filter(lot_no=current_test_detail.lot_no,
+        #                                        actual_trains=current_test_detail.actual_trains).first()
+        # if mto:
+        #     max_result_ids = list(mto.order_results.filter(
+        #         test_indicator_name=test_indicator_name
+        #     ).values('data_point_name').annotate(max_id=Max('id')).values_list('max_id', flat=True))
+        #     if mto.order_results.filter(id__in=max_result_ids, level__gt=1).exists():
+        #         current_test_detail.is_qualified = False
+        #     else:
+        #         current_test_detail.is_qualified = True
+        #     current_test_detail.save()
+        current_test_detail.value = json.dumps(list(test_results.values()))
+        current_test_detail.is_qualified = is_qualified
+        current_test_detail.status = 2
+        current_test_detail.save()
         return Response({'msg': '检测完成', 'success': True})
 
 
