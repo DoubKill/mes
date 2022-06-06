@@ -261,11 +261,13 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
     """
     queryset = MaterialTestOrder.objects.filter(
         delete_flag=False).prefetch_related(
-        'order_results').order_by('-production_factory_date',
-                                  '-production_class',
-                                  'production_equip_no',
-                                  'product_no',
-                                  'actual_trains')
+        Prefetch('order_results',
+                 queryset=MaterialTestResult.objects.order_by('id'))
+    ).order_by('-production_factory_date',
+               '-production_class',
+               'production_equip_no',
+               'product_no',
+               'actual_trains')
     serializer_class = MaterialTestOrderSerializer
     filter_backends = (DjangoFilterBackend,)
     permission_classes = (IsAuthenticated,)

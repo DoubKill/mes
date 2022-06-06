@@ -481,19 +481,20 @@ class MaterialTestOrderListSerializer(BaseModelSerializer):
     def to_representation(self, instance):
         data = super().to_representation(instance)
         order_results = data['order_results']
-        ret = {}
+        ret = {'门尼': {}, '硬度': {}, '比重': {}, '流变': {}, '钢拔': {}, '物性': {}}
         for item in order_results:
             indicator = item['test_indicator_name']
             data_point = item['data_point_name']
-            if indicator not in ret:
-                ret[indicator] = {}
-                ret[indicator][data_point] = item
-            else:
-                if data_point not in ret[indicator]:
-                    ret[indicator][data_point] = item
-                else:
-                    if ret[indicator][data_point]['id'] < item['id']:
-                        ret[indicator][data_point] = item
+            ret[indicator][data_point] = item
+            # if indicator not in ret:
+            #     ret[indicator] = {}
+            #     ret[indicator][data_point] = item
+            # else:
+            #     if data_point not in ret[indicator]:
+            #         ret[indicator][data_point] = item
+            #     else:
+            #         if ret[indicator][data_point]['id'] < item['id']:
+            #             ret[indicator][data_point] = item
         data['order_results'] = ret
         return data
 
