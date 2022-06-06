@@ -14,6 +14,7 @@ from rest_framework.validators import UniqueTogetherValidator, UniqueValidator
 
 from django.db.models import Max
 
+from basics.models import WorkSchedulePlan
 from inventory.models import DeliveryPlan, DeliveryPlanStatus, WmsNucleinManagement
 from mes.base_serializer import BaseModelSerializer
 
@@ -187,7 +188,13 @@ class MaterialTestOrderSerializer(BaseModelSerializer):
 
     def create(self, validated_data):
         order_results = validated_data.pop('order_results', None)
-
+        ws = WorkSchedulePlan.objects.filter(plan_schedule__day_time=validated_data['production_factory_date'],
+                                             classes__global_name=validated_data['production_class'],
+                                             plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
+        if not ws:
+            production_group = '班'
+        else:
+            production_group = ws.group.global_name
         pallets = PalletFeedbacks.objects.filter(
             equip_no=validated_data['production_equip_no'],
             product_no=validated_data['product_no'],
@@ -209,6 +216,7 @@ class MaterialTestOrderSerializer(BaseModelSerializer):
                 created = False
             else:
                 validated_data['material_test_order_uid'] = uuid.uuid1()
+                validated_data['production_group'] = production_group
                 instance = super().create(validated_data)
                 created = True
 
@@ -501,6 +509,43 @@ class MaterialTestOrderListSerializer(BaseModelSerializer):
     class Meta:
         model = MaterialTestOrder
         fields = '__all__'
+
+
+class MaterialTestResultExportSerializer(BaseModelSerializer):
+    upper_lower = serializers.SerializerMethodField(read_only=True)
+
+    def get_upper_lower(self, obj):
+        return f'{obj.judged_lower_limit}-{obj.judged_upper_limit}'
+
+    class Meta:
+        model = MaterialTestResult
+        fields = ('value', 'data_point_name', 'level', 'upper_lower')
+
+
+class MaterialTestOrderExportSerializer(BaseModelSerializer):
+    order_results = MaterialTestResultExportSerializer(many=True)
+
+    # def to_representation(self, instance):
+    #     data = super().to_representation(instance)
+    #     order_results = data['order_results']
+    #     ret = {'ML(1+4)': {'value': '', 'upper_lower': '', 'level': ''},
+    #            '比重值': {'value': '', 'upper_lower': '', 'level': ''},
+    #            '硬度值': {'value': '', 'upper_lower': '', 'level': ''},
+    #            'MH': {'value': '', 'upper_lower': '', 'level': ''},
+    #            'ML': {'value': '', 'upper_lower': '', 'level': ''},
+    #            'TC10': {'value': '', 'upper_lower': '', 'level': ''},
+    #            'TC50': {'value': '', 'upper_lower': '', 'level': ''},
+    #            'TC90': {'value': '', 'upper_lower': '', 'level': ''}}
+    #     for item in order_results:
+    #         data_point = item['data_point_name']
+    #         ret[data_point] = item
+    #     data['order_results'] = ret
+    #     return data
+
+    class Meta:
+        model = MaterialTestOrder
+        fields = ('product_no', 'production_factory_date', 'production_class', 'order_results',
+                  'production_group', 'production_equip_no', 'actual_trains', 'is_qualified')
 
 
 class MaterialTestMethodSerializer(BaseModelSerializer):

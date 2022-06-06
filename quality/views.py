@@ -1,11 +1,11 @@
 import datetime
 import json
-import ast
-import os
 import re
 from decimal import Decimal
+from io import BytesIO
 
-import requests
+from django.http import HttpResponse
+from openpyxl import load_workbook
 from suds.client import Client
 from django.db import connection
 from django.forms import model_to_dict
@@ -73,7 +73,8 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     UnqualifiedPalletFeedBackSerializer, LabelPrintLogSerializer, ProductTestPlanDetailSerializer, \
     ProductTestPlanDetailBulkCreateSerializer, MaterialTestPlanSerializer, MaterialTestPlanCreateSerializer, \
     MaterialTestPlanDetailSerializer, MaterialSingleTypeExamineResultSerializer, \
-    MaterialInspectionRegistrationSerializer, MaterialDataPointIndicatorHistorySerializer
+    MaterialInspectionRegistrationSerializer, MaterialDataPointIndicatorHistorySerializer, \
+    MaterialTestOrderExportSerializer
 
 from django.db.models import Prefetch
 from django.db.models import Q
@@ -278,6 +279,105 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
             return MaterialTestOrderSerializer
         else:
             return MaterialTestOrderListSerializer
+
+    def export_xls(self, result):
+        wb = load_workbook('xlsx_template/product_test_result.xlsx')
+        ws = wb.worksheets[0]
+        sheet = wb.copy_worksheet(ws)
+        data_row = 3
+        if not result:
+            return Response('暂无数据！')
+        product_no = result[0]['product_no']
+        sheet.title = product_no
+
+        for i in result:
+            if i['product_no'] != product_no:
+                product_no = i['product_no']
+                sheet = wb.copy_worksheet(ws)
+                sheet.title = product_no
+                data_row = 3
+            order_results = i['order_results']
+            ret = {'ML(1+4)': {'value': '', 'upper_lower': '', 'level': ''},
+                   '比重值': {'value': '', 'upper_lower': '', 'level': ''},
+                   '硬度值': {'value': '', 'upper_lower': '', 'level': ''},
+                   'MH': {'value': '', 'upper_lower': '', 'level': ''},
+                   'ML': {'value': '', 'upper_lower': '', 'level': ''},
+                   'TC10': {'value': '', 'upper_lower': '', 'level': ''},
+                   'TC50': {'value': '', 'upper_lower': '', 'level': ''},
+                   'TC90': {'value': '', 'upper_lower': '', 'level': ''}}
+            for item in order_results:
+                data_point = item['data_point_name']
+                ret[data_point] = item
+            sheet.cell(data_row, 1).value = i['product_no']
+            sheet.cell(data_row, 2).value = i['production_factory_date']
+            sheet.cell(data_row, 3).value = '{}/{}'.format(i['production_class'], i['production_group'])
+            sheet.cell(data_row, 4).value = i['production_equip_no']
+            sheet.cell(data_row, 5).value = i['actual_trains']
+            sheet.cell(data_row, 6).value = ret['ML(1+4)']['value']
+            sheet.cell(data_row, 7).value = ret['ML(1+4)']['upper_lower']
+            sheet.cell(data_row, 8).value = ret['ML(1+4)']['level']
+            sheet.cell(data_row, 9).value = ret['比重值']['value']
+            sheet.cell(data_row, 10).value = ret['比重值']['upper_lower']
+            sheet.cell(data_row, 11).value = ret['比重值']['level']
+            sheet.cell(data_row, 12).value = ret['硬度值']['value']
+            sheet.cell(data_row, 13).value = ret['硬度值']['upper_lower']
+            sheet.cell(data_row, 14).value = ret['硬度值']['level']
+            sheet.cell(data_row, 15).value = ret['MH']['value']
+            sheet.cell(data_row, 16).value = ret['MH']['upper_lower']
+            sheet.cell(data_row, 17).value = ret['MH']['level']
+            sheet.cell(data_row, 18).value = ret['ML']['value']
+            sheet.cell(data_row, 19).value = ret['ML']['upper_lower']
+            sheet.cell(data_row, 20).value = ret['ML']['level']
+            sheet.cell(data_row, 21).value = ret['TC10']['value']
+            sheet.cell(data_row, 22).value = ret['TC10']['upper_lower']
+            sheet.cell(data_row, 23).value = ret['TC10']['level']
+            sheet.cell(data_row, 24).value = ret['TC50']['value']
+            sheet.cell(data_row, 25).value = ret['TC50']['upper_lower']
+            sheet.cell(data_row, 26).value = ret['TC50']['level']
+            sheet.cell(data_row, 27).value = ret['TC90']['value']
+            sheet.cell(data_row, 28).value = ret['TC90']['upper_lower']
+            sheet.cell(data_row, 29).value = ret['TC90']['level']
+            sheet.cell(data_row, 30).value = 'Y' if i['is_qualified'] else 'N'
+            data_row = data_row + 1
+
+        wb.remove_sheet(ws)
+        output = BytesIO()
+        wb.save(output)
+        # 重新定位到开始
+        output.seek(0)
+        response = HttpResponse(content_type='application/vnd.ms-excel')
+        filename = '快检详细信息'
+        response['Content-Disposition'] = u'attachment;filename= ' + filename.encode('gbk').decode(
+            'ISO-8859-1') + '.xls'
+        response.write(output.getvalue())
+        return response
+
+    def list(self, request, *args, **kwargs):
+        export = self.request.query_params.get('export')
+        queryset = self.filter_queryset(self.get_queryset())
+        if export:
+            st = self.request.query_params.get('st')
+            et = self.request.query_params.get('et')
+            if not all([st, et]):
+                raise ValidationError('请选择导出的时间范围！')
+            diff = datetime.datetime.strptime(et, '%Y-%m-%d') - \
+                   datetime.datetime.strptime(st, '%Y-%m-%d')
+            if diff.days > 7:
+                raise ValidationError('导出数据的日期跨度不得超过一个周！')
+            queryset = self.filter_queryset(queryset=MaterialTestOrder.objects.filter(
+                        delete_flag=False).prefetch_related(
+                        Prefetch('order_results',
+                                 queryset=MaterialTestResult.objects.order_by('id'))
+                    ).order_by('product_no', 'production_factory_date', '-production_class', 'production_equip_no', 'actual_trains'))
+            data = MaterialTestOrderExportSerializer(queryset, many=True).data
+            return self.export_xls(data)
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     def create(self, request, *args, **kwargs):
         data = request.data
