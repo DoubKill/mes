@@ -1,6 +1,6 @@
 import datetime
 
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Max
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
@@ -24,6 +24,7 @@ from rest_framework.decorators import action
 from rest_framework import status
 
 from spareparts.models import SpareLocationBinding
+from system.models import GroupExtension
 from terminal.utils import get_current_factory_date
 
 
@@ -365,3 +366,30 @@ class CurrentFactoryDate(APIView):
     def get(self, request):
         res = get_current_factory_date()
         return Response(res)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class CommonCodeView(APIView):
+
+    def get(self, request):
+        code = self.request.query_params.get('code')
+        if code == '1':
+            prefix, model_name = ['T', GlobalCodeType]
+            max_code = model_name.objects.filter(type_no__startswith=prefix).aggregate(max_code=Max('type_no'))['max_code']
+        elif code == '2':
+            prefix, model_name = ['C', GlobalCode]
+            max_code = model_name.objects.filter(global_no__startswith=prefix).aggregate(max_code=Max('global_no'))['max_code']
+        elif code == '3':
+            prefix, model_name = ['R', GroupExtension]
+            max_code = model_name.objects.filter(group_code__startswith=prefix).aggregate(max_code=Max('group_code'))['max_code']
+        else:
+            raise ValidationError('参数错误')
+        try:
+            if not max_code:
+                default_code = f'{prefix}00001'
+            else:
+                default_code = '{}{:05}'.format(prefix, int(max_code[1:]) + 1)
+        except Exception as e:
+            raise ValidationError('解析自增公共编码异常')
+        return Response(data={'results': default_code})
+

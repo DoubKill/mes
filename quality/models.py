@@ -1,4 +1,5 @@
 import datetime
+from ipaddress import ip_address
 
 from django.db import models
 
@@ -422,6 +423,7 @@ class LabelPrint(models.Model):
     data = models.TextField(help_text="标签数据json集", verbose_name="标签数据json集")
     created_date = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
     last_updated_date = models.DateTimeField(verbose_name='修改时间', auto_now=True)
+    ip_address = models.CharField(max_length=64, help_text='打印ip地址', null=True, blank=True)
 
     def __str__(self):
         return self.lot_no

@@ -331,9 +331,10 @@ class ReturnRubber(AbstractEntity):
     end_trains = models.IntegerField(help_text='结束车次')
     desc = models.CharField(max_length=64, help_text='异常描述', null=True, blank=True)
     msg = models.CharField(max_length=64, help_text='处理意见', null=True, blank=True)
-    recipe_user = models.CharField(max_length=64, help_text='工艺员')
-    status = models.IntegerField(help_text='打印状态:0生成, 1待打印', default=0)
+    recipe_user = models.CharField(max_length=64, help_text='工艺员', null=True, blank=True)
+    print_flag = models.IntegerField(help_text='打印状态:0打印完成, 1待打印', default=1)
     print_count = models.IntegerField(help_text='打印张数', default=1)
+    ip_address = models.CharField(max_length=64, help_text='下发打印任务的ip地址', null=True, blank=True)
 
     class Meta:
         db_table = 'return_rubber'
