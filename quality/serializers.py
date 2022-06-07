@@ -531,6 +531,9 @@ class MaterialTestResultExportSerializer(BaseModelSerializer):
     class Meta:
         model = MaterialTestResult
         fields = ('value', 'data_point_name', 'level', 'upper_lower')
+        extra_kwargs = {
+                    'value': {'coerce_to_string': False},
+                }
 
 
 class MaterialTestOrderExportSerializer(BaseModelSerializer):
