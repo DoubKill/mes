@@ -4914,7 +4914,7 @@ class EquipIndexView(APIView):
                 state = '生产停机'
                 error_reason = ''
                 breakdown_time = 0
-                error_continue_minutes = 0
+                error_continue_minutes = total_time
                 repair_plan_id = ''
 
             if halt_time < 0:
