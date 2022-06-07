@@ -261,7 +261,7 @@ class MaterialTestOrder(AbstractEntity):
     production_group = models.CharField(max_length=64, help_text='生产班组名')
     production_equip_no = models.CharField(max_length=64, help_text='机台')
     production_factory_date = models.DateField(help_text='工厂日期')
-    note = models.TextField(max_length=100, help_text='备注', blank=True, null=True)
+    note = models.CharField(max_length=100, help_text='备注', blank=True, null=True)
     is_qualified = models.BooleanField(help_text='是否合格', default=True)
     is_passed = models.BooleanField(help_text='是否通过pass章', default=False)
 
