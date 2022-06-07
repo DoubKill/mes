@@ -472,8 +472,8 @@ class MaterialTestResultListSerializer(BaseModelSerializer):
                   'judged_upper_limit', 'test_indicator_name', 'mes_result', 'result', 'machine_name', 'level')
         extra_kwargs = {
             'value': {'coerce_to_string': False},
-            'judged_lower_limit': {'coerce_to_string': False},
-            'judged_upper_limit': {'coerce_to_string': False}
+            # 'judged_lower_limit': {'coerce_to_string': False},
+            # 'judged_upper_limit': {'coerce_to_string': False}
         }
 
 
