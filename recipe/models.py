@@ -183,12 +183,11 @@ class ProductBatching(AbstractEntity):
             # 查看是否存在对搭设置
             mixed = ProductBatchingMixed.objects.filter(product_batching__stage_product_batch_no=self.stage_product_batch_no,
                                                         product_batching__used_type=4, product_batching__delete_flag=False,
-                                                        product_batching__dev_type__category_no=dev_type)
+                                                        product_batching__dev_type__category_no=dev_type).last()
             if mixed:
-                material_name_weight = list(sfj_details.exclude(material__material_name__in=list(mixed.values_list('f_feed_name', 's_feed_name')[0])).values('material__material_name', 'actual_weight', 'standard_error'))
-                l_mixed = mixed.last()
-                material_name_weight += [{'material__material_name': l_mixed.f_feed_name, 'actual_weight': l_mixed.f_weight, 'standard_error': 0},
-                                         {'material__material_name': l_mixed.s_feed_name, 'actual_weight': l_mixed.s_weight, 'standard_error': 0}]
+                material_name_weight = list(sfj_details.exclude(material__material_name=mixed.origin_material_name).values('material__material_name', 'actual_weight', 'standard_error'))
+                material_name_weight = [{'material__material_name': mixed.f_feed_name, 'actual_weight': mixed.f_weight, 'standard_error': 0},
+                                        {'material__material_name': mixed.s_feed_name, 'actual_weight': mixed.s_weight, 'standard_error': 0}] + material_name_weight
             else:
                 material_name_weight = list(sfj_details.values('material__material_name', 'actual_weight', 'standard_error'))
             from terminal.models import OtherMaterialLog
@@ -420,6 +419,7 @@ class ProductBatchingEquip(models.Model):
 class ProductBatchingMixed(models.Model):
     product_batching = models.ForeignKey(ProductBatching, on_delete=models.CASCADE, help_text='配方id',
                                          related_name='product_batching_mixed')
+    origin_material_name = models.CharField(max_length=64, help_text='被对搭的原始物料', null=True, blank=True)
     f_feed = models.CharField(max_length=8, help_text='对搭原料段次1')
     s_feed = models.CharField(max_length=8, help_text='对搭原料段次2')
     f_feed_name = models.CharField(max_length=64, help_text='对搭原料名1')

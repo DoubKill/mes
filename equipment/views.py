@@ -2600,7 +2600,8 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
                 return Response({"success": False, "message": '当前库位不存在该备件', "data": None})
             if query.quantity < out_quantity:
                 return Response({"success": False, "message": '当前库区中的数量不足', "data": None})
-            if out_quantity > instance.plan_out_quantity - instance.out_quantity:
+            # 使用库存数量判断
+            if out_quantity > query.quantity - instance.out_quantity:
                 return Response({"success": False, "message": '出库数量不能大于单据出库数量', "data": None})
             if instance.plan_out_quantity <= out_quantity + instance.out_quantity:
                 instance.out_quantity += out_quantity

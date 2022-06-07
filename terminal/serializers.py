@@ -282,50 +282,63 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                                   Q(material__material_name__icontains='待处理料')))
                 if query_set:  # 此处由工艺确认: 掺料与待处理料不会同时出现在一个配方中
                     recipe_material_name = query_set.first().material.material_name
-                    # 炼胶类型判断: 混炼/终炼
-                    if re.findall('FM|RFM|RE', classes_plan.product_batching.stage_product_batch_no):
-                        # 待处理料不需要做加硫磺前后判断
-                        if '掺料' in recipe_material_name:
-                            # 加硫磺前后(上面限定了胶皮,这里不会出现小料硫磺xxx-硫磺)
-                            s_id = product_recipe.filter(Q(material__material_name__icontains='硫磺')).first()
-                            if s_id:
-                                if s_id.id < query_set.first().id:
-                                    # 硫磺在前, 只能投加硫料
+                    # 配方尾缀为K的不区分顺序
+                    if classes_plan.product_batching.stage_product_batch_no.endswith('K'):
+                        if '加硫' in recipe_material_name:
+                            if add_s:
+                                other_type, status, scan_material_msg = recipe_material_name, True, f'物料:{scan_material} 扫码成功'
+                            else:
+                                other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入加硫料'
+                        else:
+                            if add_s:
+                                other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入无硫料'
+                            else:
+                                other_type, status, scan_material_msg = recipe_material_name, True, f'物料:{scan_material} 扫码成功'
+                    else:
+                        # 炼胶类型判断: 混炼/终炼
+                        if re.findall('FM|RFM|RE', classes_plan.product_batching.stage_product_batch_no):
+                            # 待处理料不需要做加硫磺前后判断
+                            if '掺料' in recipe_material_name:
+                                # 加硫磺前后(上面限定了胶皮,这里不会出现小料硫磺xxx-硫磺)
+                                s_id = product_recipe.filter(Q(material__material_name__icontains='硫磺')).first()
+                                if s_id:
+                                    if s_id.id < query_set.first().id:
+                                        # 硫磺在前, 只能投加硫料
+                                        if add_s:
+                                            other_type, status, scan_material_msg = recipe_material_name, True, f'掺料:{scan_material} 扫码成功'
+                                        else:
+                                            other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入加硫料'
+                                    else:
+                                        if add_s:
+                                            other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入无硫料'
+                                        else:
+                                            other_type, status, scan_material_msg = recipe_material_name, True, f'掺料:{scan_material} 扫码成功'
+                                else:  # 有掺料无硫磺
                                     if add_s:
                                         other_type, status, scan_material_msg = recipe_material_name, True, f'掺料:{scan_material} 扫码成功'
                                     else:
                                         other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入加硫料'
-                                else:
+                            else:  # 加硫待处理料、无硫待处理料、前两者都有
+                                add_s_wait_s = query_set.filter(material__material_name__icontains='加硫待处理料')
+                                no_s_wait_s = query_set.filter(material__material_name__icontains='无硫待处理料')
+                                if add_s_wait_s and not no_s_wait_s:
+                                    if add_s:
+                                        other_type, status, scan_material_msg = recipe_material_name, True, f'待处理物料:{scan_material}扫码成功'
+                                    else:
+                                        other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入加硫料'
+                                elif no_s_wait_s and not add_s_wait_s:
                                     if add_s:
                                         other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入无硫料'
                                     else:
-                                        other_type, status, scan_material_msg = recipe_material_name, True, f'掺料:{scan_material} 扫码成功'
-                            else:  # 有掺料无硫磺
-                                if add_s:
-                                    other_type, status, scan_material_msg = recipe_material_name, True, f'掺料:{scan_material} 扫码成功'
-                                else:
-                                    other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入加硫料'
-                        else:  # 加硫待处理料、无硫待处理料、前两者都有
-                            add_s_wait_s = query_set.filter(material__material_name__icontains='加硫待处理料')
-                            no_s_wait_s = query_set.filter(material__material_name__icontains='无硫待处理料')
-                            if add_s_wait_s and not no_s_wait_s:
-                                if add_s:
-                                    other_type, status, scan_material_msg = recipe_material_name, True, f'待处理物料:{scan_material}扫码成功'
-                                else:
-                                    other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入加硫料'
-                            elif no_s_wait_s and not add_s_wait_s:
-                                if add_s:
-                                    other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入无硫料'
+                                        other_type, status, scan_material_msg = recipe_material_name, True, f'待处理物料:{scan_material}扫码成功'
                                 else:
                                     other_type, status, scan_material_msg = recipe_material_name, True, f'待处理物料:{scan_material}扫码成功'
-                            else:
-                                other_type, status, scan_material_msg = recipe_material_name, True, f'待处理物料:{scan_material}扫码成功'
-                    else:
-                        # 加硫禁止投料
-                        if add_s:
-                            other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入无硫料'
                         else:
-                            other_type, status, scan_material_msg = recipe_material_name, True, f'物料:{scan_material} 扫码成功'
+                            # 加硫禁止投料
+                            if add_s:
+                                other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入无硫料'
+                            else:
+                                other_type, status, scan_material_msg = recipe_material_name, True, f'物料:{scan_material} 扫码成功'
                 else:
                     scan_material_msg = '配方中无掺料, 所投物料不在配方中'
                 if not OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code, status=status, other_type=other_type):
