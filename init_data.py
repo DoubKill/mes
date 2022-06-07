@@ -740,7 +740,7 @@ permission_data = [
     {'id': 788, 'code': 'view_replace_material', 'name': '查看', 'parent_id': 787},
     {'id': 789, 'code': 'opera_replace_material', 'name': '操作按钮', 'parent_id': 787},
 
-    {'id': 790, 'code': 'return_rubber', 'name': '胶皮补打卡片', 'parent_id': None},
+    {'id': 790, 'code': 'return_rubber', 'name': '胶片补打卡片', 'parent_id': None},
     {'id': 791, 'code': 'view_return_rubber', 'name': '查看', 'parent_id': 790},
     {'id': 792, 'code': 'add_return_rubber', 'name': '新建', 'parent_id': 790},
     {'id': 793, 'code': 'print_return_rubber', 'name': '打印', 'parent_id': 790},
@@ -752,7 +752,7 @@ permission_data = [
     {'id': 798, 'code': 'add2_weighting_package_manual', 'name': '配方(通用)新建', 'parent_id': 794},
     {'id': 799, 'code': 'print2_weighting_package_manual', 'name': '配方(通用)打印', 'parent_id': 794},
 
-    {'id': 804, 'code': 'durate_putin_reason', 'name': '不合格品原因统计', 'parent_id': None},
+    {'id': 804, 'code': 'durate_putin_reason', 'name': '不入库原因统计', 'parent_id': None},
     {'id': 805, 'code': 'view_durate_putin_reason', 'name': '查看', 'parent_id': 804},
     {'id': 806, 'code': 'export_durate_putin_reason', 'name': '导出', 'parent_id': 804},
 

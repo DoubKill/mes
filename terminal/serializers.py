@@ -118,24 +118,34 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 else:
                     raise serializers.ValidationError('配方不需要使用料包')
         elif bra_code.startswith('AAJ1Z'):  # 胶皮
-            pallet_feedback = PalletFeedbacks.objects.filter(lot_no=bra_code).first()
-            if pallet_feedback:
-                scan_material_type = '胶皮'
-                if re.findall('FM|RFM|RE', pallet_feedback.product_no):
-                    add_s = True
-                # 配方中含有种子胶
-                seed = [i for i in materials if '种子胶' in i]
-                if seed and pallet_feedback.product_no == classes_plan.product_batching.stage_product_batch_no:
-                    material_no = seed[0]
-                    material_name = seed[0]
-                    scan_material = pallet_feedback.product_no
-                else:
-                    material_no = pallet_feedback.product_no
-                    material_name = pallet_feedback.product_no
-                    scan_material = material_name
-                total_weight = pallet_feedback.actual_weight
-                unit = unit
-                DepotPallt.objects.filter(pallet_data__lot_no=bra_code).update(outer_time=now_date, pallet_status=2)
+            if bra_code.startswith('AAJ1Z20'):  # 补打胶皮
+                return_rubber = ReturnRubber.objects.filter(bra_code=bra_code).last()
+                if return_rubber:
+                    scan_material_type = '胶皮'
+                    add_s = True if return_rubber.print_type == '加硫' else False
+                    material_no = return_rubber.product_no
+                    material_name = material_no
+                    scan_material = material_no
+                    total_weight = 500
+            else:  # 收皮条码
+                pallet_feedback = PalletFeedbacks.objects.filter(lot_no=bra_code).first()
+                if pallet_feedback:
+                    scan_material_type = '胶皮'
+                    if re.findall('FM|RFM|RE', pallet_feedback.product_no):
+                        add_s = True
+                    # 配方中含有种子胶
+                    seed = [i for i in materials if '种子胶' in i]
+                    if seed and pallet_feedback.product_no == classes_plan.product_batching.stage_product_batch_no:
+                        material_no = seed[0]
+                        material_name = seed[0]
+                        scan_material = pallet_feedback.product_no
+                    else:
+                        material_no = pallet_feedback.product_no
+                        material_name = pallet_feedback.product_no
+                        scan_material = material_name
+                    total_weight = pallet_feedback.actual_weight
+                    unit = unit
+                    DepotPallt.objects.filter(pallet_data__lot_no=bra_code).update(outer_time=now_date, pallet_status=2)
         elif len(bra_code) > 12 and bra_code[12] in ['H', 'Z']:  # 胶皮补打
             start_time = f'20{bra_code[:2]}-{bra_code[2:4]}-{bra_code[4:6]} {bra_code[6:8]}:{bra_code[8:10]}:{bra_code[10:12]}'
             end_time = str(datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S') + timedelta(seconds=1))
@@ -235,7 +245,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 else:  # 胶块替代(1、不能通过直接绑定erp替代; 2、增加这段逻辑确保替代胶块能走到下面物料是否在配方中判断)
                     material_name = scan_material
                     material_no = scan_material
-                total_weight = res.get('ZL')
+                total_weight = Decimal(res.get('ZL'))
                 unit = res.get('BZDW')
         if not material_name:
             raise serializers.ValidationError('未找到该条形码信息！')
@@ -248,12 +258,18 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                               'scan_material': scan_material, 'plan_classes_uid': plan_classes_uid,
                               'scan_material_type': scan_material_type}
         # 判断物料是否在配方中
-        if isinstance(material_name, dict) or material_name not in materials:
+        if isinstance(material_name, dict) or material_name not in materials or bra_code.startswith('AAJ1Z20'):
             flag, send_flag = True, True
             record_data = {'plan_classes_uid': plan_classes_uid, 'bra_code': bra_code,
                            'product_no': classes_plan.product_batching.stage_product_batch_no,
                            'material_name': scan_material, 'plan_weight': total_weight}
             other_type, status = scan_material_type, False
+            # 添加到工艺放行表中的数据
+            replace_material_data = {"plan_classes_uid": plan_classes_uid, "equip_no": classes_plan.equip.equip_no,
+                                     "product_no": classes_plan.product_batching.stage_product_batch_no,
+                                     "real_material": scan_material, "bra_code": bra_code, "status": "未处理",
+                                     "created_user": self.context['request'].user, "real_material_no": scan_material,
+                                     "last_updated_date": now_date, "material_type": scan_material_type}
             # 胶皮
             if scan_material_type == '胶皮':
                 flag, send_flag = False, False
@@ -315,14 +331,11 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 if not OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code, status=status, other_type=other_type):
                     record_data.update({'other_type': other_type, 'status': status})
                     OtherMaterialLog.objects.create(**record_data)
+                if not ReplaceMaterial.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code, reason_type='物料名不一致'):
+                    replace_material_data.update({'reason_type': '物料名不一致'})
+                    ReplaceMaterial.objects.create(**replace_material_data)
             # 胶块/细料
             else:
-                # 添加到工艺放行表中的数据
-                replace_material_data = {"plan_classes_uid": plan_classes_uid, "equip_no": classes_plan.equip.equip_no,
-                                         "product_no": classes_plan.product_batching.stage_product_batch_no,
-                                         "real_material": scan_material, "bra_code": bra_code, "status": "未处理",
-                                         "created_user": self.context['request'].user, "real_material_no": scan_material,
-                                         "last_updated_date": now_date, "material_type": scan_material_type}
                 if scan_material_type == '胶块':
                     res = self.material_pass(plan_classes_uid, scan_material, material_type=scan_material_type)
                     if not res[0]:
@@ -710,12 +723,15 @@ class ReturnRubberSerializer(BaseModelSerializer):
         max_code = ReturnRubber.objects.filter(bra_code__startswith=prefix_code).aggregate(max_code=Max('bra_code'))['max_code']
         bra_code = prefix_code + ("%04d" % (int(max_code[-4:]) + 1) if max_code else '0001')
         validated_data.update({'batch_class': batch_class, 'batch_group': batch_group, 'bra_code': bra_code,
-                               'created_user': self.context['request'].user})
+                               'created_user': self.context['request'].user, 'last_updated_user': self.context['request'].user,
+                               'ip_address': get_real_ip(self.context['request'].META)})
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
-        validated_data.update({'status': 1, 'last_updated_user': self.context['request'].user,
-                               'last_updated_date': datetime.now()})
+        if instance.print_flag == 1:
+            raise serializers.ValidationError('打印尚未完成, 请稍后重试')
+        validated_data.update({'print_flag': 1, 'last_updated_user': self.context['request'].user,
+                               'last_updated_date': datetime.now(), 'ip_address': get_real_ip(self.context['request'].META)})
         return super().update(instance, validated_data)
 
     class Meta:

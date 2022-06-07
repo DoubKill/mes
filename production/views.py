@@ -3701,11 +3701,13 @@ class AttendanceClockViewSet(ModelViewSet):
         results = {
             'ids': [],
         }
+        # 标准上下班时间
+        standard_begin_time = datetime.datetime.strptime(f"{date_now} {str(attendance_group_obj.attendance_st)}", '%Y-%m-%d %H:%M:%S')
+        standard_end_time = datetime.datetime.strptime(f"{date_now} {str(attendance_group_obj.attendance_et)}", '%Y-%m-%d %H:%M:%S')
         if status == '上岗':
             begin_date = time_now
-            attendance_st = datetime.datetime.strptime(f"{date_now} {str(attendance_group_obj.attendance_st)}", '%Y-%m-%d %H:%M:%S')
             lead_time = datetime.timedelta(minutes=attendance_group_obj.lead_time)
-            if time_now < attendance_st - lead_time:
+            if time_now < standard_begin_time - lead_time:
                 raise ValidationError('未到可打卡时间')
             # 本次上岗打卡操作自动补上上次离岗打卡
             last_date = datetime.datetime.strptime(date_now, '%Y-%m-%d') - datetime.timedelta(days=1)
@@ -3734,11 +3736,13 @@ class AttendanceClockViewSet(ModelViewSet):
             if time_now < begin_date + range_time:
                 raise ValidationError(f'上班{attendance_group_obj.range_time}分钟内不能打下班卡')
             # 下班半小时后不能再打卡
-            attendance_et = datetime.datetime.strptime(f"{date_now} {str(attendance_group_obj.attendance_et)}", '%Y-%m-%d %H:%M:%S')
-            if time_now > attendance_et + datetime.timedelta(minutes=30):
+            if time_now > standard_end_time + datetime.timedelta(minutes=30):
                 raise ValidationError('下班超过半小时不可在打卡')
             end_date = time_now
-            work_time = round((end_date - begin_date).seconds / 3600, 2)
+            # 计算实际工时(打卡时间)
+            actual_begin_time = begin_date if standard_end_time > begin_date > standard_begin_time else standard_begin_time
+            actual_end_time = end_date if standard_end_time > end_date > standard_begin_time else standard_end_time
+            work_time = round((actual_end_time - actual_begin_time).seconds / 3600, 2)
             EmployeeAttendanceRecords.objects.filter(id__in=ids).update(
                 end_date=end_date, work_time=work_time, actual_time=work_time
             )
