@@ -393,6 +393,8 @@ class GroupPermissions(APIView):
         else:
             ret = []
             parent_permissions = Permissions.objects.filter(parent__isnull=True)
+            if permission_name:
+                parent_permissions = parent_permissions.filter(name__icontains=permission_name)
             for perm in parent_permissions:
                 ret.append({'name': perm.name, 'permissions': perm.children_list})
         return Response(data={'result': ret})
