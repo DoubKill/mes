@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from basics.views import GlobalCodeTypeViewSet, GlobalCodeViewSet, WorkScheduleViewSet, EquipCategoryViewSet, \
     EquipViewSet, PlanScheduleViewSet, ClassesDetailViewSet, PlanScheduleManyCreate, LocationViewSet, CurrentClassView, \
-    CurrentFactoryDate
+    CurrentFactoryDate, CommonCodeView
 
 # app_name = 'basics'
 router = DefaultRouter()
@@ -35,5 +35,6 @@ urlpatterns = [
     path(r'plan-schedules/', PlanScheduleManyCreate.as_view()),
     path('current_class/', CurrentClassView.as_view()),
     path('current-factory-date/', CurrentFactoryDate.as_view()),  # 根据当前时间获取工厂日期和班次
+    path('common-code/', CommonCodeView.as_view()),  # 获取默认的通用编码
     path('', include(router.urls)),
 ]
