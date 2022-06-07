@@ -421,19 +421,25 @@ class UnqualifiedDealOrderUpdateSerializer(BaseModelSerializer):
         if c_agreed is not None:
             if c_agreed:
                 # 同意
-                for detail in instance.deal_details.filter(is_release=True):
-                    MaterialDealResult.objects.filter(lot_no=detail.lot_no).update(test_result='PASS',
-                                                                                   deal_suggestion=detail.suggestion,
-                                                                                   deal_time=datetime.now(),
-                                                                                   deal_user=instance.t_deal_user,
-                                                                                   update_store_test_flag=4)
+                for detail in instance.deal_details.all():
+                    update_kwargs = {
+                        'deal_suggestion': detail.suggestion,
+                        'deal_time': datetime.now(),
+                        'deal_user': instance.t_deal_user
+                    }
+                    if detail.is_release:
+                        update_kwargs['update_store_test_flag'] = 4
+                        update_kwargs['test_result'] = 'PASS'
+                    MaterialDealResult.objects.filter(lot_no=detail.lot_no).update(**update_kwargs)
             else:
                 # 不同意
-                for detail in instance.deal_details.filter(is_release=True):
-                    MaterialDealResult.objects.filter(lot_no=detail.lot_no).update(test_result='三等品',
-                                                                                   deal_suggestion='不合格',
-                                                                                   deal_time=datetime.now(),
-                                                                                   deal_user=instance.t_deal_user)
+                for detail in instance.deal_details.all():
+                    update_kwargs = {
+                        'deal_suggestion': detail.suggestion,
+                        'deal_time': datetime.now(),
+                        'deal_user': instance.t_deal_user,
+                    }
+                    MaterialDealResult.objects.filter(lot_no=detail.lot_no).update(**update_kwargs)
         return instance
 
     class Meta:
