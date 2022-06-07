@@ -449,10 +449,10 @@ class UnqualifiedDealOrderUpdateSerializer(BaseModelSerializer):
 
 
 class MaterialTestResultListSerializer(BaseModelSerializer):
-    upper_lower = serializers.SerializerMethodField(read_only=True)
+    # upper_lower = serializers.DecimalField(read_only=True)
 
-    def get_upper_lower(self, obj):
-        return f'{obj.judged_lower_limit}-{obj.judged_upper_limit}'
+    # def get_upper_lower(self, obj):
+    #     return f'{obj.judged_lower_limit}-{obj.judged_upper_limit}'
         # try:
         #     mdp_obj = MaterialDataPointIndicator.objects.filter(
         #         material_test_method__material__material_name=obj.material_test_order.product_no,
@@ -468,8 +468,13 @@ class MaterialTestResultListSerializer(BaseModelSerializer):
 
     class Meta:
         model = MaterialTestResult
-        fields = ('id', 'test_times', 'value', 'data_point_name', 'test_method_name',
-                  'test_indicator_name', 'mes_result', 'result', 'machine_name', 'level', 'upper_lower')
+        fields = ('id', 'test_times', 'value', 'data_point_name', 'test_method_name', 'judged_lower_limit',
+                  'judged_upper_limit', 'test_indicator_name', 'mes_result', 'result', 'machine_name', 'level')
+        extra_kwargs = {
+            'value': {'coerce_to_string': False},
+            'judged_lower_limit': {'coerce_to_string': False},
+            'judged_upper_limit': {'coerce_to_string': False}
+        }
 
 
 class MaterialTestOrderListSerializer(BaseModelSerializer):
