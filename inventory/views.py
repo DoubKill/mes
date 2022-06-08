@@ -2821,18 +2821,22 @@ class WmsInventoryStockView(APIView):
             batch_value_dict[k] = i['value']
 
         for item in temp:
+            batch = item[3].strip()
+            material_code = item[1].strip()
             mn_level = ''
+            mn_value = ''
             if self.DB == 'WMS':
-                ml_test_value = batch_value_dict.get('{}+{}'.format(item[3], item[1]))
+                ml_test_value = batch_value_dict.get('{}+{}'.format(batch, material_code))
                 if ml_test_value:
-                    level_data = wms_mooney_level_dict.get(item[1])
+                    mn_value = ml_test_value
+                    level_data = wms_mooney_level_dict.get(material_code)
                     if level_data:
                         if level_data['h_lower_limit_value'] <= ml_test_value <= level_data['h_upper_limit_value']:
-                            mn_level = '高'
+                            mn_level = '高级'
                         elif level_data['m_lower_limit_value'] <= ml_test_value <= level_data['m_upper_limit_value']:
-                            mn_level = '中'
+                            mn_level = '中级'
                         elif level_data['l_lower_limit_value'] <= ml_test_value <= level_data['l_upper_limit_value']:
-                            mn_level = '低'
+                            mn_level = '低级'
 
             result.append(
                 {'StockDetailState': item[0],
@@ -2845,7 +2849,8 @@ class WmsInventoryStockView(APIView):
                  'inventory_time': item[7],
                  'position': '内' if item[4][6] in ('1', '2') else '外',
                  'RFID': item[8],
-                 'mn_level': mn_level
+                 'mn_level': mn_level,
+                 'mn_value': mn_value
                  })
         if mooney_level:
             result = list(filter(lambda x: x['mn_level'] == mooney_level, result))
