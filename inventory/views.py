@@ -45,7 +45,8 @@ from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMate
     DepotSite, DepotPallt, Sulfur, SulfurDepot, SulfurDepotSite, MaterialInHistory, \
     CarbonOutPlan, FinalRubberyOutBoundOrder, MixinRubberyOutBoundOrder, FinalGumInInventoryLog, OutBoundDeliveryOrder, \
     OutBoundDeliveryOrderDetail, WMSReleaseLog, WmsInventoryMaterial, WMSMaterialSafetySettings, WmsNucleinManagement, \
-    WMSExceptHandle, MaterialOutHistoryOther, MaterialOutboundOrder, MaterialEntrance, HfBakeMaterialSet, HfBakeLog
+    WMSExceptHandle, MaterialOutHistoryOther, MaterialOutboundOrder, MaterialEntrance, HfBakeMaterialSet, HfBakeLog, \
+    WMSOutboundHistory
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
@@ -77,7 +78,7 @@ from plan.models import ProductClassesPlan, BatchingClassesPlan
 from production.models import PalletFeedbacks, TrainsFeedbacks
 from quality.deal_result import receive_deal_result
 from quality.models import LabelPrint, MaterialDealResult, LabelPrintLog, ExamineMaterial, \
-    MaterialSingleTypeExamineResult, WMSMooneyLevel
+    MaterialSingleTypeExamineResult, WMSMooneyLevel, MaterialInspectionRegistration
 from quality.serializers import MaterialDealResultListSerializer
 from quality.utils import update_wms_quality_result
 from recipe.models import MaterialAttribute
@@ -691,9 +692,10 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             if store_name in ('原材料库', '炭黑库'):
-                test_data = dict(ExamineMaterial.objects.values_list('batch', 'qualified'))
+                task_nos = [item['order_no'] for item in serializer.data]
+                test_data = dict(WMSOutboundHistory.objects.filter(task_no__in=task_nos).values_list('task_no', 'quality_status'))
                 for item in serializer.data:
-                    item['is_qualified'] = test_data.get(item['batch_no'], None)
+                    item['quality_status'] = test_data.get(item['order_no'], None)
             return self.get_paginated_response(serializer.data)
 
         serializer = self.get_serializer(queryset, many=True)
@@ -5617,15 +5619,48 @@ class WmsOutboundOrderView(APIView):
         if outbound_type == 1:
             url = '{}/MESApi/AllocateSpaceDelivery'.format(self.URL)
             for idx, item in enumerate(outbound_data):
+                task_no = task_num + str(idx+1)
                 details.append(
                     {
-                        "TaskDetailNumber": task_num + str(idx+1),
+                        "TaskDetailNumber": task_no,
                         "MaterialCode": item.get('MaterialCode'),
                         "MaterialName": item.get('MaterialName'),
                         "SpaceCode": item.get('SpaceCode'),
                         "Quantity": 1
                     }
                 )
+                if self.ORDER_TYPE == 1:
+                    quality_status_map = {1: "合格品", 2: "抽检中", 3: "不合格品", 4: "过期", 5: "待检"}
+                    em = ExamineMaterial.objects.filter(wlxxid=item['MaterialCode'],
+                                                        batch=item['BatchNo']).first()
+                    if em:
+                        mes_test_result = '合格' if em.qualified else '不合格'
+                    else:
+                        mes_test_result = '未检测'
+                    mtr = MaterialInspectionRegistration.objects.filter(material_no=item['MaterialCode'],
+                                                                        batch=item['BatchNo']).first()
+                    if mtr:
+                        zc_test_result = mtr.quality_status
+                    else:
+                        zc_test_result = '未知'
+                    hs = WmsNucleinManagement.objects.filter(batch_no=item['BatchNo'],
+                                                             material_no=item['MaterialCode']).first()
+                    if hs:
+                        hs_status = hs.locked_status
+                    else:
+                        hs_status = '未管控'
+                    try:
+                        WMSOutboundHistory.objects.create(
+                            task_no=task_no,
+                            quality_status=quality_status_map.get(item['StockDetailState']),
+                            mes_test_result=mes_test_result,
+                            zc_test_result=zc_test_result,
+                            hs_status=hs_status,
+                            mooney_value=None if not item.get('mn_value') else item['mn_value'],
+                            mooney_level=item.get('mn_level')
+                        )
+                    except Exception:
+                        raise
             data = {
                 "TaskNumber": task_num,
                 "EntranceCode": entrance_code,
