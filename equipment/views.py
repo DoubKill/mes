@@ -4858,65 +4858,68 @@ class EquipIndexView(APIView):
             to_check_order_num = apply_data_dict.get('{}-{}'.format(equip_no, '已完成'), 0)
             is_repairing = False
 
-            if last_running_time:
-                lt_time = (now_time - last_running_time).total_seconds() / 60
-                if lt_time > 15:  # 最后一条车次的生产时间与当前时间对比，大于10分钟则判定为生产停机
-                    state = '生产停机'
-                    error_reason = ''
-                    breakdown_time = 0
-                    error_continue_minutes = int(lt_time)
-                    repair_plan_id = ''
-                    last_apply_order = EquipApplyOrder.objects.filter(
-                        status__in=('已生成', '已指派', '已接单', '已开始'),
-                        equip_no=equip_no).order_by('id').last()
-                    if last_apply_order:
-                        repair_plan_id = (last_apply_order.id, last_apply_order.plan_id)
-                        state = '设备故障'
-                        breakdown_time = 0
-                        if last_apply_order.status == '已开始':
-                            is_repairing = True
-                        if last_apply_order.equip_condition == '停机':
-                            state = '故障停机'
-                        error_reason = last_apply_order.result_fault_cause
-                        fault_time = last_apply_order.fault_datetime or last_apply_order.created_date
-                        error_continue_minutes = int((now_time - fault_time).total_seconds() / 60)
-
-                        # 设备故障停机时间
-                        orders = EquipApplyOrder.objects.filter(
-                            equip_no=equip_no,
-                            equip_condition='停机',
-                            repair_start_datetime__isnull=False).filter(
-                            Q(repair_end_datetime__isnull=True) |
-                            Q(repair_end_datetime__gt=begin_time)
-                        )
-                        bk_st = []
-                        bk_et = []
-                        for order in orders:
-                            if order.repair_start_datetime <= datetime.strptime(begin_time, '%Y-%m-%d %H:%M:%S'):
-                                down_st = datetime.strptime(begin_time, '%Y-%m-%d %H:%M:%S')
-                            else:
-                                down_st = last_apply_order.repair_start_datetime
-                            if not order.repair_end_datetime:
-                                down_et = now_time
-                            else:
-                                down_et = order.repair_end_datetime
-                            bk_st.append(down_st)
-                            bk_et.append(down_et)
-                        if bk_st and bk_et:
-                            breakdown_time = int((max(bk_et) - min(bk_st)).total_seconds() / 60)
-                else:
-                    state = '运行中'
-                    error_reason = ''
-                    breakdown_time = 0
-                    error_continue_minutes = 0
-                    repair_plan_id = ''
-            else:
-                state = '生产停机'
+            # 取最后一条报修单
+            last_apply_order = EquipApplyOrder.objects.filter(
+                # equip_condition='停机',
+                # work_type='维修',
+                status__in=('已生成', '已指派', '已接单', '已开始'),
+                equip_no=equip_no).order_by('id').last()
+            if not last_apply_order:
+                repair_plan_id = ()
+                state = '运行中'
                 error_reason = ''
                 breakdown_time = 0
-                error_continue_minutes = total_time
-                repair_plan_id = ''
-
+                error_continue_minutes = 0
+                if last_running_time:
+                    cm = (now_time - last_running_time).total_seconds() / 60
+                    if cm > 15:
+                        state = '生产停机'
+                        error_continue_minutes = int(cm)
+                else:
+                    state = '生产停机'
+                    error_continue_minutes = total_time
+            else:
+                repair_plan_id = (last_apply_order.id, last_apply_order.plan_id)
+                breakdown_time = 0
+                state = '设备故障'
+                error_reason = last_apply_order.result_fault_cause
+                fault_time = last_apply_order.fault_datetime or last_apply_order.created_date
+                error_continue_minutes = int((now_time - fault_time).total_seconds() / 60)
+                if last_running_time:
+                    cm = (now_time - last_running_time).total_seconds() / 60
+                    if cm <= 15:
+                        repair_plan_id = ()
+                        state = '运行中'
+                        error_reason = ''
+                        error_continue_minutes = 0
+                else:
+                    if last_apply_order.status == '已开始':
+                        is_repairing = True
+                    if last_apply_order.equip_condition == '停机':
+                        state = '故障停机'
+                    # 设备故障停机时间
+                    orders = EquipApplyOrder.objects.filter(
+                        equip_no=equip_no,
+                        equip_condition='停机',
+                        repair_start_datetime__isnull=False).filter(
+                        Q(repair_end_datetime__isnull=True) |
+                        Q(repair_end_datetime__gt=begin_time)
+                    )
+                    bk_st = []
+                    bk_et = []
+                    for order in orders:
+                        if order.repair_start_datetime <= datetime.strptime(begin_time, '%Y-%m-%d %H:%M:%S'):
+                            down_st = datetime.strptime(begin_time, '%Y-%m-%d %H:%M:%S')
+                        else:
+                            down_st = last_apply_order.repair_start_datetime
+                        if not order.repair_end_datetime:
+                            down_et = now_time
+                        else:
+                            down_et = order.repair_end_datetime
+                        bk_st.append(down_st)
+                        bk_et.append(down_et)
+                    if bk_st and bk_et:
+                        breakdown_time = int((max(bk_et) - min(bk_st)).total_seconds()/60)
             if halt_time < 0:
                 halt_time = 0
                 breakdown_time = 0
