@@ -4875,6 +4875,8 @@ class EquipIndexView(APIView):
                     if cm > 15:
                         state = '生产停机'
                         error_continue_minutes = int(cm)
+                    else:
+                        halt_time -= round(cm, 0)
                 else:
                     state = '生产停机'
                     error_continue_minutes = total_time
@@ -4892,6 +4894,7 @@ class EquipIndexView(APIView):
                         state = '运行中'
                         error_reason = ''
                         error_continue_minutes = 0
+                        halt_time -= round(cm, 0)
                 else:
                     if last_apply_order.status == '已开始':
                         is_repairing = True
