@@ -3539,7 +3539,7 @@ class WMSMooneyLevelView(ModelViewSet):
         material_type = self.request.query_params.get('material_type')
         material_no = self.request.query_params.get('material_no')
         material_name = self.request.query_params.get('material_name')
-        filter_kwargs = {}
+        filter_kwargs = {'material__material_type__global_name__icontains': '胶'}
         if material_type:
             filter_kwargs['material__material_type__global_name'] = material_type
         if material_no:
