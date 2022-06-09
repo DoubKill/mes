@@ -2444,6 +2444,12 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
     permission_classes = (IsAuthenticated,)
     filter_class = EquipWarehouseOrderFilter
 
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return EquipWarehouseOrderListSerializer
+        else:
+            return EquipWarehouseOrderSerializer
+
     def list(self, request, *args, **kwargs):
         state = self.request.query_params.get('status')
         order = self.request.query_params.get('order', None)
@@ -2538,7 +2544,6 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipWarehouseOrderDetailFilter
-    pagination_class = None
 
     @atomic
     def create(self, request, *args, **kwargs):
