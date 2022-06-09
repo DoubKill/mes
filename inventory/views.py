@@ -2833,13 +2833,18 @@ class WmsInventoryStockView(APIView):
                     mn_value = ml_test_value
                     level_data = wms_mooney_level_dict.get(material_code)
                     if level_data:
-                        if level_data['h_lower_limit_value'] <= ml_test_value <= level_data['h_upper_limit_value']:
+                        h_lower_limit_value = level_data['h_lower_limit_value'] if level_data['h_lower_limit_value'] else 0
+                        h_upper_limit_value = level_data['h_upper_limit_value'] if level_data['h_upper_limit_value'] else 0
+                        m_lower_limit_value = level_data['m_lower_limit_value'] if level_data['m_lower_limit_value'] else 0
+                        m_upper_limit_value = level_data['m_upper_limit_value'] if level_data['m_upper_limit_value'] else 0
+                        l_lower_limit_value = level_data['l_lower_limit_value'] if level_data['l_lower_limit_value'] else 0
+                        l_upper_limit_value = level_data['l_upper_limit_value'] if level_data['l_upper_limit_value'] else 0
+                        if h_lower_limit_value <= ml_test_value <= h_upper_limit_value:
                             mn_level = '高级'
-                        elif level_data['m_lower_limit_value'] <= ml_test_value <= level_data['m_upper_limit_value']:
+                        elif m_lower_limit_value <= ml_test_value <= m_upper_limit_value:
                             mn_level = '中级'
-                        elif level_data['l_lower_limit_value'] <= ml_test_value <= level_data['l_upper_limit_value']:
+                        elif l_lower_limit_value <= ml_test_value <= l_upper_limit_value:
                             mn_level = '低级'
-
             result.append(
                 {'StockDetailState': item[0],
                  'MaterialCode': item[1],

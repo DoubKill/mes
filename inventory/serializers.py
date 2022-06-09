@@ -857,11 +857,17 @@ class WmsInventoryStockSerializer(serializers.ModelSerializer):
         if not examine_data:
             return ""
         ml_test_value = examine_data.value
-        if wms_mooney_level.h_lower_limit_value <= ml_test_value <= wms_mooney_level.h_upper_limit_value:
+        h_lower_limit_value = wms_mooney_level.h_lower_limit_value if wms_mooney_level.h_lower_limit_value else 0
+        h_upper_limit_value = wms_mooney_level.h_upper_limit_value if wms_mooney_level.h_upper_limit_value else 0
+        m_lower_limit_value = wms_mooney_level.m_lower_limit_value if wms_mooney_level.m_lower_limit_value else 0
+        m_upper_limit_value = wms_mooney_level.m_upper_limit_value if wms_mooney_level.m_upper_limit_value else 0
+        l_lower_limit_value = wms_mooney_level.l_lower_limit_value if wms_mooney_level.l_lower_limit_value else 0
+        l_upper_limit_value = wms_mooney_level.l_upper_limit_value if wms_mooney_level.l_upper_limit_value else 0
+        if h_lower_limit_value <= ml_test_value <= h_upper_limit_value:
             return '高级'
-        elif wms_mooney_level.m_lower_limit_value <= ml_test_value <= wms_mooney_level.m_upper_limit_value:
+        elif m_lower_limit_value <= ml_test_value <= m_upper_limit_value:
             return '中级'
-        elif wms_mooney_level.l_lower_limit_value <= ml_test_value <= wms_mooney_level.l_upper_limit_value:
+        elif l_lower_limit_value <= ml_test_value <= l_upper_limit_value:
             return '低级'
         else:
             return ""
