@@ -344,9 +344,6 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 if not OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code, status=status, other_type=other_type):
                     record_data.update({'other_type': other_type, 'status': status})
                     OtherMaterialLog.objects.create(**record_data)
-                if not ReplaceMaterial.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code, reason_type='物料名不一致'):
-                    replace_material_data.update({'reason_type': '物料名不一致'})
-                    ReplaceMaterial.objects.create(**replace_material_data)
             # 胶块/细料
             else:
                 if scan_material_type == '胶块':
