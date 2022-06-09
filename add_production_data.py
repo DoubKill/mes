@@ -115,7 +115,6 @@ def main():
                 #                                 lower_limit__lte=value).first()
                 #                             if indicator:
                 #                                 item['mes_result'] = indicator.result
-                #                                 item['data_point_indicator'] = indicator
                 #                                 item['level'] = indicator.level
                 #                             else:
                 #                                 item['mes_result'] = '三等品'

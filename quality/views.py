@@ -48,7 +48,7 @@ from quality.filters import TestMethodFilter, DataPointFilter, \
     MaterialTestPlanFilter, MaterialInspectionRegistrationFilter, UnqualifiedPalletFeedBackListFilter
 from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod, MaterialTestOrder, \
     MaterialTestMethod, TestType, DataPoint, DealSuggestion, MaterialDealResult, LevelResult, MaterialTestResult, \
-    LabelPrint, TestDataPoint, BatchMonth, BatchDay, BatchProductNo, BatchEquip, BatchClass, UnqualifiedDealOrder, \
+    LabelPrint, UnqualifiedDealOrder, \
     MaterialExamineResult, MaterialExamineType, MaterialExamineRatingStandard, ExamineValueUnit, ExamineMaterial, \
     DataPointStandardError, MaterialSingleTypeExamineResult, MaterialEquipType, MaterialEquip, \
     QualifiedRangeDisplay, IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, \
@@ -60,8 +60,7 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestOrderSerializer, MaterialTestOrderListSerializer, \
     MaterialTestMethodSerializer, TestMethodSerializer, TestTypeSerializer, DataPointSerializer, \
     DealSuggestionSerializer, DealResultDealSerializer, MaterialDealResultListSerializer, LevelResultSerializer, \
-    TestIndicatorSerializer, LabelPrintSerializer, BatchMonthSerializer, BatchDaySerializer, \
-    BatchCommonSerializer, BatchProductNoDaySerializer, BatchProductNoMonthSerializer, \
+    TestIndicatorSerializer, LabelPrintSerializer, \
     UnqualifiedDealOrderCreateSerializer, UnqualifiedDealOrderSerializer, UnqualifiedDealOrderUpdateSerializer, \
     MaterialDealResultListSerializer1, ExamineMaterialSerializer, MaterialExamineTypeSerializer, \
     ExamineValueUnitSerializer, MaterialExamineResultMainSerializer, DataPointStandardErrorSerializer, \
@@ -77,7 +76,7 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
 
 from django.db.models import Prefetch
 from django.db.models import Q
-from quality.utils import print_mdr, get_cur_sheet, get_sheet_data, export_mto
+from quality.utils import get_cur_sheet, get_sheet_data, export_mto, gen_pallet_test_result
 from recipe.models import Material, ProductBatching, ERPMESMaterialRelation, ZCMaterial
 from django.db.models import Max, Sum, Avg, Count
 
@@ -831,166 +830,22 @@ class MaterialTestResultHistoryView(APIView):
         return Response(ret)
 
 
-@method_decorator([api_recorder], name="dispatch")
-class ProductDayDetail(APIView):
-    """胶料日合格率详细信息统计"""
-
-    # 伪代码
-    def get(self, request, *args, **kwargs):
-        params = request.query_params
-        month_time = params.get('ym_time', datetime.datetime.now()).month
-        year_time = params.get('ym_time', datetime.datetime.now()).year
-        product_no = params.get('product_no', 'C-FM-UC109-001')
-        pass_dict = {'1': ['门尼', '比重', '硬度', '流变'], '2': ['门尼', '比重', '硬度'], '3': ['流变']}
-        name_dict = {'1': '综合合格率', '2': '一次合格率', '3': '流变合格率'}
-
-        ruturn_pass = []
-        return_dict = {}
-
-        for day_time in range(1, int(datetime.datetime.now().day) + 1):
-            # 1、胶料编码
-            return_dict['product_no'] = product_no
-            lot_no_list = MaterialTestOrder.objects.filter(delete_flag=False,
-                                                           production_factory_date__year=year_time,
-                                                           production_factory_date__month=month_time,
-                                                           production_factory_date__day=day_time,
-                                                           product_no=product_no).values('lot_no').annotate().distinct()
-
-            mto_count = lot_no_list.count()
-            if mto_count == 0:
-                continue
-            return_dict = {}
-            # 2、当天的日期也要返回给前端
-            return_dict['day_time'] = str(year_time) + '-' + str(month_time) + '-' + str(day_time)
-            # 3、计算产量 车次
-            plan_classes_uid_list = MaterialTestOrder.objects.filter(delete_flag=False,
-                                                                     production_factory_date__year=year_time,
-                                                                     production_factory_date__month=month_time,
-                                                                     production_factory_date__day=day_time,
-                                                                     product_no=product_no).values(
-                'plan_classes_uid').annotate().distinct().values_list('plan_classes_uid', flat=True)
-            tfb_train_list = TrainsFeedbacks.objects.filter(end_time__year=year_time, end_time__month=month_time,
-                                                            end_time__day=day_time,
-                                                            plan_classes_uid__in=plan_classes_uid_list).values(
-                'plan_classes_uid').annotate(max_train=Max('actual_trains')).aggregate(sum_train=Sum('max_train'))
-            return_dict['sum_train'] = tfb_train_list['sum_train']
-
-            # 4、 循环三种指标类型，得到合格率
-            for tin_key in pass_dict.keys():
-                pass_count = 0
-                test_indicator_name_dict = pass_dict[tin_key]
-
-                for lot_no_dict in lot_no_list:
-                    mto_set = MaterialTestOrder.objects.filter(delete_flag=False,
-                                                               production_factory_date__year=year_time,
-                                                               production_factory_date__month=month_time,
-                                                               production_factory_date__day=day_time,
-                                                               product_no=product_no, **lot_no_dict).all()
-                    if not mto_set:
-                        continue
-                    level_list = []
-                    for mto_obj in mto_set:
-                        mrt_list = mto_obj.order_results.filter(
-                            test_indicator_name__in=test_indicator_name_dict).all().values('data_point_name').annotate(
-                            max_test_time=Max('test_times'))
-                        for mrt_dict in mrt_list:
-                            mrt_dict_obj = MaterialTestResult.objects.filter(material_test_order=mto_obj,
-                                                                             data_point_name=mrt_dict[
-                                                                                 'data_point_name'],
-                                                                             test_times=mrt_dict[
-                                                                                 'max_test_time']).last()
-                            level_list.append(mrt_dict_obj)
-                    quality_sign = True
-                    for mtr_obj in level_list:
-                        if not mtr_obj.mes_result:  # mes没有数据
-                            if not mtr_obj.result:  # 快检也没有数据
-                                quality_sign = False
-                            elif mtr_obj.result != '一等品':
-                                quality_sign = False
-
-                        elif mtr_obj.mes_result == '一等品':
-                            if mtr_obj.result not in ['一等品', None]:
-                                quality_sign = False
-
-                        elif mtr_obj.mes_result != '一等品':
-                            quality_sign = False
-
-                    if quality_sign:
-                        pass_count += 1
-                percent_of_pass = str((pass_count / mto_count) * 100) + '%'
-                return_dict[name_dict[tin_key]] = percent_of_pass
-
-            # 5、计算每个数据点超出的上下限
-            point_count = {}
-            point_upper = {}
-            point_lower = {}
-            for lot_no_dict in lot_no_list:
-                mto_set = MaterialTestOrder.objects.filter(delete_flag=False,
-                                                           production_factory_date__year=year_time,
-                                                           production_factory_date__month=month_time,
-                                                           production_factory_date__day=day_time,
-                                                           product_no=product_no, **lot_no_dict).all()
-                if not mto_set:
-                    continue
-
-                for mto_obj in mto_set:
-                    mrt_list = mto_obj.order_results.filter().all().values('data_point_name').annotate(
-                        max_test_time=Max('test_times'))
-
-                    for mrt_dict in mrt_list:
-                        level_list = []
-                        mtr_obj = MaterialTestResult.objects.filter(material_test_order=mto_obj,
-                                                                    data_point_name=mrt_dict[
-                                                                        'data_point_name'],
-                                                                    test_times=mrt_dict[
-                                                                        'max_test_time']).last()
-                        if not mtr_obj.data_point_indicator:
-                            continue
-                        if mrt_dict['data_point_name'] not in point_count.keys():
-                            point_count[mrt_dict['data_point_name']] = 0
-                        point_count[mrt_dict['data_point_name']] += 1
-                        mdp_obj = MaterialDataPointIndicator.objects.filter(
-                            material_test_method=mtr_obj.data_point_indicator.material_test_method,
-                            data_point=mtr_obj.data_point_indicator.data_point, result='一等品').first()
-
-                        if mtr_obj.data_point_indicator:
-                            if mtr_obj.value > mdp_obj.upper_limit:
-                                if mrt_dict['data_point_name'] not in point_upper.keys():
-                                    point_upper[mrt_dict['data_point_name']] = 0
-                                point_upper[mrt_dict['data_point_name']] += 1
-                            elif mtr_obj.value < mdp_obj.lower_limit:
-                                if mrt_dict['data_point_name'] not in point_lower.keys():
-                                    point_lower[mrt_dict['data_point_name']] = 0
-                                point_lower[mrt_dict['data_point_name']] += 1
-
-            for point in point_count.keys():
-                return_dict[point] = {}
-                if point in point_upper.keys():
-                    return_dict[point]['+'] = point_upper[point]
-                    return_dict[point]['+%'] = str((point_upper[point] / point_count[point]) * 100) + '%'
-                if point in point_lower.keys():
-                    return_dict[point]['-'] = point_lower[point]
-                    return_dict[point]['-%'] = str((point_lower[point] / point_count[point]) * 100) + '%'
-            ruturn_pass.append(return_dict)
-        return Response(ruturn_pass)
-
-
-@method_decorator([api_recorder], name="dispatch")
-class PrintMaterialDealResult(APIView):
-    """不合格品打印功能"""
-
-    def get(self, request, *args, **kwargs):
-        day = self.request.query_params.get('day', None)
-        status = self.request.query_params.get('status', None)
-        filter_dict = {}
-        if day:
-            filter_dict['production_factory_date__icontains'] = day
-        if status:
-            filter_dict['status'] = status
-        MaterialDealResult.objects.filter()
-        mdr_set = MaterialDealResult.objects.filter(~Q(deal_result="一等品")).filter(~Q(status="复测")).filter(**filter_dict,
-                                                                                                          delete_flag=False)
-        return print_mdr("results", mdr_set)
+# @method_decorator([api_recorder], name="dispatch")
+# class PrintMaterialDealResult(APIView):
+#     """不合格品打印功能"""
+#
+#     def get(self, request, *args, **kwargs):
+#         day = self.request.query_params.get('day', None)
+#         status = self.request.query_params.get('status', None)
+#         filter_dict = {}
+#         if day:
+#             filter_dict['production_factory_date__icontains'] = day
+#         if status:
+#             filter_dict['status'] = status
+#         MaterialDealResult.objects.filter()
+#         mdr_set = MaterialDealResult.objects.filter(~Q(deal_result="一等品")).filter(~Q(status="复测")).filter(**filter_dict,
+#                                                                                                           delete_flag=False)
+#         return print_mdr("results", mdr_set)
 
 
 # 1天
@@ -1021,30 +876,6 @@ def get_statics_query_dates(query_params):
     return start_time, end_time
 
 
-@method_decorator([api_recorder, cache_page(timeout=60 * 60 * 24 * 30, cache='default')], name="dispatch")
-class BatchMonthStatisticsView(AllMixin, ReadOnlyModelViewSet):
-    queryset = BatchMonth.objects.all()
-    serializer_class = BatchMonthSerializer
-
-    @action(detail=False)
-    def statistic_headers(self, request):
-        result = {
-            'points': TestDataPoint.objects.values_list('name', flat=True).distinct(),
-            'equips': BatchEquip.objects.values_list('production_equip_no', flat=True).distinct(),
-            'classes': BatchClass.objects.values_list('production_class', flat=True).distinct()
-        }
-        return Response(result)
-
-    def get_queryset(self):
-        start_time, end_time = get_statics_query_dates(self.request.query_params)
-        batches = BatchMonth.objects.filter(date__gte=start_time,
-                                            date__lte=end_time)
-        if batches:
-            batches = BatchCommonSerializer.batch_annotate(batches)
-            batches = batches.order_by('date')
-        return batches
-
-
 def get_statics_query_date(query_params):
     date = query_params.get('date')
     try:
@@ -1052,63 +883,6 @@ def get_statics_query_date(query_params):
     except ValueError:
         raise ValidationError('日期格式:yyyy-mm')
     return date
-
-
-@method_decorator([api_recorder, cache_page(timeout=CACHE_TIME_TIMEOUT, cache='default')], name="dispatch")
-class BatchDayStatisticsView(AllMixin, ReadOnlyModelViewSet):
-    queryset = BatchDay.objects.all()
-    serializer_class = BatchDaySerializer
-
-    def get_queryset(self):
-        date = get_statics_query_date(self.request.query_params)
-        batches = BatchDay.objects.filter(date__year=date.year,
-                                          date__month=date.month)
-        if batches:
-            batches = BatchCommonSerializer.batch_annotate(batches)
-            batches = batches.order_by('date')
-
-        return batches
-
-
-@method_decorator([api_recorder, cache_page(timeout=CACHE_TIME_TIMEOUT, cache='default')], name="dispatch")
-class BatchProductNoDayStatisticsView(AllMixin, ReadOnlyModelViewSet):
-    queryset = BatchProductNo.objects.all()
-    serializer_class = BatchProductNoDaySerializer
-    filter_backends = (DjangoFilterBackend,)
-    filterset_fields = ['product_no']
-
-    def get_serializer_context(self):
-        date = get_statics_query_date(self.request.query_params)
-        context = super().get_serializer_context()
-        context['date'] = date
-        return context
-
-    def get_queryset(self):
-        date = get_statics_query_date(self.request.query_params)
-        return BatchProductNo.objects.filter(
-            batch__batch_month__date__year=date.year,
-            batch__batch_month__date__month=date.month).distinct()
-
-
-@method_decorator([api_recorder, cache_page(timeout=60 * 60 * 24 * 30, cache='default')], name="dispatch")
-class BatchProductNoMonthStatisticsView(AllMixin, ReadOnlyModelViewSet):
-    queryset = BatchProductNo.objects.all()
-    serializer_class = BatchProductNoMonthSerializer
-    filter_backends = (DjangoFilterBackend,)
-    filterset_fields = ['product_no']
-
-    def get_serializer_context(self):
-        start_time, end_time = get_statics_query_dates(self.request.query_params)
-        context = super().get_serializer_context()
-        context['start_time'] = start_time
-        context['end_time'] = end_time
-        return context
-
-    def get_queryset(self):
-        start_time, end_time = get_statics_query_dates(self.request.query_params)
-        return BatchProductNo.objects.filter(
-            batch__batch_month__date__gte=start_time,
-            batch__batch_month__date__lte=end_time).distinct()
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -1367,6 +1141,8 @@ class ImportAndExportView(APIView):
         classes = production_data[3].strip() + '班'
         # 机台
         equip_no = production_data[4].strip()
+        # 班组
+        group = production_data[5].strip()
         # 取数据点
         reverse_dict = {value: key for key, value in by_dict.items()}
         data_points = [reverse_dict.get(i) for i in range(7, 20) if production_data[i]]
@@ -1403,7 +1179,9 @@ class ImportAndExportView(APIView):
         if not pallet_data:
             raise ValidationError('未找到该批次生产数据：【{}】-【{}】-【{}】-【{}】！！'.format(factory_date, classes, equip_no, product_no))
         pallet_trains_map = {}  # 车次与收皮条码map数据
+        lot_nos = []
         for pallet in pallet_data:
+            lot_nos.append(pallet['lot_no'])
             for j in range(pallet['begin_trains'], pallet['end_trains']+1):
                 if j not in pallet_trains_map:
                     pallet_trains_map[j] = {'lot_no': [pallet['lot_no']],
@@ -1422,24 +1200,18 @@ class ImportAndExportView(APIView):
                 continue
             for lot_no in pallet_trains_map[actual_trains]['lot_no']:
                 plan_classes_uid = pallet_trains_map[actual_trains]['plan_classes_uid']
-                test_order = MaterialTestOrder.objects.filter(lot_no=lot_no,
-                                                              actual_trains=actual_trains
-                                                              ).first()
-                if test_order:
-                    instance = test_order
-                    created = False
-                else:
-                    validated_data = dict()
-                    validated_data['material_test_order_uid'] = uuid.uuid1()
-                    validated_data['actual_trains'] = actual_trains
-                    validated_data['lot_no'] = lot_no
-                    validated_data['product_no'] = product_no
-                    validated_data['plan_classes_uid'] = plan_classes_uid
-                    validated_data['production_class'] = classes
-                    validated_data['production_equip_no'] = equip_no
-                    validated_data['production_factory_date'] = factory_date
-                    instance = MaterialTestOrder.objects.create(**validated_data)
-                    created = True
+                validated_data = dict()
+                validated_data['material_test_order_uid'] = uuid.uuid1()
+                validated_data['actual_trains'] = actual_trains
+                validated_data['lot_no'] = lot_no
+                validated_data['product_no'] = product_no
+                validated_data['plan_classes_uid'] = plan_classes_uid
+                validated_data['production_class'] = classes
+                validated_data['production_equip_no'] = equip_no
+                validated_data['production_factory_date'] = factory_date
+                instance, created = MaterialTestOrder.objects.get_or_create(
+                    defaults=validated_data, **{'lot_no': lot_no,
+                                                'actual_trains': actual_trains})
                 for data_point_name, method in data_point_method_map.items():
                     test_method_name = method['test_method__name']
                     test_indicator_name = method['test_method__test_type__test_indicator__name']
@@ -1460,7 +1232,9 @@ class ImportAndExportView(APIView):
                                    'result': '三等品',
                                    'level': 2,
                                    'is_judged': is_judged,
-                                   'created_user': self.request.user
+                                   'created_user': self.request.user,
+                                   'test_class': classes,
+                                   'test_group': group
                                    }
                     if method.get('qualified_range'):
                         if method['qualified_range'][0] <= point_value <= method['qualified_range'][1]:
@@ -1471,19 +1245,10 @@ class ImportAndExportView(APIView):
                         result_data['judged_lower_limit'] = method['qualified_range'][0]
                     else:
                         continue
-                    if created:
-                        result_data['test_times'] = 1
-                    else:
-                        last_test_result = MaterialTestResult.objects.filter(
-                            material_test_order=instance,
-                            test_indicator_name=test_indicator_name,
-                            data_point_name=data_point_name,
-                        ).order_by('-test_times').first()
-                        if last_test_result:
-                            result_data['test_times'] = last_test_result.test_times + 1
-                        else:
-                            result_data['test_times'] = 1
+                    if not created:
+                        instance.order_results.filter(data_point_name=data_point_name).delete()
                     MaterialTestResult.objects.create(**result_data)
+        gen_pallet_test_result(lot_nos)
         return Response('导入成功')
 
 
@@ -2396,6 +2161,7 @@ class ReportValueView(APIView):
         test_results = {}
         for k, v in json.loads(current_test_detail.value).items():
             test_results[k] = {"name": k, "value": v, "flag": ""}
+        lot_nos = []
         # 根据检测间隔，补充车次相关test_order和test_result表数据
         for train in range(current_test_detail.actual_trains,
                            current_test_detail.actual_trains + equip_test_plan.test_interval):
@@ -2411,19 +2177,20 @@ class ReportValueView(APIView):
                 continue
             for pallet in pallets:
                 lot_no = pallet.lot_no
-                test_order = MaterialTestOrder.objects.filter(lot_no=lot_no, actual_trains=train).first()
-                if not test_order:
-                    test_order = MaterialTestOrder.objects.create(
-                        lot_no=lot_no,
-                        material_test_order_uid=uuid.uuid1(),
-                        actual_trains=train,
-                        product_no=product_no,
-                        plan_classes_uid=pallet.plan_classes_uid,
-                        production_class=production_class,
-                        production_group=group,
-                        production_equip_no=equip_no,
-                        production_factory_date=product_date
-                    )
+                lot_nos.append(lot_no)
+                test_order_data = {
+                    "lot_no": lot_no,
+                    'material_test_order_uid': uuid.uuid1(),
+                    'actual_trains': train,
+                    'product_no': product_no,
+                    'plan_classes_uid': pallet.plan_classes_uid,
+                    'production_class': production_class,
+                    'production_group': group,
+                    'production_equip_no': equip_no,
+                    'production_factory_date': product_date}
+                test_order, created = MaterialTestOrder.objects.get_or_create(
+                    defaults=test_order_data, **{'lot_no': lot_no,
+                                                 'actual_trains': train})
 
                 # 由MES判断检测结果
                 material_test_method = MaterialTestMethod.objects.filter(
@@ -2466,7 +2233,8 @@ class ReportValueView(APIView):
                         # mes_result = '三等品'
                         # level = 2
                         continue
-
+                    if not created:
+                        test_order.order_results.filter(data_point_name=data_point_name).delete()
                     MaterialTestResult.objects.create(
                         material_test_order=test_order,
                         test_factory_date=datetime.datetime.now(),
@@ -2503,6 +2271,7 @@ class ReportValueView(APIView):
         current_test_detail.is_qualified = is_qualified
         current_test_detail.status = 2
         current_test_detail.save()
+        gen_pallet_test_result(lot_nos)
         return Response({'msg': '检测完成', 'success': True})
 
 
