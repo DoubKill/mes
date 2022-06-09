@@ -224,5 +224,6 @@ urlpatterns = [
 
     path('product-in-out-history/', ProductInOutHistoryView.as_view()),
 
-    path('outbound-product-info/', OutboundProductInfo.as_view())
+    path('outbound-product-info/', OutboundProductInfo.as_view()),
+    path('wms-mn-level-search/', WMSMnLevelSearchView.as_view()),
 ]

@@ -109,6 +109,8 @@ router.register('material-test-plan', MaterialTestPlanViewSet, basename='materia
 # 原材料检测计划详情
 router.register('material-test-plan-detail', MaterialTestPlanDetailViewSet, basename='material-test-plan-detail')
 
+router.register('wms-mooney-level', WMSMooneyLevelView)
+
 urlpatterns = [
     path('', include(router.urls)),
     path('batching-materials/', ProductBatchingMaterialListView.as_view()),  # 胶料原材料列表
