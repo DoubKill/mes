@@ -45,7 +45,8 @@ from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMate
     DepotSite, DepotPallt, Sulfur, SulfurDepot, SulfurDepotSite, MaterialInHistory, \
     CarbonOutPlan, FinalRubberyOutBoundOrder, MixinRubberyOutBoundOrder, FinalGumInInventoryLog, OutBoundDeliveryOrder, \
     OutBoundDeliveryOrderDetail, WMSReleaseLog, WmsInventoryMaterial, WMSMaterialSafetySettings, WmsNucleinManagement, \
-    WMSExceptHandle, MaterialOutHistoryOther, MaterialOutboundOrder, MaterialEntrance, HfBakeMaterialSet, HfBakeLog
+    WMSExceptHandle, MaterialOutHistoryOther, MaterialOutboundOrder, MaterialEntrance, HfBakeMaterialSet, HfBakeLog, \
+    WMSOutboundHistory
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
@@ -77,7 +78,7 @@ from plan.models import ProductClassesPlan, BatchingClassesPlan
 from production.models import PalletFeedbacks, TrainsFeedbacks
 from quality.deal_result import receive_deal_result
 from quality.models import LabelPrint, MaterialDealResult, LabelPrintLog, ExamineMaterial, \
-    MaterialSingleTypeExamineResult
+    MaterialSingleTypeExamineResult, WMSMooneyLevel, MaterialInspectionRegistration
 from quality.serializers import MaterialDealResultListSerializer
 from quality.utils import update_wms_quality_result
 from recipe.models import MaterialAttribute
@@ -691,9 +692,10 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             if store_name in ('原材料库', '炭黑库'):
-                test_data = dict(ExamineMaterial.objects.values_list('batch', 'qualified'))
+                task_nos = [item['order_no'] for item in serializer.data]
+                test_data = dict(WMSOutboundHistory.objects.filter(task_no__in=task_nos).values_list('task_no', 'quality_status'))
                 for item in serializer.data:
-                    item['is_qualified'] = test_data.get(item['batch_no'], None)
+                    item['quality_status'] = test_data.get(item['order_no'], None)
             return self.get_paginated_response(serializer.data)
 
         serializer = self.get_serializer(queryset, many=True)
@@ -2630,6 +2632,7 @@ class WmsStorageView(ListAPIView):
         st = self.request.query_params.get('st')
         et = self.request.query_params.get('et')
         quality_status = self.request.query_params.get('quality_status')
+        mooney_level = self.request.query_params.get('mooney_level')
         export = self.request.query_params.get('export')  # 1：当前页面  2：所有
         if material_no:
             filter_kwargs['material_no__icontains'] = material_no
@@ -2673,13 +2676,45 @@ class WmsStorageView(ListAPIView):
             else:
                 batch_nos = list(WmsNucleinManagement.objects.values_list('batch_no', flat=True))
                 queryset = queryset.exclude(batch_no__in=batch_nos)
+        stock_batch_nos = set(queryset.values_list('batch_no', flat=True))
+        context = {
+            'request': self.request,
+            'format': self.format_kwarg,
+            'view': self,
+            'ncm_data': dict(WmsNucleinManagement.objects.filter(batch_no__in=stock_batch_nos).values_list('batch_no', 'locked_status'))
+        }
+        if mooney_level:
+            wms_mooney_level_material_nos = set(WMSMooneyLevel.objects.filter(
+                h_upper_limit_value__isnull=False).values_list('material_no', flat=True))
+            stock_material_nos = set(queryset.values_list('material_no', flat=True))
+            stock_level_material_nos = wms_mooney_level_material_nos & stock_material_nos
+            examined_stock_batch_nos = set(MaterialSingleTypeExamineResult.objects.filter(
+                type__name__icontains='门尼',
+                material_examine_result__material__batch__in=stock_batch_nos
+            ).values_list('material_examine_result__material__batch', flat=True))
+            queryset = queryset.filter(material_no__in=stock_level_material_nos,
+                                       batch_no__in=examined_stock_batch_nos)
+            ret = list(filter(lambda x: x['mn_level'] == mooney_level, WmsInventoryStockSerializer(queryset, many=True, context=context).data))
+            page = self.paginate_queryset(ret)
+            # serializer = self.get_serializer(page, many=True)
+            resp_data = self.get_paginated_response(page).data
+            if export:
+                if export == '1':
+                    data = page
+                else:
+                    data = ret
+                return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            resp_data['total_weight'] = round(sum(float(i['total_weight']) for i in ret), 2)
+            resp_data['total_trains'] = round(sum(float(i['qty']) for i in ret), 2)
+            return Response(resp_data)
+
         page = self.paginate_queryset(queryset)
-        serializer = self.get_serializer(page, many=True)
+        serializer = WmsInventoryStockSerializer(page, many=True, context=context)
         if export:
             if export == '1':
                 data = serializer.data
             else:
-                data = self.get_serializer(queryset, many=True).data
+                data = WmsInventoryStockSerializer(queryset, many=True, context=context).data
             return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
         data = self.get_paginated_response(serializer.data).data
         sum_data = queryset.aggregate(total_weight=Sum('total_weight'),
@@ -2706,8 +2741,7 @@ class WmsInventoryStockView(APIView):
         batch_no = self.request.query_params.get('batch_no')
         page = self.request.query_params.get('page', 1)
         page_size = self.request.query_params.get('page_size', 15)
-        st_value = self.request.query_params.get('st_value')
-        et_value = self.request.query_params.get('et_value')
+        mooney_level = self.request.query_params.get('mooney_level')
         st = (int(page) - 1) * int(page_size)
         et = int(page) * int(page_size)
         extra_where_str = ""
@@ -2759,62 +2793,58 @@ class WmsInventoryStockView(APIView):
             temp = list(filter(lambda x: x[8].startswith('5'), temp))
         elif is_entering == 'N':
             temp = list(filter(lambda x: not x[8].startswith('5'), temp))
-        examine_data = []
-        if st_value or et_value:
-            if all([st_value, et_value]):
-                stock_batch_nos = set([i[3] for i in temp])
-                st_value = float(st_value)
-                et_value = float(et_value)
-                examine_data = MaterialSingleTypeExamineResult.objects.filter(
-                    type__name__icontains='门尼',
-                    value__gte=st_value,
-                    value__lte=et_value,
-                    material_examine_result__material__batch__in=stock_batch_nos
-                ).values('material_examine_result__material__batch',
-                         'material_examine_result__material__wlxxid',
-                         'value')
-            elif st_value:
-                stock_batch_nos = set([i[3] for i in temp])
-                st_value = float(st_value)
-                examine_data = MaterialSingleTypeExamineResult.objects.filter(
-                    type__name__icontains='门尼',
-                    value__gte=st_value,
-                    material_examine_result__material__batch__in=stock_batch_nos
-                ).values('material_examine_result__material__batch',
-                         'material_examine_result__material__wlxxid',
-                         'value')
-            elif et_value:
-                stock_batch_nos = set([i[3] for i in temp])
-                et_value = float(et_value)
-                examine_data = MaterialSingleTypeExamineResult.objects.filter(
-                    type__name__icontains='门尼',
-                    value__lte=et_value,
-                    material_examine_result__material__batch__in=stock_batch_nos
-                ).values('material_examine_result__material__batch',
-                         'material_examine_result__material__wlxxid',
-                         'value')
-            batch_value_dict = {}
-            for i in examine_data:
-                k = '{}+{}'.format(i['material_examine_result__material__batch'],
-                                   i['material_examine_result__material__wlxxid'])
-                batch_value_dict[k] = i['value']
-            temp = list(filter(lambda x: '{}+{}'.format(x[3], x[1]) in batch_value_dict, temp))
         count = len(temp)
-        temp = temp[st:et]
         result = []
+        if not mooney_level:
+            temp = temp[st:et]
+        stock_batch_nos = set([i[3] for i in temp])
+        material_nos = set([i[1] for i in temp])
+
+        # 门尼等级信息
+        wms_mooney_levels = WMSMooneyLevel.objects.filter(
+            h_upper_limit_value__isnull=False,
+            material_no__in=material_nos).values('material_no', 'h_upper_limit_value',
+                                                 'h_lower_limit_value', 'm_upper_limit_value',
+                                                 'm_lower_limit_value', 'l_upper_limit_value','l_lower_limit_value')
+        wms_mooney_level_dict = {i['material_no']: i for i in wms_mooney_levels}
+
+        # 物料检测信息
+        examine_data = MaterialSingleTypeExamineResult.objects.filter(
+            type__name__icontains='门尼',
+            material_examine_result__material__batch__in=stock_batch_nos,
+            material_examine_result__material__wlxxid__in=material_nos
+        ).values('material_examine_result__material__batch',
+                 'material_examine_result__material__wlxxid',
+                 'value')
+        batch_value_dict = {}
+        for i in examine_data:
+            k = '{}+{}'.format(i['material_examine_result__material__batch'],
+                               i['material_examine_result__material__wlxxid'])
+            batch_value_dict[k] = i['value']
+
         for item in temp:
-            ml_test_value = ''
+            batch = item[3].strip()
+            material_code = item[1].strip()
+            mn_level = ''
+            mn_value = ''
             if self.DB == 'WMS':
-                if st_value or et_value:
-                    ml_test_value = batch_value_dict.get('{}+{}'.format(item[3], item[1]))
-                else:
-                    examine_result = MaterialSingleTypeExamineResult.objects.filter(
-                        material_examine_result__material__wlxxid=item[1],
-                        material_examine_result__material__batch=item[3],
-                        type__name__icontains='门尼'
-                    ).order_by('id').last()
-                    if examine_result:
-                        ml_test_value = examine_result.value
+                ml_test_value = batch_value_dict.get('{}+{}'.format(batch, material_code))
+                if ml_test_value:
+                    mn_value = ml_test_value
+                    level_data = wms_mooney_level_dict.get(material_code)
+                    if level_data:
+                        h_lower_limit_value = level_data['h_lower_limit_value'] if level_data['h_lower_limit_value'] else 0
+                        h_upper_limit_value = level_data['h_upper_limit_value'] if level_data['h_upper_limit_value'] else 0
+                        m_lower_limit_value = level_data['m_lower_limit_value'] if level_data['m_lower_limit_value'] else 0
+                        m_upper_limit_value = level_data['m_upper_limit_value'] if level_data['m_upper_limit_value'] else 0
+                        l_lower_limit_value = level_data['l_lower_limit_value'] if level_data['l_lower_limit_value'] else 0
+                        l_upper_limit_value = level_data['l_upper_limit_value'] if level_data['l_upper_limit_value'] else 0
+                        if h_lower_limit_value <= ml_test_value <= h_upper_limit_value:
+                            mn_level = '高级'
+                        elif m_lower_limit_value <= ml_test_value <= m_upper_limit_value:
+                            mn_level = '中级'
+                        elif l_lower_limit_value <= ml_test_value <= l_upper_limit_value:
+                            mn_level = '低级'
             result.append(
                 {'StockDetailState': item[0],
                  'MaterialCode': item[1],
@@ -2826,8 +2856,13 @@ class WmsInventoryStockView(APIView):
                  'inventory_time': item[7],
                  'position': '内' if item[4][6] in ('1', '2') else '外',
                  'RFID': item[8],
-                 'ml_test_value': ml_test_value
+                 'mn_level': mn_level,
+                 'mn_value': mn_value
                  })
+        if mooney_level:
+            result = list(filter(lambda x: x['mn_level'] == mooney_level, result))
+            count = len(result)
+            result = result[st:et]
         sc.close()
         return Response({'results': result, "count": count})
 
@@ -5377,7 +5412,7 @@ class WMSStockSummaryView(APIView):
                 data_dict[item[1]]['weight_{}'.format(quality_status)] = item[7]
         result = []
         for item in data_dict.values():
-            weighting = safety_data.get(item['code'])
+            weighting = safety_data.get(item['code'].strip())
             if weighting:
                 if weighting < item['weight_1'] + item['weight_5']:
                     item['flag'] = 'H'
@@ -5589,15 +5624,48 @@ class WmsOutboundOrderView(APIView):
         if outbound_type == 1:
             url = '{}/MESApi/AllocateSpaceDelivery'.format(self.URL)
             for idx, item in enumerate(outbound_data):
+                task_no = task_num + str(idx+1)
                 details.append(
                     {
-                        "TaskDetailNumber": task_num + str(idx+1),
+                        "TaskDetailNumber": task_no,
                         "MaterialCode": item.get('MaterialCode'),
                         "MaterialName": item.get('MaterialName'),
                         "SpaceCode": item.get('SpaceCode'),
                         "Quantity": 1
                     }
                 )
+                if self.ORDER_TYPE == 1:
+                    quality_status_map = {1: "合格品", 2: "抽检中", 3: "不合格品", 4: "过期", 5: "待检"}
+                    em = ExamineMaterial.objects.filter(wlxxid=item['MaterialCode'],
+                                                        batch=item['BatchNo']).first()
+                    if em:
+                        mes_test_result = '合格' if em.qualified else '不合格'
+                    else:
+                        mes_test_result = '未检测'
+                    mtr = MaterialInspectionRegistration.objects.filter(material_no=item['MaterialCode'],
+                                                                        batch=item['BatchNo']).first()
+                    if mtr:
+                        zc_test_result = mtr.quality_status
+                    else:
+                        zc_test_result = '未知'
+                    hs = WmsNucleinManagement.objects.filter(batch_no=item['BatchNo'],
+                                                             material_no=item['MaterialCode']).first()
+                    if hs:
+                        hs_status = hs.locked_status
+                    else:
+                        hs_status = '未管控'
+                    try:
+                        WMSOutboundHistory.objects.create(
+                            task_no=task_no,
+                            quality_status=quality_status_map.get(item['StockDetailState']),
+                            mes_test_result=mes_test_result,
+                            zc_test_result=zc_test_result,
+                            hs_status=hs_status,
+                            mooney_value=None if not item.get('mn_value') else item['mn_value'],
+                            mooney_level=item.get('mn_level')
+                        )
+                    except Exception:
+                        raise
             data = {
                 "TaskNumber": task_num,
                 "EntranceCode": entrance_code,

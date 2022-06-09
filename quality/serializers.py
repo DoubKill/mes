@@ -29,8 +29,8 @@ from quality.models import TestMethod, MaterialTestOrder, \
     IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, ProductReportEquip, \
     ProductReportValue, QualifiedRangeDisplay, ProductTestPlan, ProductTestPlanDetail, RubberMaxStretchTestResult, \
     LabelPrintLog, MaterialTestPlan, MaterialTestPlanDetail, MaterialDataPointIndicatorHistory, \
-    MaterialInspectionRegistration
-from recipe.models import MaterialAttribute
+    MaterialInspectionRegistration, WMSMooneyLevel
+from recipe.models import MaterialAttribute, ERPMESMaterialRelation, ZCMaterial
 
 
 class TestIndicatorSerializer(BaseModelSerializer):
@@ -2071,3 +2071,46 @@ class MaterialTestPlanSerializer(serializers.ModelSerializer):
     class Meta:
         model = MaterialTestPlan
         fields = '__all__'
+
+
+class ERPMESMaterialRelationSerializer(serializers.ModelSerializer):
+    material_type = serializers.SerializerMethodField()
+    material_no = serializers.CharField(source='wlxxid', read_only=True)
+
+    def get_material_type(self, obj):
+        ins = ERPMESMaterialRelation.objects.filter(zc_material_id=obj.id).first()
+        if ins:
+            return ins.material.material_type.global_name
+        return ''
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        ml_level = WMSMooneyLevel.objects.filter(material_no=ret['material_no'])
+        if ml_level:
+            ret.update(ml_level.values('h_upper_limit_value',
+                                       'h_lower_limit_value',
+                                       'm_upper_limit_value',
+                                       'm_lower_limit_value',
+                                       'l_upper_limit_value',
+                                       'l_lower_limit_value')[0])
+        return ret
+
+    class Meta:
+        model = ZCMaterial
+        fields = ('id', 'material_no', 'material_name', 'material_type')
+
+
+class WMSMooneyLevelSerializer(BaseModelSerializer):
+
+    def create(self, validated_data):
+        instance = WMSMooneyLevel.objects.filter(material_no=validated_data['material_no']).first()
+        if instance:
+            return super().update(instance, validated_data)
+        else:
+            return super().create(validated_data)
+
+    class Meta:
+        model = WMSMooneyLevel
+        fields = '__all__'
+        extra_kwargs = {'material_no': {'validators': []}}
+        read_only_fields = COMMON_READ_ONLY_FIELDS

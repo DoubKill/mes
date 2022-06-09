@@ -848,3 +848,22 @@ class MaterialTestPlanDetail(models.Model):
     class Meta:
         db_table = 'material_test_plan_detail'
         verbose_name_plural = verbose_name = '原材料检测计划详情'
+
+
+class WMSMooneyLevel(AbstractEntity):
+    """立库原材料门尼等级设定"""
+    material_no = models.CharField(max_length=64, help_text='原材料编码', verbose_name='原材料编码', unique=True)
+    # material_name = models.CharField(max_length=64, help_text='原材料名称', verbose_name='原材料名称')
+    h_upper_limit_value = models.FloatField(help_text='高级上限', blank=True, null=True)
+    h_lower_limit_value = models.FloatField(help_text='高级下限', blank=True, null=True)
+    m_upper_limit_value = models.FloatField(help_text='中级上限', blank=True, null=True)
+    m_lower_limit_value = models.FloatField(help_text='中级下限', blank=True, null=True)
+    l_upper_limit_value = models.FloatField(help_text='低级上限', blank=True, null=True)
+    l_lower_limit_value = models.FloatField(help_text='低级下限', blank=True, null=True)
+
+    def __str__(self):
+        return self.material_no
+
+    class Meta:
+        db_table = 'wms_mooney_level'
+        verbose_name_plural = verbose_name = '立库原材料门尼等级设定'

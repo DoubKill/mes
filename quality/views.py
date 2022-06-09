@@ -54,7 +54,7 @@ from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod
     QualifiedRangeDisplay, IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, \
     ProductReportEquip, ProductReportValue, ProductTestPlan, ProductTestPlanDetail, RubberMaxStretchTestResult, \
     LabelPrintLog, MaterialTestPlan, MaterialTestPlanDetail, MaterialDataPointIndicatorHistory, \
-    MaterialInspectionRegistration
+    MaterialInspectionRegistration, WMSMooneyLevel
 
 from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestOrderSerializer, MaterialTestOrderListSerializer, \
@@ -73,12 +73,13 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     UnqualifiedPalletFeedBackSerializer, LabelPrintLogSerializer, ProductTestPlanDetailSerializer, \
     ProductTestPlanDetailBulkCreateSerializer, MaterialTestPlanSerializer, MaterialTestPlanCreateSerializer, \
     MaterialTestPlanDetailSerializer, MaterialSingleTypeExamineResultSerializer, \
-    MaterialInspectionRegistrationSerializer, MaterialDataPointIndicatorHistorySerializer
+    MaterialInspectionRegistrationSerializer, MaterialDataPointIndicatorHistorySerializer, WMSMooneyLevelSerializer, \
+    ERPMESMaterialRelationSerializer
 
 from django.db.models import Prefetch
 from django.db.models import Q
 from quality.utils import print_mdr, get_cur_sheet, get_sheet_data, export_mto
-from recipe.models import Material, ProductBatching
+from recipe.models import Material, ProductBatching, ERPMESMaterialRelation, ZCMaterial
 from django.db.models import Max, Sum, Avg, Count
 
 
@@ -3495,3 +3496,62 @@ class MaterialTestPlanDetailViewSet(ModelViewSet):
             raise ValidationError('该数据已检测，无法删除！')
         return super().perform_destroy(instance)
 
+
+@method_decorator([api_recorder], name="dispatch")
+class WMSMooneyLevelView(ModelViewSet):
+    queryset = WMSMooneyLevel.objects.all()
+    serializer_class = WMSMooneyLevelSerializer
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_wms_mooney_level',
+                                                            'change': 'change_wms_mooney_level',
+                                                            }))
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return ERPMESMaterialRelationSerializer
+        return WMSMooneyLevelSerializer
+
+    @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated], url_path='clear-level',
+            url_name='clear-level')
+    def clear_level(self, request):
+        """清除等级"""
+        material_no = self.request.data.get('material_no')
+        WMSMooneyLevel.objects.filter(material_no=material_no).delete()
+        return Response('success')
+
+    @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated], url_path='batch-set',
+            url_name='batch-set')
+    def batch_set(self, request):
+        """批量设置"""
+        req_data = self.request.data
+        if not isinstance(req_data, dict):
+            raise ValidationError('参数错误！')
+        material_nos = req_data.pop('material_no', [])
+        if not isinstance(material_nos, list):
+            raise ValidationError('参数错误！')
+        for material_no in material_nos:
+            req_data.update({'material_no': material_no})
+            s = WMSMooneyLevelSerializer(data=req_data, context={'request': request})
+            s.is_valid(raise_exception=True)
+            s.save()
+        return Response('ok')
+
+    def list(self, request, *args, **kwargs):
+        material_type = self.request.query_params.get('material_type')
+        material_no = self.request.query_params.get('material_no')
+        material_name = self.request.query_params.get('material_name')
+        filter_kwargs = {'material__material_type__global_name__icontains': '胶'}
+        if material_type:
+            filter_kwargs['material__material_type__global_name'] = material_type
+        if material_no:
+            filter_kwargs['zc_material__wlxxid__icontains'] = material_no
+        if material_name:
+            filter_kwargs['zc_material__material_name__icontains'] = material_name
+        erp_ids = set(ERPMESMaterialRelation.objects.filter(**filter_kwargs).values_list('zc_material_id', flat=True))
+        queryset = ZCMaterial.objects.filter(id__in=erp_ids)
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
