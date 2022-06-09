@@ -6669,3 +6669,34 @@ class OutboundProductInfo(APIView):
         pallet_info = list(PalletFeedbacks.objects.filter(lot_no__in=stock_lot_nos).values('product_no').annotate(max_trains=Max('end_trains'),
                                                           min_trains=Min('begin_trains')))
         return Response(pallet_info)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class WMSMnLevelSearchView(APIView):
+
+    def post(self, request):
+        order_nos = self.request.data.get('order_nos')  # 下架任务号列表
+        if not isinstance(order_nos, list):
+            return Response({'message': "参数错误！", "success:": False, "data": []})
+        out_history = dict(WMSOutboundHistory.objects.filter(
+            task_no__in=order_nos).values_list('task_no', 'mooney_level'))
+        out_log = MaterialOutHistory.objects.using('wms').filter(
+            order_no__in=order_nos).values('order_no', 'material_name', 'lot_no')
+        out_log_dict = {i['order_no']: i for i in out_log}
+        ret = []
+        for order_no in order_nos:
+            ot = out_log_dict.get(order_no)
+            if ot:
+                material_name = ot['material_name']
+                tracking_num = ot['lot_no']
+            else:
+                material_name = ""
+                tracking_num = ""
+            ret.append(
+                {"order_no": order_no,
+                 "material_name": material_name,
+                 "tracking_num": tracking_num,
+                 "mn_level": out_history.get(order_no, "")
+                 }
+            )
+        return Response({'message': "OK", "success:": True, "data": ret})
