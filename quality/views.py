@@ -1,11 +1,11 @@
 import datetime
 import json
-import ast
-import os
 import re
 from decimal import Decimal
+from io import BytesIO
 
-import requests
+from django.http import HttpResponse
+from openpyxl import load_workbook
 from suds.client import Client
 from django.db import connection
 from django.forms import model_to_dict
@@ -54,7 +54,7 @@ from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod
     QualifiedRangeDisplay, IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, \
     ProductReportEquip, ProductReportValue, ProductTestPlan, ProductTestPlanDetail, RubberMaxStretchTestResult, \
     LabelPrintLog, MaterialTestPlan, MaterialTestPlanDetail, MaterialDataPointIndicatorHistory, \
-    MaterialInspectionRegistration
+    MaterialInspectionRegistration, WMSMooneyLevel
 
 from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestOrderSerializer, MaterialTestOrderListSerializer, \
@@ -72,13 +72,13 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     ProductTestPlanSerializer, ProductTEstResumeSerializer, ReportValueSerializer, RubberMaxStretchTestResultSerializer, \
     UnqualifiedPalletFeedBackSerializer, LabelPrintLogSerializer, ProductTestPlanDetailSerializer, \
     ProductTestPlanDetailBulkCreateSerializer, MaterialTestPlanSerializer, MaterialTestPlanCreateSerializer, \
-    MaterialTestPlanDetailSerializer, MaterialSingleTypeExamineResultSerializer, \
-    MaterialInspectionRegistrationSerializer, MaterialDataPointIndicatorHistorySerializer
+    MaterialTestPlanDetailSerializer, MaterialTestOrderExportSerializer, MaterialInspectionRegistrationSerializer, \
+    MaterialDataPointIndicatorHistorySerializer, WMSMooneyLevelSerializer, ERPMESMaterialRelationSerializer
 
 from django.db.models import Prefetch
 from django.db.models import Q
 from quality.utils import print_mdr, get_cur_sheet, get_sheet_data, export_mto
-from recipe.models import Material, ProductBatching
+from recipe.models import Material, ProductBatching, ERPMESMaterialRelation, ZCMaterial
 from django.db.models import Max, Sum, Avg, Count
 
 
@@ -261,11 +261,13 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
     """
     queryset = MaterialTestOrder.objects.filter(
         delete_flag=False).prefetch_related(
-        'order_results').order_by('-production_factory_date',
-                                  '-production_class',
-                                  'production_equip_no',
-                                  'product_no',
-                                  'actual_trains')
+        Prefetch('order_results',
+                 queryset=MaterialTestResult.objects.order_by('id'))
+    ).order_by('-production_factory_date',
+               '-production_class',
+               'production_equip_no',
+               'product_no',
+               'actual_trains')
     serializer_class = MaterialTestOrderSerializer
     filter_backends = (DjangoFilterBackend,)
     permission_classes = (IsAuthenticated,)
@@ -276,6 +278,105 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
             return MaterialTestOrderSerializer
         else:
             return MaterialTestOrderListSerializer
+
+    def export_xls(self, result):
+        wb = load_workbook('xlsx_template/product_test_result.xlsx')
+        ws = wb.worksheets[0]
+        sheet = wb.copy_worksheet(ws)
+        data_row = 3
+        if not result:
+            return Response('暂无数据！')
+        product_no = result[0]['product_no']
+        sheet.title = product_no
+
+        for i in result:
+            if i['product_no'] != product_no:
+                product_no = i['product_no']
+                sheet = wb.copy_worksheet(ws)
+                sheet.title = product_no
+                data_row = 3
+            order_results = i['order_results']
+            ret = {'ML(1+4)': {'value': '', 'upper_lower': '', 'level': ''},
+                   '比重值': {'value': '', 'upper_lower': '', 'level': ''},
+                   '硬度值': {'value': '', 'upper_lower': '', 'level': ''},
+                   'MH': {'value': '', 'upper_lower': '', 'level': ''},
+                   'ML': {'value': '', 'upper_lower': '', 'level': ''},
+                   'TC10': {'value': '', 'upper_lower': '', 'level': ''},
+                   'TC50': {'value': '', 'upper_lower': '', 'level': ''},
+                   'TC90': {'value': '', 'upper_lower': '', 'level': ''}}
+            for item in order_results:
+                data_point = item['data_point_name']
+                ret[data_point] = item
+            sheet.cell(data_row, 1).value = i['product_no']
+            sheet.cell(data_row, 2).value = i['production_factory_date']
+            sheet.cell(data_row, 3).value = '{}/{}'.format(i['production_class'], i['production_group'])
+            sheet.cell(data_row, 4).value = i['production_equip_no']
+            sheet.cell(data_row, 5).value = i['actual_trains']
+            sheet.cell(data_row, 6).value = ret['ML(1+4)']['value']
+            sheet.cell(data_row, 7).value = ret['ML(1+4)']['upper_lower']
+            sheet.cell(data_row, 8).value = ret['ML(1+4)']['level']
+            sheet.cell(data_row, 9).value = ret['比重值']['value']
+            sheet.cell(data_row, 10).value = ret['比重值']['upper_lower']
+            sheet.cell(data_row, 11).value = ret['比重值']['level']
+            sheet.cell(data_row, 12).value = ret['硬度值']['value']
+            sheet.cell(data_row, 13).value = ret['硬度值']['upper_lower']
+            sheet.cell(data_row, 14).value = ret['硬度值']['level']
+            sheet.cell(data_row, 15).value = ret['MH']['value']
+            sheet.cell(data_row, 16).value = ret['MH']['upper_lower']
+            sheet.cell(data_row, 17).value = ret['MH']['level']
+            sheet.cell(data_row, 18).value = ret['ML']['value']
+            sheet.cell(data_row, 19).value = ret['ML']['upper_lower']
+            sheet.cell(data_row, 20).value = ret['ML']['level']
+            sheet.cell(data_row, 21).value = ret['TC10']['value']
+            sheet.cell(data_row, 22).value = ret['TC10']['upper_lower']
+            sheet.cell(data_row, 23).value = ret['TC10']['level']
+            sheet.cell(data_row, 24).value = ret['TC50']['value']
+            sheet.cell(data_row, 25).value = ret['TC50']['upper_lower']
+            sheet.cell(data_row, 26).value = ret['TC50']['level']
+            sheet.cell(data_row, 27).value = ret['TC90']['value']
+            sheet.cell(data_row, 28).value = ret['TC90']['upper_lower']
+            sheet.cell(data_row, 29).value = ret['TC90']['level']
+            sheet.cell(data_row, 30).value = 'Y' if i['is_qualified'] else 'N'
+            data_row = data_row + 1
+
+        wb.remove_sheet(ws)
+        output = BytesIO()
+        wb.save(output)
+        # 重新定位到开始
+        output.seek(0)
+        response = HttpResponse(content_type='application/vnd.ms-excel')
+        filename = '快检详细信息'
+        response['Content-Disposition'] = u'attachment;filename= ' + filename.encode('gbk').decode(
+            'ISO-8859-1') + '.xls'
+        response.write(output.getvalue())
+        return response
+
+    def list(self, request, *args, **kwargs):
+        export = self.request.query_params.get('export')
+        queryset = self.filter_queryset(self.get_queryset())
+        if export:
+            st = self.request.query_params.get('st')
+            et = self.request.query_params.get('et')
+            if not all([st, et]):
+                raise ValidationError('请选择导出的时间范围！')
+            diff = datetime.datetime.strptime(et, '%Y-%m-%d') - \
+                   datetime.datetime.strptime(st, '%Y-%m-%d')
+            if diff.days > 7:
+                raise ValidationError('导出数据的日期跨度不得超过一个周！')
+            queryset = self.filter_queryset(queryset=MaterialTestOrder.objects.filter(
+                        delete_flag=False).prefetch_related(
+                        Prefetch('order_results',
+                                 queryset=MaterialTestResult.objects.order_by('id'))
+                    ).order_by('product_no', 'production_factory_date', '-production_class', 'production_equip_no', 'actual_trains'))
+            data = MaterialTestOrderExportSerializer(queryset, many=True).data
+            return self.export_xls(data)
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     def create(self, request, *args, **kwargs):
         data = request.data
@@ -2291,7 +2392,10 @@ class ReportValueView(APIView):
             data_point_list = ['扯断强度', '伸长率%', 'M300']
         else:
             data_point_list = []
-
+        is_qualified = True
+        test_results = {}
+        for k, v in json.loads(current_test_detail.value).items():
+            test_results[k] = {"name": k, "value": v, "flag": ""}
         # 根据检测间隔，补充车次相关test_order和test_result表数据
         for train in range(current_test_detail.actual_trains,
                            current_test_detail.actual_trains + equip_test_plan.test_interval):
@@ -2350,6 +2454,14 @@ class ReportValueView(APIView):
                         else:
                             mes_result = '三等品'
                             level = 2
+                            try:
+                                if test_value > indicator.upper_limit:
+                                    test_results[data_point_name]['flag'] = 'H'
+                                elif test_value < indicator.lower_limit:
+                                    test_results[data_point_name]['flag'] = 'L'
+                            except Exception:
+                                pass
+                            is_qualified = False
                     else:
                         # mes_result = '三等品'
                         # level = 2
@@ -2375,18 +2487,22 @@ class ReportValueView(APIView):
                         judged_lower_limit=indicator.lower_limit
                     )
 
-        test_indicator_name = current_test_detail.test_plan.test_indicator_name
-        mto = MaterialTestOrder.objects.filter(lot_no=current_test_detail.lot_no,
-                                               actual_trains=current_test_detail.actual_trains).first()
-        if mto:
-            max_result_ids = list(mto.order_results.filter(
-                test_indicator_name=test_indicator_name
-            ).values('data_point_name').annotate(max_id=Max('id')).values_list('max_id', flat=True))
-            if mto.order_results.filter(id__in=max_result_ids, level__gt=1).exists():
-                current_test_detail.is_qualified = False
-            else:
-                current_test_detail.is_qualified = True
-            current_test_detail.save()
+        # test_indicator_name = current_test_detail.test_plan.test_indicator_name
+        # mto = MaterialTestOrder.objects.filter(lot_no=current_test_detail.lot_no,
+        #                                        actual_trains=current_test_detail.actual_trains).first()
+        # if mto:
+        #     max_result_ids = list(mto.order_results.filter(
+        #         test_indicator_name=test_indicator_name
+        #     ).values('data_point_name').annotate(max_id=Max('id')).values_list('max_id', flat=True))
+        #     if mto.order_results.filter(id__in=max_result_ids, level__gt=1).exists():
+        #         current_test_detail.is_qualified = False
+        #     else:
+        #         current_test_detail.is_qualified = True
+        #     current_test_detail.save()
+        current_test_detail.value = json.dumps(list(test_results.values()))
+        current_test_detail.is_qualified = is_qualified
+        current_test_detail.status = 2
+        current_test_detail.save()
         return Response({'msg': '检测完成', 'success': True})
 
 
@@ -3495,3 +3611,62 @@ class MaterialTestPlanDetailViewSet(ModelViewSet):
             raise ValidationError('该数据已检测，无法删除！')
         return super().perform_destroy(instance)
 
+
+@method_decorator([api_recorder], name="dispatch")
+class WMSMooneyLevelView(ModelViewSet):
+    queryset = WMSMooneyLevel.objects.all()
+    serializer_class = WMSMooneyLevelSerializer
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_wms_mooney_level',
+                                                            'change': 'change_wms_mooney_level',
+                                                            }))
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return ERPMESMaterialRelationSerializer
+        return WMSMooneyLevelSerializer
+
+    @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated], url_path='clear-level',
+            url_name='clear-level')
+    def clear_level(self, request):
+        """清除等级"""
+        material_no = self.request.data.get('material_no')
+        WMSMooneyLevel.objects.filter(material_no=material_no).delete()
+        return Response('success')
+
+    @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated], url_path='batch-set',
+            url_name='batch-set')
+    def batch_set(self, request):
+        """批量设置"""
+        req_data = self.request.data
+        if not isinstance(req_data, dict):
+            raise ValidationError('参数错误！')
+        material_nos = req_data.pop('material_no', [])
+        if not isinstance(material_nos, list):
+            raise ValidationError('参数错误！')
+        for material_no in material_nos:
+            req_data.update({'material_no': material_no})
+            s = WMSMooneyLevelSerializer(data=req_data, context={'request': request})
+            s.is_valid(raise_exception=True)
+            s.save()
+        return Response('ok')
+
+    def list(self, request, *args, **kwargs):
+        material_type = self.request.query_params.get('material_type')
+        material_no = self.request.query_params.get('material_no')
+        material_name = self.request.query_params.get('material_name')
+        filter_kwargs = {'material__material_type__global_name__icontains': '胶'}
+        if material_type:
+            filter_kwargs['material__material_type__global_name'] = material_type
+        if material_no:
+            filter_kwargs['zc_material__wlxxid__icontains'] = material_no
+        if material_name:
+            filter_kwargs['zc_material__material_name__icontains'] = material_name
+        erp_ids = set(ERPMESMaterialRelation.objects.filter(**filter_kwargs).values_list('zc_material_id', flat=True))
+        queryset = ZCMaterial.objects.filter(id__in=erp_ids)
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)

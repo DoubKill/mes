@@ -261,7 +261,7 @@ class MaterialTestOrder(AbstractEntity):
     production_group = models.CharField(max_length=64, help_text='生产班组名')
     production_equip_no = models.CharField(max_length=64, help_text='机台')
     production_factory_date = models.DateField(help_text='工厂日期')
-    note = models.TextField(max_length=100, help_text='备注', blank=True, null=True)
+    note = models.CharField(max_length=100, help_text='备注', blank=True, null=True)
     is_qualified = models.BooleanField(help_text='是否合格', default=True)
     is_passed = models.BooleanField(help_text='是否通过pass章', default=False)
 
@@ -420,10 +420,10 @@ class LabelPrint(models.Model):
     label_type = models.PositiveIntegerField(help_text="标签类型", choices=TYPE_CHOICE, verbose_name="标签类型")
     lot_no = models.CharField(max_length=64, help_text="追踪条码", verbose_name="追踪条码")
     status = models.IntegerField(help_text='打印状态', choices=STATUS_CHOICE, verbose_name='打印状态')
-    data = models.TextField(help_text="标签数据json集", verbose_name="标签数据json集")
     created_date = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
     last_updated_date = models.DateTimeField(verbose_name='修改时间', auto_now=True)
     ip_address = models.CharField(max_length=64, help_text='打印ip地址', null=True, blank=True)
+    data = models.TextField(help_text="标签数据json集", verbose_name="标签数据json集")
 
     def __str__(self):
         return self.lot_no
@@ -557,7 +557,7 @@ class ProductTestPlanDetail(models.Model):
     production_classes = models.CharField(max_length=64, help_text='生产班次')
     production_group = models.CharField(max_length=64, help_text='生产班组')
     actual_trains = models.PositiveIntegerField(help_text='生产车次')
-    value = models.CharField(max_length=200, help_text="检测结果值json格式,{'ML(1+4)': 12}", null=True, blank=True)
+    value = models.CharField(max_length=512, help_text="检测结果值json格式,{'ML(1+4)': 12}", null=True, blank=True)
     raw_value = models.TextField(help_text='检测原数据', null=True,  blank=True)
     test_time = models.DateTimeField(auto_now=True)
     status = models.PositiveIntegerField(help_text='状态', choices=STATUS_CHOICE, default=1)
@@ -848,3 +848,22 @@ class MaterialTestPlanDetail(models.Model):
     class Meta:
         db_table = 'material_test_plan_detail'
         verbose_name_plural = verbose_name = '原材料检测计划详情'
+
+
+class WMSMooneyLevel(AbstractEntity):
+    """立库原材料门尼等级设定"""
+    material_no = models.CharField(max_length=64, help_text='原材料编码', verbose_name='原材料编码', unique=True)
+    # material_name = models.CharField(max_length=64, help_text='原材料名称', verbose_name='原材料名称')
+    h_upper_limit_value = models.FloatField(help_text='高级上限', blank=True, null=True)
+    h_lower_limit_value = models.FloatField(help_text='高级下限', blank=True, null=True)
+    m_upper_limit_value = models.FloatField(help_text='中级上限', blank=True, null=True)
+    m_lower_limit_value = models.FloatField(help_text='中级下限', blank=True, null=True)
+    l_upper_limit_value = models.FloatField(help_text='低级上限', blank=True, null=True)
+    l_lower_limit_value = models.FloatField(help_text='低级下限', blank=True, null=True)
+
+    def __str__(self):
+        return self.material_no
+
+    class Meta:
+        db_table = 'wms_mooney_level'
+        verbose_name_plural = verbose_name = '立库原材料门尼等级设定'

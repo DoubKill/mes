@@ -14,6 +14,7 @@ from rest_framework.validators import UniqueTogetherValidator, UniqueValidator
 
 from django.db.models import Max
 
+from basics.models import WorkSchedulePlan
 from inventory.models import DeliveryPlan, DeliveryPlanStatus, WmsNucleinManagement
 from mes.base_serializer import BaseModelSerializer
 
@@ -29,8 +30,8 @@ from quality.models import TestMethod, MaterialTestOrder, \
     IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, ProductReportEquip, \
     ProductReportValue, QualifiedRangeDisplay, ProductTestPlan, ProductTestPlanDetail, RubberMaxStretchTestResult, \
     LabelPrintLog, MaterialTestPlan, MaterialTestPlanDetail, MaterialDataPointIndicatorHistory, \
-    MaterialInspectionRegistration
-from recipe.models import MaterialAttribute
+    MaterialInspectionRegistration, WMSMooneyLevel
+from recipe.models import MaterialAttribute, ERPMESMaterialRelation, ZCMaterial
 
 
 class TestIndicatorSerializer(BaseModelSerializer):
@@ -187,7 +188,13 @@ class MaterialTestOrderSerializer(BaseModelSerializer):
 
     def create(self, validated_data):
         order_results = validated_data.pop('order_results', None)
-
+        ws = WorkSchedulePlan.objects.filter(plan_schedule__day_time=validated_data['production_factory_date'],
+                                             classes__global_name=validated_data['production_class'],
+                                             plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
+        if not ws:
+            production_group = '班'
+        else:
+            production_group = ws.group.global_name
         pallets = PalletFeedbacks.objects.filter(
             equip_no=validated_data['production_equip_no'],
             product_no=validated_data['product_no'],
@@ -209,6 +216,7 @@ class MaterialTestOrderSerializer(BaseModelSerializer):
                 created = False
             else:
                 validated_data['material_test_order_uid'] = uuid.uuid1()
+                validated_data['production_group'] = production_group
                 instance = super().create(validated_data)
                 created = True
 
@@ -413,19 +421,25 @@ class UnqualifiedDealOrderUpdateSerializer(BaseModelSerializer):
         if c_agreed is not None:
             if c_agreed:
                 # 同意
-                for detail in instance.deal_details.filter(is_release=True):
-                    MaterialDealResult.objects.filter(lot_no=detail.lot_no).update(test_result='PASS',
-                                                                                   deal_suggestion=detail.suggestion,
-                                                                                   deal_time=datetime.now(),
-                                                                                   deal_user=instance.t_deal_user,
-                                                                                   update_store_test_flag=4)
+                for detail in instance.deal_details.all():
+                    update_kwargs = {
+                        'deal_suggestion': detail.suggestion,
+                        'deal_time': datetime.now(),
+                        'deal_user': instance.t_deal_user
+                    }
+                    if detail.is_release:
+                        update_kwargs['update_store_test_flag'] = 4
+                        update_kwargs['test_result'] = 'PASS'
+                    MaterialDealResult.objects.filter(lot_no=detail.lot_no).update(**update_kwargs)
             else:
                 # 不同意
-                for detail in instance.deal_details.filter(is_release=True):
-                    MaterialDealResult.objects.filter(lot_no=detail.lot_no).update(test_result='三等品',
-                                                                                   deal_suggestion='不合格',
-                                                                                   deal_time=datetime.now(),
-                                                                                   deal_user=instance.t_deal_user)
+                for detail in instance.deal_details.all():
+                    update_kwargs = {
+                        'deal_suggestion': detail.suggestion,
+                        'deal_time': datetime.now(),
+                        'deal_user': instance.t_deal_user,
+                    }
+                    MaterialDealResult.objects.filter(lot_no=detail.lot_no).update(**update_kwargs)
         return instance
 
     class Meta:
@@ -435,10 +449,10 @@ class UnqualifiedDealOrderUpdateSerializer(BaseModelSerializer):
 
 
 class MaterialTestResultListSerializer(BaseModelSerializer):
-    upper_lower = serializers.SerializerMethodField(read_only=True)
+    # upper_lower = serializers.DecimalField(read_only=True)
 
-    def get_upper_lower(self, obj):
-        return f'{obj.judged_lower_limit}-{obj.judged_upper_limit}'
+    # def get_upper_lower(self, obj):
+    #     return f'{obj.judged_lower_limit}-{obj.judged_upper_limit}'
         # try:
         #     mdp_obj = MaterialDataPointIndicator.objects.filter(
         #         material_test_method__material__material_name=obj.material_test_order.product_no,
@@ -454,35 +468,98 @@ class MaterialTestResultListSerializer(BaseModelSerializer):
 
     class Meta:
         model = MaterialTestResult
-        fields = ('id', 'test_times', 'value', 'data_point_name', 'test_method_name',
-                  'test_indicator_name', 'mes_result', 'result', 'machine_name', 'level', 'upper_lower')
+        fields = ('id', 'test_times', 'value', 'data_point_name', 'test_method_name', 'judged_lower_limit',
+                  'judged_upper_limit', 'test_indicator_name', 'mes_result', 'result', 'machine_name', 'level')
+        extra_kwargs = {
+            'value': {'coerce_to_string': False},
+            # 'judged_lower_limit': {'coerce_to_string': False},
+            # 'judged_upper_limit': {'coerce_to_string': False}
+        }
 
 
 class MaterialTestOrderListSerializer(BaseModelSerializer):
     order_results = MaterialTestResultListSerializer(many=True)
+    deal_info = serializers.SerializerMethodField(read_only=True)
+
+    def get_deal_info(self, obj):
+        result = MaterialDealResult.objects.filter(lot_no=obj.lot_no).first()
+        if result:
+            return {
+                'test_result': result.test_result,
+                'deal_user': result.deal_user,
+                'deal_suggestion': '' if not result.deal_user else result.deal_suggestion,
+                'deal_time': '' if not result.deal_time else datetime.strftime(result.deal_time, '%Y-%m-%d %H:%M:%S')
+            }
+        return {
+            'test_result': '',
+            'deal_user': '',
+            'deal_suggestion': '',
+            'deal_time': '',
+        }
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
         order_results = data['order_results']
-        ret = {}
+        ret = {'门尼': {}, '硬度': {}, '比重': {}, '流变': {}, '钢拔': {}, '物性': {}}
         for item in order_results:
             indicator = item['test_indicator_name']
             data_point = item['data_point_name']
-            if indicator not in ret:
-                ret[indicator] = {}
-                ret[indicator][data_point] = item
-            else:
-                if data_point not in ret[indicator]:
-                    ret[indicator][data_point] = item
-                else:
-                    if ret[indicator][data_point]['id'] < item['id']:
-                        ret[indicator][data_point] = item
+            ret[indicator][data_point] = item
+            # if indicator not in ret:
+            #     ret[indicator] = {}
+            #     ret[indicator][data_point] = item
+            # else:
+            #     if data_point not in ret[indicator]:
+            #         ret[indicator][data_point] = item
+            #     else:
+            #         if ret[indicator][data_point]['id'] < item['id']:
+            #             ret[indicator][data_point] = item
         data['order_results'] = ret
         return data
 
     class Meta:
         model = MaterialTestOrder
         fields = '__all__'
+
+
+class MaterialTestResultExportSerializer(BaseModelSerializer):
+    upper_lower = serializers.SerializerMethodField(read_only=True)
+
+    def get_upper_lower(self, obj):
+        return f'{obj.judged_lower_limit}-{obj.judged_upper_limit}'
+
+    class Meta:
+        model = MaterialTestResult
+        fields = ('value', 'data_point_name', 'level', 'upper_lower')
+        extra_kwargs = {
+                    'value': {'coerce_to_string': False},
+                }
+
+
+class MaterialTestOrderExportSerializer(BaseModelSerializer):
+    order_results = MaterialTestResultExportSerializer(many=True)
+
+    # def to_representation(self, instance):
+    #     data = super().to_representation(instance)
+    #     order_results = data['order_results']
+    #     ret = {'ML(1+4)': {'value': '', 'upper_lower': '', 'level': ''},
+    #            '比重值': {'value': '', 'upper_lower': '', 'level': ''},
+    #            '硬度值': {'value': '', 'upper_lower': '', 'level': ''},
+    #            'MH': {'value': '', 'upper_lower': '', 'level': ''},
+    #            'ML': {'value': '', 'upper_lower': '', 'level': ''},
+    #            'TC10': {'value': '', 'upper_lower': '', 'level': ''},
+    #            'TC50': {'value': '', 'upper_lower': '', 'level': ''},
+    #            'TC90': {'value': '', 'upper_lower': '', 'level': ''}}
+    #     for item in order_results:
+    #         data_point = item['data_point_name']
+    #         ret[data_point] = item
+    #     data['order_results'] = ret
+    #     return data
+
+    class Meta:
+        model = MaterialTestOrder
+        fields = ('product_no', 'production_factory_date', 'production_class', 'order_results',
+                  'production_group', 'production_equip_no', 'actual_trains', 'is_qualified')
 
 
 class MaterialTestMethodSerializer(BaseModelSerializer):
@@ -2071,3 +2148,46 @@ class MaterialTestPlanSerializer(serializers.ModelSerializer):
     class Meta:
         model = MaterialTestPlan
         fields = '__all__'
+
+
+class ERPMESMaterialRelationSerializer(serializers.ModelSerializer):
+    material_type = serializers.SerializerMethodField()
+    material_no = serializers.CharField(source='wlxxid', read_only=True)
+
+    def get_material_type(self, obj):
+        ins = ERPMESMaterialRelation.objects.filter(zc_material_id=obj.id).first()
+        if ins:
+            return ins.material.material_type.global_name
+        return ''
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        ml_level = WMSMooneyLevel.objects.filter(material_no=ret['material_no'])
+        if ml_level:
+            ret.update(ml_level.values('h_upper_limit_value',
+                                       'h_lower_limit_value',
+                                       'm_upper_limit_value',
+                                       'm_lower_limit_value',
+                                       'l_upper_limit_value',
+                                       'l_lower_limit_value')[0])
+        return ret
+
+    class Meta:
+        model = ZCMaterial
+        fields = ('id', 'material_no', 'material_name', 'material_type')
+
+
+class WMSMooneyLevelSerializer(BaseModelSerializer):
+
+    def create(self, validated_data):
+        instance = WMSMooneyLevel.objects.filter(material_no=validated_data['material_no']).first()
+        if instance:
+            return super().update(instance, validated_data)
+        else:
+            return super().create(validated_data)
+
+    class Meta:
+        model = WMSMooneyLevel
+        fields = '__all__'
+        extra_kwargs = {'material_no': {'validators': []}}
+        read_only_fields = COMMON_READ_ONLY_FIELDS

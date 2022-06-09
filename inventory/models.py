@@ -1266,3 +1266,24 @@ class HfBakeLog(models.Model):
     class Meta:
         db_table = 'hf_bake_log'
         verbose_name_plural = verbose_name = '烘房烘烤履历'
+
+
+class WMSOutboundHistory(models.Model):
+    QUALITY_STATUS_CHOICE = (
+        ('合格品', '合格品'),
+        ('合格品', '合格品'),
+        ('不合格品', '不合格品'),
+        ('过期', '过期'),
+        ('待检', '待检'),
+    )
+    task_no = models.CharField(max_length=128, help_text='出库单号', unique=True)
+    quality_status = models.CharField(max_length=8, help_text='立库品质状态', choices=QUALITY_STATUS_CHOICE)
+    mes_test_result = models.CharField(max_length=8, help_text='MES检测结果(合格/不合格/未检测)')
+    zc_test_result = models.CharField(max_length=8, help_text='总厂检测结果(合格/不合格/待检/未知)')
+    hs_status = models.CharField(max_length=8, help_text='核酸管控结果(已锁定/已解锁/未锁定)')
+    mooney_value = models.IntegerField(help_text='门尼检测值', blank=True, null=True)
+    mooney_level = models.CharField(max_length=8, help_text='门尼等级(高级/中级/低级)', blank=True, null=True)
+
+    class Meta:
+        db_table = 'wms_outbond_history'
+        verbose_name_plural = verbose_name = 'wms出库记录'
