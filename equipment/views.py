@@ -2603,12 +2603,12 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
             # 使用库存数量判断
             if out_quantity > query.quantity - instance.out_quantity:
                 return Response({"success": False, "message": '出库数量不能大于单据出库数量', "data": None})
-            if instance.plan_out_quantity <= out_quantity + instance.out_quantity:
-                instance.out_quantity += out_quantity
-                instance.status = 6  # 出库完成
-            else:
-                instance.out_quantity += out_quantity
-                instance.status = 5  # 出库中
+            # if instance.plan_out_quantity <= out_quantity + instance.out_quantity:
+            #     instance.out_quantity += out_quantity
+            #     instance.status = 6  # 出库完成
+            # else:
+            instance.out_quantity += out_quantity
+            instance.status = 5  # 出库中
             query.quantity -= out_quantity
             query.save()
             instance.outer_time = outer_time
