@@ -29,8 +29,8 @@ def main():
         else:
             st = max_train + 1
         now = datetime.datetime.now()
-        b_day = datetime.timedelta(seconds=-random.randint(10, 100))
-        e_day = datetime.timedelta(seconds=random.randint(10, 100))
+        b_day = datetime.timedelta(seconds=-random.randint(120, 180))
+        e_day = datetime.timedelta(seconds=-random.randint(1, 10))
         begin_time = now + b_day
         end_time = now + e_day
         if st <= pcp.plan_trains:

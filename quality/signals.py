@@ -84,6 +84,9 @@ def batching_post_save(sender, instance=None, created=False, update_fields=None,
                                                      is_judged=True,
                                                      material__material_no=material_test_order.product_no
                                                      ).exists():
+                if instance.level > 1:
+                    material_test_order.is_qualified = False
+                    material_test_order.save()
                 try:
                     pn = material_test_order.product_no.split('-')[2]
                 except Exception:
