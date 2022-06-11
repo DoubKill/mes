@@ -190,7 +190,9 @@ def gen_pallet_test_result(lot_nos):
                                                  material__material_no=pfb_obj.product_no).exists():
             if pn.startswith('T'):
                 test_product_flat = True
+                test_orders.update(is_experiment=True)
             else:
+                test_orders.update(is_experiment=False)
                 continue
 
         for test_order in test_orders:

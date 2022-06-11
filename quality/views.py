@@ -2408,6 +2408,7 @@ class ProductTestStaticsView(APIView):
         production_class = self.request.query_params.get('classes', '')  # 班次
         st = self.request.query_params.get('s_time')  # 开始时间
         et = self.request.query_params.get('e_time')  # 结束时间
+        sy_flag = self.request.query_params.get('sy_flag', 'N')
         if not all([st, et]):
             raise ValidationError('请选择日期范围查询！')
         diff = datetime.datetime.strptime(et, '%Y-%m-%d') - datetime.datetime.strptime(st, '%Y-%m-%d')
@@ -2431,7 +2432,9 @@ class ProductTestStaticsView(APIView):
         if production_class:
             filter_kwargs['production_class'] = production_class
             where_str += "AND production_class='{}'".format(production_class)
-
+        if sy_flag == 'N':
+            filter_kwargs['is_experiment'] = False
+            where_str += "AND mto.is_experiment={}".format(0)
         mto_data = MaterialTestOrder.objects.filter(**filter_kwargs).values('product_no', 'is_qualified').annotate(qty=Count('id'))
 
         # 流变总检查车次
@@ -2691,7 +2694,7 @@ order by temp.PRODUCT_NO, temp.TEST_INDICATOR_NAME;""".format(where_str)
         resp_data = ret.values()
         for dt in resp_data:
             for k, v in dt.items():
-                if k not in ('RATE_1_PASS', 'RATE_S_PASS', "rate"):
+                if k not in ('rate', 'HG'):
                     if v == 0:
                         dt[k] = ''
         summary_data = {'rate': round(total_qualified_count/total_check_count*100, 2) if total_check_count else '',

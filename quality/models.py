@@ -187,6 +187,7 @@ class MaterialTestOrder(AbstractEntity):
     note = models.CharField(max_length=100, help_text='备注', blank=True, null=True)
     is_qualified = models.BooleanField(help_text='是否合格', default=True)
     is_passed = models.BooleanField(help_text='是否通过pass章', default=False)
+    is_experiment = models.BooleanField(help_text='是否为试验料', default=False)
 
     class Meta:
         db_table = 'material_test_order'
