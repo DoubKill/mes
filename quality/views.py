@@ -2402,291 +2402,302 @@ class ProductTestStaticsView(APIView):
     permission_classes = (IsAuthenticated,)
 
     def get(self, request):
-        product_segment = self.request.query_params.get('station', '')
-        product_standard = self.request.query_params.get('product_type', '')
-        production_equip_no = self.request.query_params.get('equip_no', '')
-        production_class = self.request.query_params.get('classes', '')
-        start_time = self.request.query_params.get('s_time')
-        end_time = self.request.query_params.get('e_time')
-        diff = datetime.datetime.strptime(end_time, '%Y-%m-%d') - datetime.datetime.strptime(start_time, '%Y-%m-%d')
+        stage = self.request.query_params.get('station', '')  # 段次
+        product_standard = self.request.query_params.get('product_type', '')  # 胶料规格
+        production_equip_no = self.request.query_params.get('equip_no', '')  # 机台
+        production_class = self.request.query_params.get('classes', '')  # 班次
+        st = self.request.query_params.get('s_time')  # 开始时间
+        et = self.request.query_params.get('e_time')  # 结束时间
+        if not all([st, et]):
+            raise ValidationError('请选择日期范围查询！')
+        diff = datetime.datetime.strptime(et, '%Y-%m-%d') - datetime.datetime.strptime(st, '%Y-%m-%d')
         if diff.days > 31:
             raise ValidationError('搜索日期跨度不得超过一个月！')
-        product_str = ''
-        if product_segment:
-            product_str += '-{}'.format(product_segment)
+        filter_kwargs = {
+            'production_factory_date__gte': st,
+            'production_factory_date__lte': et,
+        }
+        where_str = """ mtr."LEVEL" = 2 AND to_char(mto."PRODUCTION_FACTORY_DATE", 'yyyy-mm-dd') >= '{}' 
+                      AND to_char(mto."PRODUCTION_FACTORY_DATE", 'yyyy-mm-dd') <= '{}'""".format(st, et)
+        if stage:
+            filter_kwargs['product_no__icontains'] = '-{}'.format(stage)
+            where_str += "AND product_no like '%-{}%'".format(stage)
         if product_standard:
-            product_str += '-{}'.format(product_standard)
-        queryset = MaterialTestResult.objects.filter(
-            material_test_order__product_no__icontains=product_str,
-            material_test_order__production_factory_date__gte=start_time,
-            material_test_order__production_factory_date__lte=end_time,
-            material_test_order__production_equip_no__icontains=production_equip_no,
-            material_test_order__production_class__icontains=production_class
-        )
-        # 统计不合格中超过和小于标准的数量
-        # ---------------- begin ---------------
-        dic = {}
-        data_point_dic = {}
-        data_point_query = MaterialDataPointIndicator.objects.filter(level=1).values(
-            'material_test_method__material__material_no', 'data_point__name',
-            'upper_limit', 'lower_limit')
-        for i in data_point_query:
-            if data_point_dic.get(i['material_test_method__material__material_no']):
-                data_point_dic[i['material_test_method__material__material_no']][i['data_point__name']] = [
-                    i['lower_limit'], i['upper_limit']]
+            filter_kwargs['product_no__icontains'] = '-{}'.format(product_standard)
+            where_str += "AND product_no like '%-{}%'".format(product_standard)
+        if production_equip_no:
+            filter_kwargs['production_equip_no'] = production_equip_no
+            where_str += "AND production_equip_no='{}'".format(production_equip_no)
+        if production_class:
+            filter_kwargs['production_class'] = production_class
+            where_str += "AND production_class='{}'".format(production_class)
+
+        mto_data = MaterialTestOrder.objects.filter(**filter_kwargs).values('product_no', 'is_qualified').annotate(qty=Count('id'))
+
+        # 流变总检查车次
+        lb_check_cnt = MaterialTestOrder.objects.filter(**filter_kwargs).filter(
+            order_results__test_indicator_name='流变').distinct().values('id').count()
+        # 流变总检查不合格车次
+        lb_qualified_cnt = MaterialTestOrder.objects.filter(**filter_kwargs).filter(
+            order_results__test_indicator_name='流变', order_results__level=2).values('id').distinct().count()
+
+        # 一次总检查车次
+        yc_check_cnt = MaterialTestOrder.objects.filter(**filter_kwargs).filter(
+            order_results__test_indicator_name__in=('门尼', '比重', '硬度')).values('id').distinct().count()
+        # 一次总检查不合格车次
+        yc_qualified_cnt = MaterialTestOrder.objects.filter(**filter_kwargs).filter(
+            order_results__test_indicator_name__in=('门尼', '比重', '硬度'),
+            order_results__level=2).values('id').distinct().count()
+
+        # 按照胶料规格分组，每个规格流变检测多少车次
+        lb_product_check_data = MaterialTestOrder.objects.filter(**filter_kwargs).filter(
+            order_results__test_indicator_name='流变'
+        ).values('product_no').annotate(cnt=Count('id', distinct=True))
+        # 按照胶料规格分组，每个规格流变合格多少车次
+        lb_product_qualified_data = dict(MaterialTestOrder.objects.filter(**filter_kwargs).filter(
+            order_results__test_indicator_name='流变',
+            order_results__level=2).values('product_no').annotate(cnt=Count('id', distinct=True)).values_list('product_no', 'cnt'))
+
+        # 各胶料流变总检车次、不合格车次
+        datas = {}  # {"C590": [2, 1]}
+        for item in lb_product_check_data:
+            s_pn = item['product_no'].split('-')[2]
+            s_total_qty = item['cnt']
+            s_unq_qty = lb_product_qualified_data.get(item['product_no'], 0)
+            if s_pn in datas:
+                datas[s_pn][0] += s_total_qty
+                datas[s_pn][1] += s_unq_qty
             else:
-                data_point_dic[i['material_test_method__material__material_no']] = {
-                    i['data_point__name']: [i['lower_limit'], i['upper_limit']]}
+                datas[s_pn] = [s_total_qty, s_unq_qty]
+        # 按照胶料规格分组，每个规格一次检测多少车次
+        yc_product_check_data = MaterialTestOrder.objects.filter(**filter_kwargs).filter(
+            order_results__test_indicator_name__in=('门尼', '比重', '硬度')
+        ).values('product_no').annotate(cnt=Count('id', distinct=True))
+        # 按照胶料规格分组，每个规格一次合格多少车次
+        yc_product_qualified_data = dict(MaterialTestOrder.objects.filter(**filter_kwargs).filter(
+            order_results__test_indicator_name__in=('门尼', '比重', '硬度'),
+            order_results__level=2).values('product_no').annotate(cnt=Count('id', distinct=True)).values_list('product_no', 'cnt'))
+
+        # 各胶料一次总检车次、不合格车次
+        data1 = {}  # {"C590": [2, 1]}
+        for item in yc_product_check_data:
+            pn_1 = item['product_no'].split('-')[2]
+            total_qty_1 = item['cnt']
+            unq_qty_1 = yc_product_qualified_data.get(item['product_no'], 0)
+            if pn_1 in data1:
+                data1[pn_1][0] += total_qty_1
+                data1[pn_1][1] += unq_qty_1
+            else:
+                data1[pn_1] = [total_qty_1, unq_qty_1]
+        if not mto_data:
+            return Response({})
+
+        total_check_count = 0
+        total_qualified_count = 0
+        # 各胶料总检车、合格、不合格车次
+        mto_data_dict = {}  # {"C590": {"total_qty": 12, "qualified_qty": 10, "unqualified_qty": 2}}
+        for item in mto_data:
+            mto_product_no = item['product_no'].split('-')[2]
+            mto_qty = item['qty']
+            mto_qualified_qty = 0
+            mto_unqualified_qty = 0
+            is_qualified = item['is_qualified']
+            total_check_count += mto_qty
+            if is_qualified:
+                mto_qualified_qty += mto_qty
+                total_qualified_count += mto_qty
+            else:
+                mto_unqualified_qty += mto_qty
+            if mto_product_no not in mto_data_dict:
+                mto_data_dict[mto_product_no] = {
+                    'total_qty': mto_qty,
+                    'qualified_qty': mto_qualified_qty,
+                    'unqualified_qty': mto_unqualified_qty
+                }
+            else:
+                mto_data_dict[mto_product_no]['total_qty'] += mto_qty
+                mto_data_dict[mto_product_no]['qualified_qty'] += mto_qualified_qty
+                mto_data_dict[mto_product_no]['unqualified_qty'] += mto_unqualified_qty
 
         sql = """
-        SELECT
-     * 
-    FROM
-     (
-     SELECT
-     a.data_point_name,
-      a.value,
-      b.product_no,
-      b.production_factory_date,
-      b.production_class,
-      a.test_times,
-      b.actual_trains,
-      b.production_equip_no 
-     FROM
-      material_test_result a
-      LEFT JOIN material_test_order b ON a.material_test_order_id = b.id 
-     WHERE
-      b.PRODUCTION_EQUIP_NO LIKE '%{}%'
-                AND b.PRODUCT_NO LIKE '%{}%'
-                AND b.PRODUCTION_CLASS LIKE '%{}%'
-                AND b.PRODUCTION_FACTORY_DATE >= TO_DATE('{}', 'YYYY-MM-DD')
-                AND b.PRODUCTION_FACTORY_DATE <= TO_DATE('{}', 'YYYY-MM-DD')
-     ) a 
-    WHERE
-     a.test_times = (
-     SELECT
-      max( x.test_times ) 
-     FROM
-      (
-      SELECT
-       a.value,
-       a.test_class,
-       a.test_times,
-       a.data_point_name,
-       b.production_factory_date,
-       b.actual_trains,
-       b.product_no,
-       b.production_equip_no 
-      FROM
-       material_test_result a
-       LEFT JOIN material_test_order b ON a.material_test_order_id = b.id 
-      WHERE
-       b.PRODUCTION_EQUIP_NO LIKE '%{}%'
-                AND b.PRODUCT_NO LIKE '%{}%'
-                AND b.PRODUCTION_CLASS LIKE '%{}%'
-                AND b.PRODUCTION_FACTORY_DATE >= TO_DATE('{}', 'YYYY-MM-DD')
-                AND b.PRODUCTION_FACTORY_DATE <= TO_DATE('{}', 'YYYY-MM-DD')
-      ) x 
-     WHERE
-      x.data_point_name = a.data_point_name 
-      AND x.actual_trains = a.actual_trains 
-      AND x.product_no = a.product_no 
-     AND x.production_equip_no = a.production_equip_no 
-     )""".format(production_equip_no, product_str, production_class, start_time, end_time,
-                   production_equip_no, product_str, production_class, start_time, end_time)
-
+        select
+    temp.PRODUCT_NO product_no,
+    temp.DATA_POINT_NAME,
+    temp.TEST_INDICATOR_NAME,
+    count(*) uqd,
+    temp.flag
+from (SELECT
+       mtr.DATA_POINT_NAME,
+       (CASE
+           WHEN mtr.VALUE < mtr.JUDGED_LOWER_LIMIT THEN '-'
+           WHEN mtr.VALUE > mtr.JUDGED_UPPER_LIMIT THEN '+'
+           ELSE '+' END) as flag,
+       REGEXP_SUBSTR(PRODUCT_NO, '[^-]+', 1, 3, 'i') as PRODUCT_NO,
+       mtr.TEST_INDICATOR_NAME
+FROM "MATERIAL_TEST_RESULT" mtr
+INNER JOIN "MATERIAL_TEST_ORDER" mto ON (mtr."MATERIAL_TEST_ORDER_ID" = mto."ID")
+WHERE {}
+    ) temp
+group by temp.DATA_POINT_NAME, temp.PRODUCT_NO, temp.TEST_INDICATOR_NAME, temp.flag
+order by temp.PRODUCT_NO, temp.TEST_INDICATOR_NAME;""".format(where_str)
         cursor = connection.cursor()
         cursor.execute(sql)
-        data = cursor.fetchall()
-        for item in data:
-            if data_point_dic.get(item[2]):
-                data_point_list = data_point_dic[item[2]].get(item[0])
-                if data_point_list:
-                    MH_lower = MH_upper = ML_lower = ML_upper = TC10_lower = TC10_upper = TC50_lower = TC50_upper = TC90_lower = TC90_upper = 0
-                    bz_lower = bz_upper = mn_lower = mn_upper = yd_lower = yd_upper = 0
-                    if 'ML(1+4)' == item[0]:
-                        mn_lower = 1 if item[1] < data_point_list[0] else 0
-                        mn_upper = 1 if item[1] > data_point_list[1] else 0
-                    if '比重值' == item[0]:
-                        bz_lower = 1 if item[1] < data_point_list[0] else 0
-                        bz_upper = 1 if item[1] > data_point_list[1] else 0
-                    if '硬度值' == item[0]:
-                        yd_lower = 1 if item[1] < data_point_list[0] else 0
-                        yd_upper = 1 if item[1] > data_point_list[1] else 0
-                    if 'MH' in item[0]:
-                        MH_lower = 1 if item[1] < data_point_list[0] else 0
-                        MH_upper = 1 if item[1] > data_point_list[1] else 0
-                    if 'ML' == item[0]:
-                        ML_lower = 1 if item[1] < data_point_list[0] else 0
-                        ML_upper = 1 if item[1] > data_point_list[1] else 0
-                    if 'TC10' in item[0]:
-                        TC10_lower = 1 if item[1] < data_point_list[0] else 0
-                        TC10_upper = 1 if item[1] > data_point_list[1] else 0
-                    if 'TC50' in item[0]:
-                        TC50_lower = 1 if item[1] < data_point_list[0] else 0
-                        TC50_upper = 1 if item[1] > data_point_list[1] else 0
-                    if 'TC90' in item[0]:
-                        TC90_lower = 1 if item[1] < data_point_list[0] else 0
-                        TC90_upper = 1 if item[1] > data_point_list[1] else 0
-                    spe = item[2].split('-')[2]
-                    if dic.get(spe):
-                        data = dic.get(spe)
-                        dic[spe].update({
-                            'mn_lower': data['mn_lower'] + mn_lower,
-                            'mn_upper': data['mn_upper'] + mn_upper,
-                            'bz_lower': data['bz_lower'] + bz_lower,
-                            'bz_upper': data['bz_upper'] + bz_upper,
-                            'yd_lower': data['yd_lower'] + yd_lower,
-                            'yd_upper': data['yd_upper'] + yd_upper,
-                            'MH_lower': data['MH_lower'] + MH_lower,
-                            'MH_upper': data['MH_upper'] + MH_upper,
-                            'ML_lower': data['ML_lower'] + ML_lower,
-                            'ML_upper': data['ML_upper'] + ML_upper,
-                            'TC10_lower': data['TC10_lower'] + TC10_lower,
-                            'TC10_upper': data['TC10_upper'] + TC10_upper,
-                            'TC50_lower': data['TC50_lower'] + TC50_lower,
-                            'TC50_upper': data['TC50_upper'] + TC50_upper,
-                            'TC90_lower': data['TC90_lower'] + TC90_lower,
-                            'TC90_upper': data['TC90_upper'] + TC90_upper,
-                        })
-                    else:
-                        dic[spe] = {
-                            'mn_lower': mn_lower,
-                            'mn_upper': mn_upper,
-                            'bz_lower': bz_lower,
-                            'bz_upper': bz_upper,
-                            'yd_lower': yd_lower,
-                            'yd_upper': yd_upper,
-                            'MH_lower': MH_lower,
-                            'MH_upper': MH_upper,
-                            'ML_lower': ML_lower,
-                            'ML_upper': ML_upper,
-                            'TC10_lower': TC10_lower,
-                            'TC10_upper': TC10_upper,
-                            'TC50_lower': TC50_lower,
-                            'TC50_upper': TC50_upper,
-                            'TC90_lower': TC90_lower,
-                            'TC90_upper': TC90_upper,
-                        }
-        # --------------- end -----------------
-        # 检查数与合格数
-        records = queryset.values('material_test_order__product_no').annotate(
-            JC=Count('material_test_order_id', distinct=True),
-            HG=Count('material_test_order_id', distinct=True, filter=Q(material_test_order__is_qualified=True)))
-        if not records:
-            return Response([])
+        query_data = cursor.fetchall()
+        ret = {}
+        for item in query_data:
+            product_type = item[0]
+            data_point_name = item[1]
+            test_indicator_name = item[2]
+            qty = item[3]
+            flag = item[4]
+            mn_unqualified_count, mn_lower_count, mn_upper_count = 0, 0, 0
+            bz_unqualified_count, bz_lower_count, bz_upper_count = 0, 0, 0
+            yd_unqualified_count, yd_lower_count, yd_upper_count = 0, 0, 0
+            ml_unqualified_count, ml_lower_count, ml_upper_count = 0, 0, 0
+            mh_unqualified_count, mh_lower_count, mh_upper_count = 0, 0, 0
+            tc10_unqualified_count, tc10_lower_count, tc10_upper_count = 0, 0, 0
+            tc50_unqualified_count, tc50_lower_count, tc50_upper_count = 0, 0, 0
+            tc90_unqualified_count, tc90_lower_count, tc90_upper_count = 0, 0, 0
 
-        # result = {re.search(r'\w{1,2}\d{3}', j['material_test_order__product_no']).group():
-        #               {'product_type': re.search(r'\w{1,2}\d{3}', j['material_test_order__product_no']).group(),
-        #                'JC': j['JC'], 'HG': j['HG'], 'MN': 0, 'YD': 0, 'BZ': 0, 'RATE_1': [], 'MH': 0, 'ML': 0,
-        #                'TC10': 0, 'TC50': 0, 'TC90': 0, 'RATE_S': [], 'sum_s': 0, 'rate': round(j['HG'] / j['JC'] * 100, 2)} for j in records}
-        result = {}
-        for j in records:
-            product_type = re.search(r'\w{1,2}\d{3}', j['material_test_order__product_no']).group()
-            if product_type not in result:
-                data = {'product_type': product_type, 'JC': j['JC'], 'HG': j['HG'], 'MN': 0, 'YD': 0, 'BZ': 0,
-                        'RATE_1': [], 'MH': 0, 'ML': 0, 'TC10': 0, 'TC50': 0, 'TC90': 0, 'RATE_S': [], 'sum_s': 0,
-                        'rate': '%.2f' % (j['HG'] / j['JC'] * 100)}
-                result[product_type] = data
+            if test_indicator_name == '门尼':
+                mn_unqualified_count = qty
+                if flag == '-':
+                    mn_lower_count = qty
+                else:
+                    mn_upper_count = qty
+            elif test_indicator_name == '硬度':
+                yd_unqualified_count = qty
+                if flag == '-':
+                    yd_lower_count = qty
+                else:
+                    yd_upper_count = qty
+            elif test_indicator_name == '比重':
+                bz_unqualified_count = qty
+                if flag == '-':
+                    bz_lower_count = qty
+                else:
+                    bz_upper_count = qty
+            if test_indicator_name == '流变':
+                if data_point_name == 'ML':
+                    ml_unqualified_count = qty
+                    if flag == '-':
+                        ml_lower_count = qty
+                    else:
+                        ml_upper_count = qty
+                elif data_point_name == 'MH':
+                    mh_unqualified_count = qty
+                    if flag == '-':
+                        mh_lower_count = qty
+                    else:
+                        mh_upper_count = qty
+                elif data_point_name == 'TC10':
+                    tc10_unqualified_count = qty
+                    if flag == '-':
+                        tc10_lower_count = qty
+                    else:
+                        tc10_upper_count = qty
+                elif data_point_name == 'TC50':
+                    tc50_unqualified_count = qty
+                    if flag == '-':
+                        tc50_lower_count = qty
+                    else:
+                        tc50_upper_count = qty
+                elif data_point_name == 'TC90':
+                    tc90_unqualified_count = qty
+                    if flag == '-':
+                        tc90_lower_count = qty
+                    else:
+                        tc90_upper_count = qty
+            if product_type not in ret:
+                qt_data = mto_data_dict.get(product_type)
+                rate_date1 = data1.get(product_type)
+                rate_dates = datas.get(product_type)
+                if qt_data:
+                    check_qty = qt_data.get('total_qty', 0)
+                    qualified_qty = qt_data.get('qualified_qty', 0)
+                    unqualified_qty = qt_data.get('unqualified_qty', 0)
+                    rate = round(qualified_qty / check_qty * 100, 2) if check_qty else ''
+                else:
+                    check_qty = qualified_qty = unqualified_qty = ''
+                    rate = ''
+                if rate_date1:
+                    rate1 = round((rate_date1[0] - rate_date1[1]) / rate_date1[0] * 100, 2) if rate_date1[0] else ''
+                else:
+                    rate1 = ''
+                if rate_dates:
+                    rates = round((rate_dates[0] - rate_dates[1]) / rate_dates[0] * 100, 2) if rate_dates[0] else ''
+                    sum_s = rate_dates[1]
+                else:
+                    rates = ''
+                    sum_s = ''
+                ret[product_type] = {"product_type": product_type,  # 胶料
+                                     "JC": check_qty,  # 检查数量
+                                     "HG": qualified_qty,  # 合格数量
+                                     "cp_all": unqualified_qty,  # 次品合计
+                                     "MN": mn_unqualified_count,  # 门尼不合格数量
+                                     "YD": yd_unqualified_count,  # 硬度不合格数量
+                                     "BZ": bz_unqualified_count,  # 比重不合格数量
+                                     "MH": mh_unqualified_count,  # 流变MH不合格数量
+                                     "ML": ml_unqualified_count,  # 流变ML不合格数量
+                                     "TC10": tc10_unqualified_count,  # 流变TC10不合格数量
+                                     "TC50": tc50_unqualified_count,  # 流变TC50不合格数量
+                                     "TC90": tc90_unqualified_count,  # 流变TC90不合格数量
+                                     "sum_s": sum_s,  # 流变合计
+                                     "mn_lower": mn_lower_count,  # 门尼低于下限不合格数量
+                                     "mn_upper": mn_upper_count,  # 门尼高于上限不合格数量
+                                     "bz_lower": bz_lower_count,  # 比重低于下限不合格数量
+                                     "bz_upper": bz_upper_count,  # 门尼高于上限不合格数量
+                                     "yd_lower": yd_lower_count,  # 硬度低于下限不合格数量
+                                     "yd_upper": yd_upper_count,  # 硬度高于上限不合格数量
+                                     "MH_lower": mh_lower_count,  # MH低于下限不合格数量
+                                     "MH_upper": mh_upper_count,  # MH高于上限不合格数量
+                                     "ML_lower": ml_lower_count,  # ML低于下限不合格数量
+                                     "ML_upper": ml_upper_count,  # ML高于上限不合格数量
+                                     "TC10_lower": tc10_lower_count,  # ML低于下限不合格数量
+                                     "TC10_upper": tc10_upper_count,  # ML高于上限不合格数量
+                                     "TC50_lower": tc50_lower_count,  # ML低于下限不合格数量
+                                     "TC50_upper": tc50_upper_count,  # ML高于上限不合格数量
+                                     "TC90_lower": tc90_lower_count,  # ML低于下限不合格数量
+                                     "TC90_upper": tc90_upper_count,  # ML高于上限不合格数量
+                                     'RATE_1_PASS': rate1,
+                                     'RATE_S_PASS': rates,
+                                     "rate": rate
+                                     }
             else:
-                data = result.get(product_type)
-                data.update({'JC': data['JC'] + j['JC'], 'HG': data['HG'] + j['HG']})
-                data.update({'rate': round(data['HG'] / data['JC'] * 100, 2)})
-        """result {'J260': {'product_type': 'J260', 'JC': 2, 'HG': 1}}"""
-        # ---------------- begin ---------------
-        for i in result.keys():
-            if dic.get(i):
-                result[i].update(dic[i])
-            else:
-                result[i].update({
-                    'mn_lower': 0,
-                    'mn_upper': 0,
-                    'bz_lower': 0,
-                    'bz_upper': 0,
-                    'yd_lower': 0,
-                    'yd_upper': 0,
-                    'MH_lower': 0,
-                    'MH_upper': 0,
-                    'ML_lower': 0,
-                    'ML_upper': 0,
-                    'TC10_lower': 0,
-                    'TC10_upper': 0,
-                    'TC50_lower': 0,
-                    'TC50_upper': 0,
-                    'TC90_lower': 0,
-                    'TC90_upper': 0,
-                })
-        """result {'J260': {'product_type': 'J260', 'JC': 2, 'HG': 1, 'MH': 1, 'ML': 1, 'TC10': 1 .....}}"""
-        # --------------- end -----------------
-        pre_data = queryset.values('material_test_order__product_no', 'test_indicator_name', 'data_point_name') \
-            .annotate(num=Count('id', distinct=True, filter=Q(~Q(level=1)))) \
-            .values('material_test_order_id', 'material_test_order__product_no', 'test_indicator_name',
-                    'data_point_name', 'num', 'test_times') \
-            .order_by('test_times')
-        # 处理数据
-        data = {(str(i['material_test_order_id']) + '_' + re.search(r"\w{1,2}\d{3}", i[
-            'material_test_order__product_no']).group() + '_' + i['test_indicator_name'] + '_' + i[
-                     'data_point_name']): [i['num'], i['test_times']] for i in pre_data}
-        """{'182_J260_比重_比重值': [2, 1], '182_J260_流变_MH': [2, 1], '182_J260_流变_TC10': [2, 1], '182_J260_流变_TC50': [2, 1], 
-        '182_J260_流变_TC90': [2, 1], '182_J260_物性_M300': [2, 1], '182_J260_物性_伸长率%': [2, 1], '182_J260_物性_扯断强度': [2, 1], 
-        '182_J260_硬度_硬度值': [2, 1], '182_J260_钢拔_钢拔': [2, 1], '182_J260_门尼_ML(1+4)': [2, 1], '183_J260_门尼_ML(1+4)': [1, 0]}"""
-        for k, v in data.items():
-            single_data = result.get(k.split('_')[1])
-            order_id = k.split('_')[0]
-            if 'ML(1+4)' in k:
-                single_data['MN'] += v[0]
-                if order_id not in single_data['RATE_1'] and v[0] != 0:
-                    single_data['RATE_1'].append(order_id)
-            elif '硬度值' in k:
-                single_data['YD'] += v[0]
-                if order_id not in single_data['RATE_1'] and v[0] != 0:
-                    single_data['RATE_1'].append(order_id)
-            elif '比重值' in k:
-                single_data['BZ'] += v[0]
-                if order_id not in single_data['RATE_1'] and v[0] != 0:
-                    single_data['RATE_1'].append(order_id)
-            elif 'MH' in k:
-                single_data['MH'] += v[0]
-                if order_id not in single_data['RATE_S'] and v[0] != 0:
-                    single_data['RATE_S'].append(order_id)
-            elif 'ML' in k:
-                single_data['ML'] += v[0]
-                if order_id not in single_data['RATE_S'] and v[0] != 0:
-                    single_data['RATE_S'].append(order_id)
-            elif 'TC10' in k:
-                single_data['TC10'] += v[0]
-                if order_id not in single_data['RATE_S'] and v[0] != 0:
-                    single_data['RATE_S'].append(order_id)
-            elif 'TC50' in k:
-                single_data['TC50'] += v[0]
-                if order_id not in single_data['RATE_S'] and v[0] != 0:
-                    single_data['RATE_S'].append(order_id)
-            elif 'TC90' in k:
-                single_data['TC90'] += v[0]
-                if order_id not in single_data['RATE_S'] and v[0] != 0:
-                    single_data['RATE_S'].append(order_id)
-            else:
-                continue
-        res_data = result.values()
-        all = {}
-        rate_1, rate_lb, rate_test_all, rate_pass_sum = 0, 0, 0, 0
-        for v in res_data:
-            v['sum_s'] = len(v.pop('RATE_S'))
-            rate_1_pass_sum = v['JC'] - len(v.pop('RATE_1'))
-            rate_s_pass_sum = v['JC'] - v['sum_s']
-            v['RATE_1_PASS'] = '%.2f' % (rate_1_pass_sum / v['JC'] * 100)
-            v['cp_all'] = v['JC'] - v['HG']
-            v['RATE_S_PASS'] = '%.2f' % (rate_s_pass_sum / v['JC'] * 100)
-            rate_1 += rate_1_pass_sum
-            rate_lb += rate_s_pass_sum
-            rate_test_all += v['JC']
-            rate_pass_sum += v['HG']
-        all.update(rate_1='%.2f' % (rate_1 / rate_test_all * 100), rate_lb='%.2f' % (rate_lb / rate_test_all * 100),
-                   rate='%.2f' % (rate_pass_sum / rate_test_all * 100))
-        for dic in res_data:
-            for key, value in dic.items():
-                dic[key] = None if not dic[key] else dic[key]
-        return Response({'result': res_data, 'all': all})
+                ret[product_type]['MN'] += mn_unqualified_count
+                ret[product_type]['YD'] += yd_unqualified_count
+                ret[product_type]['BZ'] += bz_unqualified_count
+                ret[product_type]['MH'] += mh_unqualified_count
+                ret[product_type]['ML'] += ml_unqualified_count
+                ret[product_type]['TC10'] += tc10_unqualified_count
+                ret[product_type]['TC50'] += tc50_unqualified_count
+                ret[product_type]['TC90'] += tc90_unqualified_count
+                ret[product_type]['mn_lower'] += mn_lower_count
+                ret[product_type]['mn_upper'] += mn_upper_count
+                ret[product_type]['bz_lower'] += bz_lower_count
+                ret[product_type]['bz_upper'] += bz_upper_count
+                ret[product_type]['yd_lower'] += yd_lower_count
+                ret[product_type]['yd_upper'] += yd_upper_count
+                ret[product_type]['MH_lower'] += mh_lower_count
+                ret[product_type]['MH_upper'] += mh_upper_count
+                ret[product_type]['ML_lower'] += ml_lower_count
+                ret[product_type]['ML_upper'] += ml_upper_count
+                ret[product_type]['TC10_lower'] += tc10_lower_count
+                ret[product_type]['TC10_upper'] += tc10_upper_count
+                ret[product_type]['TC50_lower'] += tc50_lower_count
+                ret[product_type]['TC50_upper'] += tc50_upper_count
+                ret[product_type]['TC90_lower'] += tc90_lower_count
+                ret[product_type]['TC90_upper'] += tc90_upper_count
+        resp_data = ret.values()
+        for dt in resp_data:
+            for k, v in dt.items():
+                if k not in ('RATE_1_PASS', 'RATE_S_PASS', "rate"):
+                    if v == 0:
+                        dt[k] = ''
+        summary_data = {'rate': round(total_qualified_count/total_check_count*100, 2) if total_check_count else '',
+                        'rate_1': round((yc_check_cnt-yc_qualified_cnt)/yc_check_cnt*100, 2) if yc_check_cnt else '',
+                        'rate_lb': round((lb_check_cnt-lb_qualified_cnt)/lb_check_cnt*100, 2) if lb_check_cnt else ''}
+        return Response({'result': resp_data, 'all': summary_data})
 
 
 @method_decorator([api_recorder], name='dispatch')
