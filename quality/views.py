@@ -2421,20 +2421,20 @@ class ProductTestStaticsView(APIView):
         where_str = """ mtr."LEVEL" = 2 AND to_char(mto."PRODUCTION_FACTORY_DATE", 'yyyy-mm-dd') >= '{}' 
                       AND to_char(mto."PRODUCTION_FACTORY_DATE", 'yyyy-mm-dd') <= '{}'""".format(st, et)
         if stage:
-            filter_kwargs['product_no__icontains'] = '-{}'.format(stage)
-            where_str += "AND product_no like '%-{}%'".format(stage)
+            filter_kwargs['product_no__icontains'] = '-{}-'.format(stage)
+            where_str += " AND mto.PRODUCT_NO like '%-{}-%'".format(stage)
         if product_standard:
-            filter_kwargs['product_no__icontains'] = '-{}'.format(product_standard)
-            where_str += "AND product_no like '%-{}%'".format(product_standard)
+            filter_kwargs['product_no__icontains'] = '-{}-'.format(product_standard)
+            where_str += " AND mto.PRODUCT_NO like '%-{}-%'".format(product_standard)
         if production_equip_no:
             filter_kwargs['production_equip_no'] = production_equip_no
-            where_str += "AND production_equip_no='{}'".format(production_equip_no)
+            where_str += " AND mto.PRODUCTION_EQUIP_NO='{}'".format(production_equip_no)
         if production_class:
             filter_kwargs['production_class'] = production_class
-            where_str += "AND production_class='{}'".format(production_class)
+            where_str += " AND mto.PRODUCTION_CLASS='{}'".format(production_class)
         if sy_flag == 'N':
             filter_kwargs['is_experiment'] = False
-            where_str += "AND mto.is_experiment={}".format(0)
+            where_str += " AND mto.IS_EXPERIMENT={}".format(0)
         mto_data = MaterialTestOrder.objects.filter(**filter_kwargs).values('product_no', 'is_qualified').annotate(qty=Count('id'))
 
         # 流变总检查车次
