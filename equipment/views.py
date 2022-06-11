@@ -4715,6 +4715,7 @@ class EquipOrderEntrustView(APIView):
 
 @method_decorator([api_recorder], name='dispatch')
 class EquipIndexView(APIView):
+    authentication_classes = ()
 
     @staticmethod
     def get_current_factory_date():
