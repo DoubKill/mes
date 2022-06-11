@@ -2694,7 +2694,7 @@ order by temp.PRODUCT_NO, temp.TEST_INDICATOR_NAME;""".format(where_str)
         resp_data = ret.values()
         for dt in resp_data:
             for k, v in dt.items():
-                if k not in ('rate', 'HG'):
+                if k not in ('rate', 'HG', 'RATE_1_PASS', 'RATE_S_PASS'):
                     if v == 0:
                         dt[k] = ''
         summary_data = {'rate': round(total_qualified_count/total_check_count*100, 2) if total_check_count else '',
