@@ -1271,7 +1271,7 @@ class HfBakeLog(models.Model):
 class WMSOutboundHistory(models.Model):
     QUALITY_STATUS_CHOICE = (
         ('合格品', '合格品'),
-        ('合格品', '合格品'),
+        ('抽检中', '抽检中'),
         ('不合格品', '不合格品'),
         ('过期', '过期'),
         ('待检', '待检'),

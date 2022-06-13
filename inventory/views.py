@@ -564,14 +564,11 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
                 elif is_entering == 'N':
                     queryset = queryset.exclude(pallet_no__startswith=5)
             if quality_status:
-                if quality_status == '1':
-                    batch_nos = list(ExamineMaterial.objects.filter(qualified=True).values_list('batch', flat=True))
-                elif quality_status == '3':
-                    batch_nos = list(ExamineMaterial.objects.filter(qualified=False).values_list('batch', flat=True))
-                else:
-                    batch_nos = list(ExamineMaterial.objects.values_list('batch', flat=True))
-                    return queryset.filter(~Q(batch_no__in=batch_nos) | Q(batch_no__isnull=True)).filter(**filter_dict)
-                filter_dict.update(batch_no__in=batch_nos)
+                status_map = {'1': "合格品", '2': "抽检中", '3': "不合格品", '4': "过期", '5': "待检"}
+                task_nos = list(WMSOutboundHistory.objects.filter(
+                    quality_status=status_map.get(quality_status)
+                ).values_list('task_no', flat=True))
+                filter_dict['order_no__in'] = task_nos
             return queryset.filter(**filter_dict)
         else:
             return []
