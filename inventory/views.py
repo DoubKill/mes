@@ -564,7 +564,7 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
                 elif is_entering == 'N':
                     queryset = queryset.exclude(pallet_no__startswith=5)
             if quality_status:
-                status_map = {'1': "合格", '2': "抽检中", '3': "不合格", '4': "过期", '5': "待检"}
+                status_map = {'1': "合格品", '2': "抽检中", '3': "不合格品", '4': "过期", '5': "待检"}
                 task_nos = list(WMSOutboundHistory.objects.filter(
                     quality_status=status_map.get(quality_status)
                 ).values_list('task_no', flat=True))
