@@ -4553,6 +4553,7 @@ class OutBoundTasksListView(ListAPIView):
     """
     serializer_class = OutBoundTasksSerializer
     # permission_classes = (IsAuthenticated, )  # 出库看板使用，不需要登录
+    authentication_classes = ()
 
     def get_queryset(self):
         warehouse_name = self.request.query_params.get('warehouse_name')  # 库存名称
@@ -4571,6 +4572,7 @@ class OutBoundTasksListView(ListAPIView):
 class InOutBoundSummaryView(APIView):
     """混炼终炼出库口出入库统计，参数：warehouse_name=混炼胶库/终炼胶库&station_id=出库口id"""
     # permission_classes = (IsAuthenticated, )  # 出库看板使用，不需要登录
+    authentication_classes = ()
 
     def get(self, request):
         warehouse_name = self.request.query_params.get('warehouse_name')  # 库存名称

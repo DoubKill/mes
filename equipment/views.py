@@ -2423,8 +2423,17 @@ class EquipWarehouseLocationViewSet(ModelViewSet):
     filter_fields = ('equip_warehouse_area_id',)
 
     def list(self, request, *args, **kwargs):
+        area_id = self.request.query_params.get('equip_warehouse_area_id')
+        spare_code = self.request.query_params.get('spare_code')
         if self.request.query_params.get('all'):
-            data = self.get_serializer(self.filter_queryset(self.queryset), many=True).data
+            queryset = self.filter_queryset(self.queryset)
+            if spare_code:
+                already_locations = set(EquipWarehouseInventory.objects.filter(delete_flag=False, quantity__gt=0,
+                                                                               equip_spare__spare_code=spare_code,
+                                                                               equip_warehouse_area__id=area_id)
+                                        .values_list('equip_warehouse_location__id', flat=True))
+                queryset = queryset.filter(id__in=already_locations)
+            data = self.get_serializer(queryset, many=True).data
             return Response(data)
         return super().list(request, *args, **kwargs)
 
@@ -2443,6 +2452,12 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
     serializer_class = EquipWarehouseOrderSerializer
     permission_classes = (IsAuthenticated,)
     filter_class = EquipWarehouseOrderFilter
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return EquipWarehouseOrderListSerializer
+        else:
+            return EquipWarehouseOrderSerializer
 
     def list(self, request, *args, **kwargs):
         state = self.request.query_params.get('status')
@@ -2538,7 +2553,6 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipWarehouseOrderDetailFilter
-    pagination_class = None
 
     @atomic
     def create(self, request, *args, **kwargs):
@@ -2559,7 +2573,9 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
         if status == 1:
             if instance.plan_in_quantity <= instance.in_quantity:
                 return Response({"success": False, "message": '该单据已入库完成', "data": None})
-            if instance.in_quantity + in_quantity >= instance.plan_in_quantity:
+            if instance.in_quantity + in_quantity > instance.plan_in_quantity:
+                return Response({"success": False, "message": '入库数量大于单据剩余未入库数量', "data": None})
+            if instance.in_quantity + in_quantity == instance.plan_in_quantity:
                 instance.status = 3  # 已完成
             elif instance.in_quantity + in_quantity < instance.plan_in_quantity:
                 instance.status = 2  # 入库中
@@ -2600,14 +2616,15 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
                 return Response({"success": False, "message": '当前库位不存在该备件', "data": None})
             if query.quantity < out_quantity:
                 return Response({"success": False, "message": '当前库区中的数量不足', "data": None})
-            if out_quantity > instance.plan_out_quantity - instance.out_quantity:
+            # 使用库存数量判断
+            if out_quantity > query.quantity:
                 return Response({"success": False, "message": '出库数量不能大于单据出库数量', "data": None})
-            if instance.plan_out_quantity <= out_quantity + instance.out_quantity:
-                instance.out_quantity += out_quantity
-                instance.status = 6  # 出库完成
-            else:
-                instance.out_quantity += out_quantity
-                instance.status = 5  # 出库中
+            # if instance.plan_out_quantity <= out_quantity + instance.out_quantity:
+            #     instance.out_quantity += out_quantity
+            #     instance.status = 6  # 出库完成
+            # else:
+            instance.out_quantity += out_quantity
+            instance.status = 5  # 出库中
             query.quantity -= out_quantity
             query.save()
             instance.outer_time = outer_time
@@ -2675,12 +2692,26 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
             results = EquipWarehouseRecordSerializer(data, many=True).data
             return Response({'results': results})
         if equip_spare:  # 获取库存中备件的库区和库位
+            quantity = 0
+            location_id = self.request.query_params.get('location_id')
+            area_id = self.request.query_params.get('area_id')
+            if location_id and area_id:
+                inventory = self.queryset.filter(equip_spare_id=equip_spare, equip_warehouse_area_id=area_id,
+                                                 quantity__gt=0, equip_warehouse_location_id=location_id).aggregate(total=Sum('quantity'))['total']
+                if inventory:
+                    quantity = inventory
+                return Response({"quantity": quantity})
             first = self.queryset.filter(equip_spare_id=equip_spare, quantity__gt=0).first()  # 默认显示的库区和库位
-            area = self.queryset.filter(equip_spare_id=equip_spare).values('equip_warehouse_area__area_name', 'equip_warehouse_area__id').distinct()
+            area = self.queryset.filter(equip_spare_id=equip_spare, quantity__gt=0).values('equip_warehouse_area__area_name', 'equip_warehouse_area__id').distinct()
             location = self.queryset.filter(equip_spare_id=equip_spare, quantity__gt=0).values('equip_warehouse_location__location_name', 'equip_warehouse_location__id', 'equip_warehouse_area__id').distinct()
             if not first:
-                return Response({"success": False, "message": '库存中不存在该备件', "data": None})
-            return Response({'area': area, 'location': location, 'first': {
+                return Response({"quantity": quantity})
+            inventory = self.queryset.filter(equip_spare_id=equip_spare, equip_warehouse_area=first.equip_warehouse_area,
+                                             quantity__gt=0, equip_warehouse_location=first.equip_warehouse_location).aggregate(
+                total=Sum('quantity'))['total']
+            if inventory:
+                quantity = inventory
+            return Response({'area': area, 'location': location, 'quantity': quantity, 'first': {
                 'area_name': first.equip_warehouse_area.area_name,
                 'area_id': first.equip_warehouse_area.id,
                 'location_name': first.equip_warehouse_location.location_name,
@@ -2971,7 +3002,8 @@ class EquipAutoPlanView(APIView):
                 obj = EquipSpareErp.objects.filter(spare_code=spare_code).first()
                 if order.status in [1, 2, 3]:  # 入库单据
                     quantity = order.plan_in_quantity - order.in_quantity
-                    default = EquipWarehouseInventory.objects.filter(equip_spare__spare_code=spare_code, quantity__gt=0).first()
+                    queryset = EquipWarehouseInventory.objects.filter(equip_spare__spare_code=spare_code, quantity__gt=0)
+                    default = queryset.first()
                     area = EquipWarehouseArea.objects.filter(
                         Q(warehouse_area__equip_component_type=obj.equip_component_type) | Q(
                             warehouse_area__isnull=True)).first()
@@ -2998,24 +3030,36 @@ class EquipAutoPlanView(APIView):
                             location.insert(0, location.pop(location.index(i)))
 
                 else:  # 出库单据
-                    quantity = order.plan_out_quantity - order.out_quantity
+                    quantity = 0
+                    location_id = self.request.query_params.get('location_id')
+                    area_id = self.request.query_params.get('area_id')
+                    if location_id and area_id:
+                        inventory = EquipWarehouseInventory.objects.filter(equip_spare__spare_code=spare_code, delete_flag=False,
+                                                                           equip_warehouse_area_id=area_id, quantity__gt=0,
+                                                                           equip_warehouse_location_id=location_id).aggregate(total=Sum('quantity'))['total']
+                        if inventory:
+                            quantity = inventory
+                        return Response({"success": True, "message": None, "data": {"quantity": quantity}})
                     queryset = EquipWarehouseInventory.objects.filter(equip_spare__spare_code=spare_code, quantity__gt=0)
-                    default = queryset.filter(quantity__gt=0).first()
+                    default = queryset.first()
                     if not default:
                         return Response({"success": False, "message": '库存中不存在该备件', "data": None})
                     area_id = default.equip_warehouse_area.id
                     area_name = default.equip_warehouse_area.area_name
-                    areas = queryset.values('equip_warehouse_area__id', 'equip_warehouse_area__area_name')
+                    areas = queryset.values('equip_warehouse_area__id', 'equip_warehouse_area__area_name').distinct()
                     areas = [{'equip_warehouse_area_id': item['equip_warehouse_area__id'], 'area_name': item['equip_warehouse_area__area_name']} for item in areas]
                     res = queryset.values('equip_warehouse_location__location_name', 'equip_warehouse_location__id').distinct()
                     location = [{'id': item['equip_warehouse_location__id'],
                                  'location_name': item['equip_warehouse_location__location_name']} for item in res]
                     de_location_name = default.equip_warehouse_location.location_name
                     de_location_id = default.equip_warehouse_location.id
+                    # 当前库区的所有库位
                     # 将默认显示的库位放到第一个
                     for i in location:
                         if i['id'] == de_location_id:
                             location.insert(0, location.pop(location.index(i)))
+                            quantity = default.quantity
+                now_locations = list(default.equip_warehouse_area.equipwarehouselocation_set.filter(id__in=list(queryset.values_list('equip_warehouse_location_id', flat=True))).values('id', 'location_name')) if default else []
                 data = {
                     'id': order.id,
                     "equip_warehouse_order": order.equip_warehouse_order.id,
@@ -3025,7 +3069,7 @@ class EquipAutoPlanView(APIView):
                     'area_id': area_id,
                     'area_name': area_name,
                     'areas': areas,
-                    'location': location,
+                    'location': now_locations,
                     'de_location_id': de_location_id,  # 默认显示的库区
                     'de_location_name': de_location_name,
                     'equip_spare': order.equip_spare.id
@@ -4715,6 +4759,7 @@ class EquipOrderEntrustView(APIView):
 
 @method_decorator([api_recorder], name='dispatch')
 class EquipIndexView(APIView):
+    authentication_classes = ()
 
     @staticmethod
     def get_current_factory_date():
@@ -4821,8 +4866,13 @@ class EquipIndexView(APIView):
                     plan_trains = plan_actual_data['plan_trains'] if plan_actual_data['plan_trains'] else 0
                     # 计算所有计划开始结束时间累加
                     plan_list = Plan.objects.using(equip_no).filter(
-                        date_time=factory_date).values('starttime', 'stoptime', 'actno', 'state', 'recipe', 'setno')
+                        date_time=factory_date,
+                        actno__gt=0).values('starttime', 'stoptime', 'actno', 'state', 'recipe', 'setno')
                     time_consume = 0
+                    try:
+                        last_running_time = max([datetime.strptime(i['stoptime'], '%Y-%m-%d %H:%M:%S') for i in filter(lambda x: x['stoptime'], plan_list)])
+                    except:
+                        pass
                     for item in plan_list:
                         try:
                             finish_no = int(item['actno'])

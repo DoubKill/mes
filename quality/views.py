@@ -742,7 +742,7 @@ class LabelPrintViewSet(mixins.CreateModelMixin,
         if ip_address:
             instance = self.get_queryset().filter(label_type=station_dict.get(station), status=0, ip_address=ip_address).order_by('id').first()
         else:
-            instance = self.get_queryset().filter(label_type=station_dict.get(station), status=0).order_by('id').first()
+            instance = self.get_queryset().filter(label_type=station_dict.get(station), status=0, ip_address__isnull=True).order_by('id').first()
         if instance:
             instance.status = 2
             instance.save()
