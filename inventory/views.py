@@ -455,6 +455,7 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         l_batch_no = self.request.query_params.get("l_batch_no")
         is_entering = self.request.query_params.get("is_entering")
         tunnel = self.request.query_params.get("tunnel")
+        task_status = self.request.query_params.get("task_status")
         if location:
             filter_dict.update(location__icontains=location)
         if material_no:
@@ -563,6 +564,8 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
                     queryset = queryset.filter(pallet_no__startswith=5)
                 elif is_entering == 'N':
                     queryset = queryset.exclude(pallet_no__startswith=5)
+            if task_status:
+                queryset.filter(task_status=task_status)
             if quality_status:
                 if quality_status == '1':
                     batch_nos = list(ExamineMaterial.objects.filter(qualified=True).values_list('batch', flat=True))
@@ -645,8 +648,8 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         style = xlwt.XFStyle()
         style.alignment.wrap = 1
 
-        columns = ['No', '类型', '出入库单号', '质检条码', '巷道', '批次号', '托盘号', '是否进烘房', '供应商',
-                   '物料编码', '物料名称', '出入库数', '重量', '发起人', '发起时间', '完成时间']
+        columns = ['序号', '出库单据号', '下架任务号', '巷道编码', '追踪码', '识别卡ID', '库位码', '物料名称', '物料编码',
+                   '批次号', '创建时间', '状态', '创建人', '数量', '重量', '件数', '唛头重量']
         # 写入文件标题
         for col_num in range(len(columns)):
             sheet.write(0, col_num, columns[col_num])
@@ -654,21 +657,22 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         data_row = 1
         for i in result:
             sheet.write(data_row, 0, result.index(i) + 1)
-            sheet.write(data_row, 1, i['order_type'])
+            sheet.write(data_row, 1, i['task_no'])
             sheet.write(data_row, 2, i['order_no'])
-            sheet.write(data_row, 3, i['lot_no'])
-            sheet.write(data_row, 4, i['location'][4])
-            sheet.write(data_row, 5, i['batch_no'])
-            sheet.write(data_row, 6, i['pallet_no'])
-            sheet.write(data_row, 7, i['is_entering'])
-            sheet.write(data_row, 8, '')
-            sheet.write(data_row, 9, i['material_no'])
-            sheet.write(data_row, 10, i['material_name'])
-            sheet.write(data_row, 11, i['qty'])
-            sheet.write(data_row, 12, i['weight'])
-            sheet.write(data_row, 13, i['initiator'])
-            sheet.write(data_row, 14, i['start_time'])
-            sheet.write(data_row, 15, i['fin_time'])
+            sheet.write(data_row, 3, i['location'][4])
+            sheet.write(data_row, 4, i['lot_no'])
+            sheet.write(data_row, 5, i['pallet_no'])
+            sheet.write(data_row, 6, i['location'])
+            sheet.write(data_row, 7, i['material_name'])
+            sheet.write(data_row, 8, i['material_no'])
+            sheet.write(data_row, 9, i['batch_no'])
+            sheet.write(data_row, 10, i['start_time'])
+            sheet.write(data_row, 11, i['task_status_name'])
+            sheet.write(data_row, 12, i['initiator'])
+            sheet.write(data_row, 13, i['qty'])
+            sheet.write(data_row, 14, i['weight'])
+            sheet.write(data_row, 15, i['sl'])
+            sheet.write(data_row, 15, i['zl'])
             data_row = data_row + 1
         # 写出到IO
         output = BytesIO()

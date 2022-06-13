@@ -1464,9 +1464,13 @@ class InOutCommonSerializer(serializers.Serializer):
     initiator = serializers.SerializerMethodField()
     start_time = serializers.DateTimeField(source='task.start_time', read_only=True)
     fin_time = serializers.DateTimeField(source='task.fin_time', read_only=True)
+    task_no = serializers.CharField(source='task.order_no', read_only=True)
     order_type = serializers.SerializerMethodField()
     batch_no = serializers.CharField(max_length=64, read_only=True)
     is_entering = serializers.SerializerMethodField()
+    sl = serializers.DecimalField(max_digits=18, decimal_places=4, read_only=True)
+    zl = serializers.DecimalField(max_digits=18, decimal_places=4, read_only=True)
+    task_status_name = serializers.SerializerMethodField()
 
     def get_initiator(self, obj):
         if obj.task.initiator == 'MES':
@@ -1487,6 +1491,16 @@ class InOutCommonSerializer(serializers.Serializer):
             return "入库"
         else:
             return "出库"
+
+    def get_task_status_name(self, obj):
+        status_dict = {1: '待处理',
+                       2: '处理中',
+                       3: '完成',
+                       4: '已解绑',
+                       5: '取消',
+                       6: '异常',
+                       12: '强制完成'}
+        return status_dict.get(obj.task_status, '未知')
 
 
 class DepotModelSerializer(serializers.ModelSerializer):
