@@ -39,6 +39,7 @@ class BaseUploader(object):
     type = ""
     upload_fields = ()
     model = ''
+    filter_dict = {}
 
     def __init__(self):
         if not all([self.path, self.type, self.upload_fields, self.model]):
@@ -56,7 +57,7 @@ class BaseUploader(object):
         return resp.json()
 
     def upload(self):
-        ret = self.model.objects.exclude(id__in=self.loaded).values(*self.upload_fields)
+        ret = self.model.objects.exclude(id__in=self.loaded).filter(**self.filter_dict).values(*self.upload_fields)
         for data in ret:
             try:
                 res = self.request(data)
@@ -89,6 +90,7 @@ class WorkScheduleUploader(BaseUploader):
     type = 3
     upload_fields = ('id', 'schedule_no', 'schedule_name', 'period', 'description', 'use_flag', 'work_procedure__global_no')
     model = WorkSchedule
+    filter_dict = {"work_procedure__global_name": '密炼'}
 
 
 class ClassesDetailUploader(BaseUploader):
@@ -97,6 +99,7 @@ class ClassesDetailUploader(BaseUploader):
     type = 4
     upload_fields = ('id', 'work_schedule__schedule_no', 'classes__global_no', 'description', 'start_time', 'end_time')
     model = ClassesDetail
+    filter_dict = {"work_schedule__work_procedure__global_name": '密炼'}
 
 
 class EquipCategoryAttributeUploader(BaseUploader):
@@ -125,6 +128,7 @@ class PlanScheduleUploader(BaseUploader):
     type = 7
     upload_fields = ('id', 'plan_schedule_no', 'day_time', 'work_schedule__schedule_no')
     model = PlanSchedule
+    filter_dict = {"work_schedule__work_procedure__global_name": '密炼'}
 
 
 class WorkSchedulePlanUploader(BaseUploader):
@@ -135,6 +139,7 @@ class WorkSchedulePlanUploader(BaseUploader):
         'id', 'work_schedule_plan_no', 'classes__global_no', 'rest_flag', 'plan_schedule__plan_schedule_no',
         'group__global_no', 'start_time', 'end_time')
     model = WorkSchedulePlan
+    filter_dict = {"plan_schedule__work_schedule__work_procedure__global_name": '密炼'}
 
 
 class MaterialUploader(BaseUploader):
