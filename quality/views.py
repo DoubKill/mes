@@ -54,7 +54,7 @@ from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod
     QualifiedRangeDisplay, IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, \
     ProductReportEquip, ProductReportValue, ProductTestPlan, ProductTestPlanDetail, RubberMaxStretchTestResult, \
     LabelPrintLog, MaterialTestPlan, MaterialTestPlanDetail, MaterialDataPointIndicatorHistory, \
-    MaterialInspectionRegistration, WMSMooneyLevel
+    MaterialInspectionRegistration, WMSMooneyLevel, UnqualifiedDealOrderDetail
 
 from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestOrderSerializer, MaterialTestOrderListSerializer, \
@@ -1245,6 +1245,10 @@ class UnqualifiedDealOrderViewSet(ModelViewSet):
         queryset = UnqualifiedDealOrder.objects.order_by('-id')
         t_deal = self.request.query_params.get('t_solved')
         c_deal = self.request.query_params.get('c_solved')
+        factory_date = self.request.query_params.get('factory_date')
+        equip_no = self.request.query_params.get('equip_no')
+        classes = self.request.query_params.get('classes')
+        product_no = self.request.query_params.get('product_no')
         if t_deal == 'Y':  # 技术部门已处理
             queryset = queryset.filter(t_deal_user__isnull=False)
         elif t_deal == 'N':  # 技术部门未处理
@@ -1253,7 +1257,23 @@ class UnqualifiedDealOrderViewSet(ModelViewSet):
             queryset = queryset.filter(c_deal_user__isnull=False)
         elif c_deal == 'N':  # 检查部门未处理
             queryset = queryset.filter(c_deal_user__isnull=True)
-        return queryset
+        if factory_date:
+            ids1 = UnqualifiedDealOrderDetail.objects.filter(
+                factory_date=factory_date).values_list('unqualified_deal_order_id', flat=True)
+            queryset = queryset.filter(id__in=ids1)
+        if equip_no:
+            ids2 = UnqualifiedDealOrderDetail.objects.filter(
+                equip_no=equip_no).values_list('unqualified_deal_order_id', flat=True)
+            queryset = queryset.filter(id__in=ids2)
+        if classes:
+            ids3 = UnqualifiedDealOrderDetail.objects.filter(
+                classes=classes).values_list('unqualified_deal_order_id', flat=True)
+            queryset = queryset.filter(id__in=ids3)
+        if product_no:
+            ids4 = UnqualifiedDealOrderDetail.objects.filter(
+                product_no=product_no).values_list('unqualified_deal_order_id', flat=True)
+            queryset = queryset.filter(id__in=ids4)
+        return queryset.distinct()
 
     def get_serializer_class(self):
         if self.action == 'create':
