@@ -6680,6 +6680,14 @@ class OutboundProductInfo(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class WMSMnLevelSearchView(APIView):
 
+    def get(self, request):
+        task_no = self.request.query_params.get('task_no')
+        hs = WMSOutboundHistory.objects.filter(task_no=task_no).values()
+        if hs:
+            return Response(hs[0])
+        else:
+            return Response({})
+
     def post(self, request):
         order_nos = self.request.data.get('order_nos')  # 下架任务号列表
         if not isinstance(order_nos, list):
