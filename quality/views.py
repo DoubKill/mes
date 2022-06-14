@@ -293,6 +293,7 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
             delete_flag=False
         ).values('data_point__name', 'upper_limit', 'lower_limit')
         indicators_data_dict = {i['data_point__name']: i for i in indicators_data}
+        sheet.cell(2, 1).value = product_no
         sheet.cell(5, 7).value = indicators_data_dict.get('MH', {}).get('upper_limit')
         sheet.cell(6, 7).value = indicators_data_dict.get('MH', {}).get('lower_limit')
         sheet.cell(5, 8).value = indicators_data_dict.get('ML', {}).get('upper_limit')
@@ -321,6 +322,7 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
                     delete_flag=False
                 ).values('data_point__name', 'upper_limit', 'lower_limit')
                 indicators_data_dict = {i['data_point__name']: i for i in indicators_data}
+                sheet.cell(2, 1).value = product_no
                 sheet.cell(5, 7).value = indicators_data_dict.get('MH', {}).get('upper_limit')
                 sheet.cell(6, 7).value = indicators_data_dict.get('MH', {}).get('lower_limit')
                 sheet.cell(5, 8).value = indicators_data_dict.get('ML', {}).get('upper_limit')
