@@ -1162,6 +1162,8 @@ class ImportAndExportView(APIView):
         equip_no = production_data[4].strip()
         # 班组
         group = production_data[5].strip()
+        if not group:
+            raise ValidationError('请输入班组！')
         # 取数据点
         reverse_dict = {value: key for key, value in by_dict.items()}
         data_points = [reverse_dict.get(i) for i in range(7, 20) if production_data[i]]
@@ -1228,6 +1230,7 @@ class ImportAndExportView(APIView):
                 validated_data['production_class'] = classes
                 validated_data['production_equip_no'] = equip_no
                 validated_data['production_factory_date'] = factory_date
+                validated_data['production_group'] = group
                 instance, created = MaterialTestOrder.objects.get_or_create(
                     defaults=validated_data, **{'lot_no': lot_no,
                                                 'actual_trains': actual_trains})
