@@ -503,14 +503,10 @@ class MaterialTestOrderListSerializer(BaseModelSerializer):
 
 
 class MaterialTestResultExportSerializer(BaseModelSerializer):
-    upper_lower = serializers.SerializerMethodField(read_only=True)
-
-    def get_upper_lower(self, obj):
-        return f'{obj.judged_lower_limit}-{obj.judged_upper_limit}'
 
     class Meta:
         model = MaterialTestResult
-        fields = ('value', 'data_point_name', 'level', 'upper_lower')
+        fields = ('value', 'data_point_name')
         extra_kwargs = {
                     'value': {'coerce_to_string': False},
                 }
@@ -518,23 +514,6 @@ class MaterialTestResultExportSerializer(BaseModelSerializer):
 
 class MaterialTestOrderExportSerializer(BaseModelSerializer):
     order_results = MaterialTestResultExportSerializer(many=True)
-
-    # def to_representation(self, instance):
-    #     data = super().to_representation(instance)
-    #     order_results = data['order_results']
-    #     ret = {'ML(1+4)': {'value': '', 'upper_lower': '', 'level': ''},
-    #            '比重值': {'value': '', 'upper_lower': '', 'level': ''},
-    #            '硬度值': {'value': '', 'upper_lower': '', 'level': ''},
-    #            'MH': {'value': '', 'upper_lower': '', 'level': ''},
-    #            'ML': {'value': '', 'upper_lower': '', 'level': ''},
-    #            'TC10': {'value': '', 'upper_lower': '', 'level': ''},
-    #            'TC50': {'value': '', 'upper_lower': '', 'level': ''},
-    #            'TC90': {'value': '', 'upper_lower': '', 'level': ''}}
-    #     for item in order_results:
-    #         data_point = item['data_point_name']
-    #         ret[data_point] = item
-    #     data['order_results'] = ret
-    #     return data
 
     class Meta:
         model = MaterialTestOrder

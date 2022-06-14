@@ -282,62 +282,79 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
         wb = load_workbook('xlsx_template/product_test_result.xlsx')
         ws = wb.worksheets[0]
         sheet = wb.copy_worksheet(ws)
-        data_row = 3
+        data_row = 7
         if not result:
             return Response('暂无数据！')
         product_no = result[0]['product_no']
         sheet.title = product_no
-
+        indicators_data = MaterialDataPointIndicator.objects.filter(
+            material_test_method__material__material_no=product_no,
+            level=1,
+            delete_flag=False
+        ).values('data_point__name', 'upper_limit', 'lower_limit')
+        indicators_data_dict = {i['data_point__name']: i for i in indicators_data}
+        sheet.cell(5, 7).value = indicators_data_dict.get('MH', {}).get('upper_limit')
+        sheet.cell(6, 7).value = indicators_data_dict.get('MH', {}).get('lower_limit')
+        sheet.cell(5, 8).value = indicators_data_dict.get('ML', {}).get('upper_limit')
+        sheet.cell(6, 8).value = indicators_data_dict.get('ML', {}).get('lower_limit')
+        sheet.cell(5, 9).value = indicators_data_dict.get('TC10', {}).get('upper_limit')
+        sheet.cell(6, 9).value = indicators_data_dict.get('TC10', {}).get('lower_limit')
+        sheet.cell(5, 10).value = indicators_data_dict.get('TC50', {}).get('upper_limit')
+        sheet.cell(6, 10).value = indicators_data_dict.get('TC50', {}).get('lower_limit')
+        sheet.cell(5, 11).value = indicators_data_dict.get('TC90', {}).get('upper_limit')
+        sheet.cell(6, 11).value = indicators_data_dict.get('TC90', {}).get('lower_limit')
+        sheet.cell(5, 12).value = indicators_data_dict.get('比重值', {}).get('upper_limit')
+        sheet.cell(6, 12).value = indicators_data_dict.get('比重值', {}).get('lower_limit')
+        sheet.cell(5, 13).value = indicators_data_dict.get('ML(1+4)', {}).get('upper_limit')
+        sheet.cell(6, 13).value = indicators_data_dict.get('ML(1+4)', {}).get('lower_limit')
+        sheet.cell(5, 14).value = indicators_data_dict.get('硬度值', {}).get('upper_limit')
+        sheet.cell(6, 14).value = indicators_data_dict.get('硬度值', {}).get('lower_limit')
         for i in result:
             if i['product_no'] != product_no:
                 product_no = i['product_no']
                 sheet = wb.copy_worksheet(ws)
                 sheet.title = product_no
-                data_row = 3
+                data_row = 7
+                indicators_data = MaterialDataPointIndicator.objects.filter(
+                    material_test_method__material__material_no=product_no,
+                    level=1,
+                    delete_flag=False
+                ).values('data_point__name', 'upper_limit', 'lower_limit')
+                indicators_data_dict = {i['data_point__name']: i for i in indicators_data}
+                sheet.cell(5, 7).value = indicators_data_dict.get('MH', {}).get('upper_limit')
+                sheet.cell(6, 7).value = indicators_data_dict.get('MH', {}).get('lower_limit')
+                sheet.cell(5, 8).value = indicators_data_dict.get('ML', {}).get('upper_limit')
+                sheet.cell(6, 8).value = indicators_data_dict.get('ML', {}).get('lower_limit')
+                sheet.cell(5, 9).value = indicators_data_dict.get('TC10', {}).get('upper_limit')
+                sheet.cell(6, 9).value = indicators_data_dict.get('TC10', {}).get('lower_limit')
+                sheet.cell(5, 10).value = indicators_data_dict.get('TC50', {}).get('upper_limit')
+                sheet.cell(6, 10).value = indicators_data_dict.get('TC50', {}).get('lower_limit')
+                sheet.cell(5, 11).value = indicators_data_dict.get('TC90', {}).get('upper_limit')
+                sheet.cell(6, 11).value = indicators_data_dict.get('TC90', {}).get('lower_limit')
+                sheet.cell(5, 12).value = indicators_data_dict.get('比重值', {}).get('upper_limit')
+                sheet.cell(6, 12).value = indicators_data_dict.get('比重值', {}).get('lower_limit')
+                sheet.cell(5, 13).value = indicators_data_dict.get('ML(1+4)', {}).get('upper_limit')
+                sheet.cell(6, 13).value = indicators_data_dict.get('ML(1+4)', {}).get('lower_limit')
+                sheet.cell(5, 14).value = indicators_data_dict.get('硬度值', {}).get('upper_limit')
+                sheet.cell(6, 14).value = indicators_data_dict.get('硬度值', {}).get('lower_limit')
             order_results = i['order_results']
-            ret = {'ML(1+4)': {'value': '', 'upper_lower': '', 'level': ''},
-                   '比重值': {'value': '', 'upper_lower': '', 'level': ''},
-                   '硬度值': {'value': '', 'upper_lower': '', 'level': ''},
-                   'MH': {'value': '', 'upper_lower': '', 'level': ''},
-                   'ML': {'value': '', 'upper_lower': '', 'level': ''},
-                   'TC10': {'value': '', 'upper_lower': '', 'level': ''},
-                   'TC50': {'value': '', 'upper_lower': '', 'level': ''},
-                   'TC90': {'value': '', 'upper_lower': '', 'level': ''}}
-            for item in order_results:
-                data_point = item['data_point_name']
-                ret[data_point] = item
+            ret = {i['data_point_name']: i['value'] for i in order_results}
             sheet.cell(data_row, 1).value = i['product_no']
             sheet.cell(data_row, 2).value = i['production_factory_date']
-            sheet.cell(data_row, 3).value = '{}/{}'.format(i['production_class'], i['production_group'])
-            sheet.cell(data_row, 4).value = i['production_equip_no']
-            sheet.cell(data_row, 5).value = i['actual_trains']
-            sheet.cell(data_row, 6).value = ret['ML(1+4)']['value']
-            sheet.cell(data_row, 7).value = ret['ML(1+4)']['upper_lower']
-            sheet.cell(data_row, 8).value = ret['ML(1+4)']['level']
-            sheet.cell(data_row, 9).value = ret['比重值']['value']
-            sheet.cell(data_row, 10).value = ret['比重值']['upper_lower']
-            sheet.cell(data_row, 11).value = ret['比重值']['level']
-            sheet.cell(data_row, 12).value = ret['硬度值']['value']
-            sheet.cell(data_row, 13).value = ret['硬度值']['upper_lower']
-            sheet.cell(data_row, 14).value = ret['硬度值']['level']
-            sheet.cell(data_row, 15).value = ret['MH']['value']
-            sheet.cell(data_row, 16).value = ret['MH']['upper_lower']
-            sheet.cell(data_row, 17).value = ret['MH']['level']
-            sheet.cell(data_row, 18).value = ret['ML']['value']
-            sheet.cell(data_row, 19).value = ret['ML']['upper_lower']
-            sheet.cell(data_row, 20).value = ret['ML']['level']
-            sheet.cell(data_row, 21).value = ret['TC10']['value']
-            sheet.cell(data_row, 22).value = ret['TC10']['upper_lower']
-            sheet.cell(data_row, 23).value = ret['TC10']['level']
-            sheet.cell(data_row, 24).value = ret['TC50']['value']
-            sheet.cell(data_row, 25).value = ret['TC50']['upper_lower']
-            sheet.cell(data_row, 26).value = ret['TC50']['level']
-            sheet.cell(data_row, 27).value = ret['TC90']['value']
-            sheet.cell(data_row, 28).value = ret['TC90']['upper_lower']
-            sheet.cell(data_row, 29).value = ret['TC90']['level']
-            sheet.cell(data_row, 30).value = 'Y' if i['is_qualified'] else 'N'
+            sheet.cell(data_row, 3).value = i['production_class']
+            sheet.cell(data_row, 4).value = i['production_group']
+            sheet.cell(data_row, 5).value = i['production_equip_no']
+            sheet.cell(data_row, 6).value = i['actual_trains']
+            sheet.cell(data_row, 7).value = ret.get('MH')
+            sheet.cell(data_row, 8).value = ret.get('ML')
+            sheet.cell(data_row, 9).value = ret.get('TC10')
+            sheet.cell(data_row, 10).value = ret.get('TC50')
+            sheet.cell(data_row, 11).value = ret.get('TC90')
+            sheet.cell(data_row, 12).value = ret.get('比重值')
+            sheet.cell(data_row, 13).value = ret.get('ML(1+4)')
+            sheet.cell(data_row, 14).value = ret.get('硬度值')
+            sheet.cell(data_row, 15).value = 'Y' if i['is_qualified'] else 'N'
             data_row = data_row + 1
-
         wb.remove_sheet(ws)
         output = BytesIO()
         wb.save(output)
