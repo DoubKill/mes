@@ -20,7 +20,7 @@ django.setup()
 import pymssql
 import logging
 logger = logging.getLogger('quality_log')
-
+from quality.utils import gen_pallet_test_result
 from quality.models import ZCKJConfig, ProductTestPlanDetail, ProductTestPlan, MaterialDataPointIndicator, \
     MaterialTestResult, MaterialTestMethod, MaterialTestOrder, ProductReportEquip
 from production.models import PalletFeedbacks
@@ -39,6 +39,7 @@ def get_rids(server, user, password, database, machine_no, rid, test_time):
 
 
 def main():
+    lot_nos = []
     for config in ZCKJConfig.objects.filter(use_flag=True):
 
         for sub_machine in config.sub_machines.all():
@@ -151,23 +152,22 @@ def main():
 
                         for pallet in pallets:
                             lot_no = pallet.lot_no
-
-                            # 车次检测单
-                            test_order = MaterialTestOrder.objects.filter(
-                                lot_no=lot_no, actual_trains=train).first()
-                            if not test_order:
-                                test_order = MaterialTestOrder.objects.create(
-                                    lot_no=lot_no,
-                                    material_test_order_uid=uuid.uuid1(),
-                                    actual_trains=train,
-                                    product_no=product_no,
-                                    plan_classes_uid=pallet.plan_classes_uid,
-                                    production_class=production_class,
-                                    production_group=production_group,
-                                    production_equip_no=equip_no,
-                                    production_factory_date=factory_date
-                                )
-
+                            lot_nos.append(lot_no)
+                            test_order_data = {
+                                                "lot_no": lot_no,
+                                                'material_test_order_uid':  uuid.uuid1(),
+                                                'actual_trains':  train,
+                                                'product_no':  product_no,
+                                                'plan_classes_uid':  pallet.plan_classes_uid,
+                                                'production_class':  production_class,
+                                                'production_group':  production_group,
+                                                'production_equip_no':  equip_no,
+                                                'production_factory_date':  factory_date}
+                            test_order, created = MaterialTestOrder.objects.get_or_create(
+                                defaults=test_order_data, **{'lot_no': lot_no,
+                                                             'actual_trains': train})
+                            if not created:
+                                test_order.order_results.filter(data_point_name=data_point_name).delete()
                             # 创建数据点检测结果
                             MaterialTestResult.objects.create(
                                 material_test_order=test_order,
@@ -214,6 +214,7 @@ def main():
             if rids:
                 sub_machine.max_rid = rids[-1]
                 sub_machine.save()
+    gen_pallet_test_result(lot_nos)
 
 
 if __name__ == '__main__':

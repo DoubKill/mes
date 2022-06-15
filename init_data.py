@@ -1005,7 +1005,7 @@ permission_data = [
     {'id': 1012, 'code': 'accept_d_equip_apply_order', 'name': '补卡申请', 'parent_id': 1004},
     {'id': 1013, 'code': 'export_d_equip_apply_order', 'name': '加班申请', 'parent_id': 1004},
 
-    {'id': 1014, 'code': 'wms_mooney_level', 'name': '物料门尼值等级管理', 'parent_id': None},
+    {'id': 1014, 'code': 'wms_mooney_level', 'name': '原材料门尼值等级管理', 'parent_id': None},
     {'id': 1015, 'code': 'view_wms_mooney_level', 'name': '查看', 'parent_id': 1014},
     {'id': 1016, 'code': 'change_wms_mooney_level', 'name': '修改', 'parent_id': 1014},
 
