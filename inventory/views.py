@@ -2837,11 +2837,11 @@ class WmsInventoryStockView(APIView):
                         l_lower_limit_value = level_data['l_lower_limit_value'] if level_data['l_lower_limit_value'] else 0
                         l_upper_limit_value = level_data['l_upper_limit_value'] if level_data['l_upper_limit_value'] else 0
                         if h_lower_limit_value <= ml_test_value <= h_upper_limit_value:
-                            mn_level = '高级'
+                            mn_level = '高门尼'
                         elif m_lower_limit_value <= ml_test_value <= m_upper_limit_value:
-                            mn_level = '中级'
+                            mn_level = '标准门尼'
                         elif l_lower_limit_value <= ml_test_value <= l_upper_limit_value:
-                            mn_level = '低级'
+                            mn_level = '低门尼'
             result.append(
                 {'StockDetailState': item[0],
                  'MaterialCode': item[1],
