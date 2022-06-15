@@ -864,11 +864,11 @@ class WmsInventoryStockSerializer(serializers.ModelSerializer):
         l_lower_limit_value = wms_mooney_level.l_lower_limit_value if wms_mooney_level.l_lower_limit_value else 0
         l_upper_limit_value = wms_mooney_level.l_upper_limit_value if wms_mooney_level.l_upper_limit_value else 0
         if h_lower_limit_value <= ml_test_value <= h_upper_limit_value:
-            return '高级'
+            return '高门尼'
         elif m_lower_limit_value <= ml_test_value <= m_upper_limit_value:
-            return '中级'
+            return '标准门尼'
         elif l_lower_limit_value <= ml_test_value <= l_upper_limit_value:
-            return '低级'
+            return '低门尼'
         else:
             return ""
 
