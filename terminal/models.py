@@ -650,7 +650,7 @@ class JZPlan(models.Model):
     starttime = models.CharField(max_length=19, help_text='起始时间，写入后会被上位机更新', blank=True, null=True)
     stoptime = models.CharField(max_length=19, help_text='结束时间，不用写上位机更新', blank=True, null=True)
     grouptime = models.CharField(max_length=4, help_text='班时：早班、中班、晚班', blank=True, null=True)
-    oper = models.CharField(max_length=8, help_text='操作员', blank=True, null=True)
+    oper = models.CharField(max_length=16, help_text='操作员', blank=True, null=True)
     state = models.CharField(max_length=4, help_text='完成、终止、等待、运行')
     setno = models.IntegerField(help_text='设定车次')
     actno = models.IntegerField(blank=True, help_text='完成车次，写0', null=True)

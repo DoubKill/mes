@@ -420,7 +420,7 @@ class LoadMaterialLogViewSet(TerminalCreateAPIView,
             change_num = float(records.adjust_left_weight) - left_weight
             variety = float(records.variety) - change_num
             # 数量变换取值[累加](包数：[负整框:10], 重量：[负整框:100])
-            beyond = 10 if records.unit == '包' else 100
+            beyond = 30 if records.unit == '包' else 400
             if variety > beyond or variety + float(records.init_weight) < 0:
                 return response(success=False, message='修改值达到上限,不可修改')
             records.variety = float(records.variety) - change_num
@@ -3021,19 +3021,24 @@ class MaterialInfoIssue(APIView):
                 try:
                     if material_info.objects.using(equip_no).filter(name=m.material_name):
                         continue
-                    last_m_info = material_info.objects.using(equip_no).order_by('id').last()
-                    if last_m_info:
-                        m_id = last_m_info.id + 1
-                    else:
-                        m_id = 1
-                    instance = material_info.objects.using(equip_no).create(
-                        id=m_id, name=m.material_name, remark='MES', code=m.material_name if not code else code, use_not=0,
-                        time=datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    )
-                    # 嘉正称量系统需要同步中间表数据
-                    if code:
+                    if code:  # # 嘉正称量系统需要同步中间表数据
+                        instance = material_info.objects.using(equip_no).create(
+                            name=m.material_name, remark='MES',
+                            code=code, use_not=0,
+                            time=datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        )
                         jz = JZCLSystem(equip_no)
                         res = jz.notice(table_seq=5, table_id=instance.id, opera_type=1)
+                    else:
+                        last_m_info = material_info.objects.using(equip_no).order_by('id').last()
+                        if last_m_info:
+                            m_id = last_m_info.id + 1
+                        else:
+                            m_id = 1
+                        instance = material_info.objects.using(equip_no).create(
+                            id=m_id, name=m.material_name, remark='MES', code=m.material_name if not code else code, use_not=0,
+                            time=datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        )
                 except Exception as e:
                     raise ValidationError(f'通知称量系统{equip_no}新增物料失败')
         return Response('成功')

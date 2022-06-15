@@ -1660,6 +1660,7 @@ class PlanSerializer(serializers.ModelSerializer):
         validated_data['planid'] = datetime.now().strftime('%Y%m%d%H%M%S')[2:]
         validated_data['state'] = '等待'
         validated_data['actno'] = 0
+        validated_data['oper'] = self.context['request'].user.username
         validated_data['addtime'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         # 查询配方的合包状态
         recipe = RecipePre.objects.using(equip_no).filter(name=validated_data['recipe']).first()
@@ -1729,6 +1730,10 @@ class JZPlanSerializer(serializers.ModelSerializer):
         validated_data['planid'] = prefix + ('0001' if not max_plan_id else '%04d' % (int(max_plan_id[-4:]) + 1))
         validated_data['state'] = '等待'
         validated_data['actno'] = 0
+        validated_data['starttime'] = None
+        validated_data['stoptime'] = None
+        validated_data['downtime'] = None
+        validated_data['oper'] = self.context['request'].user.username
         validated_data['addtime'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         # 查询配方的合包状态
         recipe = pre_model.objects.using(equip_no).filter(name=validated_data['recipe']).first()
@@ -1746,7 +1751,8 @@ class JZPlanSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = JZPlan
-        read_only_fields = ('planid', 'state', 'actno', 'order_by', 'addtime', 'starttime', 'stoptime', 'oper')
+        read_only_fields = ('planid', 'state', 'actno', 'order_by', 'addtime', 'starttime', 'stoptime', 'oper',
+                            'downtime', 'create_flag')
         fields = '__all__'
 
 

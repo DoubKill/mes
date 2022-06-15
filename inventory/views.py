@@ -760,6 +760,7 @@ class AdditionalPrintView(APIView):
         }
         for single_data in data:
             # 有条码直接打印, 无条码生成新码
+            enable_ip = single_data.pop('enable_ip', '')
             location = single_data.get('location')
             station = single_data.get('station')
             material_no = single_data.get('material_no')
@@ -791,7 +792,8 @@ class AdditionalPrintView(APIView):
                     label.update({"equip_no": data.equip_no, "classes_group": f"{data.classes}/{group}",
                                   "actual_trains": f"{data.begin_trains}/{data.end_trains}"})
                 label = json.dumps(label)
-            LabelPrint.objects.create(label_type=station_dict.get(station), lot_no=lot_no, status=0, data=label, ip_address=get_real_ip(self.request.META))
+            ip_address = get_real_ip(self.request.META) if enable_ip else None
+            LabelPrint.objects.create(label_type=station_dict.get(station), lot_no=lot_no, status=0, data=label, ip_address=ip_address)
         return Response('下发打印完成')
 
 
