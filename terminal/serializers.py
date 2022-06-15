@@ -1587,10 +1587,8 @@ class MaterialInfoSerializer(serializers.ModelSerializer):
         equip_no = validated_data.pop('equip_no')
         validated_data['time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         try:
-            if equip_no in JZ_EQUIP_NO:
-                instance = JZMaterialInfo.objects.using(equip_no).create(**validated_data)
-            else:
-                instance = MaterialInfo.objects.using(equip_no).create(**validated_data)
+            material_model = JZMaterialInfo if equip_no in JZ_EQUIP_NO else MaterialInfo
+            instance = material_model.objects.using(equip_no).create(**validated_data)
         except ConnectionDoesNotExist:
             raise serializers.ValidationError('称量机台{}服务错误！'.format(equip_no))
         except Exception:

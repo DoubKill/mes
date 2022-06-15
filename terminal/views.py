@@ -552,7 +552,7 @@ class WeightTankStatusViewSet(CommonDeleteMixin, ModelViewSet):
     """
     物料罐列表
     """
-    queryset = WeightTankStatus.objects.all()
+    queryset = WeightTankStatus.objects.all().order_by('id')
     pagination_class = None
     permission_classes = (IsAuthenticated,)
     filter_backends = [DjangoFilterBackend]
@@ -1638,10 +1638,8 @@ class XLMaterialVIewSet(GenericViewSet,
         if use_not:
             filter_kwargs['use_not'] = use_not
         try:
-            if equip_no in JZ_EQUIP_NO:
-                ret = list(JZMaterialInfo.objects.using(equip_no).filter(**filter_kwargs).values())
-            else:
-                ret = list(MaterialInfo.objects.using(equip_no).filter(**filter_kwargs).values())
+            material_model = JZMaterialInfo if equip_no in JZ_EQUIP_NO else MaterialInfo
+            ret = list(material_model.objects.using(equip_no).filter(**filter_kwargs).values())
         except Exception:
             raise ValidationError('称量机台{}服务错误！'.format(equip_no))
         return Response(ret)
@@ -1665,10 +1663,8 @@ class XLBinVIewSet(GenericViewSet, ListModelMixin):
         if not equip_no:
             raise ValidationError('参数缺失')
         try:
-            if equip_no in JZ_EQUIP_NO:
-                data = list(JZBin.objects.using(equip_no).values())
-            else:
-                data = list(Bin.objects.using(equip_no).values())
+            bin_model = JZBin if equip_no in JZ_EQUIP_NO else Bin
+            data = list(bin_model.objects.using(equip_no).values())
         except Exception:
             raise ValidationError('称量机台{}服务错误！'.format(equip_no))
         ret = {'A': [], 'B': []}
@@ -2183,10 +2179,8 @@ class ReportBasicView(ListAPIView):
         if recipe:
             filter_kwargs['recipe__icontains'] = recipe
 
-        if equip_no in JZ_EQUIP_NO:
-            queryset = JZReportBasic.objects.using(equip_no).filter(**filter_kwargs)
-        else:
-            queryset = ReportBasic.objects.using(equip_no).filter(**filter_kwargs)
+        basic_model = JZReportBasic if equip_no in JZ_EQUIP_NO else ReportBasic
+        queryset = basic_model.objects.using(equip_no).filter(**filter_kwargs)
         try:
             page = self.paginate_queryset(queryset)
             serializer = self.get_serializer(page, many=True)
@@ -2382,10 +2376,8 @@ class ReportWeightViewStaticsView(APIView):
         if diff > 31:
             raise ValidationError('查询周期不可超过31天')
         try:
-            if equip_no in JZ_EQUIP_NO:
-                data = JZReportWeight.objects.using(equip_no).filter(~Q(material='总重量'), weight_time__gte=st, weight_time__lte=et)
-            else:
-                data = ReportWeight.objects.using(equip_no).filter(~Q(material='总重量'), 时间__gte=st, 时间__lte=et)
+            weight_model = JZReportWeight if equip_no in JZ_EQUIP_NO else ReportWeight
+            data = weight_model.objects.using(equip_no).filter(~Q(material='总重量'), 时间__gte=st, 时间__lte=et)
             results = data.values('material').annotate(material_total_weight=Sum('act_weight')).values('material', 'material_total_weight')
             total_weight = sum(data.values_list('act_weight', flat=True))
         except Exception as e:
