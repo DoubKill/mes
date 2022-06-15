@@ -1,6 +1,7 @@
 import datetime
 import re
 import time
+import logging
 from datetime import timedelta
 from decimal import Decimal
 
@@ -26,7 +27,7 @@ from equipment.models import EquipMachineHaltType
 from equipment.serializers import EquipApplyRepairSerializer
 from inventory.models import MaterialOutHistory
 from mes.common_code import CommonDeleteMixin, TerminalCreateAPIView, response, SqlClient
-from mes.conf import TH_CONF
+from mes.conf import TH_CONF, JZ_EQUIP_NO
 from mes.derorators import api_recorder
 from mes.permissions import PermissionClass
 from mes.settings import DATABASES
@@ -43,7 +44,8 @@ from terminal.models import TerminalLocation, EquipOperationLog, WeightBatchingL
     FeedingOperationLog, CarbonTankFeedingPrompt, OilTankSetting, PowderTankSetting, CarbonTankFeedWeightSet, \
     ReplaceMaterial, ReturnRubber, ToleranceDistinguish, ToleranceProject, ToleranceHandle, ToleranceRule, \
     WeightPackageManual, WeightPackageSingle, WeightPackageWms, OtherMaterialLog, EquipHaltReason, \
-    WeightPackageLogManualDetails, WmsAddPrint
+    WeightPackageLogManualDetails, WmsAddPrint, JZReportWeight, JZMaterialInfo, JZBin, JZReportBasic, JZPlan, \
+    JZRecipeMaterial, JZRecipePre
 from terminal.serializers import LoadMaterialLogCreateSerializer, \
     EquipOperationLogSerializer, BatchingClassesEquipPlanSerializer, WeightBatchingLogSerializer, \
     WeightBatchingLogCreateSerializer, FeedingLogSerializer, WeightTankStatusSerializer, \
@@ -56,9 +58,12 @@ from terminal.serializers import LoadMaterialLogCreateSerializer, \
     CarbonTankSetUpdateSerializer, FeedingOperationLogSerializer, CarbonFeedingPromptSerializer, \
     CarbonFeedingPromptCreateSerializer, PowderTankSettingSerializer, OilTankSettingSerializer, \
     ReplaceMaterialSerializer, ReturnRubberSerializer, ToleranceRuleSerializer, WeightPackageManualSerializer, \
-    WeightPackageSingleSerializer, WeightPackageLogCUpdateSerializer, WmsAddPrintSerializer
+    WeightPackageSingleSerializer, WeightPackageLogCUpdateSerializer, WmsAddPrintSerializer, JZBinSerializer, \
+    JZPlanSerializer, JZPlanUpdateSerializer
 from terminal.utils import TankStatusSync, CarbonDeliverySystem, out_task_carbon, get_tolerance, material_out_barcode, \
-    get_manual_materials, CLSystem, get_common_equip, xl_c_calculate
+    get_manual_materials, CLSystem, get_common_equip, xl_c_calculate, JZCLSystem, JZTankStatusSync
+
+logger = logging.getLogger('sync_log')
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -489,11 +494,16 @@ class WeightBatchingLogViewSet(TerminalCreateAPIView, mixins.ListModelMixin, Gen
             return response(success=False, message=instance.failed_reason)
         # 开门
         try:
-            tank_status_sync = TankStatusSync(equip_no=equip_no)
-            tank_no = instance.tank_no
-            tank_num = tank_no[:len(tank_no) - 1]
-            kwargs = {'signal_a': tank_num} if tank_no.endswith('A') else {'signal_b': tank_num}
-            tank_status_sync.sync(**kwargs)
+            if equip_no in JZ_EQUIP_NO:
+                tank_status_sync = JZTankStatusSync(equip_no=equip_no)
+                tank_no = instance.tank_no
+                tank_status_sync.sync(tank_no)
+            else:
+                tank_status_sync = TankStatusSync(equip_no=equip_no)
+                tank_no = instance.tank_no
+                tank_num = tank_no[:len(tank_no) - 1]
+                kwargs = {'signal_a': tank_num} if tank_no.endswith('A') else {'signal_b': tank_num}
+                tank_status_sync.sync(**kwargs)
         except:
             return response(success=False, message='打开料罐门失败！')
         # 开门成功判断次数并记录时间(公共变量(料罐扫码限制)设定)
@@ -615,7 +625,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
             e_time = datetime.datetime.strptime(e_time, '%Y-%m-%d')
             if (e_time - s_time).days > 15:
                 raise ValidationError('筛选日期不可大于15天')
-        db_config = [k for k, v in DATABASES.items() if 'YK_XL' in v['NAME']]
+        db_config = [k for k, v in DATABASES.items() if 'YK_XL' in v['NAME'] or 'MWDS' in v['NAME']]
         if equip_no not in db_config:
             return Response([])
         # mes网页请求
@@ -625,7 +635,8 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
             weight_filter_kwargs.update({'product_no': product_no})
             plan_filter_kwargs.update({'recipe': product_no})
         # 获取称量系统生产计划数据
-        equip_plan_info = Plan.objects.using(equip_no).filter(**plan_filter_kwargs)
+        plan_model = JZPlan if equip_no in JZ_EQUIP_NO else Plan
+        equip_plan_info = plan_model.objects.using(equip_no).filter(**plan_filter_kwargs)
         # 履历表中已生成的record(plan表主键)
         ids = list(set(self.get_queryset().filter(**weight_filter_kwargs).values_list('record', flat=True)))
         # 打印履历表为空(全是未打印数据)
@@ -662,7 +673,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                     else:
                         # 已经打印数据数据更新(打印时完成了50包, 最终计划完成100包)
                         if k.package_fufil != k.package_plan_count:
-                            get_status = Plan.objects.using(equip_no).filter(planid=k.plan_weight_uid).first()
+                            get_status = plan_model.objects.using(equip_no).filter(planid=k.plan_weight_uid).first()
                             if get_status:
                                 k.package_fufil = get_status.actno
                                 # 更新未打印数量
@@ -696,7 +707,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                     else:
                         # 已经打印数据数据更新(打印时完成了50包, 最终计划完成100包)
                         if k.package_fufil != k.package_plan_count:
-                            get_status = Plan.objects.using(equip_no).filter(planid=k.plan_weight_uid).first()
+                            get_status = plan_model.objects.using(equip_no).filter(planid=k.plan_weight_uid).first()
                             if get_status:
                                 k.package_fufil = get_status.actno
                                 # 更新未打印数量
@@ -717,7 +728,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
             for k in already_print:
                 # 已经打印数据数据更新(打印时完成了50包, 最终计划完成100包)
                 if k.package_fufil != k.package_plan_count:
-                    get_status = Plan.objects.using(equip_no).filter(planid=k.plan_weight_uid).first()
+                    get_status = plan_model.objects.using(equip_no).filter(planid=k.plan_weight_uid).first()
                     if get_status:
                         k.package_fufil = get_status.actno
                         # 更新未打印数量
@@ -900,7 +911,8 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         return check_type, manual.id
 
     def handle_machine_print(self, equip_no, i, now_date):
-        recipe_pre = RecipePre.objects.using(equip_no).filter(name=i['product_no'])
+        pre_model, material_model = [JZRecipePre, JZRecipeMaterial] if equip_no in JZ_EQUIP_NO else [RecipePre, RecipeMaterial]
+        recipe_pre = pre_model.objects.using(equip_no).filter(name=i['product_no'])
         dev_type = recipe_pre.first().ver.upper().strip() if recipe_pre else ''
         plan_weight = recipe_pre.first().weight if recipe_pre else 0
         split_count = 1 if not recipe_pre else recipe_pre.first().split_count
@@ -951,7 +963,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         if not ml_equip_no:
             i.update({'display_manual_info': msg})
         else:
-            machine_materials = list(RecipeMaterial.objects.using(equip_no).filter(recipe_name=i['product_no']).values_list('name', flat=True))
+            machine_materials = list(material_model.objects.using(equip_no).filter(recipe_name=i['product_no']).values_list('name', flat=True))
             batch_info_res = []
             batch_info = ProductBatchingEquip.objects.filter(
                 ~Q(Q(feeding_mode__startswith='C') | Q(feeding_mode__startswith='P')),
@@ -1251,10 +1263,11 @@ class GetXlRecipesInfoView(APIView):
 
     def get(self, request):
         data = {}
-        db_config = [k for k, v in DATABASES.items() if 'YK_XL' in v['NAME']]
+        db_config = [k for k, v in DATABASES.items() if 'YK_XL' in v['NAME'] or 'MWDS' in v['NAME']]
         for batching_equip in db_config:
             try:
-                all_recipes = RecipePre.objects.using(batching_equip).filter(use_not=0)
+                recipe_model = JZRecipePre if batching_equip in JZ_EQUIP_NO else RecipePre
+                all_recipes = recipe_model.objects.using(batching_equip).filter(use_not=0)
                 for i in all_recipes:
                     if i.name not in data:
                         data[i.name] = {'batching_equip': [batching_equip], 'dev_type': i.ver, 'product_no': i.name}
@@ -1308,10 +1321,13 @@ class PackageExpireView(APIView):
         package_expire_recipe = PackageExpire.objects.all().values_list('product_name', flat=True).distinct()
         all_product_no = []
         # 获取所有称量系统配方号
-        equip_list = [k for k, v in DATABASES.items() if 'YK_XL' in v.get('NAME')]
+        equip_list = [k for k, v in DATABASES.items() if 'YK_XL' in v.get('NAME') or 'MDWS' in v.get('NAME')]
         for equip in equip_list:
             try:
-                single_equip_recipe = list(RecipePre.objects.using(equip).filter(use_not=0).values_list('name', flat=True).distinct())
+                if equip in JZ_EQUIP_NO:
+                    single_equip_recipe = list(JZRecipePre.objects.using(equip).filter(use_not=0).values_list('name', flat=True).distinct())
+                else:
+                    single_equip_recipe = list(RecipePre.objects.using(equip).filter(use_not=0).values_list('name', flat=True).distinct())
             except:
                 # 机台连不上
                 continue
@@ -1622,7 +1638,10 @@ class XLMaterialVIewSet(GenericViewSet,
         if use_not:
             filter_kwargs['use_not'] = use_not
         try:
-            ret = list(MaterialInfo.objects.using(equip_no).filter(**filter_kwargs).values())
+            if equip_no in JZ_EQUIP_NO:
+                ret = list(JZMaterialInfo.objects.using(equip_no).filter(**filter_kwargs).values())
+            else:
+                ret = list(MaterialInfo.objects.using(equip_no).filter(**filter_kwargs).values())
         except Exception:
             raise ValidationError('称量机台{}服务错误！'.format(equip_no))
         return Response(ret)
@@ -1646,14 +1665,21 @@ class XLBinVIewSet(GenericViewSet, ListModelMixin):
         if not equip_no:
             raise ValidationError('参数缺失')
         try:
-            data = list(Bin.objects.using(equip_no).values())
+            if equip_no in JZ_EQUIP_NO:
+                data = list(JZBin.objects.using(equip_no).values())
+            else:
+                data = list(Bin.objects.using(equip_no).values())
         except Exception:
             raise ValidationError('称量机台{}服务错误！'.format(equip_no))
         ret = {'A': [], 'B': []}
         for item in data:
+            s_bin = item['bin']
+            if isinstance(s_bin, int):  # 嘉正称量系统
+                s_bin = f'{int(s_bin / 2)}B' if s_bin % 2 == 0 else f'{int((s_bin + 1) / 2)}A'
+                item['bin'] = s_bin
             if item['name'] == '0':
                 item['name'] = None
-            if 'A' in item['bin']:
+            if 'A' in s_bin:
                 ret['A'].append(item)
             else:
                 ret['B'].append(item)
@@ -1670,22 +1696,44 @@ class XLBinVIewSet(GenericViewSet, ListModelMixin):
     def save_bin(self, request):
         data = self.request.data.get('bin_data')
         equip_no = self.request.data.get('equip_no')
-        queryset = Bin.objects.using(equip_no).all()
         if not all([data, equip_no]):
             raise ValidationError('参数不足')
         if not isinstance(data, list):
             raise ValidationError('参数错误')
-        for item in data:
-            filter_kwargs = {'id': item.get('id')}
-            try:
-                obj = get_object_or_404(queryset, **filter_kwargs)
-            except ConnectionDoesNotExist:
-                raise ValidationError('称量机台{}服务错误！'.format(equip_no))
-            except Exception:
-                raise
-            s = BinSerializer(instance=obj, data=item)
-            s.is_valid(raise_exception=True)
-            s.save()
+        jz = None
+        if equip_no in JZ_EQUIP_NO:
+            jz = JZCLSystem(equip_no)
+            queryset = JZBin.objects.using(equip_no).all()
+        else:
+            queryset = Bin.objects.using(equip_no).all()
+        with atomic(using=equip_no):
+            for item in data:
+                filter_kwargs = {'id': item.get('id')}
+                try:
+                    obj = get_object_or_404(queryset, **filter_kwargs)
+                except ConnectionDoesNotExist:
+                    raise ValidationError('称量机台{}服务错误！'.format(equip_no))
+                except Exception:
+                    raise
+                # 无变化则pass, 不保存
+                if obj.name == item.get('name'):
+                    continue
+                if jz:  # 嘉正需要修改中间表数据并且通知称量同步本地数据
+                    s_bin = int(item.get('bin')[:-1]) * 2 - (1 if 'A' in item.get('bin') else 0)
+                    item['bin'] = s_bin
+                    s = JZBinSerializer(instance=obj, data=item)
+                    s.is_valid(raise_exception=True)
+                    s.save()
+                    # 通知称量同步中间表数据
+                    try:
+                        res = jz.notice(table_seq=1, table_id=item.get('id'), opera_type=3)
+                    except Exception as e:
+                        logger.error(f'修改料仓信息失败{e.args[0]}')
+                        raise ValidationError(e.args[0])
+                else:
+                    s = BinSerializer(instance=obj, data=item)
+                    s.is_valid(raise_exception=True)
+                    s.save()
         return Response('更新成功！')
 
 
@@ -1705,9 +1753,10 @@ class RecipePreVIew(ListAPIView):
         use_not = self.request.query_params.get('use_not')
         st = self.request.query_params.get('st')
         et = self.request.query_params.get('et')
+        recipe_model = JZRecipePre if equip_no in JZ_EQUIP_NO else RecipePre
         if self.request.query_params.get('all'):
             try:
-                return Response(RecipePre.objects.using(equip_no).filter(use_not=0).values('id', 'name', 'ver'))
+                return Response(recipe_model.objects.using(equip_no).filter(use_not=0).values('id', 'name', 'ver'))
             except ConnectionDoesNotExist:
                 raise ValidationError('称量机台{}服务错误！'.format(equip_no))
             except Exception:
@@ -1728,7 +1777,7 @@ class RecipePreVIew(ListAPIView):
             filter_kwargs['time__gte'] = st
         if et:
             filter_kwargs['time__lte'] = et
-        queryset = RecipePre.objects.using(equip_no).filter(**filter_kwargs)
+        queryset = recipe_model.objects.using(equip_no).filter(**filter_kwargs)
         try:
             page = self.paginate_queryset(queryset)
             serializer = self.get_serializer(page, many=True)
@@ -1754,9 +1803,8 @@ class RecipePreVIew(ListAPIView):
         product_name = ret.group(1)
         dev_type = ret.group(2)
         product_batching = ProductBatching.objects.exclude(
-            used_type__in=[6, 7]).filter(stage_product_batch_no=product_name,
-                                         dev_type__category_no=dev_type,
-                                         batching_type=2).first()
+            used_type__in=[6]).filter(stage_product_batch_no=product_name, dev_type__category_no=dev_type,
+                                      batching_type=2).first()
         if not product_batching:
             raise ValidationError('该配方MES不存在或已废弃！')
 
@@ -1839,7 +1887,8 @@ class RecipeMaterialVIew(APIView):
         if not all([equip_no, recipe_name]):
             raise ValidationError('参数缺失')
         try:
-            ret = list(RecipeMaterial.objects.using(equip_no).filter(recipe_name=recipe_name).values())
+            material_model = JZRecipeMaterial if equip_no in JZ_EQUIP_NO else RecipeMaterial
+            ret = list(material_model.objects.using(equip_no).filter(recipe_name=recipe_name).values())
         except ConnectionDoesNotExist:
             raise ValidationError('称量机台{}服务错误！'.format(equip_no))
         except Exception:
@@ -1862,14 +1911,14 @@ class XLPlanVIewSet(ModelViewSet):
     filter_backends = [DjangoFilterBackend]
 
     def get_serializer_class(self):
+        equip_no = self.request.query_params.get('equip_no') if self.request.query_params.get('equip_no') else self.request.data.get('equip_no')
         if self.action in ('list', 'create'):
-            return PlanSerializer
+            return JZPlanSerializer if equip_no in JZ_EQUIP_NO else PlanSerializer
         else:
-            return PlanUpdateSerializer
+            return JZPlanUpdateSerializer if equip_no in JZ_EQUIP_NO else PlanUpdateSerializer
 
     def list(self, request, *args, **kwargs):
         equip_no = self.request.query_params.get('equip_no')
-        now_date = datetime.datetime.now().date()
         date_time = self.request.query_params.get('date_time')
         grouptime = self.request.query_params.get('grouptime')
         recipe = self.request.query_params.get('recipe')
@@ -1889,7 +1938,8 @@ class XLPlanVIewSet(ModelViewSet):
             filter_kwargs['actno__gte'] = 1
         if batch_time:
             filter_kwargs['date_time'] = batch_time
-        queryset = Plan.objects.using(equip_no).filter(**filter_kwargs).order_by('order_by')
+        plan_model = JZPlan if equip_no in JZ_EQUIP_NO else Plan
+        queryset = plan_model.objects.using(equip_no).filter(**filter_kwargs).order_by('order_by')
         if not state:
             try:
                 serializer = self.get_serializer(queryset, many=True)
@@ -1911,9 +1961,22 @@ class XLPlanVIewSet(ModelViewSet):
                 if (e_time - s_time).days > 15:
                     raise ValidationError('筛选日期不可大于15天')
             filter_kwargs.update({'date_time__gte': s_time, 'date_time__lte': e_time})
-            new_queryset = Plan.objects.using(equip_no).filter(**filter_kwargs).values('recipe').distinct()
+            new_queryset = plan_model.objects.using(equip_no).filter(**filter_kwargs).values('recipe').distinct()
             serializer = self.get_serializer(new_queryset, many=True)
             return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        equip_no = self.request.data.get('equip_no')
+        # 嘉正称量系统下达的计划先通知才可以删除，非下达计划直接删除[下达也是等待状态]
+        instance = self.get_object()
+        if equip_no in JZ_EQUIP_NO and instance.downtime:
+            try:
+                jz = JZCLSystem(equip_no)
+                res = jz.notice(table_seq=4, table_id=instance.id, opera_type=2)
+            except Exception as e:
+                raise ValidationError(f'通知称量系统{equip_no}删除计划失败')
+        instance.delete()
+        return Response('删除成功')
 
     def get_object(self):
         """
@@ -1926,7 +1989,8 @@ class XLPlanVIewSet(ModelViewSet):
         equip_no = self.request.data.get('equip_no')
         if not equip_no:
             raise ValidationError('称量机台参数缺失！')
-        queryset = Plan.objects.using(equip_no).all()
+        plan_model = JZPlan if equip_no in JZ_EQUIP_NO else Plan
+        queryset = plan_model.objects.using(equip_no).all()
         # Perform the lookup filtering.
         lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
 
@@ -1953,6 +2017,8 @@ class XLPlanVIewSet(ModelViewSet):
     def up_down_move(self, request):
         """称量计划上下移动"""
         equip_no = self.request.data.get('equip_no')
+        if equip_no in JZ_EQUIP_NO:
+            raise ValidationError(f'称量系统{equip_no}不支持上下移动计划')
         c_id = self.request.data.get('c_id')
         n_id = self.request.data.get('n_id')
         check_plan = Plan.objects.using(equip_no).filter(~Q(state='等待'), id__in=[c_id, n_id])
@@ -1982,6 +2048,8 @@ class XLPlanVIewSet(ModelViewSet):
     def rotate_classes(self, request):
         """称量计划结转班次"""
         equip_no = self.request.data.get('equip_no')
+        if equip_no in JZ_EQUIP_NO:
+            raise ValidationError(f'称量系统{equip_no}不支持班次结转')
         next_classes = self.request.data.get('next_classes')
         now_datetime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         now_date, now_time = now_datetime[:10], now_datetime[11:]
@@ -2011,7 +2079,7 @@ class XLPlanVIewSet(ModelViewSet):
             next_classes 夜班  早班切 -grouptime  中班切 grouptime
             """
             filter_date = [now_date] + ([(datetime.datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')] if next_classes == '早班' else [])
-            plan_list = Plan.objects.using(equip_no).filter(state__in=['运行中', '等待'], date_time__in=filter_date).order_by('-state')
+            plan_list = Plan.objects.using(equip_no).filter(state__in=['运行中', '等待', '运行'], date_time__in=filter_date).order_by('-state')
             if not plan_list:
                 return '未找到运行中或者等待的计划'
             now_classes = plan_list.first().grouptime
@@ -2028,7 +2096,7 @@ class XLPlanVIewSet(ModelViewSet):
                 replace_order_by = max(order_by_list) + 1
                 new_plan_id = datetime.datetime.now().strftime('%Y%m%d%H%M%S')[2:]
                 p_data = plan_data[index]
-                setno = p_data['setno'] - (p_data['actno'] if plan.actno else 0) if plan.state == '运行中' else p_data['setno']
+                setno = p_data['setno'] - (p_data['actno'] if plan.actno else 0) if '运行' in plan.state else p_data['setno']
                 p_data.update({'planid': new_plan_id, 'grouptime': next_classes, 'oper': self.request.user.username,
                                'order_by': replace_order_by, 'date_time': now_date, 'setno': setno, 'actno': None,
                                'addtime': now_datetime, 'state': '等待'})
@@ -2038,7 +2106,7 @@ class XLPlanVIewSet(ModelViewSet):
                     handle_plan_data['stop'] = [plan] + ([] if not handle_plan_data.get('stop') else handle_plan_data['stop'])
                     handle_plan_data['issue'] = [new_plan] + ([] if not handle_plan_data.get('issue') else handle_plan_data['issue'])
                 else:
-                    if plan.state == '运行中':
+                    if '运行' in plan.state:
                         handle_plan_data['stop'] = ([] if not handle_plan_data.get('stop') else handle_plan_data['stop']) + [plan]
                         handle_plan_data['issue'] = ([] if not handle_plan_data.get('issue') else handle_plan_data['issue']) + [new_plan]
                     else:
@@ -2115,7 +2183,10 @@ class ReportBasicView(ListAPIView):
         if recipe:
             filter_kwargs['recipe__icontains'] = recipe
 
-        queryset = ReportBasic.objects.using(equip_no).filter(**filter_kwargs)
+        if equip_no in JZ_EQUIP_NO:
+            queryset = JZReportBasic.objects.using(equip_no).filter(**filter_kwargs)
+        else:
+            queryset = ReportBasic.objects.using(equip_no).filter(**filter_kwargs)
         try:
             page = self.paginate_queryset(queryset)
             serializer = self.get_serializer(page, many=True)
@@ -2139,58 +2210,72 @@ class UpdateFlagCountView(APIView):
         use_not = self.request.data.get('use_not', '')
         delete_flag = self.request.data.get('delete_flag')
         now_date = datetime.datetime.now().date() - timedelta(days=1)
-        pre_fix = now_date.strftime('%Y%m%d')[2:]
-        if isinstance(use_not, int):
-            recipe_instance = RecipePre.objects.using(equip_no).filter(id=rid)
-            if not recipe_instance:
-                raise ValidationError('数据发生变化，刷新后重试')
-            recipe_name = recipe_instance.first().name
-            if use_not == 1:  # 停用配方
-                processing_plan = Plan.objects.using(equip_no).filter(state='运行中', actno__gte=1).last()
-                if not processing_plan:
-                    plan_recipes = Plan.objects.using(equip_no).filter(planid__gte=pre_fix, state=['运行中', '等待'], recipe=recipe_name).last()
-                else:
-                    plan_recipes = Plan.objects.using(equip_no).filter(id__gte=processing_plan.id, state__in=['运行中', '等待'], recipe=recipe_name).last()
-                if plan_recipes:
-                    raise ValidationError(f'该配方存在状态为{plan_recipes.state}计划, 无法停用')
-            else:  # 有同名配方不可启用
-                if RecipePre.objects.using(equip_no).filter(name=recipe_name, use_not=use_not):
-                    raise ValidationError('存在同名已经启用的配方')
-            recipe_instance.update(use_not=use_not)
-            return Response(f"{'停用' if use_not == 1 else '启用'}配方成功")
-        if delete_flag:
-            recipe_instance = RecipePre.objects.using(equip_no).filter(id=rid).last()
-            if not recipe_instance:
-                raise ValidationError('数据发生变化，刷新后重试')
-            # 运行中或者等待的配方不能删除
-            processing_plan = Plan.objects.using(equip_no).filter(state='运行中', actno__gte=1).last()
-            if not processing_plan:
-                plan_recipes = Plan.objects.using(equip_no).filter(planid__gte=pre_fix, state=['运行中', '等待'],
-                                                                   recipe=recipe_instance.name).last()
-            else:
-                plan_recipes = Plan.objects.using(equip_no).filter(id__gte=processing_plan.id, state__in=['运行中', '等待'],
-                                                                   recipe=recipe_instance.name).last()
-            if plan_recipes:
-                raise ValidationError(f'该配方存在状态为{plan_recipes.state}计划, 无法删除')
-            RecipeMaterial.objects.using(equip_no).filter(recipe_name=recipe_instance.name).delete()
-            recipe_instance.delete()
-            return Response("删除配方成功")
-        filter_kwargs = {}
-        if merge_flag is not None:
-            filter_kwargs['merge_flag'] = merge_flag
-        if split_count:
-            filter_kwargs['split_count'] = split_count
-        db_name = Plan if oper_type == '计划' else RecipePre
-        instance = db_name.objects.using(equip_no).filter(id=rid)
-        if not instance:
-            raise ValidationError('未找到编号对应的数据')
+        plan_model, recipe_pre_model, recipe_material_model, pre_fix, jz = [JZPlan, JZRecipePre, JZRecipeMaterial, now_date.strftime('%Y%m%d'), JZCLSystem(equip_no)] if equip_no in JZ_EQUIP_NO else [Plan, RecipePre, RecipeMaterial, now_date.strftime('%Y%m%d')[2:], None]
         with atomic(using=equip_no):
+            if isinstance(use_not, int):
+                recipe_instance = recipe_pre_model.objects.using(equip_no).filter(id=rid)
+                if not recipe_instance:
+                    raise ValidationError('数据发生变化，刷新后重试')
+                recipe_name = recipe_instance.first().name
+                if use_not == 1:  # 停用配方
+                    processing_plan = plan_model.objects.using(equip_no).filter(state__in=['运行中', '运行'], actno__gte=1).last()
+                    if not processing_plan:
+                        plan_recipes = plan_model.objects.using(equip_no).filter(planid__gte=pre_fix, state__in=['运行中', '等待', '运行'], recipe=recipe_name).last()
+                    else:
+                        plan_recipes = plan_model.objects.using(equip_no).filter(id__gte=processing_plan.id, state__in=['运行中', '等待', '运行'], recipe=recipe_name).last()
+                    if plan_recipes:
+                        raise ValidationError(f'该配方存在状态为{plan_recipes.state}计划, 无法停用')
+                else:  # 有同名配方不可启用
+                    if recipe_pre_model.objects.using(equip_no).filter(name=recipe_name, use_not=use_not):
+                        raise ValidationError('存在同名已经启用的配方')
+                recipe_instance.update(use_not=use_not)
+                if jz:  # 通知嘉正称量系统同步数据
+                    try:
+                        rep = jz.notice(table_seq=3, table_id=rid, opera_type=3)
+                    except Exception as e:
+                        raise ValidationError(f'通知称量系统{equip_no}修改数据失败')
+                return Response(f"{'停用' if use_not == 1 else '启用'}配方成功")
+            if delete_flag:
+                recipe_instance = recipe_pre_model.objects.using(equip_no).filter(id=rid).last()
+                if not recipe_instance:
+                    raise ValidationError('数据发生变化，刷新后重试')
+                # 运行中或者等待的配方不能删除
+                processing_plan = plan_model.objects.using(equip_no).filter(state__in=['运行中', '运行'], actno__gte=1).last()
+                if not processing_plan:
+                    plan_recipes = plan_model.objects.using(equip_no).filter(planid__gte=pre_fix, state__in=['运行中', '等待', '运行'],
+                                                                             recipe=recipe_instance.name).last()
+                else:
+                    plan_recipes = plan_model.objects.using(equip_no).filter(id__gte=processing_plan.id, state__in=['运行中', '等待', '运行'],
+                                                                             recipe=recipe_instance.name).last()
+                if plan_recipes:
+                    raise ValidationError(f'该配方存在状态为{plan_recipes.state}计划, 无法删除')
+                details = recipe_material_model.objects.using(equip_no).filter(recipe_name=recipe_instance.name)
+                detail_ids = details.values_list('id', flat=True)
+                details.delete()
+                recipe_instance.delete()
+                if jz:  # 通知嘉正称量系统同步数据
+                    try:
+                        for i in detail_ids:
+                            rep_detail = jz.notice(table_seq=2, table_id=i, opera_type=2)
+                        rep_pre = jz.notice(table_seq=3, table_id=rid, opera_type=2)
+                    except Exception as e:
+                        raise ValidationError(e.args[0])
+                return Response("删除配方成功")
+            filter_kwargs = {}
+            if merge_flag is not None:
+                filter_kwargs['merge_flag'] = merge_flag
+            if split_count:
+                filter_kwargs['split_count'] = split_count
+            db_name = plan_model if oper_type == '计划' else recipe_pre_model
+            instance = db_name.objects.using(equip_no).filter(id=rid)
+            if not instance:
+                raise ValidationError('未找到编号对应的数据')
             # 配方更新
             f_instance = instance.first()
             if oper_type != '计划' and f_instance.split_count != split_count:
                 now_time = datetime.datetime.now().replace(microsecond=0).strftime('%Y-%m-%d %H:%M:%S')
                 new_total_weight = 0
-                materials = RecipeMaterial.objects.using(equip_no).filter(recipe_name=f_instance.name)
+                materials = recipe_material_model.objects.using(equip_no).filter(recipe_name=f_instance.name)
                 for material in materials:
                     new_weight = round(material.weight * f_instance.split_count / split_count, 3)
                     if new_weight >= 100:  # 数据库最大只能5位，其中3位为小数
@@ -2200,6 +2285,11 @@ class UpdateFlagCountView(APIView):
                     material.time = now_time
                     material.save()
                     new_total_weight += new_weight
+                    if jz:
+                        try:
+                            rep_detail = jz.notice(table_seq=2, table_id=material.id, opera_type=3)
+                        except Exception as e:
+                            raise ValidationError(e.args[0])
                 new_tolerance = get_tolerance(batching_equip=equip_no, standard_weight=new_total_weight, project_name='all', only_num=True)
                 filter_kwargs.update({'weight': new_total_weight, 'error': new_tolerance, 'time': now_time})
                 f_instance.weight = new_total_weight
@@ -2207,8 +2297,18 @@ class UpdateFlagCountView(APIView):
                 f_instance.time = now_time
                 f_instance.split_count = split_count
                 f_instance.save()
+                if jz:
+                    try:
+                        rep_pre = jz.notice(table_seq=3, table_id=rid, opera_type=3)
+                    except Exception as e:
+                        raise ValidationError(e.args[0])
                 return Response('操作成功')
             instance.update(**filter_kwargs)
+            if jz:
+                try:
+                    rep_plan = jz.notice(table_seq=4, table_id=rid, opera_type=3)
+                except Exception as e:
+                    raise ValidationError(e.args[0])
         return Response('操作成功')
 
 
@@ -2237,8 +2337,10 @@ class ReportWeightView(ListAPIView):
             filter_kwargs['planid'] = planid
         if recipe:
             filter_kwargs['recipe'] = recipe
+
+        plan_model, weight_model = [JZPlan, JZReportWeight] if equip_no in JZ_EQUIP_NO else [Plan, ReportWeight]
         if st or et:
-            plan_queryset = Plan.objects.using(equip_no).all()
+            plan_queryset = plan_model.objects.using(equip_no).all()
             if st:
                 plan_queryset = plan_queryset.filter(date_time__gte=st)
             if et:
@@ -2249,7 +2351,7 @@ class ReportWeightView(ListAPIView):
                 raise ValidationError('称量机台{}服务错误！'.format(equip_no))
             filter_kwargs['planid__in'] = list(plan_ids)
 
-        queryset = ReportWeight.objects.using(equip_no).filter(**filter_kwargs)
+        queryset = weight_model.objects.using(equip_no).filter(**filter_kwargs)
         try:
             page = self.paginate_queryset(queryset)
             serializer = self.get_serializer(page, many=True)
@@ -2280,7 +2382,10 @@ class ReportWeightViewStaticsView(APIView):
         if diff > 31:
             raise ValidationError('查询周期不可超过31天')
         try:
-            data = ReportWeight.objects.using(equip_no).filter(~Q(material='总重量'), 时间__gte=st, 时间__lte=et)
+            if equip_no in JZ_EQUIP_NO:
+                data = JZReportWeight.objects.using(equip_no).filter(~Q(material='总重量'), weight_time__gte=st, weight_time__lte=et)
+            else:
+                data = ReportWeight.objects.using(equip_no).filter(~Q(material='总重量'), 时间__gte=st, 时间__lte=et)
             results = data.values('material').annotate(material_total_weight=Sum('act_weight')).values('material', 'material_total_weight')
             total_weight = sum(data.values_list('act_weight', flat=True))
         except Exception as e:
@@ -2302,19 +2407,25 @@ class XLPlanCViewSet(ListModelMixin, GenericViewSet):
         equip_no = self.request.query_params.get('equip_no')
         date_now = datetime.datetime.now().date()
         date_before = date_now - timedelta(days=1)
-        date_now_planid = ''.join(str(date_now).split('-'))[2:]
-        date_before_planid = ''.join(str(date_before).split('-'))[2:]
+        if equip_no in JZ_EQUIP_NO:
+            date_now_planid = date_now.strftime('%Y%m%d')
+            date_before_planid = date_before.strftime('%Y%m%d')
+            plan_model, pre_model = JZPlan, JZRecipePre
+        else:
+            date_now_planid = date_now.strftime('%Y%m%d')[2:]
+            date_before_planid = date_before.strftime('%Y%m%d')[2:]
+            plan_model, pre_model = Plan, RecipePre
         try:
-            all_filter_plan = Plan.objects.using(equip_no).filter(
+            all_filter_plan = plan_model.objects.using(equip_no).filter(
                 Q(planid__startswith=date_now_planid) | Q(planid__startswith=date_before_planid),
-                state__in=['运行中', '等待']).all().order_by(*['-state', 'order_by'])
+                state__in=['运行中', '等待', '运行']).all().order_by(*['-state', 'order_by'])
         except:
             return response(success=False, message='称量机台{}错误'.format(equip_no))
         if not all_filter_plan:
             return response(success=False, message='机台{}无进行中或已完成的配料计划'.format(equip_no))
         serializer = self.get_serializer(all_filter_plan[:5], many=True)
         for i in serializer.data:
-            recipe_pre = RecipePre.objects.using(equip_no).filter(name=i['recipe'])
+            recipe_pre = pre_model.objects.using(equip_no).filter(name=i['recipe'])
             dev_type = recipe_pre.first().ver.upper().strip() if recipe_pre else ''
             i.update({'dev_type': dev_type, 'planid': i['planid'].strip()})
         return response(success=True, data=serializer.data)
@@ -2348,24 +2459,33 @@ class WeightingTankStatus(APIView):
 
     def get(self, request, *args, **kwargs):
         equip_no = self.request.query_params.get('equip_no')
+        date_now = datetime.datetime.now().date()
+        date_before = date_now - timedelta(days=1)
         # 从称量系统同步料罐状态到mes表中
-        tank_status_sync = TankStatusSync(equip_no=equip_no)
         try:
+            if equip_no in JZ_EQUIP_NO:
+                tank_status_sync = JZTankStatusSync(equip_no=equip_no)
+                plan_model = JZPlan
+                # 获取计划号
+                date_now_planid = date_now.strftime('%Y%m%d')
+                date_before_planid = date_before.strftime('%Y%m%d')
+            else:
+                tank_status_sync = TankStatusSync(equip_no=equip_no)
+                plan_model = Plan
+                # 获取计划号
+                date_now_planid = date_now.strftime('%Y%m%d')[2:]
+                date_before_planid = date_before.strftime('%Y%m%d')[2:]
             tank_status_sync.sync()
         except Exception as e:
             return response(success=False, message='mes同步称量系统料罐状态失败:{}'.format(e.args[0]))
         # 获取该机台号下所有料罐信息
         tanks_info = WeightTankStatus.objects.filter(equip_no=equip_no, use_flag=True) \
             .values('id', 'tank_no', 'tank_name', 'status', 'material_name', 'material_no', 'open_flag')
-        # 获取计划号
-        date_now = datetime.datetime.now().date()
-        date_before = date_now - timedelta(days=1)
-        date_now_planid = ''.join(str(date_now).split('-'))[2:]
-        date_before_planid = ''.join(str(date_before).split('-'))[2:]
-        all_filter_plan = Plan.objects.using(equip_no).filter(
+        # 筛选计划
+        all_filter_plan = plan_model.objects.using(equip_no).filter(
             Q(planid__startswith=date_now_planid) | Q(planid__startswith=date_before_planid),
-            state__in=['运行中', '等待']).all().order_by(*['-state', 'order_by'])
-        processing_plan = all_filter_plan.filter(state='运行中', actno__gte=1).order_by('id').last()
+            state__in=['运行中', '等待', '运行']).all().order_by(*['-state', 'order_by'])
+        processing_plan = all_filter_plan.filter(state__in=['运行中', '运行'], actno__gte=1).order_by('id').last()
         if processing_plan:
             planids = processing_plan.planid.strip()
             diff_no = processing_plan.setno - processing_plan.actno
@@ -2899,28 +3019,31 @@ class MaterialInfoIssue(APIView):
             m = Material.objects.get(id=material_id)
         except Exception:
             raise ValidationError('object does not exit!')
-        error_equip = []
         for equip_no in equip_nos:
-            try:
-                if MaterialInfo.objects.using(equip_no).filter(name=m.material_name):
-                    continue
-                last_m_info = MaterialInfo.objects.using(equip_no).order_by('id').last()
-                if last_m_info:
-                    m_id = last_m_info.id + 1
-                else:
-                    m_id = 1
-                MaterialInfo.objects.using(equip_no).create(
-                    id=m_id,
-                    name=m.material_name,
-                    code=m.material_name,
-                    remark='MES',
-                    use_not=0,
-                    time=datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                )
-            except Exception:
-                error_equip.append(equip_no)
-        if error_equip:
-            raise ValidationError('称量机台{}网络错误！'.format('、'.join(error_equip)))
+            material_info, code = MaterialInfo, None
+            if equip_no in JZ_EQUIP_NO:
+                material_info = JZMaterialInfo
+                max_code = material_info.objects.using(equip_no).aggregate(max_code=Max('code'))['max_code']
+                code = '00001' if not max_code else '%05d' % (int(max_code) + 1)
+            with atomic(using=equip_no):
+                try:
+                    if material_info.objects.using(equip_no).filter(name=m.material_name):
+                        continue
+                    last_m_info = material_info.objects.using(equip_no).order_by('id').last()
+                    if last_m_info:
+                        m_id = last_m_info.id + 1
+                    else:
+                        m_id = 1
+                    instance = material_info.objects.using(equip_no).create(
+                        id=m_id, name=m.material_name, remark='MES', code=m.material_name if not code else code, use_not=0,
+                        time=datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    )
+                    # 嘉正称量系统需要同步中间表数据
+                    if code:
+                        jz = JZCLSystem(equip_no)
+                        res = jz.notice(table_seq=5, table_id=instance.id, opera_type=1)
+                except Exception as e:
+                    raise ValidationError(f'通知称量系统{equip_no}新增物料失败')
         return Response('成功')
 
 
@@ -3151,8 +3274,12 @@ class XlRecipeNoticeView(APIView):
             if not c_p:
                 common_equip = list(equip_no_list)
         # 查询所有的称量线体罐物料与配方设置物料是否一致
+        now_date = datetime.datetime.now().date()
+        before_date = now_date - timedelta(days=1)
+        now_date_str, before_date_str = now_date.strftime('%Y%m%d'), before_date.strftime('%Y%m%d')
+        plan_model, bin_model, n_prefix, b_prefix = [JZPlan, JZBin, now_date_str, before_date_str] if xl_equip in JZ_EQUIP_NO else [Plan, Bin, now_date_str[2:], before_date_str[2:]]
         mes_xl_materials = not_tank_materials.values_list('handle_material_name', flat=True).distinct()
-        xl_equip_materials = list(Bin.objects.using(xl_equip).values_list('name', flat=True))
+        xl_equip_materials = list(bin_model.objects.using(xl_equip).values_list('name', flat=True))
         out_mes_materials = list(set(mes_xl_materials) - set(xl_equip_materials))
         if not notice_flag and out_mes_materials:
             return Response({'notice_flag': True, 'msg': ','.join(out_mes_materials)})
@@ -3160,8 +3287,6 @@ class XlRecipeNoticeView(APIView):
         same_material_list = list(set(mes_xl_materials) & set(xl_equip_materials))
         # 在使用称量配方不能下发
         # 下发配方数据
-        now_date = datetime.datetime.now().date()
-        before_date = now_date - timedelta(days=1)
         send_data = {'dev_type': product_batching.dev_type.category_no}
         detail_msg = ""
         send_equip_list = []
@@ -3172,7 +3297,7 @@ class XlRecipeNoticeView(APIView):
         for single_equip_no in send_equip_list:
             send_materials = mes_xl_details.filter(equip_no=single_equip_no, feeding_mode__startswith=keywords, handle_material_name__in=same_material_list)
             send_recipe_name = f"{product_no.split('_NEW')[0]}({product_batching.dev_type.category_no}" + (")" if single_equip_no in common_equip else f"-{single_equip_no}-ONLY)")
-            processing_xl_plan = Plan.objects.using(xl_equip).filter(Q(planid__startswith=now_date.strftime('%Y%m%d')[2:]) | Q(planid__startswith=before_date.strftime('%Y%m%d')[2:]), state__in=['运行中'], recipe=send_recipe_name)
+            processing_xl_plan = plan_model.objects.using(xl_equip).filter(Q(planid__startswith=n_prefix) | Q(planid__startswith=b_prefix), state__in=['运行中', '运行'], recipe=send_recipe_name)
             if processing_xl_plan:
                 detail_msg += f'{single_equip_no}: 预下发配方正在该线体进行配料 '
                 continue
@@ -3191,34 +3316,53 @@ class XlRecipeNoticeView(APIView):
         新增称量系统配方
         """
         dev_type = data.pop('dev_type')
+        pre_model, material_model, jz = [JZRecipePre, JZRecipeMaterial, JZCLSystem(xl_equip)] if xl_equip in JZ_EQUIP_NO else [RecipePre, RecipeMaterial, None]
         # 数据整理[物料名去除后缀, 配料重量提取默认分包数]
         for recipe_name, recipe_materials in data.items():
             total_weight = recipe_materials.aggregate(total_weight=Sum('cnt_type_detail_equip__standard_weight'))['total_weight']
             if not total_weight:
                 total_weight = 0
             # 删除之前配方
-            RecipePre.objects.using(xl_equip).filter(name=recipe_name).delete()
-            RecipeMaterial.objects.using(xl_equip).filter(recipe_name=recipe_name).delete()
+            o_recipe = material_model.objects.using(xl_equip).filter(recipe_name=recipe_name)
+            o_materials = pre_model.objects.using(xl_equip).filter(name=recipe_name)
+            if jz:
+                for k in o_materials:
+                    jz.notice(table_seq=2, table_id=k.id, opera_type=2)
+                for k in o_recipe:
+                    jz.notice(table_seq=3, table_id=k.id, opera_type=2)
+            else:
+                o_materials.delete()
+                o_recipe.delete()
+            o_materials.delete()
+            o_recipe.delete()
             split_count = 1 if total_weight <= 30 else 2
             weight = round(total_weight / split_count, 3)
             n_time = datetime.datetime.now().replace(microsecond=0).strftime('%Y-%m-%d %H:%M:%S')
             # 添加配方数据
             tolerance = get_tolerance(batching_equip=xl_equip, standard_weight=weight, project_name='all', only_num=True)
-            RecipePre.objects.using(xl_equip).create(**{'name': recipe_name, 'ver': dev_type, 'weight': weight,
-                                                        'error': tolerance, 'use_not': 0, 'merge_flag': False,
-                                                        'split_count': split_count, 'time': n_time})
+            n_recipe = pre_model.objects.using(xl_equip).create(**{'name': recipe_name, 'ver': dev_type, 'weight': weight,
+                                                                   'error': tolerance, 'use_not': 0, 'merge_flag': False,
+                                                                   'split_count': split_count, 'time': n_time})
+            if jz:
+                jz.notice(table_seq=3, table_id=n_recipe.id, opera_type=1)
             # 添加配方明细数据
-            recipe_material_list = []
-            for single in recipe_materials:
+            for index, single in enumerate(recipe_materials):
                 xl_name = single.handle_material_name
                 single_weight = round(single.cnt_type_detail_equip.standard_weight / split_count, 3)
                 # 单物料公差
                 single_tolerance = get_tolerance(batching_equip=xl_equip, standard_weight=single_weight, only_num=True)
                 create_data = {'recipe_name': recipe_name, 'name': xl_name, 'weight': single_weight,
                                'error': single_tolerance, 'time': n_time}
-                single_data = RecipeMaterial(**create_data)
-                recipe_material_list.append(single_data)
-            RecipeMaterial.objects.using(xl_equip).bulk_create(recipe_material_list)
+                if jz:
+                    material = JZMaterialInfo.objects.using(xl_equip).filter(name=xl_name, use_not=0).last()
+                    if not material:
+                        raise ValidationError(f'称量系统{xl_equip}中未找到配方物料{xl_name}')
+                    create_data.update({'order_by': index + 1, 'material_id': material.id, 'recipe_id': n_recipe.id})
+                    single_data = material_model.objects.using(xl_equip).create(**create_data)
+                    jz.notice(table_seq=2, table_id=single_data.id, opera_type=1)
+                else:
+                    single_data = material_model.objects.using(xl_equip).create(**create_data)
+
 
 
 @method_decorator([api_recorder], name='dispatch')
@@ -3301,7 +3445,7 @@ class FormulaPreparationView(APIView):
                 xl_feeds = ProductBatchingEquip.objects.filter(~Q(Q(feeding_mode__startswith='C') | Q(feeding_mode__startswith='P')),
                                                                product_batching=mes_recipe, equip_no=equip_no, type=4, send_recipe_flag=True)
                 if xl_feeds:
-                    db_config = [k for k, v in DATABASES.items() if 'YK_XL' in v['NAME']]
+                    db_config = [k for k, v in DATABASES.items() if 'YK_XL' in v['NAME'] or 'MWDS' in v['NAME']]
                     flag, res = get_common_equip(product_no, dev_name)
                     xl_name = f"{product_no}({dev_name}" + (')' if flag and equip_no in res else f'-{equip_no}-ONLY)')
                     f_material = xl_feeds.filter(feeding_mode__startswith='F')
@@ -3343,13 +3487,14 @@ class FormulaPreparationView(APIView):
         xl_equip_list = [i for i in db_config if i.startswith(keyword)]
         # 获取到对应机台并查处所有机台的配方信息，取最新比较
         for xl_equip in xl_equip_list:
+            material_model, pre_model = [JZRecipeMaterial, JZRecipePre] if xl_equip in JZ_EQUIP_NO else [RecipeMaterial, RecipePre]
             xl_materials = set(
-                RecipeMaterial.objects.using(xl_equip).filter(recipe_name=product_no).values_list('name', flat=True))
+                material_model.objects.using(xl_equip).filter(recipe_name=product_no).values_list('name', flat=True))
             if not xl_materials:
                 continue
             if xl_materials - set(mes_xl_materials.values_list('handle_material_name', flat=True)):  # 线体物料比配方多则pass
                 continue
-            xl_recipe = RecipePre.objects.using(xl_equip).filter(name=product_no, use_not=0).last()
+            xl_recipe = pre_model.objects.using(xl_equip).filter(name=product_no, use_not=0).last()
             if not xl_recipe or not xl_recipe.time or xl_recipe.time in machine_dict:
                 continue
             manual = mes_xl_materials.exclude(handle_material_name__in=xl_materials)\
