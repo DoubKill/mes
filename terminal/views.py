@@ -1324,10 +1324,8 @@ class PackageExpireView(APIView):
         equip_list = [k for k, v in DATABASES.items() if 'YK_XL' in v.get('NAME') or 'MDWS' in v.get('NAME')]
         for equip in equip_list:
             try:
-                if equip in JZ_EQUIP_NO:
-                    single_equip_recipe = list(JZRecipePre.objects.using(equip).filter(use_not=0).values_list('name', flat=True).distinct())
-                else:
-                    single_equip_recipe = list(RecipePre.objects.using(equip).filter(use_not=0).values_list('name', flat=True).distinct())
+                pre_model = JZRecipePre if equip in JZ_EQUIP_NO else RecipePre
+                single_equip_recipe = list(pre_model.objects.using(equip).filter(use_not=0).values_list('name', flat=True).distinct())
             except:
                 # 机台连不上
                 continue
