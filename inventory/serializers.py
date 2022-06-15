@@ -1473,12 +1473,15 @@ class InOutCommonSerializer(serializers.Serializer):
     task_status_name = serializers.SerializerMethodField()
 
     def get_initiator(self, obj):
-        if obj.task.initiator == 'MES':
-            order = MaterialOutboundOrder.objects.filter(order_no=obj.task.order_no).first()
-            if order:
-                return order.created_username
+        try:
+            if obj.task.initiator == 'MES':
+                order = MaterialOutboundOrder.objects.filter(order_no=obj.task.order_no).first()
+                if order:
+                    return order.created_username
+                return obj.task.initiator
             return obj.task.initiator
-        return obj.task.initiator
+        except Exception:
+            return ""
 
     def get_is_entering(self, object):
         if object.pallet_no.startswith('5'):
