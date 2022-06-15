@@ -48,7 +48,7 @@ from quality.filters import TestMethodFilter, DataPointFilter, \
     MaterialTestPlanFilter, MaterialInspectionRegistrationFilter, UnqualifiedPalletFeedBackListFilter
 from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod, MaterialTestOrder, \
     MaterialTestMethod, TestType, DataPoint, DealSuggestion, MaterialDealResult, LevelResult, MaterialTestResult, \
-    LabelPrint, TestDataPoint, BatchMonth, BatchDay, BatchProductNo, BatchEquip, BatchClass, UnqualifiedDealOrder, \
+    LabelPrint, UnqualifiedDealOrder, \
     MaterialExamineResult, MaterialExamineType, MaterialExamineRatingStandard, ExamineValueUnit, ExamineMaterial, \
     DataPointStandardError, MaterialSingleTypeExamineResult, MaterialEquipType, MaterialEquip, \
     QualifiedRangeDisplay, IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, \
@@ -60,8 +60,7 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestOrderSerializer, MaterialTestOrderListSerializer, \
     MaterialTestMethodSerializer, TestMethodSerializer, TestTypeSerializer, DataPointSerializer, \
     DealSuggestionSerializer, DealResultDealSerializer, MaterialDealResultListSerializer, LevelResultSerializer, \
-    TestIndicatorSerializer, LabelPrintSerializer, BatchMonthSerializer, BatchDaySerializer, \
-    BatchCommonSerializer, BatchProductNoDaySerializer, BatchProductNoMonthSerializer, \
+    TestIndicatorSerializer, LabelPrintSerializer, \
     UnqualifiedDealOrderCreateSerializer, UnqualifiedDealOrderSerializer, UnqualifiedDealOrderUpdateSerializer, \
     MaterialDealResultListSerializer1, ExamineMaterialSerializer, MaterialExamineTypeSerializer, \
     ExamineValueUnitSerializer, MaterialExamineResultMainSerializer, DataPointStandardErrorSerializer, \
@@ -77,7 +76,7 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
 
 from django.db.models import Prefetch
 from django.db.models import Q
-from quality.utils import print_mdr, get_cur_sheet, get_sheet_data, export_mto
+from quality.utils import get_cur_sheet, get_sheet_data, export_mto, gen_pallet_test_result
 from recipe.models import Material, ProductBatching, ERPMESMaterialRelation, ZCMaterial
 from django.db.models import Max, Sum, Avg, Count
 
@@ -283,62 +282,81 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
         wb = load_workbook('xlsx_template/product_test_result.xlsx')
         ws = wb.worksheets[0]
         sheet = wb.copy_worksheet(ws)
-        data_row = 3
+        data_row = 7
         if not result:
             return Response('暂无数据！')
         product_no = result[0]['product_no']
         sheet.title = product_no
-
+        indicators_data = MaterialDataPointIndicator.objects.filter(
+            material_test_method__material__material_no=product_no,
+            level=1,
+            delete_flag=False
+        ).values('data_point__name', 'upper_limit', 'lower_limit')
+        indicators_data_dict = {i['data_point__name']: i for i in indicators_data}
+        sheet.cell(2, 1).value = product_no
+        sheet.cell(5, 7).value = indicators_data_dict.get('MH', {}).get('upper_limit')
+        sheet.cell(6, 7).value = indicators_data_dict.get('MH', {}).get('lower_limit')
+        sheet.cell(5, 8).value = indicators_data_dict.get('ML', {}).get('upper_limit')
+        sheet.cell(6, 8).value = indicators_data_dict.get('ML', {}).get('lower_limit')
+        sheet.cell(5, 9).value = indicators_data_dict.get('TC10', {}).get('upper_limit')
+        sheet.cell(6, 9).value = indicators_data_dict.get('TC10', {}).get('lower_limit')
+        sheet.cell(5, 10).value = indicators_data_dict.get('TC50', {}).get('upper_limit')
+        sheet.cell(6, 10).value = indicators_data_dict.get('TC50', {}).get('lower_limit')
+        sheet.cell(5, 11).value = indicators_data_dict.get('TC90', {}).get('upper_limit')
+        sheet.cell(6, 11).value = indicators_data_dict.get('TC90', {}).get('lower_limit')
+        sheet.cell(5, 12).value = indicators_data_dict.get('比重值', {}).get('upper_limit')
+        sheet.cell(6, 12).value = indicators_data_dict.get('比重值', {}).get('lower_limit')
+        sheet.cell(5, 13).value = indicators_data_dict.get('ML(1+4)', {}).get('upper_limit')
+        sheet.cell(6, 13).value = indicators_data_dict.get('ML(1+4)', {}).get('lower_limit')
+        sheet.cell(5, 14).value = indicators_data_dict.get('硬度值', {}).get('upper_limit')
+        sheet.cell(6, 14).value = indicators_data_dict.get('硬度值', {}).get('lower_limit')
         for i in result:
             if i['product_no'] != product_no:
                 product_no = i['product_no']
                 sheet = wb.copy_worksheet(ws)
                 sheet.title = product_no
-                data_row = 3
+                data_row = 7
+                indicators_data = MaterialDataPointIndicator.objects.filter(
+                    material_test_method__material__material_no=product_no,
+                    level=1,
+                    delete_flag=False
+                ).values('data_point__name', 'upper_limit', 'lower_limit')
+                indicators_data_dict = {i['data_point__name']: i for i in indicators_data}
+                sheet.cell(2, 1).value = product_no
+                sheet.cell(5, 7).value = indicators_data_dict.get('MH', {}).get('upper_limit')
+                sheet.cell(6, 7).value = indicators_data_dict.get('MH', {}).get('lower_limit')
+                sheet.cell(5, 8).value = indicators_data_dict.get('ML', {}).get('upper_limit')
+                sheet.cell(6, 8).value = indicators_data_dict.get('ML', {}).get('lower_limit')
+                sheet.cell(5, 9).value = indicators_data_dict.get('TC10', {}).get('upper_limit')
+                sheet.cell(6, 9).value = indicators_data_dict.get('TC10', {}).get('lower_limit')
+                sheet.cell(5, 10).value = indicators_data_dict.get('TC50', {}).get('upper_limit')
+                sheet.cell(6, 10).value = indicators_data_dict.get('TC50', {}).get('lower_limit')
+                sheet.cell(5, 11).value = indicators_data_dict.get('TC90', {}).get('upper_limit')
+                sheet.cell(6, 11).value = indicators_data_dict.get('TC90', {}).get('lower_limit')
+                sheet.cell(5, 12).value = indicators_data_dict.get('比重值', {}).get('upper_limit')
+                sheet.cell(6, 12).value = indicators_data_dict.get('比重值', {}).get('lower_limit')
+                sheet.cell(5, 13).value = indicators_data_dict.get('ML(1+4)', {}).get('upper_limit')
+                sheet.cell(6, 13).value = indicators_data_dict.get('ML(1+4)', {}).get('lower_limit')
+                sheet.cell(5, 14).value = indicators_data_dict.get('硬度值', {}).get('upper_limit')
+                sheet.cell(6, 14).value = indicators_data_dict.get('硬度值', {}).get('lower_limit')
             order_results = i['order_results']
-            ret = {'ML(1+4)': {'value': '', 'upper_lower': '', 'level': ''},
-                   '比重值': {'value': '', 'upper_lower': '', 'level': ''},
-                   '硬度值': {'value': '', 'upper_lower': '', 'level': ''},
-                   'MH': {'value': '', 'upper_lower': '', 'level': ''},
-                   'ML': {'value': '', 'upper_lower': '', 'level': ''},
-                   'TC10': {'value': '', 'upper_lower': '', 'level': ''},
-                   'TC50': {'value': '', 'upper_lower': '', 'level': ''},
-                   'TC90': {'value': '', 'upper_lower': '', 'level': ''}}
-            for item in order_results:
-                data_point = item['data_point_name']
-                ret[data_point] = item
+            ret = {i['data_point_name']: i['value'] for i in order_results}
             sheet.cell(data_row, 1).value = i['product_no']
             sheet.cell(data_row, 2).value = i['production_factory_date']
-            sheet.cell(data_row, 3).value = '{}/{}'.format(i['production_class'], i['production_group'])
-            sheet.cell(data_row, 4).value = i['production_equip_no']
-            sheet.cell(data_row, 5).value = i['actual_trains']
-            sheet.cell(data_row, 6).value = ret['ML(1+4)']['value']
-            sheet.cell(data_row, 7).value = ret['ML(1+4)']['upper_lower']
-            sheet.cell(data_row, 8).value = ret['ML(1+4)']['level']
-            sheet.cell(data_row, 9).value = ret['比重值']['value']
-            sheet.cell(data_row, 10).value = ret['比重值']['upper_lower']
-            sheet.cell(data_row, 11).value = ret['比重值']['level']
-            sheet.cell(data_row, 12).value = ret['硬度值']['value']
-            sheet.cell(data_row, 13).value = ret['硬度值']['upper_lower']
-            sheet.cell(data_row, 14).value = ret['硬度值']['level']
-            sheet.cell(data_row, 15).value = ret['MH']['value']
-            sheet.cell(data_row, 16).value = ret['MH']['upper_lower']
-            sheet.cell(data_row, 17).value = ret['MH']['level']
-            sheet.cell(data_row, 18).value = ret['ML']['value']
-            sheet.cell(data_row, 19).value = ret['ML']['upper_lower']
-            sheet.cell(data_row, 20).value = ret['ML']['level']
-            sheet.cell(data_row, 21).value = ret['TC10']['value']
-            sheet.cell(data_row, 22).value = ret['TC10']['upper_lower']
-            sheet.cell(data_row, 23).value = ret['TC10']['level']
-            sheet.cell(data_row, 24).value = ret['TC50']['value']
-            sheet.cell(data_row, 25).value = ret['TC50']['upper_lower']
-            sheet.cell(data_row, 26).value = ret['TC50']['level']
-            sheet.cell(data_row, 27).value = ret['TC90']['value']
-            sheet.cell(data_row, 28).value = ret['TC90']['upper_lower']
-            sheet.cell(data_row, 29).value = ret['TC90']['level']
-            sheet.cell(data_row, 30).value = 'Y' if i['is_qualified'] else 'N'
+            sheet.cell(data_row, 3).value = i['production_class']
+            sheet.cell(data_row, 4).value = i['production_group']
+            sheet.cell(data_row, 5).value = i['production_equip_no']
+            sheet.cell(data_row, 6).value = i['actual_trains']
+            sheet.cell(data_row, 7).value = ret.get('MH')
+            sheet.cell(data_row, 8).value = ret.get('ML')
+            sheet.cell(data_row, 9).value = ret.get('TC10')
+            sheet.cell(data_row, 10).value = ret.get('TC50')
+            sheet.cell(data_row, 11).value = ret.get('TC90')
+            sheet.cell(data_row, 12).value = ret.get('比重值')
+            sheet.cell(data_row, 13).value = ret.get('ML(1+4)')
+            sheet.cell(data_row, 14).value = ret.get('硬度值')
+            sheet.cell(data_row, 15).value = 'Y' if i['is_qualified'] else 'N'
             data_row = data_row + 1
-
         wb.remove_sheet(ws)
         output = BytesIO()
         wb.save(output)
@@ -831,166 +849,22 @@ class MaterialTestResultHistoryView(APIView):
         return Response(ret)
 
 
-@method_decorator([api_recorder], name="dispatch")
-class ProductDayDetail(APIView):
-    """胶料日合格率详细信息统计"""
-
-    # 伪代码
-    def get(self, request, *args, **kwargs):
-        params = request.query_params
-        month_time = params.get('ym_time', datetime.datetime.now()).month
-        year_time = params.get('ym_time', datetime.datetime.now()).year
-        product_no = params.get('product_no', 'C-FM-UC109-001')
-        pass_dict = {'1': ['门尼', '比重', '硬度', '流变'], '2': ['门尼', '比重', '硬度'], '3': ['流变']}
-        name_dict = {'1': '综合合格率', '2': '一次合格率', '3': '流变合格率'}
-
-        ruturn_pass = []
-        return_dict = {}
-
-        for day_time in range(1, int(datetime.datetime.now().day) + 1):
-            # 1、胶料编码
-            return_dict['product_no'] = product_no
-            lot_no_list = MaterialTestOrder.objects.filter(delete_flag=False,
-                                                           production_factory_date__year=year_time,
-                                                           production_factory_date__month=month_time,
-                                                           production_factory_date__day=day_time,
-                                                           product_no=product_no).values('lot_no').annotate().distinct()
-
-            mto_count = lot_no_list.count()
-            if mto_count == 0:
-                continue
-            return_dict = {}
-            # 2、当天的日期也要返回给前端
-            return_dict['day_time'] = str(year_time) + '-' + str(month_time) + '-' + str(day_time)
-            # 3、计算产量 车次
-            plan_classes_uid_list = MaterialTestOrder.objects.filter(delete_flag=False,
-                                                                     production_factory_date__year=year_time,
-                                                                     production_factory_date__month=month_time,
-                                                                     production_factory_date__day=day_time,
-                                                                     product_no=product_no).values(
-                'plan_classes_uid').annotate().distinct().values_list('plan_classes_uid', flat=True)
-            tfb_train_list = TrainsFeedbacks.objects.filter(end_time__year=year_time, end_time__month=month_time,
-                                                            end_time__day=day_time,
-                                                            plan_classes_uid__in=plan_classes_uid_list).values(
-                'plan_classes_uid').annotate(max_train=Max('actual_trains')).aggregate(sum_train=Sum('max_train'))
-            return_dict['sum_train'] = tfb_train_list['sum_train']
-
-            # 4、 循环三种指标类型，得到合格率
-            for tin_key in pass_dict.keys():
-                pass_count = 0
-                test_indicator_name_dict = pass_dict[tin_key]
-
-                for lot_no_dict in lot_no_list:
-                    mto_set = MaterialTestOrder.objects.filter(delete_flag=False,
-                                                               production_factory_date__year=year_time,
-                                                               production_factory_date__month=month_time,
-                                                               production_factory_date__day=day_time,
-                                                               product_no=product_no, **lot_no_dict).all()
-                    if not mto_set:
-                        continue
-                    level_list = []
-                    for mto_obj in mto_set:
-                        mrt_list = mto_obj.order_results.filter(
-                            test_indicator_name__in=test_indicator_name_dict).all().values('data_point_name').annotate(
-                            max_test_time=Max('test_times'))
-                        for mrt_dict in mrt_list:
-                            mrt_dict_obj = MaterialTestResult.objects.filter(material_test_order=mto_obj,
-                                                                             data_point_name=mrt_dict[
-                                                                                 'data_point_name'],
-                                                                             test_times=mrt_dict[
-                                                                                 'max_test_time']).last()
-                            level_list.append(mrt_dict_obj)
-                    quality_sign = True
-                    for mtr_obj in level_list:
-                        if not mtr_obj.mes_result:  # mes没有数据
-                            if not mtr_obj.result:  # 快检也没有数据
-                                quality_sign = False
-                            elif mtr_obj.result != '一等品':
-                                quality_sign = False
-
-                        elif mtr_obj.mes_result == '一等品':
-                            if mtr_obj.result not in ['一等品', None]:
-                                quality_sign = False
-
-                        elif mtr_obj.mes_result != '一等品':
-                            quality_sign = False
-
-                    if quality_sign:
-                        pass_count += 1
-                percent_of_pass = str((pass_count / mto_count) * 100) + '%'
-                return_dict[name_dict[tin_key]] = percent_of_pass
-
-            # 5、计算每个数据点超出的上下限
-            point_count = {}
-            point_upper = {}
-            point_lower = {}
-            for lot_no_dict in lot_no_list:
-                mto_set = MaterialTestOrder.objects.filter(delete_flag=False,
-                                                           production_factory_date__year=year_time,
-                                                           production_factory_date__month=month_time,
-                                                           production_factory_date__day=day_time,
-                                                           product_no=product_no, **lot_no_dict).all()
-                if not mto_set:
-                    continue
-
-                for mto_obj in mto_set:
-                    mrt_list = mto_obj.order_results.filter().all().values('data_point_name').annotate(
-                        max_test_time=Max('test_times'))
-
-                    for mrt_dict in mrt_list:
-                        level_list = []
-                        mtr_obj = MaterialTestResult.objects.filter(material_test_order=mto_obj,
-                                                                    data_point_name=mrt_dict[
-                                                                        'data_point_name'],
-                                                                    test_times=mrt_dict[
-                                                                        'max_test_time']).last()
-                        if not mtr_obj.data_point_indicator:
-                            continue
-                        if mrt_dict['data_point_name'] not in point_count.keys():
-                            point_count[mrt_dict['data_point_name']] = 0
-                        point_count[mrt_dict['data_point_name']] += 1
-                        mdp_obj = MaterialDataPointIndicator.objects.filter(
-                            material_test_method=mtr_obj.data_point_indicator.material_test_method,
-                            data_point=mtr_obj.data_point_indicator.data_point, result='一等品').first()
-
-                        if mtr_obj.data_point_indicator:
-                            if mtr_obj.value > mdp_obj.upper_limit:
-                                if mrt_dict['data_point_name'] not in point_upper.keys():
-                                    point_upper[mrt_dict['data_point_name']] = 0
-                                point_upper[mrt_dict['data_point_name']] += 1
-                            elif mtr_obj.value < mdp_obj.lower_limit:
-                                if mrt_dict['data_point_name'] not in point_lower.keys():
-                                    point_lower[mrt_dict['data_point_name']] = 0
-                                point_lower[mrt_dict['data_point_name']] += 1
-
-            for point in point_count.keys():
-                return_dict[point] = {}
-                if point in point_upper.keys():
-                    return_dict[point]['+'] = point_upper[point]
-                    return_dict[point]['+%'] = str((point_upper[point] / point_count[point]) * 100) + '%'
-                if point in point_lower.keys():
-                    return_dict[point]['-'] = point_lower[point]
-                    return_dict[point]['-%'] = str((point_lower[point] / point_count[point]) * 100) + '%'
-            ruturn_pass.append(return_dict)
-        return Response(ruturn_pass)
-
-
-@method_decorator([api_recorder], name="dispatch")
-class PrintMaterialDealResult(APIView):
-    """不合格品打印功能"""
-
-    def get(self, request, *args, **kwargs):
-        day = self.request.query_params.get('day', None)
-        status = self.request.query_params.get('status', None)
-        filter_dict = {}
-        if day:
-            filter_dict['production_factory_date__icontains'] = day
-        if status:
-            filter_dict['status'] = status
-        MaterialDealResult.objects.filter()
-        mdr_set = MaterialDealResult.objects.filter(~Q(deal_result="一等品")).filter(~Q(status="复测")).filter(**filter_dict,
-                                                                                                          delete_flag=False)
-        return print_mdr("results", mdr_set)
+# @method_decorator([api_recorder], name="dispatch")
+# class PrintMaterialDealResult(APIView):
+#     """不合格品打印功能"""
+#
+#     def get(self, request, *args, **kwargs):
+#         day = self.request.query_params.get('day', None)
+#         status = self.request.query_params.get('status', None)
+#         filter_dict = {}
+#         if day:
+#             filter_dict['production_factory_date__icontains'] = day
+#         if status:
+#             filter_dict['status'] = status
+#         MaterialDealResult.objects.filter()
+#         mdr_set = MaterialDealResult.objects.filter(~Q(deal_result="一等品")).filter(~Q(status="复测")).filter(**filter_dict,
+#                                                                                                           delete_flag=False)
+#         return print_mdr("results", mdr_set)
 
 
 # 1天
@@ -1021,30 +895,6 @@ def get_statics_query_dates(query_params):
     return start_time, end_time
 
 
-@method_decorator([api_recorder, cache_page(timeout=60 * 60 * 24 * 30, cache='default')], name="dispatch")
-class BatchMonthStatisticsView(AllMixin, ReadOnlyModelViewSet):
-    queryset = BatchMonth.objects.all()
-    serializer_class = BatchMonthSerializer
-
-    @action(detail=False)
-    def statistic_headers(self, request):
-        result = {
-            'points': TestDataPoint.objects.values_list('name', flat=True).distinct(),
-            'equips': BatchEquip.objects.values_list('production_equip_no', flat=True).distinct(),
-            'classes': BatchClass.objects.values_list('production_class', flat=True).distinct()
-        }
-        return Response(result)
-
-    def get_queryset(self):
-        start_time, end_time = get_statics_query_dates(self.request.query_params)
-        batches = BatchMonth.objects.filter(date__gte=start_time,
-                                            date__lte=end_time)
-        if batches:
-            batches = BatchCommonSerializer.batch_annotate(batches)
-            batches = batches.order_by('date')
-        return batches
-
-
 def get_statics_query_date(query_params):
     date = query_params.get('date')
     try:
@@ -1052,63 +902,6 @@ def get_statics_query_date(query_params):
     except ValueError:
         raise ValidationError('日期格式:yyyy-mm')
     return date
-
-
-@method_decorator([api_recorder, cache_page(timeout=CACHE_TIME_TIMEOUT, cache='default')], name="dispatch")
-class BatchDayStatisticsView(AllMixin, ReadOnlyModelViewSet):
-    queryset = BatchDay.objects.all()
-    serializer_class = BatchDaySerializer
-
-    def get_queryset(self):
-        date = get_statics_query_date(self.request.query_params)
-        batches = BatchDay.objects.filter(date__year=date.year,
-                                          date__month=date.month)
-        if batches:
-            batches = BatchCommonSerializer.batch_annotate(batches)
-            batches = batches.order_by('date')
-
-        return batches
-
-
-@method_decorator([api_recorder, cache_page(timeout=CACHE_TIME_TIMEOUT, cache='default')], name="dispatch")
-class BatchProductNoDayStatisticsView(AllMixin, ReadOnlyModelViewSet):
-    queryset = BatchProductNo.objects.all()
-    serializer_class = BatchProductNoDaySerializer
-    filter_backends = (DjangoFilterBackend,)
-    filterset_fields = ['product_no']
-
-    def get_serializer_context(self):
-        date = get_statics_query_date(self.request.query_params)
-        context = super().get_serializer_context()
-        context['date'] = date
-        return context
-
-    def get_queryset(self):
-        date = get_statics_query_date(self.request.query_params)
-        return BatchProductNo.objects.filter(
-            batch__batch_month__date__year=date.year,
-            batch__batch_month__date__month=date.month).distinct()
-
-
-@method_decorator([api_recorder, cache_page(timeout=60 * 60 * 24 * 30, cache='default')], name="dispatch")
-class BatchProductNoMonthStatisticsView(AllMixin, ReadOnlyModelViewSet):
-    queryset = BatchProductNo.objects.all()
-    serializer_class = BatchProductNoMonthSerializer
-    filter_backends = (DjangoFilterBackend,)
-    filterset_fields = ['product_no']
-
-    def get_serializer_context(self):
-        start_time, end_time = get_statics_query_dates(self.request.query_params)
-        context = super().get_serializer_context()
-        context['start_time'] = start_time
-        context['end_time'] = end_time
-        return context
-
-    def get_queryset(self):
-        start_time, end_time = get_statics_query_dates(self.request.query_params)
-        return BatchProductNo.objects.filter(
-            batch__batch_month__date__gte=start_time,
-            batch__batch_month__date__lte=end_time).distinct()
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -1367,6 +1160,10 @@ class ImportAndExportView(APIView):
         classes = production_data[3].strip() + '班'
         # 机台
         equip_no = production_data[4].strip()
+        # 班组
+        group = production_data[5].strip()
+        if not group:
+            raise ValidationError('请输入班组！')
         # 取数据点
         reverse_dict = {value: key for key, value in by_dict.items()}
         data_points = [reverse_dict.get(i) for i in range(7, 20) if production_data[i]]
@@ -1403,7 +1200,9 @@ class ImportAndExportView(APIView):
         if not pallet_data:
             raise ValidationError('未找到该批次生产数据：【{}】-【{}】-【{}】-【{}】！！'.format(factory_date, classes, equip_no, product_no))
         pallet_trains_map = {}  # 车次与收皮条码map数据
+        lot_nos = []
         for pallet in pallet_data:
+            lot_nos.append(pallet['lot_no'])
             for j in range(pallet['begin_trains'], pallet['end_trains']+1):
                 if j not in pallet_trains_map:
                     pallet_trains_map[j] = {'lot_no': [pallet['lot_no']],
@@ -1422,24 +1221,19 @@ class ImportAndExportView(APIView):
                 continue
             for lot_no in pallet_trains_map[actual_trains]['lot_no']:
                 plan_classes_uid = pallet_trains_map[actual_trains]['plan_classes_uid']
-                test_order = MaterialTestOrder.objects.filter(lot_no=lot_no,
-                                                              actual_trains=actual_trains
-                                                              ).first()
-                if test_order:
-                    instance = test_order
-                    created = False
-                else:
-                    validated_data = dict()
-                    validated_data['material_test_order_uid'] = uuid.uuid1()
-                    validated_data['actual_trains'] = actual_trains
-                    validated_data['lot_no'] = lot_no
-                    validated_data['product_no'] = product_no
-                    validated_data['plan_classes_uid'] = plan_classes_uid
-                    validated_data['production_class'] = classes
-                    validated_data['production_equip_no'] = equip_no
-                    validated_data['production_factory_date'] = factory_date
-                    instance = MaterialTestOrder.objects.create(**validated_data)
-                    created = True
+                validated_data = dict()
+                validated_data['material_test_order_uid'] = uuid.uuid1()
+                validated_data['actual_trains'] = actual_trains
+                validated_data['lot_no'] = lot_no
+                validated_data['product_no'] = product_no
+                validated_data['plan_classes_uid'] = plan_classes_uid
+                validated_data['production_class'] = classes
+                validated_data['production_equip_no'] = equip_no
+                validated_data['production_factory_date'] = factory_date
+                validated_data['production_group'] = group
+                instance, created = MaterialTestOrder.objects.get_or_create(
+                    defaults=validated_data, **{'lot_no': lot_no,
+                                                'actual_trains': actual_trains})
                 for data_point_name, method in data_point_method_map.items():
                     test_method_name = method['test_method__name']
                     test_indicator_name = method['test_method__test_type__test_indicator__name']
@@ -1460,7 +1254,9 @@ class ImportAndExportView(APIView):
                                    'result': '三等品',
                                    'level': 2,
                                    'is_judged': is_judged,
-                                   'created_user': self.request.user
+                                   'created_user': self.request.user,
+                                   'test_class': classes,
+                                   'test_group': group
                                    }
                     if method.get('qualified_range'):
                         if method['qualified_range'][0] <= point_value <= method['qualified_range'][1]:
@@ -1471,19 +1267,10 @@ class ImportAndExportView(APIView):
                         result_data['judged_lower_limit'] = method['qualified_range'][0]
                     else:
                         continue
-                    if created:
-                        result_data['test_times'] = 1
-                    else:
-                        last_test_result = MaterialTestResult.objects.filter(
-                            material_test_order=instance,
-                            test_indicator_name=test_indicator_name,
-                            data_point_name=data_point_name,
-                        ).order_by('-test_times').first()
-                        if last_test_result:
-                            result_data['test_times'] = last_test_result.test_times + 1
-                        else:
-                            result_data['test_times'] = 1
+                    if not created:
+                        instance.order_results.filter(data_point_name=data_point_name).delete()
                     MaterialTestResult.objects.create(**result_data)
+        gen_pallet_test_result(lot_nos)
         return Response('导入成功')
 
 
@@ -2396,6 +2183,7 @@ class ReportValueView(APIView):
         test_results = {}
         for k, v in json.loads(current_test_detail.value).items():
             test_results[k] = {"name": k, "value": v, "flag": ""}
+        lot_nos = []
         # 根据检测间隔，补充车次相关test_order和test_result表数据
         for train in range(current_test_detail.actual_trains,
                            current_test_detail.actual_trains + equip_test_plan.test_interval):
@@ -2411,19 +2199,20 @@ class ReportValueView(APIView):
                 continue
             for pallet in pallets:
                 lot_no = pallet.lot_no
-                test_order = MaterialTestOrder.objects.filter(lot_no=lot_no, actual_trains=train).first()
-                if not test_order:
-                    test_order = MaterialTestOrder.objects.create(
-                        lot_no=lot_no,
-                        material_test_order_uid=uuid.uuid1(),
-                        actual_trains=train,
-                        product_no=product_no,
-                        plan_classes_uid=pallet.plan_classes_uid,
-                        production_class=production_class,
-                        production_group=group,
-                        production_equip_no=equip_no,
-                        production_factory_date=product_date
-                    )
+                lot_nos.append(lot_no)
+                test_order_data = {
+                    "lot_no": lot_no,
+                    'material_test_order_uid': uuid.uuid1(),
+                    'actual_trains': train,
+                    'product_no': product_no,
+                    'plan_classes_uid': pallet.plan_classes_uid,
+                    'production_class': production_class,
+                    'production_group': group,
+                    'production_equip_no': equip_no,
+                    'production_factory_date': product_date}
+                test_order, created = MaterialTestOrder.objects.get_or_create(
+                    defaults=test_order_data, **{'lot_no': lot_no,
+                                                 'actual_trains': train})
 
                 # 由MES判断检测结果
                 material_test_method = MaterialTestMethod.objects.filter(
@@ -2466,7 +2255,8 @@ class ReportValueView(APIView):
                         # mes_result = '三等品'
                         # level = 2
                         continue
-
+                    if not created:
+                        test_order.order_results.filter(data_point_name=data_point_name).delete()
                     MaterialTestResult.objects.create(
                         material_test_order=test_order,
                         test_factory_date=datetime.datetime.now(),
@@ -2503,6 +2293,7 @@ class ReportValueView(APIView):
         current_test_detail.is_qualified = is_qualified
         current_test_detail.status = 2
         current_test_detail.save()
+        gen_pallet_test_result(lot_nos)
         return Response({'msg': '检测完成', 'success': True})
 
 
@@ -2633,291 +2424,305 @@ class ProductTestStaticsView(APIView):
     permission_classes = (IsAuthenticated,)
 
     def get(self, request):
-        product_segment = self.request.query_params.get('station', '')
-        product_standard = self.request.query_params.get('product_type', '')
-        production_equip_no = self.request.query_params.get('equip_no', '')
-        production_class = self.request.query_params.get('classes', '')
-        start_time = self.request.query_params.get('s_time')
-        end_time = self.request.query_params.get('e_time')
-        diff = datetime.datetime.strptime(end_time, '%Y-%m-%d') - datetime.datetime.strptime(start_time, '%Y-%m-%d')
+        stage = self.request.query_params.get('station', '')  # 段次
+        product_standard = self.request.query_params.get('product_type', '')  # 胶料规格
+        production_equip_no = self.request.query_params.get('equip_no', '')  # 机台
+        production_class = self.request.query_params.get('classes', '')  # 班次
+        st = self.request.query_params.get('s_time')  # 开始时间
+        et = self.request.query_params.get('e_time')  # 结束时间
+        sy_flag = self.request.query_params.get('sy_flag', 'N')
+        if not all([st, et]):
+            raise ValidationError('请选择日期范围查询！')
+        diff = datetime.datetime.strptime(et, '%Y-%m-%d') - datetime.datetime.strptime(st, '%Y-%m-%d')
         if diff.days > 31:
             raise ValidationError('搜索日期跨度不得超过一个月！')
-        product_str = ''
-        if product_segment:
-            product_str += '-{}'.format(product_segment)
+        filter_kwargs = {
+            'production_factory_date__gte': st,
+            'production_factory_date__lte': et,
+        }
+        where_str = """ mtr."LEVEL" = 2 AND to_char(mto."PRODUCTION_FACTORY_DATE", 'yyyy-mm-dd') >= '{}' 
+                      AND to_char(mto."PRODUCTION_FACTORY_DATE", 'yyyy-mm-dd') <= '{}'""".format(st, et)
+        if stage:
+            filter_kwargs['product_no__icontains'] = '-{}-'.format(stage)
+            where_str += " AND mto.PRODUCT_NO like '%-{}-%'".format(stage)
         if product_standard:
-            product_str += '-{}'.format(product_standard)
-        queryset = MaterialTestResult.objects.filter(
-            material_test_order__product_no__icontains=product_str,
-            material_test_order__production_factory_date__gte=start_time,
-            material_test_order__production_factory_date__lte=end_time,
-            material_test_order__production_equip_no__icontains=production_equip_no,
-            material_test_order__production_class__icontains=production_class
-        )
-        # 统计不合格中超过和小于标准的数量
-        # ---------------- begin ---------------
-        dic = {}
-        data_point_dic = {}
-        data_point_query = MaterialDataPointIndicator.objects.filter(level=1).values(
-            'material_test_method__material__material_no', 'data_point__name',
-            'upper_limit', 'lower_limit')
-        for i in data_point_query:
-            if data_point_dic.get(i['material_test_method__material__material_no']):
-                data_point_dic[i['material_test_method__material__material_no']][i['data_point__name']] = [
-                    i['lower_limit'], i['upper_limit']]
+            filter_kwargs['product_no__icontains'] = '-{}-'.format(product_standard)
+            where_str += " AND mto.PRODUCT_NO like '%-{}-%'".format(product_standard)
+        if production_equip_no:
+            filter_kwargs['production_equip_no'] = production_equip_no
+            where_str += " AND mto.PRODUCTION_EQUIP_NO='{}'".format(production_equip_no)
+        if production_class:
+            filter_kwargs['production_class'] = production_class
+            where_str += " AND mto.PRODUCTION_CLASS='{}'".format(production_class)
+        if sy_flag == 'N':
+            filter_kwargs['is_experiment'] = False
+            where_str += " AND mto.IS_EXPERIMENT={}".format(0)
+        mto_data = MaterialTestOrder.objects.filter(**filter_kwargs).values('product_no', 'is_qualified').annotate(qty=Count('id'))
+
+        # 流变总检查车次
+        lb_check_cnt = MaterialTestOrder.objects.filter(**filter_kwargs).filter(
+            order_results__test_indicator_name='流变').distinct().values('id').count()
+        # 流变总检查不合格车次
+        lb_qualified_cnt = MaterialTestOrder.objects.filter(**filter_kwargs).filter(
+            order_results__test_indicator_name='流变', order_results__level=2).values('id').distinct().count()
+
+        # 一次总检查车次
+        yc_check_cnt = MaterialTestOrder.objects.filter(**filter_kwargs).filter(
+            order_results__test_indicator_name__in=('门尼', '比重', '硬度')).values('id').distinct().count()
+        # 一次总检查不合格车次
+        yc_qualified_cnt = MaterialTestOrder.objects.filter(**filter_kwargs).filter(
+            order_results__test_indicator_name__in=('门尼', '比重', '硬度'),
+            order_results__level=2).values('id').distinct().count()
+
+        # 按照胶料规格分组，每个规格流变检测多少车次
+        lb_product_check_data = MaterialTestOrder.objects.filter(**filter_kwargs).filter(
+            order_results__test_indicator_name='流变'
+        ).values('product_no').annotate(cnt=Count('id', distinct=True))
+        # 按照胶料规格分组，每个规格流变合格多少车次
+        lb_product_qualified_data = dict(MaterialTestOrder.objects.filter(**filter_kwargs).filter(
+            order_results__test_indicator_name='流变',
+            order_results__level=2).values('product_no').annotate(cnt=Count('id', distinct=True)).values_list('product_no', 'cnt'))
+
+        # 各胶料流变总检车次、不合格车次
+        datas = {}  # {"C590": [2, 1]}
+        for item in lb_product_check_data:
+            s_pn = item['product_no'].split('-')[2]
+            s_total_qty = item['cnt']
+            s_unq_qty = lb_product_qualified_data.get(item['product_no'], 0)
+            if s_pn in datas:
+                datas[s_pn][0] += s_total_qty
+                datas[s_pn][1] += s_unq_qty
             else:
-                data_point_dic[i['material_test_method__material__material_no']] = {
-                    i['data_point__name']: [i['lower_limit'], i['upper_limit']]}
+                datas[s_pn] = [s_total_qty, s_unq_qty]
+        # 按照胶料规格分组，每个规格一次检测多少车次
+        yc_product_check_data = MaterialTestOrder.objects.filter(**filter_kwargs).filter(
+            order_results__test_indicator_name__in=('门尼', '比重', '硬度')
+        ).values('product_no').annotate(cnt=Count('id', distinct=True))
+        # 按照胶料规格分组，每个规格一次合格多少车次
+        yc_product_qualified_data = dict(MaterialTestOrder.objects.filter(**filter_kwargs).filter(
+            order_results__test_indicator_name__in=('门尼', '比重', '硬度'),
+            order_results__level=2).values('product_no').annotate(cnt=Count('id', distinct=True)).values_list('product_no', 'cnt'))
+
+        # 各胶料一次总检车次、不合格车次
+        data1 = {}  # {"C590": [2, 1]}
+        for item in yc_product_check_data:
+            pn_1 = item['product_no'].split('-')[2]
+            total_qty_1 = item['cnt']
+            unq_qty_1 = yc_product_qualified_data.get(item['product_no'], 0)
+            if pn_1 in data1:
+                data1[pn_1][0] += total_qty_1
+                data1[pn_1][1] += unq_qty_1
+            else:
+                data1[pn_1] = [total_qty_1, unq_qty_1]
+        if not mto_data:
+            return Response({})
+
+        total_check_count = 0
+        total_qualified_count = 0
+        # 各胶料总检车、合格、不合格车次
+        mto_data_dict = {}  # {"C590": {"total_qty": 12, "qualified_qty": 10, "unqualified_qty": 2}}
+        for item in mto_data:
+            mto_product_no = item['product_no'].split('-')[2]
+            mto_qty = item['qty']
+            mto_qualified_qty = 0
+            mto_unqualified_qty = 0
+            is_qualified = item['is_qualified']
+            total_check_count += mto_qty
+            if is_qualified:
+                mto_qualified_qty += mto_qty
+                total_qualified_count += mto_qty
+            else:
+                mto_unqualified_qty += mto_qty
+            if mto_product_no not in mto_data_dict:
+                mto_data_dict[mto_product_no] = {
+                    'total_qty': mto_qty,
+                    'qualified_qty': mto_qualified_qty,
+                    'unqualified_qty': mto_unqualified_qty
+                }
+            else:
+                mto_data_dict[mto_product_no]['total_qty'] += mto_qty
+                mto_data_dict[mto_product_no]['qualified_qty'] += mto_qualified_qty
+                mto_data_dict[mto_product_no]['unqualified_qty'] += mto_unqualified_qty
 
         sql = """
-        SELECT
-     * 
-    FROM
-     (
-     SELECT
-     a.data_point_name,
-      a.value,
-      b.product_no,
-      b.production_factory_date,
-      b.production_class,
-      a.test_times,
-      b.actual_trains,
-      b.production_equip_no 
-     FROM
-      material_test_result a
-      LEFT JOIN material_test_order b ON a.material_test_order_id = b.id 
-     WHERE
-      b.PRODUCTION_EQUIP_NO LIKE '%{}%'
-                AND b.PRODUCT_NO LIKE '%{}%'
-                AND b.PRODUCTION_CLASS LIKE '%{}%'
-                AND b.PRODUCTION_FACTORY_DATE >= TO_DATE('{}', 'YYYY-MM-DD')
-                AND b.PRODUCTION_FACTORY_DATE <= TO_DATE('{}', 'YYYY-MM-DD')
-     ) a 
-    WHERE
-     a.test_times = (
-     SELECT
-      max( x.test_times ) 
-     FROM
-      (
-      SELECT
-       a.value,
-       a.test_class,
-       a.test_times,
-       a.data_point_name,
-       b.production_factory_date,
-       b.actual_trains,
-       b.product_no,
-       b.production_equip_no 
-      FROM
-       material_test_result a
-       LEFT JOIN material_test_order b ON a.material_test_order_id = b.id 
-      WHERE
-       b.PRODUCTION_EQUIP_NO LIKE '%{}%'
-                AND b.PRODUCT_NO LIKE '%{}%'
-                AND b.PRODUCTION_CLASS LIKE '%{}%'
-                AND b.PRODUCTION_FACTORY_DATE >= TO_DATE('{}', 'YYYY-MM-DD')
-                AND b.PRODUCTION_FACTORY_DATE <= TO_DATE('{}', 'YYYY-MM-DD')
-      ) x 
-     WHERE
-      x.data_point_name = a.data_point_name 
-      AND x.actual_trains = a.actual_trains 
-      AND x.product_no = a.product_no 
-     AND x.production_equip_no = a.production_equip_no 
-     )""".format(production_equip_no, product_str, production_class, start_time, end_time,
-                   production_equip_no, product_str, production_class, start_time, end_time)
-
+        select
+    temp.PRODUCT_NO product_no,
+    temp.DATA_POINT_NAME,
+    temp.TEST_INDICATOR_NAME,
+    count(*) uqd,
+    temp.flag
+from (SELECT
+       mtr.DATA_POINT_NAME,
+       (CASE
+           WHEN mtr.VALUE < mtr.JUDGED_LOWER_LIMIT THEN '-'
+           WHEN mtr.VALUE > mtr.JUDGED_UPPER_LIMIT THEN '+'
+           ELSE '+' END) as flag,
+       REGEXP_SUBSTR(PRODUCT_NO, '[^-]+', 1, 3, 'i') as PRODUCT_NO,
+       mtr.TEST_INDICATOR_NAME
+FROM "MATERIAL_TEST_RESULT" mtr
+INNER JOIN "MATERIAL_TEST_ORDER" mto ON (mtr."MATERIAL_TEST_ORDER_ID" = mto."ID")
+WHERE {}
+    ) temp
+group by temp.DATA_POINT_NAME, temp.PRODUCT_NO, temp.TEST_INDICATOR_NAME, temp.flag
+order by temp.PRODUCT_NO, temp.TEST_INDICATOR_NAME;""".format(where_str)
         cursor = connection.cursor()
         cursor.execute(sql)
-        data = cursor.fetchall()
-        for item in data:
-            if data_point_dic.get(item[2]):
-                data_point_list = data_point_dic[item[2]].get(item[0])
-                if data_point_list:
-                    MH_lower = MH_upper = ML_lower = ML_upper = TC10_lower = TC10_upper = TC50_lower = TC50_upper = TC90_lower = TC90_upper = 0
-                    bz_lower = bz_upper = mn_lower = mn_upper = yd_lower = yd_upper = 0
-                    if 'ML(1+4)' == item[0]:
-                        mn_lower = 1 if item[1] < data_point_list[0] else 0
-                        mn_upper = 1 if item[1] > data_point_list[1] else 0
-                    if '比重值' == item[0]:
-                        bz_lower = 1 if item[1] < data_point_list[0] else 0
-                        bz_upper = 1 if item[1] > data_point_list[1] else 0
-                    if '硬度值' == item[0]:
-                        yd_lower = 1 if item[1] < data_point_list[0] else 0
-                        yd_upper = 1 if item[1] > data_point_list[1] else 0
-                    if 'MH' in item[0]:
-                        MH_lower = 1 if item[1] < data_point_list[0] else 0
-                        MH_upper = 1 if item[1] > data_point_list[1] else 0
-                    if 'ML' == item[0]:
-                        ML_lower = 1 if item[1] < data_point_list[0] else 0
-                        ML_upper = 1 if item[1] > data_point_list[1] else 0
-                    if 'TC10' in item[0]:
-                        TC10_lower = 1 if item[1] < data_point_list[0] else 0
-                        TC10_upper = 1 if item[1] > data_point_list[1] else 0
-                    if 'TC50' in item[0]:
-                        TC50_lower = 1 if item[1] < data_point_list[0] else 0
-                        TC50_upper = 1 if item[1] > data_point_list[1] else 0
-                    if 'TC90' in item[0]:
-                        TC90_lower = 1 if item[1] < data_point_list[0] else 0
-                        TC90_upper = 1 if item[1] > data_point_list[1] else 0
-                    spe = item[2].split('-')[2]
-                    if dic.get(spe):
-                        data = dic.get(spe)
-                        dic[spe].update({
-                            'mn_lower': data['mn_lower'] + mn_lower,
-                            'mn_upper': data['mn_upper'] + mn_upper,
-                            'bz_lower': data['bz_lower'] + bz_lower,
-                            'bz_upper': data['bz_upper'] + bz_upper,
-                            'yd_lower': data['yd_lower'] + yd_lower,
-                            'yd_upper': data['yd_upper'] + yd_upper,
-                            'MH_lower': data['MH_lower'] + MH_lower,
-                            'MH_upper': data['MH_upper'] + MH_upper,
-                            'ML_lower': data['ML_lower'] + ML_lower,
-                            'ML_upper': data['ML_upper'] + ML_upper,
-                            'TC10_lower': data['TC10_lower'] + TC10_lower,
-                            'TC10_upper': data['TC10_upper'] + TC10_upper,
-                            'TC50_lower': data['TC50_lower'] + TC50_lower,
-                            'TC50_upper': data['TC50_upper'] + TC50_upper,
-                            'TC90_lower': data['TC90_lower'] + TC90_lower,
-                            'TC90_upper': data['TC90_upper'] + TC90_upper,
-                        })
-                    else:
-                        dic[spe] = {
-                            'mn_lower': mn_lower,
-                            'mn_upper': mn_upper,
-                            'bz_lower': bz_lower,
-                            'bz_upper': bz_upper,
-                            'yd_lower': yd_lower,
-                            'yd_upper': yd_upper,
-                            'MH_lower': MH_lower,
-                            'MH_upper': MH_upper,
-                            'ML_lower': ML_lower,
-                            'ML_upper': ML_upper,
-                            'TC10_lower': TC10_lower,
-                            'TC10_upper': TC10_upper,
-                            'TC50_lower': TC50_lower,
-                            'TC50_upper': TC50_upper,
-                            'TC90_lower': TC90_lower,
-                            'TC90_upper': TC90_upper,
-                        }
-        # --------------- end -----------------
-        # 检查数与合格数
-        records = queryset.values('material_test_order__product_no').annotate(
-            JC=Count('material_test_order_id', distinct=True),
-            HG=Count('material_test_order_id', distinct=True, filter=Q(material_test_order__is_qualified=True)))
-        if not records:
-            return Response([])
+        query_data = cursor.fetchall()
+        ret = {}
+        for item in query_data:
+            product_type = item[0]
+            data_point_name = item[1]
+            test_indicator_name = item[2]
+            qty = item[3]
+            flag = item[4]
+            mn_unqualified_count, mn_lower_count, mn_upper_count = 0, 0, 0
+            bz_unqualified_count, bz_lower_count, bz_upper_count = 0, 0, 0
+            yd_unqualified_count, yd_lower_count, yd_upper_count = 0, 0, 0
+            ml_unqualified_count, ml_lower_count, ml_upper_count = 0, 0, 0
+            mh_unqualified_count, mh_lower_count, mh_upper_count = 0, 0, 0
+            tc10_unqualified_count, tc10_lower_count, tc10_upper_count = 0, 0, 0
+            tc50_unqualified_count, tc50_lower_count, tc50_upper_count = 0, 0, 0
+            tc90_unqualified_count, tc90_lower_count, tc90_upper_count = 0, 0, 0
 
-        # result = {re.search(r'\w{1,2}\d{3}', j['material_test_order__product_no']).group():
-        #               {'product_type': re.search(r'\w{1,2}\d{3}', j['material_test_order__product_no']).group(),
-        #                'JC': j['JC'], 'HG': j['HG'], 'MN': 0, 'YD': 0, 'BZ': 0, 'RATE_1': [], 'MH': 0, 'ML': 0,
-        #                'TC10': 0, 'TC50': 0, 'TC90': 0, 'RATE_S': [], 'sum_s': 0, 'rate': round(j['HG'] / j['JC'] * 100, 2)} for j in records}
-        result = {}
-        for j in records:
-            product_type = re.search(r'\w{1,2}\d{3}', j['material_test_order__product_no']).group()
-            if product_type not in result:
-                data = {'product_type': product_type, 'JC': j['JC'], 'HG': j['HG'], 'MN': 0, 'YD': 0, 'BZ': 0,
-                        'RATE_1': [], 'MH': 0, 'ML': 0, 'TC10': 0, 'TC50': 0, 'TC90': 0, 'RATE_S': [], 'sum_s': 0,
-                        'rate': '%.2f' % (j['HG'] / j['JC'] * 100)}
-                result[product_type] = data
+            if test_indicator_name == '门尼':
+                mn_unqualified_count = qty
+                if flag == '-':
+                    mn_lower_count = qty
+                else:
+                    mn_upper_count = qty
+            elif test_indicator_name == '硬度':
+                yd_unqualified_count = qty
+                if flag == '-':
+                    yd_lower_count = qty
+                else:
+                    yd_upper_count = qty
+            elif test_indicator_name == '比重':
+                bz_unqualified_count = qty
+                if flag == '-':
+                    bz_lower_count = qty
+                else:
+                    bz_upper_count = qty
+            if test_indicator_name == '流变':
+                if data_point_name == 'ML':
+                    ml_unqualified_count = qty
+                    if flag == '-':
+                        ml_lower_count = qty
+                    else:
+                        ml_upper_count = qty
+                elif data_point_name == 'MH':
+                    mh_unqualified_count = qty
+                    if flag == '-':
+                        mh_lower_count = qty
+                    else:
+                        mh_upper_count = qty
+                elif data_point_name == 'TC10':
+                    tc10_unqualified_count = qty
+                    if flag == '-':
+                        tc10_lower_count = qty
+                    else:
+                        tc10_upper_count = qty
+                elif data_point_name == 'TC50':
+                    tc50_unqualified_count = qty
+                    if flag == '-':
+                        tc50_lower_count = qty
+                    else:
+                        tc50_upper_count = qty
+                elif data_point_name == 'TC90':
+                    tc90_unqualified_count = qty
+                    if flag == '-':
+                        tc90_lower_count = qty
+                    else:
+                        tc90_upper_count = qty
+            if product_type not in ret:
+                qt_data = mto_data_dict.get(product_type)
+                rate_date1 = data1.get(product_type)
+                rate_dates = datas.get(product_type)
+                if qt_data:
+                    check_qty = qt_data.get('total_qty', 0)
+                    qualified_qty = qt_data.get('qualified_qty', 0)
+                    unqualified_qty = qt_data.get('unqualified_qty', 0)
+                    rate = round(qualified_qty / check_qty * 100, 2) if check_qty else ''
+                else:
+                    check_qty = qualified_qty = unqualified_qty = ''
+                    rate = ''
+                if rate_date1:
+                    rate1 = round((rate_date1[0] - rate_date1[1]) / rate_date1[0] * 100, 2) if rate_date1[0] else ''
+                else:
+                    rate1 = ''
+                if rate_dates:
+                    rates = round((rate_dates[0] - rate_dates[1]) / rate_dates[0] * 100, 2) if rate_dates[0] else ''
+                    sum_s = rate_dates[1]
+                else:
+                    rates = ''
+                    sum_s = ''
+                ret[product_type] = {"product_type": product_type,  # 胶料
+                                     "JC": check_qty,  # 检查数量
+                                     "HG": qualified_qty,  # 合格数量
+                                     "cp_all": unqualified_qty,  # 次品合计
+                                     "MN": mn_unqualified_count,  # 门尼不合格数量
+                                     "YD": yd_unqualified_count,  # 硬度不合格数量
+                                     "BZ": bz_unqualified_count,  # 比重不合格数量
+                                     "MH": mh_unqualified_count,  # 流变MH不合格数量
+                                     "ML": ml_unqualified_count,  # 流变ML不合格数量
+                                     "TC10": tc10_unqualified_count,  # 流变TC10不合格数量
+                                     "TC50": tc50_unqualified_count,  # 流变TC50不合格数量
+                                     "TC90": tc90_unqualified_count,  # 流变TC90不合格数量
+                                     "sum_s": sum_s,  # 流变合计
+                                     "mn_lower": mn_lower_count,  # 门尼低于下限不合格数量
+                                     "mn_upper": mn_upper_count,  # 门尼高于上限不合格数量
+                                     "bz_lower": bz_lower_count,  # 比重低于下限不合格数量
+                                     "bz_upper": bz_upper_count,  # 门尼高于上限不合格数量
+                                     "yd_lower": yd_lower_count,  # 硬度低于下限不合格数量
+                                     "yd_upper": yd_upper_count,  # 硬度高于上限不合格数量
+                                     "MH_lower": mh_lower_count,  # MH低于下限不合格数量
+                                     "MH_upper": mh_upper_count,  # MH高于上限不合格数量
+                                     "ML_lower": ml_lower_count,  # ML低于下限不合格数量
+                                     "ML_upper": ml_upper_count,  # ML高于上限不合格数量
+                                     "TC10_lower": tc10_lower_count,  # ML低于下限不合格数量
+                                     "TC10_upper": tc10_upper_count,  # ML高于上限不合格数量
+                                     "TC50_lower": tc50_lower_count,  # ML低于下限不合格数量
+                                     "TC50_upper": tc50_upper_count,  # ML高于上限不合格数量
+                                     "TC90_lower": tc90_lower_count,  # ML低于下限不合格数量
+                                     "TC90_upper": tc90_upper_count,  # ML高于上限不合格数量
+                                     'RATE_1_PASS': rate1,
+                                     'RATE_S_PASS': rates,
+                                     "rate": rate
+                                     }
             else:
-                data = result.get(product_type)
-                data.update({'JC': data['JC'] + j['JC'], 'HG': data['HG'] + j['HG']})
-                data.update({'rate': round(data['HG'] / data['JC'] * 100, 2)})
-        """result {'J260': {'product_type': 'J260', 'JC': 2, 'HG': 1}}"""
-        # ---------------- begin ---------------
-        for i in result.keys():
-            if dic.get(i):
-                result[i].update(dic[i])
-            else:
-                result[i].update({
-                    'mn_lower': 0,
-                    'mn_upper': 0,
-                    'bz_lower': 0,
-                    'bz_upper': 0,
-                    'yd_lower': 0,
-                    'yd_upper': 0,
-                    'MH_lower': 0,
-                    'MH_upper': 0,
-                    'ML_lower': 0,
-                    'ML_upper': 0,
-                    'TC10_lower': 0,
-                    'TC10_upper': 0,
-                    'TC50_lower': 0,
-                    'TC50_upper': 0,
-                    'TC90_lower': 0,
-                    'TC90_upper': 0,
-                })
-        """result {'J260': {'product_type': 'J260', 'JC': 2, 'HG': 1, 'MH': 1, 'ML': 1, 'TC10': 1 .....}}"""
-        # --------------- end -----------------
-        pre_data = queryset.values('material_test_order__product_no', 'test_indicator_name', 'data_point_name') \
-            .annotate(num=Count('id', distinct=True, filter=Q(~Q(level=1)))) \
-            .values('material_test_order_id', 'material_test_order__product_no', 'test_indicator_name',
-                    'data_point_name', 'num', 'test_times') \
-            .order_by('test_times')
-        # 处理数据
-        data = {(str(i['material_test_order_id']) + '_' + re.search(r"\w{1,2}\d{3}", i[
-            'material_test_order__product_no']).group() + '_' + i['test_indicator_name'] + '_' + i[
-                     'data_point_name']): [i['num'], i['test_times']] for i in pre_data}
-        """{'182_J260_比重_比重值': [2, 1], '182_J260_流变_MH': [2, 1], '182_J260_流变_TC10': [2, 1], '182_J260_流变_TC50': [2, 1], 
-        '182_J260_流变_TC90': [2, 1], '182_J260_物性_M300': [2, 1], '182_J260_物性_伸长率%': [2, 1], '182_J260_物性_扯断强度': [2, 1], 
-        '182_J260_硬度_硬度值': [2, 1], '182_J260_钢拔_钢拔': [2, 1], '182_J260_门尼_ML(1+4)': [2, 1], '183_J260_门尼_ML(1+4)': [1, 0]}"""
-        for k, v in data.items():
-            single_data = result.get(k.split('_')[1])
-            order_id = k.split('_')[0]
-            if 'ML(1+4)' in k:
-                single_data['MN'] += v[0]
-                if order_id not in single_data['RATE_1'] and v[0] != 0:
-                    single_data['RATE_1'].append(order_id)
-            elif '硬度值' in k:
-                single_data['YD'] += v[0]
-                if order_id not in single_data['RATE_1'] and v[0] != 0:
-                    single_data['RATE_1'].append(order_id)
-            elif '比重值' in k:
-                single_data['BZ'] += v[0]
-                if order_id not in single_data['RATE_1'] and v[0] != 0:
-                    single_data['RATE_1'].append(order_id)
-            elif 'MH' in k:
-                single_data['MH'] += v[0]
-                if order_id not in single_data['RATE_S'] and v[0] != 0:
-                    single_data['RATE_S'].append(order_id)
-            elif 'ML' in k:
-                single_data['ML'] += v[0]
-                if order_id not in single_data['RATE_S'] and v[0] != 0:
-                    single_data['RATE_S'].append(order_id)
-            elif 'TC10' in k:
-                single_data['TC10'] += v[0]
-                if order_id not in single_data['RATE_S'] and v[0] != 0:
-                    single_data['RATE_S'].append(order_id)
-            elif 'TC50' in k:
-                single_data['TC50'] += v[0]
-                if order_id not in single_data['RATE_S'] and v[0] != 0:
-                    single_data['RATE_S'].append(order_id)
-            elif 'TC90' in k:
-                single_data['TC90'] += v[0]
-                if order_id not in single_data['RATE_S'] and v[0] != 0:
-                    single_data['RATE_S'].append(order_id)
-            else:
-                continue
-        res_data = result.values()
-        all = {}
-        rate_1, rate_lb, rate_test_all, rate_pass_sum = 0, 0, 0, 0
-        for v in res_data:
-            v['sum_s'] = len(v.pop('RATE_S'))
-            rate_1_pass_sum = v['JC'] - len(v.pop('RATE_1'))
-            rate_s_pass_sum = v['JC'] - v['sum_s']
-            v['RATE_1_PASS'] = '%.2f' % (rate_1_pass_sum / v['JC'] * 100)
-            v['cp_all'] = v['JC'] - v['HG']
-            v['RATE_S_PASS'] = '%.2f' % (rate_s_pass_sum / v['JC'] * 100)
-            rate_1 += rate_1_pass_sum
-            rate_lb += rate_s_pass_sum
-            rate_test_all += v['JC']
-            rate_pass_sum += v['HG']
-        all.update(rate_1='%.2f' % (rate_1 / rate_test_all * 100), rate_lb='%.2f' % (rate_lb / rate_test_all * 100),
-                   rate='%.2f' % (rate_pass_sum / rate_test_all * 100))
-        for dic in res_data:
-            for key, value in dic.items():
-                dic[key] = None if not dic[key] else dic[key]
-        return Response({'result': res_data, 'all': all})
+                ret[product_type]['MN'] += mn_unqualified_count
+                ret[product_type]['YD'] += yd_unqualified_count
+                ret[product_type]['BZ'] += bz_unqualified_count
+                ret[product_type]['MH'] += mh_unqualified_count
+                ret[product_type]['ML'] += ml_unqualified_count
+                ret[product_type]['TC10'] += tc10_unqualified_count
+                ret[product_type]['TC50'] += tc50_unqualified_count
+                ret[product_type]['TC90'] += tc90_unqualified_count
+                ret[product_type]['mn_lower'] += mn_lower_count
+                ret[product_type]['mn_upper'] += mn_upper_count
+                ret[product_type]['bz_lower'] += bz_lower_count
+                ret[product_type]['bz_upper'] += bz_upper_count
+                ret[product_type]['yd_lower'] += yd_lower_count
+                ret[product_type]['yd_upper'] += yd_upper_count
+                ret[product_type]['MH_lower'] += mh_lower_count
+                ret[product_type]['MH_upper'] += mh_upper_count
+                ret[product_type]['ML_lower'] += ml_lower_count
+                ret[product_type]['ML_upper'] += ml_upper_count
+                ret[product_type]['TC10_lower'] += tc10_lower_count
+                ret[product_type]['TC10_upper'] += tc10_upper_count
+                ret[product_type]['TC50_lower'] += tc50_lower_count
+                ret[product_type]['TC50_upper'] += tc50_upper_count
+                ret[product_type]['TC90_lower'] += tc90_lower_count
+                ret[product_type]['TC90_upper'] += tc90_upper_count
+        resp_data = ret.values()
+        for dt in resp_data:
+            for k, v in dt.items():
+                if k not in ('rate', 'HG', 'RATE_1_PASS', 'RATE_S_PASS'):
+                    if v == 0:
+                        dt[k] = ''
+        summary_data = {'rate': round(total_qualified_count/total_check_count*100, 2) if total_check_count else '',
+                        'rate_1': round((yc_check_cnt-yc_qualified_cnt)/yc_check_cnt*100, 2) if yc_check_cnt else '',
+                        'rate_lb': round((lb_check_cnt-lb_qualified_cnt)/lb_check_cnt*100, 2) if lb_check_cnt else ''}
+        return Response({'result': resp_data, 'all': summary_data})
 
 
 @method_decorator([api_recorder], name='dispatch')

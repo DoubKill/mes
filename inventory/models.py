@@ -1271,7 +1271,7 @@ class HfBakeLog(models.Model):
 class WMSOutboundHistory(models.Model):
     QUALITY_STATUS_CHOICE = (
         ('合格品', '合格品'),
-        ('合格品', '合格品'),
+        ('抽检中', '抽检中'),
         ('不合格品', '不合格品'),
         ('过期', '过期'),
         ('待检', '待检'),
@@ -1282,7 +1282,7 @@ class WMSOutboundHistory(models.Model):
     zc_test_result = models.CharField(max_length=8, help_text='总厂检测结果(合格/不合格/待检/未知)')
     hs_status = models.CharField(max_length=8, help_text='核酸管控结果(已锁定/已解锁/未锁定)')
     mooney_value = models.IntegerField(help_text='门尼检测值', blank=True, null=True)
-    mooney_level = models.CharField(max_length=8, help_text='门尼等级(高级/中级/低级)', blank=True, null=True)
+    mooney_level = models.CharField(max_length=8, help_text='门尼等级(高门尼/标准门尼/低门尼)', blank=True, null=True)
 
     class Meta:
         db_table = 'wms_outbond_history'

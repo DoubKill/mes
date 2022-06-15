@@ -7,7 +7,22 @@ name:
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-from quality.views import *
+from quality.views import TestIndicatorViewSet, TestTypeViewSet, DataPointViewSet, DataPointStandardErrorViewSet, \
+    TestMethodViewSet, MaterialTestMethodViewSet, MaterialDataPointIndicatorViewSet, MaterialTestOrderViewSet, \
+    DealSuggestionViewSet, MaterialDealResultViewSet, LevelResultViewSet, LabelPrintViewSet, \
+    UnqualifiedDealOrderViewSet, PalletFeedbacksTestListView, IgnoredProductInfoViewSet, ProductReportEquipViewSet, \
+    ProductReportValueViewSet, MaterialEquipTypeViewSet, MaterialEquipViewSet, ExamineValueUnitViewSet, \
+    MaterialExamineTypeViewSet, MaterialExamineResultViewSet, ExamineMaterialViewSet, \
+    MaterialInspectionRegistrationViewSet, MaterialReportEquipViewSet, MaterialReportValueViewSet, \
+    ProductTestPlanViewSet, ProductTestPlanDetailViewSet, ProductTestResumeViewSet, RubberMaxStretchTestResultViewSet, \
+    MaterialTestPlanViewSet, MaterialTestPlanDetailViewSet, WMSMooneyLevelView, ProductBatchingMaterialListView, \
+    TestIndicatorDataPointListView, MaterialDealStatusListView, DealTypeView, MaterialTestIndicatorMethods, \
+    ProductDayStatistics, DealSuggestionView, MaterialTestResultHistoryView, \
+    ImportAndExportView, BarCodePreview, DealMethodHistoryView, TestDataPointCurveView, DataPointLabelHistoryView, \
+    MaterialSingleTypeExamineResultView, ExamineResultCurveView, ShowQualifiedRange, WMSMaterialSearchView, \
+    ReportValueView, TestDataView, CheckEquip, UnqualifiedPalletFeedBackListView, DataPointListView, \
+    ProductTestStaticsView, ClassTestStaticsView, UnqialifiedEquipView, LabelPrintLogView, \
+    MaterialDataPointIndicatorHistoryView
 
 router = DefaultRouter()
 
@@ -36,18 +51,6 @@ router.register('material-deal-result', MaterialDealResultViewSet)
 router.register('level-result', LevelResultViewSet)
 # 快检标签打印
 router.register('label-print', LabelPrintViewSet)
-
-# 月批次快检合格率统计
-router.register('batch-month-statistics', BatchMonthStatisticsView)
-
-# 日批次快检合格率统计
-router.register('batch-day-statistics', BatchDayStatisticsView)
-
-# 胶料日合格率统计
-router.register('batch-product-no-day-statistics', BatchProductNoDayStatisticsView, basename='dayStatistics')
-
-# 胶料月合格率统计
-router.register('batch-product-no-month-statistics', BatchProductNoMonthStatisticsView)
 
 # 不合格处置单
 router.register('unqualified-deal-orders', UnqualifiedDealOrderViewSet)
@@ -120,10 +123,9 @@ urlpatterns = [
     # path('material_valid_time/', MaterialDealResultUpdateValidTime.as_view()),  # 快检信息综合管理修改有效时间
     path('mat-test-indicator-methods/', MaterialTestIndicatorMethods.as_view()),
     path('product_day_statistics/', ProductDayStatistics.as_view()),  # 胶料日合格率统计
-    path('product_day_detail/', ProductDayDetail.as_view()),  # 胶料日合格率详情信息统计
     path('deal-suggestion-view/', DealSuggestionView.as_view()),  # 处理意见展示
     path('test-result-history/', MaterialTestResultHistoryView.as_view()),
-    path('print-material-deal-result/', PrintMaterialDealResult.as_view()),  # 不合格处理导出功能
+    # path('print-material-deal-result/', PrintMaterialDealResult.as_view()),  # 不合格处理导出功能
     # path('unqualified-trains/', UnqualifiedOrderTrains.as_view()),
     path('import-material-test-orders/', ImportAndExportView.as_view()),  # 快检数据导入
     path('barcode-preview/', BarCodePreview.as_view()),  # 条码追溯中的条码预览接口

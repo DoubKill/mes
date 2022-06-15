@@ -4759,6 +4759,7 @@ class EquipOrderEntrustView(APIView):
 
 @method_decorator([api_recorder], name='dispatch')
 class EquipIndexView(APIView):
+    authentication_classes = ()
 
     @staticmethod
     def get_current_factory_date():
@@ -4865,8 +4866,13 @@ class EquipIndexView(APIView):
                     plan_trains = plan_actual_data['plan_trains'] if plan_actual_data['plan_trains'] else 0
                     # 计算所有计划开始结束时间累加
                     plan_list = Plan.objects.using(equip_no).filter(
-                        date_time=factory_date).values('starttime', 'stoptime', 'actno', 'state', 'recipe', 'setno')
+                        date_time=factory_date,
+                        actno__gt=0).values('starttime', 'stoptime', 'actno', 'state', 'recipe', 'setno')
                     time_consume = 0
+                    try:
+                        last_running_time = max([datetime.strptime(i['stoptime'], '%Y-%m-%d %H:%M:%S') for i in filter(lambda x: x['stoptime'], plan_list)])
+                    except:
+                        pass
                     for item in plan_list:
                         try:
                             finish_no = int(item['actno'])
