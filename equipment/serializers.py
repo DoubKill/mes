@@ -1457,6 +1457,18 @@ class EquipWarehouseOrderDetailSerializer(BaseModelSerializer):
         return res.get('all_qty') if res.get('all_qty') else 0
 
 
+class EquipWarehouseOrderListSerializer(BaseModelSerializer):
+    equip_spare = serializers.ListField(default=[], write_only=True)
+    order_id = serializers.CharField(help_text='单据条码', validators=[
+        UniqueValidator(EquipWarehouseOrder.objects.all(), message='该条码已存在')])
+
+    class Meta:
+        model = EquipWarehouseOrder
+        fields = ("id", "created_username", "order_id", "submission_department",
+        "status", "desc", "work_order_no", 'status_name', 'equip_spare', 'created_date', 'barcode')
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
 class EquipWarehouseOrderSerializer(BaseModelSerializer):
     equip_spare = serializers.ListField(default=[], write_only=True)
     order_id = serializers.CharField(help_text='单据条码', validators=[

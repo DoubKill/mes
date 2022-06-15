@@ -567,14 +567,11 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
             if task_status:
                 queryset.filter(task_status=task_status)
             if quality_status:
-                if quality_status == '1':
-                    batch_nos = list(ExamineMaterial.objects.filter(qualified=True).values_list('batch', flat=True))
-                elif quality_status == '3':
-                    batch_nos = list(ExamineMaterial.objects.filter(qualified=False).values_list('batch', flat=True))
-                else:
-                    batch_nos = list(ExamineMaterial.objects.values_list('batch', flat=True))
-                    return queryset.filter(~Q(batch_no__in=batch_nos) | Q(batch_no__isnull=True)).filter(**filter_dict)
-                filter_dict.update(batch_no__in=batch_nos)
+                status_map = {'1': "合格品", '2': "抽检中", '3': "不合格品", '4': "过期", '5': "待检"}
+                task_nos = list(WMSOutboundHistory.objects.filter(
+                    quality_status=status_map.get(quality_status)
+                ).values_list('task_no', flat=True))
+                filter_dict['order_no__in'] = task_nos
             return queryset.filter(**filter_dict)
         else:
             return []
@@ -6692,8 +6689,9 @@ class WMSMnLevelSearchView(APIView):
         order_nos = self.request.data.get('order_nos')  # 下架任务号列表
         if not isinstance(order_nos, list):
             return Response({'message': "参数错误！", "success:": False, "data": []})
-        out_history = dict(WMSOutboundHistory.objects.filter(
-            task_no__in=order_nos).values_list('task_no', 'mooney_level'))
+        out_history = list(WMSOutboundHistory.objects.filter(
+            task_no__in=order_nos).values('task_no', 'mooney_level', 'mooney_value'))
+        out_history_dict = {item['task_no']: item for item in out_history}
         out_log = MaterialOutHistory.objects.using('wms').filter(
             order_no__in=order_nos).values('order_no', 'material_name', 'lot_no')
         out_log_dict = {i['order_no']: i for i in out_log}
@@ -6706,11 +6704,24 @@ class WMSMnLevelSearchView(APIView):
             else:
                 material_name = ""
                 tracking_num = ""
+            out_history_data = out_history_dict.get(order_no)
+            if not out_history_data:
+                mn_level = "无等级"
+            else:
+                level = out_history_data['mooney_level']
+                value = out_history_data['mooney_value']
+                if level:
+                    mn_level = level
+                else:
+                    if value:
+                        mn_level = "无等级"
+                    else:
+                        mn_level = "待检"
             ret.append(
                 {"order_no": order_no,
                  "material_name": material_name,
                  "tracking_num": tracking_num,
-                 "mn_level": out_history.get(order_no, "")
+                 "mn_level": mn_level
                  }
             )
         return Response({'message': "OK", "success:": True, "data": ret})

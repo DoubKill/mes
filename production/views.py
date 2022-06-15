@@ -63,9 +63,7 @@ from rest_framework.generics import ListAPIView, GenericAPIView, ListCreateAPIVi
     get_object_or_404
 from datetime import timedelta
 
-from quality.models import BatchProductNo, BatchDay, Batch, BatchMonth, BatchYear, MaterialTestOrder, \
-    MaterialDealResult, MaterialTestResult, MaterialDataPointIndicator
-from quality.serializers import BatchProductNoDateZhPassSerializer, BatchProductNoClassZhPassSerializer
+from quality.models import MaterialTestOrder, MaterialDealResult, MaterialTestResult, MaterialDataPointIndicator
 from quality.utils import get_cur_sheet, get_sheet_data
 from system.models import User, Section
 from recipe.models import Material
@@ -1125,45 +1123,6 @@ class EquipProductRealView(APIView):
                 "product_time": _.product_time.strftime('%Y-%m-%d %H:%M:%S'),
             }
             ret["data"].append(new)
-
-
-@method_decorator([api_recorder], name="dispatch")
-class MaterialPassRealView(APIView):
-    permission_classes = (IsAuthenticated,)
-
-    def get(self, request, *args, **kwargs):
-        data = None
-        query_unit = self.request.query_params.get('query_unit', 'day')
-        material_no = self.request.query_params.get('material_no')
-        batch_product_nos = BatchProductNo.objects.all()
-        if material_no:
-            batch_product_nos = BatchProductNo.objects.filter(
-                product_no=material_no)
-        if query_unit == 'day':
-            data = BatchProductNoDateZhPassSerializer(
-                batch_product_nos,
-                many=True,
-                context={'batch_date_model': BatchDay}).data
-        elif query_unit == 'month':
-            data = BatchProductNoDateZhPassSerializer(
-                batch_product_nos,
-                many=True,
-                context={'batch_date_model': BatchMonth}).data
-        elif query_unit == 'year':
-            data = BatchProductNoDateZhPassSerializer(
-                batch_product_nos,
-                many=True,
-                context={'batch_date_model': BatchYear}).data
-        elif query_unit == 'classes':
-            data = BatchProductNoClassZhPassSerializer(
-                batch_product_nos,
-                many=True).data
-        else:
-            raise ValidationError('查询维度不支持')
-        return Response({
-            'time': timezone.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'data': data
-        })
 
 
 @method_decorator([api_recorder], name="dispatch")

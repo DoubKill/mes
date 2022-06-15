@@ -35,6 +35,7 @@ from recipe.serializers import MaterialSerializer, ProductInfoSerializer, \
 from recipe.models import Material, ProductInfo, ProductBatching, MaterialAttribute, \
     ProductBatchingDetail, MaterialSupplier, WeighCntType, WeighBatchingDetail, ZCMaterial, ERPMESMaterialRelation, \
     ProductBatchingEquip, ProductBatchingMixed, MultiReplaceMaterial
+from recipe.utils import get_mixed
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -545,18 +546,16 @@ class ProductBatchingNoNew(APIView):
             mixed_ratio = self.request.data.get('mixed_ratio')
             feeds, ratios = mixed_ratio['stage'], mixed_ratio['ratio']
             instance = ProductBatching.objects.filter(id=product_batching_id).last()
-            f_s = instance.batching_details.filter(Q(material__material_name__icontains=feeds['f_feed']) | Q(
-                material__material_name__icontains=feeds['s_feed'])).last()
+            f_s, f_stage = get_mixed(instance)
             if not f_s:
                 raise ValidationError('对搭设置的段次信息在配方中不存在')
-            f_weight, s_weight = round(float(f_s.actual_weight) * (ratios['f_ratio'] / sum(ratios.values())), 3), \
-                                 round(float(f_s.actual_weight) * (ratios['s_ratio'] / sum(ratios.values())), 3)
+            f_name, f_weight, s_weight = f_s.material.material_name, round(float(f_s.actual_weight) * (ratios['f_ratio'] / sum(ratios.values())), 3), round(float(f_s.actual_weight) * (ratios['s_ratio'] / sum(ratios.values())), 3)
             # 查询对搭设置
             mixed = ProductBatchingMixed.objects.filter(product_batching_id=product_batching_id)
             use_data = {'f_feed': feeds['f_feed'], 's_feed': feeds['s_feed'], 's_weight': s_weight,
-                        'f_feed_name': instance.stage_product_batch_no.replace(instance.stage.global_name, feeds['f_feed']),
-                        's_feed_name': instance.stage_product_batch_no.replace(instance.stage.global_name, feeds['s_feed']),
-                        'f_ratio': ratios['f_ratio'], 's_ratio': ratios['s_ratio'], 'f_weight': f_weight}
+                        'f_feed_name': f_name.replace(f_stage, feeds['f_feed']), 'f_ratio': ratios['f_ratio'],
+                        's_feed_name': f_name.replace(f_stage, feeds['s_feed']), 's_ratio': ratios['s_ratio'],
+                        'f_weight': f_weight, 'origin_material_name': f_name}
             if not mixed:  # 不存在新增
                 use_data.update({'product_batching': instance})
                 ProductBatchingMixed.objects.create(**use_data)
