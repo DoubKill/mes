@@ -88,7 +88,6 @@ urlpatterns = [
     path('interval-output-statistics/', IntervalOutputStatisticsView.as_view()),  # 区间产量统计
     path('material-output-real/', MaterialOutputView.as_view()),  # 规格产量统计
     path('equip-product-real/', EquipProductRealView.as_view()),  # 实时机台生产信息
-    path('material-pass-real/', MaterialPassRealView.as_view()),
     path('equip-tank/', MaterialTankStatusList.as_view()),  # 机台编号和罐编号
     # 中策调可视化的接口
     path('equip-output-statistics/', WeekdayProductStatisticsView.as_view()), # 上周所有机台每日总产能
