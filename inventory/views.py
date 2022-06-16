@@ -5152,7 +5152,8 @@ class OutboundStock(APIView):
             order_qty=9999,
             station=station,
             quality_status=quality_status,
-            product_no=product_no
+            product_no=product_no,
+            created_user=self.request.user
         )
 
         detail_ids = []
