@@ -5463,6 +5463,13 @@ class WMSOutTaskView(ListAPIView):
     serializer_class = MaterialOutHistoryOtherSerializer
     permission_classes = (IsAuthenticated,)
     DB = 'wms'
+    EXPORT_FIELDS_DICT = {'出库单据号': 'order_no',
+                          '单据类型': 'task_type_name',
+                          '创建时间': 'start_time',
+                          '状态': 'task_status_name',
+                          '数量': 'qty',
+                          '创建人': 'initiator'
+                          }
 
     def get_serializer_context(self):
         """
@@ -5481,18 +5488,44 @@ class WMSOutTaskView(ListAPIView):
         task_status = self.request.query_params.get('task_status')
         material_no = self.request.query_params.get('material_no')
         material_name = self.request.query_params.get('material_name')
+        st = self.request.query_params.get('st')
+        et = self.request.query_params.get('et')
         filter_kwargs = {}
         if order_no:
             filter_kwargs['order_no__icontains'] = order_no
         if task_status:
             filter_kwargs['task_status'] = task_status
         if material_no:
-            task_ids = MaterialOutHistory.objects.using(self.DB).filter(material_no__icontains=material_no).values_list('task_id', flat=True)
+            task_ids = MaterialOutHistory.objects.using(self.DB).filter(material_no=material_no).values_list('task_id', flat=True)
             filter_kwargs['id__in'] = task_ids
         if material_name:
-            task_ids = MaterialOutHistory.objects.using(self.DB).filter(material_name__icontains=material_name).values_list('task_id', flat=True)
+            task_ids = MaterialOutHistory.objects.using(self.DB).filter(material_name=material_name).values_list('task_id', flat=True)
             filter_kwargs['id__in'] = task_ids
+        if st:
+            filter_kwargs['start_time__gte'] = st
+        if et:
+            filter_kwargs['start_time__lte'] = et
         return query_set.filter(**filter_kwargs)
+
+    def list(self, request, *args, **kwargs):
+        export = self.request.query_params.get('export')
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if export:
+            et = self.request.query_params.get('et')
+            st = self.request.query_params.get('st')
+            if not all([st, et]):
+                raise ValidationError('请选择导出的时间范围！')
+            diff = datetime.datetime.strptime(et, '%Y-%m-%d %H:%M:%S') - datetime.datetime.strptime(st, '%Y-%m-%d %H:%M:%S')
+            if diff.days > 31:
+                raise ValidationError('导出数据的日期跨度不得超过一个月！')
+            data = self.get_serializer(queryset, many=True).data
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, '出库单据')
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 @method_decorator([api_recorder], name="dispatch")
