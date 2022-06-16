@@ -3050,13 +3050,15 @@ class ReplaceMaterialViewSet(ModelViewSet):
     """
     queryset = ReplaceMaterial.objects.all().order_by('-last_updated_date', 'equip_no')
     serializer_class = ReplaceMaterialSerializer
-    pagination_class = None
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = ReplaceMaterialFilter
 
     def list(self, request, *args, **kwargs):
         choice = self.request.query_params.get('id')  # 是否是下拉框选择
+        # 超过24消失未处理默认超期失效
+        now_time = datetime.datetime.now() - timedelta(days=1)
+        self.get_queryset().filter(status='未处理', created_date__lte=now_time).update(status='超期失效')
         queryset = self.filter_queryset(self.get_queryset())
         if not choice:
             page = self.paginate_queryset(queryset)
@@ -3099,6 +3101,7 @@ class ReplaceMaterialViewSet(ModelViewSet):
             else:
                 item['result'] = 0
             item['status'] = '已处理'
+            item['last_updated_user'] = self.request.user
             self.get_queryset().filter(id=uid).update(**item)
         return Response('处理成功')
 

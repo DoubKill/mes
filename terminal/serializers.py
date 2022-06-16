@@ -533,7 +533,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                     single_material_weight = weight_package.split_count
                 elif bra_code.startswith('MC'):
                     single_material_weight = 1 if single.batching_type == '通用' else single.split_num
-                    instance = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, material_name=material_name).last()
+                    instance = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, material_name=material_name, useup_time__year='1970').last()
                     if instance and instance.unit == '包' and single_material_weight != instance.single_need:
                         raise serializers.ValidationError('投入物料分包数与之前不一致')
                 else:

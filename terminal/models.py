@@ -313,7 +313,7 @@ class ReplaceMaterial(AbstractEntity):
     real_material = models.CharField(max_length=64, help_text='实际投入物料名')
     material_type = models.CharField(max_length=64, help_text='扫码物料类别')
     bra_code = models.CharField(max_length=64, help_text='实际投入物料条码')
-    status = models.CharField(max_length=8, help_text='状态:已处理,未处理')
+    status = models.CharField(max_length=8, help_text='状态:已处理,未处理,超期失效')
     result = models.BooleanField(help_text='处理结果', default=False)
 
     class Meta:
