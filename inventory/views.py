@@ -5121,6 +5121,88 @@ class OutBoundDeliveryOrderViewSet(ModelViewSet):
 
 
 @method_decorator([api_recorder], name="dispatch")
+class OutboundStock(APIView):
+    permission_classes = (IsAuthenticated, PermissionClass({'add': 'outbound_product_inventory'}))
+
+    def post(self, request):
+        data = self.request.data
+        warehouse = data.get('warehouse')
+        quality_status = data.get('quality_status')
+        product_no = data.get('product_no')
+        station = data.get('station')
+        stock_data = data.get('stock_data')
+
+        last_order = OutBoundDeliveryOrder.objects.filter(
+            created_date__date=datetime.datetime.now().date()
+        ).order_by('created_date').last()
+        if last_order:
+            last_ordering = str(int(last_order.order_no[12:])+1)
+            if len(last_ordering) <= 5:
+                ordering = last_ordering.zfill(5)
+            else:
+                ordering = last_ordering.zfill(len(last_ordering))
+        else:
+            ordering = '00001'
+        order_no = 'MES{}{}{}'.format('Z' if warehouse == '终炼胶库' else 'H',
+                                      datetime.datetime.now().date().strftime('%Y%m%d'),
+                                      ordering)
+        instance = OutBoundDeliveryOrder.objects.create(
+            warehouse=warehouse,
+            order_no=order_no,
+            order_qty=9999,
+            station=station,
+            quality_status=quality_status,
+            product_no=product_no
+        )
+
+        detail_ids = []
+        items = []
+        for item in stock_data:
+            item['sub_no'] = '00001'
+            item['outbound_delivery_order'] = instance.id
+            s = OutBoundDeliveryOrderDetailSerializer(data=item, context={'request': request})
+            s.is_valid(raise_exception=True)
+            detail = s.save()
+            detail_ids.append(detail.id)
+            dict1 = {'WORKID': detail.order_no,
+                     'MID': instance.product_no,
+                     'PICI': "1",
+                     'RFID': detail.pallet_no,
+                     'STATIONID': instance.station,
+                     'SENDDATE': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+            if instance.warehouse == '终炼胶库':
+                dict1['STOREDEF_ID'] = 1
+            items.append(dict1)
+        username = self.request.user.username
+        json_data = {
+            'msgId': instance.order_no,
+            'OUTTYPE': '快检出库',
+            "msgConut": str(len(items)),
+            "SENDUSER": self.request.user.username,
+            "items": items
+        }
+        if not DEBUG:
+            json_data = json.dumps(json_data, ensure_ascii=False)
+            if instance.warehouse == '混炼胶库':
+                sender = OUTWORKUploader(end_type="指定出库")
+            else:
+                sender = OUTWORKUploaderLB(end_type="指定出库")
+            result = sender.request(instance.order_no, '指定出库', str(len(items)), username, json_data)
+            if result is not None:
+                try:
+                    items = result['items']
+                    msg = items[0]['msg']
+                except:
+                    msg = result[0]['msg']
+                if "TRUE" in msg:  # 成功
+                    OutBoundDeliveryOrderDetail.objects.filter(id__in=detail_ids).update(status=2)
+                else:  # 失败
+                    OutBoundDeliveryOrderDetail.objects.filter(id__in=detail_ids).update(status=5)
+                    raise ValidationError('出库失败：{}'.format(msg))
+        return Response('ok')
+
+
+@method_decorator([api_recorder], name="dispatch")
 class OutBoundDeliveryOrderDetailViewSet(ModelViewSet):
     queryset = OutBoundDeliveryOrderDetail.objects.all().order_by('-created_date')
     serializer_class = OutBoundDeliveryOrderDetailSerializer
@@ -6733,9 +6815,9 @@ class WMSMnLevelSearchView(APIView):
                     mn_level = level
                 else:
                     if value:
-                        mn_level = "无等级"
+                        mn_level = "未设置等级标准"
                     else:
-                        mn_level = "待检"
+                        mn_level = "门尼未检测"
             ret.append(
                 {"order_no": order_no,
                  "material_name": material_name,

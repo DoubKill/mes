@@ -107,6 +107,7 @@ permission_data = [
 
     {'id': 75, 'code': 'product_inventory', 'name': '胶料库内库存统计', 'parent_id': None},
     {'id': 76, 'code': 'view_product_inventory', 'name': '查看', 'parent_id': 75},
+    {'id': 1017, 'code': 'outbound_product_inventory', 'name': '出库', 'parent_id': 75},
 
     {'id': 78, 'code': 'test_indicator', 'name': '胶料试验指标管理', 'parent_id': None},
     {'id': 79, 'code': 'view_test_indicator', 'name': '查看', 'parent_id': 78},
@@ -1009,7 +1010,7 @@ permission_data = [
     {'id': 1015, 'code': 'view_wms_mooney_level', 'name': '查看', 'parent_id': 1014},
     {'id': 1016, 'code': 'change_wms_mooney_level', 'name': '修改', 'parent_id': 1014},
 
-    # 下一个 1017 开始
+    # 下一个 1018 开始
 ]
 
 
