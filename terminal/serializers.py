@@ -13,7 +13,7 @@ from django.db.utils import ConnectionDoesNotExist
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
-from basics.models import WorkSchedulePlan
+from basics.models import WorkSchedulePlan, GlobalCode
 from inventory.models import MixGumOutInventoryLog, DepotPallt
 from mes import settings
 from mes.base_serializer import BaseModelSerializer
@@ -94,6 +94,8 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         classes_plan = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid).first()
         if not classes_plan:
             raise serializers.ValidationError('该计划不存在')
+        # 获取机型  check_used获取扫码限制使用
+        scan_dev = classes_plan.equip.category.category_name
         # 获取配方信息
         material_name_weight, cnt_type_details = classes_plan.product_batching.get_product_batch(classes_plan)
         if not material_name_weight:
@@ -390,7 +392,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                             raise serializers.ValidationError('扫码合包配置冲突')
                         if already_y and already_y.last().single_need != weight_package.split_count:
                             raise serializers.ValidationError('分包数与之前扫入不一致')
-                        if weight_package.dev_type != classes_plan.equip.category.category_name:
+                        if weight_package.dev_type != scan_dev:
                             raise serializers.ValidationError('投料与生产机型不一致, 无法投料')
                         if product_no_dev != classes_plan.product_batching.stage_product_batch_no:
                             # 试验配方会使用正常配方料包 ex: C-1MB-C590-07(正常) K-1MB-TC590-45(试验[版本可能不同])
@@ -476,7 +478,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                             raise serializers.ValidationError('扫码合包配置冲突')
                         replace_material_data.update({'material_type': '人工配'})
                         product_no_dev = re.split(r'\(|\（|\[', manual.product_no)[0]
-                        if manual.dev_type != classes_plan.equip.category.category_name:
+                        if manual.dev_type != scan_dev:
                             raise serializers.ValidationError('投料与生产机型不一致, 无法投料')
                         if product_no_dev != classes_plan.product_batching.stage_product_batch_no:
                             # 试验配方会使用正常配方料包 ex: C-1MB-C590-07(正常) K-1MB-TC590-45(试验[版本可能不同])
@@ -538,13 +540,13 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                         raise serializers.ValidationError('投入物料分包数与之前不一致')
                 else:
                     single_material_weight = detail_infos[material_name]
-                attrs = self.check_used(plan_classes_uid, material_name, bra_code, total_weight, single_material_weight, attrs)
+                attrs = self.check_used(plan_classes_uid, material_name, bra_code, total_weight, single_material_weight, attrs, scan_dev)
                 details.append(dict(attrs))
             else:
                 single_material_weight = material_name.pop('single_weight', 1)
                 for k in material_name.keys():
                     copy_attrs = copy.deepcopy(attrs)
-                    res_attrs = self.check_used(plan_classes_uid, k, bra_code, total_weight, single_material_weight, copy_attrs)
+                    res_attrs = self.check_used(plan_classes_uid, k, bra_code, total_weight, single_material_weight, copy_attrs, scan_dev)
                     if res_attrs['status'] == 2:
                         raise serializers.ValidationError(res_attrs['tank_data']['msg'])
                     res_attrs['tank_data'].update({'material_name': k, 'material_no': k, 'scan_material': k})
@@ -580,7 +582,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             return True, material_name
         return False, ''
 
-    def check_used(self, plan_classes_uid, material_name, bra_code, total_weight, single_material_weight, attrs):
+    def check_used(self, plan_classes_uid, material_name, bra_code, total_weight, single_material_weight, attrs, scan_dev):
         """
         判断物料是否充足、是否重复扫码等逻辑
         """
@@ -620,9 +622,14 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 n_scan_material_type = attrs['tank_data'].get('scan_material_type')
                 check_flag = True
                 # 胶块6分钟内不超过4框, 胶皮4分钟内不超过4架
-                limit_data = {"胶块": [6, 4], "胶皮": [4, 4]}
                 if n_scan_material_type in ['胶块', '胶皮']:
-                    limit_minutes, limit_nums = limit_data[n_scan_material_type]
+                    limit_minutes, limit_nums = [4, 4] if n_scan_material_type == '胶皮' else [6, 4]
+                    g_config = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='密炼扫码限制', global_no=f'{scan_dev}-{n_scan_material_type}').last()
+                    if g_config:
+                        try:
+                            limit_minutes, limit_nums = list(map(lambda x: int(x), g_config.global_name.split('-')))
+                        except:
+                            pass
                     limit_time = datetime.now() - timedelta(minutes=limit_minutes)
                     num = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, material_name=material_name, scan_time__gte=limit_time).count()
                     if num >= limit_nums:
