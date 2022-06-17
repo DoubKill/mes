@@ -1220,9 +1220,7 @@ class ImportAndExportView(APIView):
         if not pallet_data:
             raise ValidationError('未找到该批次生产数据：【{}】-【{}】-【{}】-【{}】！！'.format(factory_date, classes, equip_no, product_no))
         pallet_trains_map = {}  # 车次与收皮条码map数据
-        lot_nos = []
         for pallet in pallet_data:
-            lot_nos.append(pallet['lot_no'])
             for j in range(pallet['begin_trains'], pallet['end_trains']+1):
                 if j not in pallet_trains_map:
                     pallet_trains_map[j] = {'lot_no': [pallet['lot_no']],
@@ -1232,6 +1230,7 @@ class ImportAndExportView(APIView):
 
         del j, data_points, pallet_data, production_data, reverse_dict
 
+        lot_nos = []
         for item in data:
             try:
                 actual_trains = int(item[6])
@@ -1240,6 +1239,7 @@ class ImportAndExportView(APIView):
             if not pallet_trains_map.get(actual_trains):  # 未找到收皮条码
                 continue
             for lot_no in pallet_trains_map[actual_trains]['lot_no']:
+                lot_nos.append(lot_no)
                 plan_classes_uid = pallet_trains_map[actual_trains]['plan_classes_uid']
                 validated_data = dict()
                 validated_data['material_test_order_uid'] = uuid.uuid1()
