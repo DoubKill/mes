@@ -1959,6 +1959,20 @@ class XLPlanVIewSet(ModelViewSet):
             serializer = self.get_serializer(new_queryset, many=True)
             return Response(serializer.data)
 
+    def create(self, request, *args, **kwargs):
+        equip_no = self.request.data.get('equip_no')
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        instance = serializer.save()
+        if equip_no in JZ_EQUIP_NO:
+            try:
+                jz = JZCLSystem(equip_no)
+                res = jz.add_plan(plan_no=instance.planid, recipe_name=instance.recipe, plan_num=instance.setno)
+            except Exception as e:
+                instance.delete()
+                raise ValidationError(f'通知称量系统{equip_no}新建计划失败')
+        return Response('新建计划成功')
+
     def destroy(self, request, *args, **kwargs):
         equip_no = self.request.data.get('equip_no')
         # 嘉正称量系统下达的计划先通知才可以删除，非下达计划直接删除[下达也是等待状态]

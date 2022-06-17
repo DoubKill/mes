@@ -1648,7 +1648,7 @@ class PlanSerializer(serializers.ModelSerializer):
         mes_machine_weight = mes_recipe.aggregate(weight=Sum('cnt_type_detail_equip__standard_weight'))['weight']
         if not mes_machine_weight:
             raise serializers.ValidationError('获取mes设置重量失败, 无法比较重量')
-        if recipe_obj.weight * recipe_obj.split_count != mes_machine_weight:
+        if abs(recipe_obj.weight * recipe_obj.split_count - mes_machine_weight) > Decimal('0.01'):
             raise serializers.ValidationError(f'称量配方重量: {recipe_obj.weight}与mes配方不一致: {round(mes_machine_weight, 3)}')
         last_group_plan = Plan.objects.using(equip_no).filter(date_time=validated_data['date_time'],
                                                               grouptime=validated_data['grouptime']
@@ -1671,8 +1671,8 @@ class PlanSerializer(serializers.ModelSerializer):
             ins.add_plan(instance.planid)
         except ConnectionDoesNotExist:
             raise serializers.ValidationError('称量机台{}服务错误！'.format(equip_no))
-        except Exception:
-            raise
+        except Exception as e:
+            raise serializers.ValidationError('新增计划异常')
         return instance
 
     class Meta:
@@ -1715,7 +1715,7 @@ class JZPlanSerializer(serializers.ModelSerializer):
         mes_machine_weight = mes_recipe.aggregate(weight=Sum('cnt_type_detail_equip__standard_weight'))['weight']
         if not mes_machine_weight:
             raise serializers.ValidationError('获取mes设置重量失败, 无法比较重量')
-        if recipe_obj.weight * recipe_obj.split_count != mes_machine_weight:
+        if abs(recipe_obj.weight * recipe_obj.split_count - mes_machine_weight) > Decimal('0.01'):
             raise serializers.ValidationError(f'称量配方重量: {recipe_obj.weight}与mes配方不一致: {round(mes_machine_weight, 3)}')
         last_group_plan = plan_model.objects.using(equip_no).filter(date_time=validated_data['date_time'],
                                                                     grouptime=validated_data['grouptime']
@@ -1738,15 +1738,12 @@ class JZPlanSerializer(serializers.ModelSerializer):
         # 查询配方的合包状态
         recipe = pre_model.objects.using(equip_no).filter(name=validated_data['recipe']).first()
         validated_data['merge_flag'] = recipe.merge_flag if recipe else False
-        with atomic(using=equip_no):
-            try:
-                instance = plan_model.objects.using(equip_no).create(**validated_data)
-                jz = JZCLSystem(equip_no)
-                res = jz.add_plan(plan_no=instance.planid, recipe_name=instance.recipe, plan_num=instance.setno)
-            except ConnectionDoesNotExist:
-                raise serializers.ValidationError('称量机台{}服务错误！'.format(equip_no))
-            except Exception as e:
-                raise serializers.ValidationError(f'通知称量系统{equip_no}新建计划失败')
+        try:
+            instance = plan_model.objects.using(equip_no).create(**validated_data)
+        except ConnectionDoesNotExist:
+            raise serializers.ValidationError('称量机台{}服务错误！'.format(equip_no))
+        except Exception as e:
+            raise serializers.ValidationError('新增计划异常')
         return instance
 
     class Meta:
