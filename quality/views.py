@@ -2733,6 +2733,61 @@ order by temp.PRODUCT_NO, temp.TEST_INDICATOR_NAME;""".format(where_str)
                 ret[product_type]['TC50_upper'] += tc50_upper_count
                 ret[product_type]['TC90_lower'] += tc90_lower_count
                 ret[product_type]['TC90_upper'] += tc90_upper_count
+
+        # 补充全部合格的胶料规格数据
+        for k, v in mto_data_dict.items():
+            product_type = k
+            unqualified_qty = v['unqualified_qty']
+            check_qty = v['total_qty']
+            qualified_qty = v['qualified_qty']
+            if unqualified_qty == 0:
+                if product_type not in ret:
+                    rate = round(qualified_qty / check_qty * 100, 2) if check_qty else ''
+                    rate_date1 = data1.get(product_type)
+                    rate_dates = datas.get(product_type)
+                    if rate_date1:
+                        rate1 = round((rate_date1[0] - rate_date1[1]) / rate_date1[0] * 100, 2) if rate_date1[0] else ''
+                    else:
+                        rate1 = ''
+                    if rate_dates:
+                        rates = round((rate_dates[0] - rate_dates[1]) / rate_dates[0] * 100, 2) if rate_dates[0] else ''
+                    else:
+                        rates = ''
+                    ret[product_type] = {
+                        "product_type": product_type,  # 胶料
+                        "JC": check_qty,  # 检查数量
+                        "HG": qualified_qty,  # 合格数量
+                        "cp_all": 0,  # 次品合计
+                        "MN": '',  # 门尼不合格数量
+                        "YD": '',  # 硬度不合格数量
+                        "BZ": '',  # 比重不合格数量
+                        "MH": '',  # 流变MH不合格数量
+                        "ML": '',  # 流变ML不合格数量
+                        "TC10": '',  # 流变TC10不合格数量
+                        "TC50": '',  # 流变TC50不合格数量
+                        "TC90": '',  # 流变TC90不合格数量
+                        "sum_s": '',  # 流变合计
+                        "mn_lower": '',  # 门尼低于下限不合格数量
+                        "mn_upper": '',  # 门尼高于上限不合格数量
+                        "bz_lower": '',  # 比重低于下限不合格数量
+                        "bz_upper": '',  # 门尼高于上限不合格数量
+                        "yd_lower": '',  # 硬度低于下限不合格数量
+                        "yd_upper": '',  # 硬度高于上限不合格数量
+                        "MH_lower": '',  # MH低于下限不合格数量
+                        "MH_upper": '',  # MH高于上限不合格数量
+                        "ML_lower": '',  # ML低于下限不合格数量
+                        "ML_upper": '',  # ML高于上限不合格数量
+                        "TC10_lower": '',  # ML低于下限不合格数量
+                        "TC10_upper": '',  # ML高于上限不合格数量
+                        "TC50_lower": '',  # ML低于下限不合格数量
+                        "TC50_upper": '',  # ML高于上限不合格数量
+                        "TC90_lower": '',  # ML低于下限不合格数量
+                        "TC90_upper": '',  # ML高于上限不合格数量
+                        'RATE_1_PASS': rate1,
+                        'RATE_S_PASS': rates,
+                        "rate": rate
+                    }
+
         resp_data = ret.values()
         for dt in resp_data:
             for k, v in dt.items():
