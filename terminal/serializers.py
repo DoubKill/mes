@@ -30,7 +30,7 @@ from terminal.models import EquipOperationLog, WeightBatchingLog, FeedingLog, We
     WeightPackageWms, MachineManualRelation, WeightPackageLogDetails, WeightPackageLogManualDetails, WmsAddPrint, \
     JZMaterialInfo, JZBin, JZPlan, JZRecipeMaterial, JZRecipePre
 from terminal.utils import TankStatusSync, CLSystem, material_out_barcode, get_tolerance, get_common_equip, get_real_ip, \
-    JZTankStatusSync, JZCLSystem
+    JZTankStatusSync, JZCLSystem, send_dk
 
 logger = logging.getLogger('send_log')
 
@@ -122,10 +122,10 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 else:
                     raise serializers.ValidationError('配方不需要使用料包')
         elif bra_code.startswith('AAJ1Z'):  # 胶皮
+            scan_material_type = '胶皮'
             if bra_code.startswith('AAJ1Z20'):  # 补打胶皮
                 return_rubber = ReturnRubber.objects.filter(bra_code=bra_code).last()
                 if return_rubber:
-                    scan_material_type = '胶皮'
                     add_s = True if return_rubber.print_type == '加硫' else False
                     material_no = return_rubber.product_no
                     material_name = material_no
@@ -134,7 +134,6 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             else:  # 收皮条码
                 pallet_feedback = PalletFeedbacks.objects.filter(lot_no=bra_code).first()
                 if pallet_feedback:
-                    scan_material_type = '胶皮'
                     if re.findall('FM|RFM|RE', pallet_feedback.product_no):
                         add_s = True
                     # 配方中含有种子胶
@@ -205,6 +204,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         elif bra_code.startswith('WMS'):
             wms = WmsAddPrint.objects.filter(bra_code=bra_code).first()
             if wms:
+                scan_material_type = '胶皮'
                 scan_material = wms.material_name
                 # 查询配方中对应名称[扫码:环保型塑解剂, 群控: 环保型塑解剂-C]
                 mes_recipe = {i[:-2]: i for i in materials if i.endswith('-C') or i.endswith('-X')}
@@ -560,12 +560,14 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 logger.error('群控服务器错误！')
                 raise serializers.ValidationError(e.args[0])
         if scan_material_msg:
+            if scan_material_type == '胶皮':
+                dk_control = 'Start' if '成功' in scan_material_type else 'Stop'
+                status, text = send_dk(classes_plan.equip.equip_no, dk_control)
             raise serializers.ValidationError(scan_material_msg)
         for i in details:
             msg = i['tank_data'].pop('msg')
             if msg:
                 raise serializers.ValidationError(msg)
-        del_scan_material_type = attrs.pop('scan_material_type')
         return attrs
 
     def material_pass(self, plan_classes_uid, scan_material, reason_type='物料名不一致', material_type='机配'):
@@ -685,8 +687,10 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
 
     def create(self, validated_data):
         details = validated_data.get('attrs')
+        scan_material_type = validated_data.pop('scan_material_type', '')
         plan_classes_uid, trains = '', 1
         for i in details:
+            equip_no = i.get('equip_no')
             tank_data = i.get('tank_data')
             plan_classes_uid = i.get('plan_classes_uid')
             trains = i.get('trains')
@@ -697,6 +701,9 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 LoadTankMaterialLog.objects.filter(plan_classes_uid=pre_material.plan_classes_uid, bra_code=pre_material.bra_code)\
                     .update(**{'actual_weight': pre_material.init_weight, 'adjust_left_weight': 0, 'real_weight': 0,
                                'useup_time': datetime.now()})
+            # 胶皮扫码正确发送消息给导开机
+            if scan_material_type == '胶皮':
+                status, text = send_dk(equip_no, 'Start')
             instance = LoadTankMaterialLog.objects.create(**tank_data)
         # 判断补充进料后是否能进上辅机
         fml = FeedingMaterialLog.objects.using('SFJ').filter(plan_classes_uid=plan_classes_uid, trains=int(trains)).last()

@@ -5,6 +5,7 @@ import json
 import math
 import re
 import time
+import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
 
@@ -17,12 +18,15 @@ from basics.models import WorkSchedulePlan
 from inventory.conf import cb_ip, cb_port
 from inventory.models import MaterialOutHistory
 from inventory.utils import wms_out
+from mes.common_code import WebService
 from mes.conf import JZ_EQUIP_NO
 from mes.settings import DATABASES
 from plan.models import BatchingClassesPlan
 from recipe.models import ProductBatching, ProductBatchingDetail, ProductBatchingEquip
 from terminal.models import WeightTankStatus, RecipePre, RecipeMaterial, Plan, Bin, ToleranceRule, JZRecipeMaterial, \
     JZPlan
+
+logger = logging.getLogger("send_log")
 
 
 class INWeighSystem(object):
@@ -985,3 +989,23 @@ def get_real_ip(meta_data):
     else:
         real_ip = meta_data.get('REMOTE_ADDR')
     return real_ip
+
+
+def send_dk(equip_no, dk_signal):
+    """
+    发送消息控制导开机 ex: equip_no=Z11 dk_signal in ['Start', 'Stop']
+    """
+    if "0" in equip_no and not equip_no.endswith('0'):
+        ext_str = equip_no[-1]
+    else:
+        ext_str = equip_no[1:]
+    try:
+        status, text = WebService.issue({"status": dk_signal}, 'daokaiji_ctrl', equip_no=ext_str, equip_name="上辅机", default_url_name='planService')
+    except Exception as e:
+        logger.error(f'{equip_no}导开机信号发送失败: {e.args[0]}')
+        return False, f"{equip_no} 网络连接异常"
+    if not status:
+        logger.error(f'{equip_no}导开机信号发送失败: {text}')
+        return False, f"{equip_no}导开机信号发送失败"
+    logger.info(f"{equip_no}导开机{'启动' if dk_signal == 'Start' else '停止'}信号发送成功")
+    return True, f"{equip_no}导开机{'启动' if dk_signal == 'Start' else '停止'}信号发送成功"
