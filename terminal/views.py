@@ -1,4 +1,5 @@
 import datetime
+import math
 import re
 import time
 import logging
@@ -6,7 +7,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth.models import Permission
-from django.db.models import Max, Sum, Q, Prefetch, Count, F
+from django.db.models import Max, Sum, Q, Prefetch, Count, F, Value, CharField
 from django.db.transaction import atomic
 from django.db.utils import ConnectionDoesNotExist
 from django.shortcuts import get_object_or_404
@@ -25,6 +26,7 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 from basics.models import WorkSchedulePlan, Equip, GlobalCode
 from equipment.models import EquipMachineHaltType
 from equipment.serializers import EquipApplyRepairSerializer
+from equipment.utils import gen_template_response
 from inventory.models import MaterialOutHistory
 from mes.common_code import CommonDeleteMixin, TerminalCreateAPIView, response, SqlClient
 from mes.conf import TH_CONF, JZ_EQUIP_NO
@@ -2374,8 +2376,15 @@ class ReportWeightViewStaticsView(APIView):
     物料消耗量统计
     """
     permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_xl_report_weight_statics'}))
+    FILE_NAME = '称量物料消耗汇总表'
+    EXPORT_FIELDS_DICT = {"机台": "s_equip_no",
+                          "配方": "recipe",
+                          "物料名称": "material",
+                          "实际重量(kg)": "material_total_weight"
+                          }
 
     def get(self, request):
+        t_report_flag = self.request.query_params.get('t_report_flag')  # 称量物料汇总标识
         equip_no = self.request.query_params.get('equip_no', 'F01')
         st = self.request.query_params.get('st')
         if not st:
@@ -2387,14 +2396,50 @@ class ReportWeightViewStaticsView(APIView):
         diff = (datetime.datetime.strptime(et, '%Y-%m-%d %H:%M:%S') - datetime.datetime.strptime(st, '%Y-%m-%d %H:%M:%S')).days
         if diff > 31:
             raise ValidationError('查询周期不可超过31天')
-        try:
-            weight_model = JZReportWeight if equip_no in JZ_EQUIP_NO else ReportWeight
-            data = weight_model.objects.using(equip_no).filter(~Q(material='总重量'), 时间__gte=st, 时间__lte=et)
-            results = data.values('material').annotate(material_total_weight=Sum('act_weight')).values('material', 'material_total_weight')
-            total_weight = sum(data.values_list('act_weight', flat=True))
-        except Exception as e:
-            raise ValidationError('称量机台{}服务错误！'.format(equip_no))
-        return Response({'results': results, 'total_weight': total_weight})
+        if not t_report_flag:
+            try:
+                weight_model = JZReportWeight if equip_no in JZ_EQUIP_NO else ReportWeight
+                data = weight_model.objects.using(equip_no).filter(~Q(material='总重量'), 时间__gte=st, 时间__lte=et)
+                results = data.values('material').annotate(material_total_weight=Sum('act_weight')).values('material', 'material_total_weight')
+                total_weight = sum(data.values_list('act_weight', flat=True))
+            except Exception as e:
+                raise ValidationError('称量机台{}服务错误！'.format(equip_no))
+            return Response({'results': results, 'total_weight': total_weight})
+        else:
+            results = []
+            product_no = self.request.query_params.get('product_no')
+            s_equip_no = self.request.query_params.get('s_equip_no')
+            material_name = self.request.query_params.get('material_name')
+            export = self.request.query_params.get('export')
+            filter_kwargs = {'时间__gte': st, '时间__lte': et}
+            if product_no:
+                filter_kwargs['recipe__icontains'] = product_no
+            if material_name:
+                filter_kwargs['material__icontains'] = material_name
+            # 获取机台
+            equip_no_list = [s_equip_no] if s_equip_no else [k for k, v in DATABASES.items() if 'YK_XL' in v.get('NAME') or 'MDWS' in v.get('NAME')]
+            for i in equip_no_list:
+                weight_model = JZReportWeight if i in JZ_EQUIP_NO else ReportWeight
+                s_data = weight_model.objects.using(i).filter(~Q(material='总重量'), **filter_kwargs).order_by('recipe')
+                s_res = s_data.values('recipe', 'material').annotate(material_total_weight=Sum('act_weight'), s_equip_no=Value(i, output_field=CharField())).values('s_equip_no', 'recipe', 'material', 'material_total_weight')
+                results.extend(list(s_res))
+            if export:  # 导出
+                return gen_template_response(self.EXPORT_FIELDS_DICT, results, self.FILE_NAME)
+            # 分页
+            page = self.request.query_params.get('page', 1)
+            page_size = self.request.query_params.get('page_size', 10)
+            try:
+                begin = (int(page) - 1) * int(page_size)
+                end = int(page) * int(page_size)
+            except:
+                raise ValidationError("page/page_size异常，请修正后重试")
+            else:
+                if begin not in range(0, 99999):
+                    raise ValidationError("page/page_size值异常")
+                if end not in range(0, 99999):
+                    raise ValidationError("page/page_size值异常")
+            return Response({'total_data': len(results), 'total_page': math.ceil(len(results) / int(page_size)),
+                             'page_result': results[begin: end]})
 
 
 @method_decorator([api_recorder], name="dispatch")
