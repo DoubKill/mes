@@ -248,7 +248,7 @@ class ProductBatchingSerializer(BaseModelSerializer):
         stage_product_batch_no = validated_data['stage_product_batch_no']
         equip = validated_data['equip']
         batching_type = validated_data['batching_type']
-        instance = ProductBatching.objects.exclude(used_type__in=[6, 7]).filter(
+        instance = ProductBatching.objects.exclude(used_type__in=[6]).filter(
             stage_product_batch_no=stage_product_batch_no,  equip=equip, batching_type=batching_type)
         if instance:
             instance.update(**validated_data)

@@ -283,10 +283,10 @@ class OMin(Min):
 
 class WebService(object):
     client = requests.request
-    url = "http://{}:9000/小料称量"
+    url = "http://{}:9000/{}"
 
     @classmethod
-    def issue(cls, data, category, method="post", equip_no=6, equip_name="收皮终端"):
+    def issue(cls, data, category, method="post", equip_no=6, equip_name="收皮终端", default_url_name='小料称量'):
         headers = {
             'Content-Type': 'text/xml; charset=utf-8',
             'SOAPAction': 'http://tempuri.org/INXWebService/{}'
@@ -294,7 +294,7 @@ class WebService(object):
 
         child_system = ChildSystemInfo.objects.filter(system_name=f"{equip_name}{equip_no}").first()
         recv_ip = child_system.link_address
-        url = cls.url.format(recv_ip)
+        url = cls.url.format(recv_ip, default_url_name)
         headers['SOAPAction'] = headers['SOAPAction'].format(category)
         body = cls.trans_dict_to_xml(data, category)
         rep = cls.client(method, url, headers=headers, data=body, timeout=5)

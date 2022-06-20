@@ -369,7 +369,7 @@ DATABASES = {
     },
     "F02": {  # 细料称2
         'ENGINE': 'sql_server.pyodbc',
-        'NAME': 'YK_XL',
+        'NAME': 'MWDS',
         'HOST': os.getenv('FO2_IP', '10.10.10.10'),
         'PORT': '1433',
         'USER': 'gz',

@@ -455,6 +455,7 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         l_batch_no = self.request.query_params.get("l_batch_no")
         is_entering = self.request.query_params.get("is_entering")
         tunnel = self.request.query_params.get("tunnel")
+        task_status = self.request.query_params.get("task_status")
         if location:
             filter_dict.update(location__icontains=location)
         if material_no:
@@ -563,6 +564,8 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
                     queryset = queryset.filter(pallet_no__startswith=5)
                 elif is_entering == 'N':
                     queryset = queryset.exclude(pallet_no__startswith=5)
+            if task_status:
+                queryset = queryset.filter(task_status=task_status)
             if quality_status:
                 status_map = {'1': "合格品", '2': "抽检中", '3': "不合格品", '4': "过期", '5': "待检"}
                 task_nos = list(WMSOutboundHistory.objects.filter(
@@ -642,8 +645,8 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         style = xlwt.XFStyle()
         style.alignment.wrap = 1
 
-        columns = ['No', '类型', '出入库单号', '质检条码', '巷道', '批次号', '托盘号', '是否进烘房', '供应商',
-                   '物料编码', '物料名称', '出入库数', '重量', '发起人', '发起时间', '完成时间']
+        columns = ['序号', '出库单据号', '下架任务号', '巷道编码', '追踪码', '识别卡ID', '库位码', '物料名称', '物料编码',
+                   '批次号', '创建时间', '状态', '创建人', '数量', '重量', '件数', '唛头重量']
         # 写入文件标题
         for col_num in range(len(columns)):
             sheet.write(0, col_num, columns[col_num])
@@ -651,21 +654,22 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         data_row = 1
         for i in result:
             sheet.write(data_row, 0, result.index(i) + 1)
-            sheet.write(data_row, 1, i['order_type'])
+            sheet.write(data_row, 1, i['task_no'])
             sheet.write(data_row, 2, i['order_no'])
-            sheet.write(data_row, 3, i['lot_no'])
-            sheet.write(data_row, 4, i['location'][4])
-            sheet.write(data_row, 5, i['batch_no'])
-            sheet.write(data_row, 6, i['pallet_no'])
-            sheet.write(data_row, 7, i['is_entering'])
-            sheet.write(data_row, 8, '')
-            sheet.write(data_row, 9, i['material_no'])
-            sheet.write(data_row, 10, i['material_name'])
-            sheet.write(data_row, 11, i['qty'])
-            sheet.write(data_row, 12, i['weight'])
-            sheet.write(data_row, 13, i['initiator'])
-            sheet.write(data_row, 14, i['start_time'])
-            sheet.write(data_row, 15, i['fin_time'])
+            sheet.write(data_row, 3, i['location'][4])
+            sheet.write(data_row, 4, i['lot_no'])
+            sheet.write(data_row, 5, i['pallet_no'])
+            sheet.write(data_row, 6, i['location'])
+            sheet.write(data_row, 7, i['material_name'])
+            sheet.write(data_row, 8, i['material_no'])
+            sheet.write(data_row, 9, i['batch_no'])
+            sheet.write(data_row, 10, i['start_time'])
+            sheet.write(data_row, 11, i['task_status_name'])
+            sheet.write(data_row, 12, i['initiator'])
+            sheet.write(data_row, 13, i['qty'])
+            sheet.write(data_row, 14, i['weight'])
+            sheet.write(data_row, 15, i['sl'])
+            sheet.write(data_row, 15, i['zl'])
             data_row = data_row + 1
         # 写出到IO
         output = BytesIO()
@@ -760,6 +764,7 @@ class AdditionalPrintView(APIView):
         }
         for single_data in data:
             # 有条码直接打印, 无条码生成新码
+            enable_ip = single_data.pop('enable_ip', '')
             location = single_data.get('location')
             station = single_data.get('station')
             material_no = single_data.get('material_no')
@@ -791,7 +796,8 @@ class AdditionalPrintView(APIView):
                     label.update({"equip_no": data.equip_no, "classes_group": f"{data.classes}/{group}",
                                   "actual_trains": f"{data.begin_trains}/{data.end_trains}"})
                 label = json.dumps(label)
-            LabelPrint.objects.create(label_type=station_dict.get(station), lot_no=lot_no, status=0, data=label, ip_address=get_real_ip(self.request.META))
+            ip_address = get_real_ip(self.request.META) if enable_ip else None
+            LabelPrint.objects.create(label_type=station_dict.get(station), lot_no=lot_no, status=0, data=label, ip_address=ip_address)
         return Response('下发打印完成')
 
 
@@ -2837,11 +2843,11 @@ class WmsInventoryStockView(APIView):
                         l_lower_limit_value = level_data['l_lower_limit_value'] if level_data['l_lower_limit_value'] else 0
                         l_upper_limit_value = level_data['l_upper_limit_value'] if level_data['l_upper_limit_value'] else 0
                         if h_lower_limit_value <= ml_test_value <= h_upper_limit_value:
-                            mn_level = '高级'
+                            mn_level = '高门尼'
                         elif m_lower_limit_value <= ml_test_value <= m_upper_limit_value:
-                            mn_level = '中级'
+                            mn_level = '标准门尼'
                         elif l_lower_limit_value <= ml_test_value <= l_upper_limit_value:
-                            mn_level = '低级'
+                            mn_level = '低门尼'
             result.append(
                 {'StockDetailState': item[0],
                  'MaterialCode': item[1],
@@ -5123,6 +5129,89 @@ class OutBoundDeliveryOrderViewSet(ModelViewSet):
 
 
 @method_decorator([api_recorder], name="dispatch")
+class OutboundStock(APIView):
+    permission_classes = (IsAuthenticated, PermissionClass({'add': 'outbound_product_inventory'}))
+
+    def post(self, request):
+        data = self.request.data
+        warehouse = data.get('warehouse')
+        quality_status = data.get('quality_status')
+        product_no = data.get('product_no')
+        station = data.get('station')
+        stock_data = data.get('stock_data')
+
+        last_order = OutBoundDeliveryOrder.objects.filter(
+            created_date__date=datetime.datetime.now().date()
+        ).order_by('created_date').last()
+        if last_order:
+            last_ordering = str(int(last_order.order_no[12:])+1)
+            if len(last_ordering) <= 5:
+                ordering = last_ordering.zfill(5)
+            else:
+                ordering = last_ordering.zfill(len(last_ordering))
+        else:
+            ordering = '00001'
+        order_no = 'MES{}{}{}'.format('Z' if warehouse == '终炼胶库' else 'H',
+                                      datetime.datetime.now().date().strftime('%Y%m%d'),
+                                      ordering)
+        instance = OutBoundDeliveryOrder.objects.create(
+            warehouse=warehouse,
+            order_no=order_no,
+            order_qty=9999,
+            station=station,
+            quality_status=quality_status,
+            product_no=product_no,
+            created_user=self.request.user
+        )
+
+        detail_ids = []
+        items = []
+        for item in stock_data:
+            item['sub_no'] = '00001'
+            item['outbound_delivery_order'] = instance.id
+            s = OutBoundDeliveryOrderDetailSerializer(data=item, context={'request': request})
+            s.is_valid(raise_exception=True)
+            detail = s.save()
+            detail_ids.append(detail.id)
+            dict1 = {'WORKID': detail.order_no,
+                     'MID': instance.product_no,
+                     'PICI': "1",
+                     'RFID': detail.pallet_no,
+                     'STATIONID': instance.station,
+                     'SENDDATE': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+            if instance.warehouse == '终炼胶库':
+                dict1['STOREDEF_ID'] = 1
+            items.append(dict1)
+        username = self.request.user.username
+        json_data = {
+            'msgId': instance.order_no,
+            'OUTTYPE': '快检出库',
+            "msgConut": str(len(items)),
+            "SENDUSER": self.request.user.username,
+            "items": items
+        }
+        if not DEBUG:
+            json_data = json.dumps(json_data, ensure_ascii=False)
+            if instance.warehouse == '混炼胶库':
+                sender = OUTWORKUploader(end_type="指定出库")
+            else:
+                sender = OUTWORKUploaderLB(end_type="指定出库")
+            result = sender.request(instance.order_no, '指定出库', str(len(items)), username, json_data)
+            if result is not None:
+                try:
+                    items = result['items']
+                    msg = items[0]['msg']
+                except:
+                    msg = result[0]['msg']
+                if "TRUE" in msg:  # 成功
+                    OutBoundDeliveryOrderDetail.objects.filter(id__in=detail_ids).update(status=2)
+                else:  # 失败
+                    OutBoundDeliveryOrderDetail.objects.filter(id__in=detail_ids).update(status=5)
+                    raise ValidationError('出库失败：{}'.format(msg))
+        return Response('ok')
+
+
+@method_decorator([api_recorder], name="dispatch")
 class OutBoundDeliveryOrderDetailViewSet(ModelViewSet):
     queryset = OutBoundDeliveryOrderDetail.objects.all().order_by('-created_date')
     serializer_class = OutBoundDeliveryOrderDetailSerializer
@@ -5465,6 +5554,13 @@ class WMSOutTaskView(ListAPIView):
     serializer_class = MaterialOutHistoryOtherSerializer
     permission_classes = (IsAuthenticated,)
     DB = 'wms'
+    EXPORT_FIELDS_DICT = {'出库单据号': 'order_no',
+                          '单据类型': 'task_type_name',
+                          '创建时间': 'start_time',
+                          '状态': 'task_status_name',
+                          '数量': 'qty',
+                          '创建人': 'initiator'
+                          }
 
     def get_serializer_context(self):
         """
@@ -5483,18 +5579,44 @@ class WMSOutTaskView(ListAPIView):
         task_status = self.request.query_params.get('task_status')
         material_no = self.request.query_params.get('material_no')
         material_name = self.request.query_params.get('material_name')
+        st = self.request.query_params.get('st')
+        et = self.request.query_params.get('et')
         filter_kwargs = {}
         if order_no:
             filter_kwargs['order_no__icontains'] = order_no
         if task_status:
             filter_kwargs['task_status'] = task_status
         if material_no:
-            task_ids = MaterialOutHistory.objects.using(self.DB).filter(material_no__icontains=material_no).values_list('task_id', flat=True)
+            task_ids = MaterialOutHistory.objects.using(self.DB).filter(material_no=material_no).values_list('task_id', flat=True)
             filter_kwargs['id__in'] = task_ids
         if material_name:
-            task_ids = MaterialOutHistory.objects.using(self.DB).filter(material_name__icontains=material_name).values_list('task_id', flat=True)
+            task_ids = MaterialOutHistory.objects.using(self.DB).filter(material_name=material_name).values_list('task_id', flat=True)
             filter_kwargs['id__in'] = task_ids
+        if st:
+            filter_kwargs['start_time__gte'] = st
+        if et:
+            filter_kwargs['start_time__lte'] = et
         return query_set.filter(**filter_kwargs)
+
+    def list(self, request, *args, **kwargs):
+        export = self.request.query_params.get('export')
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if export:
+            et = self.request.query_params.get('et')
+            st = self.request.query_params.get('st')
+            if not all([st, et]):
+                raise ValidationError('请选择导出的时间范围！')
+            diff = datetime.datetime.strptime(et, '%Y-%m-%d %H:%M:%S') - datetime.datetime.strptime(st, '%Y-%m-%d %H:%M:%S')
+            if diff.days > 31:
+                raise ValidationError('导出数据的日期跨度不得超过一个月！')
+            data = self.get_serializer(queryset, many=True).data
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, '出库单据')
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -6673,6 +6795,14 @@ class OutboundProductInfo(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class WMSMnLevelSearchView(APIView):
 
+    def get(self, request):
+        task_no = self.request.query_params.get('task_no')
+        hs = WMSOutboundHistory.objects.filter(task_no=task_no).values()
+        if hs:
+            return Response(hs[0])
+        else:
+            return Response({})
+
     def post(self, request):
         order_nos = self.request.data.get('order_nos')  # 下架任务号列表
         if not isinstance(order_nos, list):
@@ -6702,9 +6832,9 @@ class WMSMnLevelSearchView(APIView):
                     mn_level = level
                 else:
                     if value:
-                        mn_level = "无等级"
+                        mn_level = "未设置等级标准"
                     else:
-                        mn_level = "待检"
+                        mn_level = "门尼未检测"
             ret.append(
                 {"order_no": order_no,
                  "material_name": material_name,

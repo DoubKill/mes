@@ -4,6 +4,8 @@
 import json
 import math
 import re
+import time
+import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
 
@@ -16,10 +18,15 @@ from basics.models import WorkSchedulePlan
 from inventory.conf import cb_ip, cb_port
 from inventory.models import MaterialOutHistory
 from inventory.utils import wms_out
+from mes.common_code import WebService
+from mes.conf import JZ_EQUIP_NO
 from mes.settings import DATABASES
 from plan.models import BatchingClassesPlan
 from recipe.models import ProductBatching, ProductBatchingDetail, ProductBatchingEquip
-from terminal.models import WeightTankStatus, RecipePre, RecipeMaterial, Plan, Bin, ToleranceRule
+from terminal.models import WeightTankStatus, RecipePre, RecipeMaterial, Plan, Bin, ToleranceRule, JZRecipeMaterial, \
+    JZPlan
+
+logger = logging.getLogger("send_log")
 
 
 class INWeighSystem(object):
@@ -169,7 +176,7 @@ class JZTankStatusSync(object):
         self.equip_no = equip_no
 
     @atomic
-    def sync_jz(self, tank_no=None):
+    def sync(self, tank_no=None):
         # tank_no 3A 开3A罐门
         if tank_no:
             tank_int = int(tank_no[0]) * 2 - 1 if 'A' in tank_no else int(tank_no[0]) * 2
@@ -266,7 +273,7 @@ class CarbonDeliverySystem(object):
                           </tem:GetCarbonTankLevel>
                        </soapenv:Body>
                     </soapenv:Envelope>"""
-        door_info = requests.post(self.url, data=send_data.encode('utf-8'), headers=headers, timeout=5)
+        door_info = requests.post(self.url, data=send_data.encode('utf-8'), headers=headers, timeout=1)
         res = door_info.content.decode('utf-8')
         rep_json = re.findall(r'<GetCarbonTankLevelResult>(.*)</GetCarbonTankLevelResult>', res)[0]
         carbon_tank_details = json.loads(rep_json)
@@ -299,7 +306,7 @@ class CarbonDeliverySystem(object):
                           </tem:FeedingPortToCarbonTankRelation>
                        </soapenv:Body>
                     </soapenv:Envelope>"""
-        door_info = requests.post(self.url, data=send_data.encode('utf-8'), headers=headers, timeout=5)
+        door_info = requests.post(self.url, data=send_data.encode('utf-8'), headers=headers, timeout=1)
         res = door_info.content.decode('utf-8')
         rep_json = re.findall(r'<FeedingPortToCarbonTankRelationResult>(.*)</FeedingPortToCarbonTankRelationResult>', res)[0]
         line_info = json.loads(rep_json)
@@ -362,7 +369,7 @@ def material_out_barcode(bar_code):
 
 # @atomic()
 def issue_recipe(recipe_no, equip_no):
-    recipe = ProductBatching.objects.exclude(used_type__in=[6, 7]).filter(stage_product_batch_no=recipe_no,
+    recipe = ProductBatching.objects.exclude(used_type__in=[6]).filter(stage_product_batch_no=recipe_no,
                                                                  dev_type__isnull=False, batching_type=2).last()
     weigh_recipe_name = f"{recipe.stage_product_batch_no}({recipe.dev_type.category_no})"
     time_now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -572,6 +579,216 @@ class CLSystem(object):
         return int(auto_num)
 
 
+class JZCLSystem(object):
+    equip_no_ip = {k: v.get("HOST", "10.10.10.10") for k, v in DATABASES.items()}
+
+    def __init__(self, equip_no: str):
+        self.url = f"http://{self.equip_no_ip.get(equip_no, '10.10.10.10')}:1997/CSharpWebService/Service.asmx"
+
+    def add_plan(self, plan_no, recipe_name, plan_num):
+        """新建计划 plan_no: 计划号; recipe_name: 配方名称; plan_num: 计划数量; """
+        response_data = {1: '成功', 2: '失败', 3: '计划号已存在', 999: '未查询到配方'}
+        send_data = f"""<?xml version="1.0" encoding="utf-16"?>
+                        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                            <soap:Body>
+                                <SetRealData xmlns="http://www.realinfo.com.cn/">
+                                    <names>
+                                        <string>MES_01_PLAN_NO.DESC</string>
+                                        <string>MES_01_RECIPE_NO.DESC</string>
+                                        <string>MES_01_PLAN_NUM.PV</string>
+                                        <string>MES_01_REQ_COMM.PV</string>
+                                    </names>
+                                    <datas>
+                                        <string>{plan_no}</string>
+                                        <string>{recipe_name}</string>
+                                        <string>{plan_num}</string>
+                                        <string>1</string>
+                                    </datas>
+                                </SetRealData>
+                            </soap:Body>
+                        </soap:Envelope>"""
+        door_info = requests.post(self.url, data=send_data.encode('utf-8'), timeout=1)
+        res = door_info.content.decode('utf-8')
+        result_flag = re.findall(r'<ns1:SetRealDataResult>(.*)</ns1:SetRealDataResult>', res)[0]
+        if result_flag != 'true':
+            raise ValueError(f'{plan_no}:新建计划设置组态失败')
+        rep = self.execute_result('MES_01_RESP.PV')
+        if rep == -1:
+            raise ValueError(f'{plan_no}:获取结果失败')
+        resp_string = response_data.get(rep)
+        if not resp_string:
+            raise ValueError(f'{plan_no}:未知响应码{rep}')
+        if rep != 1:
+            raise ValueError(f'{plan_no}:新建计划异常: {resp_string}')
+        return resp_string
+
+    def issue_plan(self, plan_no, recipe_name, plan_num):
+        """下达计划  plan_no: 计划号; recipe_name: 配方名称; plan_num: 计划数量; """
+        response_data = {1: '成功', 2: '失败', 3: '计划号已存在', 4: '运行和已下达计划才可停止'}
+        send_data = f"""<?xml version="1.0" encoding="utf-16"?>
+                            <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                <soap:Body>
+                                    <SetRealData xmlns="http://www.realinfo.com.cn/">
+                                        <names>
+                                            <string>MES_02_PLAN_NO.DESC</string>
+                                            <string>MES_02_RECIPE_NO.DESC</string>
+                                            <string>MES_02_PLAN_NUM.PV</string>
+                                            <string>MES_02_REQ_COMM.PV</string>
+                                        </names>
+                                        <datas>
+                                            <string>{plan_no}</string>
+                                            <string>{recipe_name}</string>
+                                            <string>{plan_num}</string>
+                                            <string>1</string>
+                                        </datas>
+                                    </SetRealData>
+                                </soap:Body>
+                            </soap:Envelope>"""
+        door_info = requests.post(self.url, data=send_data.encode('utf-8'), timeout=1)
+        res = door_info.content.decode('utf-8')
+        result_flag = re.findall(r'<ns1:SetRealDataResult>(.*)</ns1:SetRealDataResult>', res)[0]
+        if result_flag != 'true':
+            raise ValueError(f'{plan_no}:下达计划设置组态失败')
+        rep = self.execute_result('MES_02_RESP.PV')
+        if rep == -1:
+            raise ValueError(f'{plan_no}:获取结果失败')
+        resp_string = response_data.get(rep)
+        if not resp_string:
+            raise ValueError(f'{plan_no}:未知响应码{rep}')
+        if rep != 1:
+            raise ValueError(f'{plan_no}:下达计划异常: {resp_string}')
+        return resp_string
+
+    def stop(self, plan_no):
+        """停止计划 plan_no: 计划号; """
+        response_data = {1: '成功', 2: '失败', 3: '未找到计划号', 4: '运行和已下达计划才可停止'}
+        send_data = f"""<?xml version="1.0" encoding="utf-16"?>
+                            <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                <soap:Body>
+                                    <SetRealData xmlns="http://www.realinfo.com.cn/">
+                                        <names>
+                                            <string>MES_04_PLAN_NO.DESC</string>
+                                            <string>MES_04_REQ_COMM.PV</string>
+                                        </names>
+                                        <datas>
+                                            <string>{plan_no}</string>
+                                            <string>1</string>
+                                        </datas>
+                                    </SetRealData>
+                                </soap:Body>
+                            </soap:Envelope>"""
+        door_info = requests.post(self.url, data=send_data.encode('utf-8'), timeout=1)
+        res = door_info.content.decode('utf-8')
+        result_flag = re.findall(r'<ns1:SetRealDataResult>(.*)</ns1:SetRealDataResult>', res)[0]
+        if result_flag != 'true':
+            raise ValueError(f'{plan_no}:停止计划设置组态失败')
+        rep = self.execute_result('MES_04_RESP.PV')
+        if rep == -1:
+            raise ValueError(f'{plan_no}:获取结果失败')
+        resp_string = response_data.get(rep)
+        if not resp_string:
+            raise ValueError(f'{plan_no}:未知响应码{rep}')
+        if rep != 1:
+            raise ValueError(f'{plan_no}:停止计划异常: {resp_string}')
+        return resp_string
+
+    def update_trains(self, plan_no, number):
+        """修改车次  plan_no: 计划号; number: 修改车次; """
+        response_data = {1: '成功', 2: '失败', 3: '未找到计划号', 4: '更新成功-称量本地无计划', 5: '更新成功-计划完成不可修改'}
+        send_data = f"""<?xml version="1.0" encoding="utf-16"?>
+                        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                            <soap:Body>
+                                <SetRealData xmlns="http://www.realinfo.com.cn/">
+                                    <names>
+                                        <string>MES_05_PLAN_NO.DESC</string>
+                                        <string>MES_05_PLAN_NUM.PV</string>
+                                        <string>MES_05_REQ_COMM.PV</string>
+                                    </names>
+                                    <datas>
+                                        <string>{plan_no}</string>
+                                        <string>{number}</string>
+                                        <string>1</string>
+                                    </datas>
+                                </SetRealData>
+                            </soap:Body>
+                        </soap:Envelope>"""
+        door_info = requests.post(self.url, data=send_data.encode('utf-8'), timeout=1)
+        res = door_info.content.decode('utf-8')
+        result_flag = re.findall(r'<ns1:SetRealDataResult>(.*)</ns1:SetRealDataResult>', res)[0]
+        if result_flag != 'true':
+            raise ValueError(f'{plan_no}:修改车次设置组态失败')
+        rep = self.execute_result('MES_05_RESP.PV')
+        if rep == -1:
+            raise ValueError(f'{plan_no}:获取结果失败')
+        resp_string = response_data.get(rep)
+        if not resp_string:
+            raise ValueError(f'{plan_no}:未知响应码{rep}')
+        if rep != 1:
+            raise ValueError(f'{plan_no}:修改车次异常: {resp_string}')
+        return resp_string
+
+    def notice(self, table_seq, table_id, opera_type):
+        """
+        修改表数据以后通知称量更新本地数据
+        table_seq: 操作表  1:料仓物料信息表; 2:配方物料数据表; 3:配方基础数据表; 4:计划表; 5.原材料表;
+        table_id: 数据在表里的id编号
+        opera_type: 操作类型  1:新增;(计划表不支持); 2:删除; 3:修改;
+        """
+        response_data = {1: '成功', 2: '失败', 3: '无法识别的指令', 4: '无法识别的操作类型'}
+        send_data = f"""<?xml version="1.0" encoding="utf-16"?>
+                            <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                <soap:Body>
+                                    <SetRealData xmlns="http://www.realinfo.com.cn/">
+                                        <names>
+                                            <string>MES_06_REQ_COMM.PV</string>
+                                            <string>MES_06_ID.PV</string>
+                                            <string>MES_06_OPERA_TYPE.PV</string>
+                                        </names>
+                                        <datas>
+                                            <string>{table_seq}</string>
+                                            <string>{table_id}</string>
+                                            <string>{opera_type}</string>
+                                        </datas>
+                                    </SetRealData>
+                                </soap:Body>
+                            </soap:Envelope>"""
+        door_info = requests.post(self.url, data=send_data.encode('utf-8'), timeout=1)
+        res = door_info.content.decode('utf-8')
+        result_flag = re.findall(r'<ns1:SetRealDataResult>(.*)</ns1:SetRealDataResult>', res)[0]
+        if result_flag != 'true':
+            raise ValueError(f'通知接口设置组态失败: table_seq[{table_seq}]-table_id[{table_id}]-opera_type[{opera_type}]')
+        rep = self.execute_result('MES_06_RESP.PV')
+        if rep == -1:
+            raise ValueError(f'获取结果失败: table_seq[{table_seq}]-table_id[{table_id}]-opera_type[{opera_type}]')
+        resp_string = response_data.get(rep)
+        if not resp_string:
+            raise ValueError(f'未知响应码{rep}: table_seq[{table_seq}]-table_id[{table_id}]-opera_type[{opera_type}]')
+        if rep != 1:
+            raise ValueError(f'通知接口异常: {resp_string}, detail: table_seq[{table_seq}]-table_id[{table_id}]-opera_type[{opera_type}]')
+        return resp_string
+
+    def execute_result(self, param):
+        """获取称量接口调用结果"""
+        send_data = f"""<?xml version="1.0" encoding="utf-16"?>
+                        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                            <soap:Body>
+                                <GetRealData xmlns="http://www.realinfo.com.cn/">
+                                    <names>
+                                        <string>{param}</string>
+                                    </names>
+                                </GetRealData>
+                            </soap:Body>
+                        </soap:Envelope>"""
+        time.sleep(0.5)  # 增加延时，防止频繁调用导致失败
+        door_info = requests.post(self.url, data=send_data.encode('utf-8'), timeout=1)
+        res = door_info.content.decode('utf-8')
+        result_flag = re.findall(r'<ns1:GetRealDataResult>(.*)</ns1:GetRealDataResult>', res)[0]
+        if result_flag != 'true':
+            return -1
+        rep = re.findall(r'<ns1:string>(.*?)</ns1:string>', res)[0]
+        return int(Decimal(rep))
+
+
 def get_tolerance(batching_equip, standard_weight, material_name=None, project_name='单个化工重量', only_num=None):
     if not standard_weight:
         standard_weight = 0
@@ -614,7 +831,8 @@ def get_manual_materials(product_no, dev_type, batching_equip, equip_no=None):
                                                      product_batching__stage_product_batch_no=product_no_dev,
                                                      product_batching__dev_type__category_name=dev_type)
     # 机配物料
-    machine_material = list(RecipeMaterial.objects.using(batching_equip).filter(recipe_name=product_no).values_list('name', flat=True))
+    rep_material_model = JZRecipeMaterial if batching_equip in JZ_EQUIP_NO else RecipeMaterial
+    machine_material = list(rep_material_model.objects.using(batching_equip).filter(recipe_name=product_no).values_list('name', flat=True))
     # 人工配物料信息
     manual_material = []
     for i in mes_recipe:
@@ -702,26 +920,32 @@ def compare_common_equip(product_no_dev, dev_type, equip_list):
 
 def xl_c_calculate(equip_no, planid, queryset):
     """获取计划物料用量 ex equip_no: F01  planid: 20201114131845,210517091223  queryset(料罐信息表数据)"""
+    plan_model, material_model = [JZPlan, JZRecipeMaterial] if equip_no in JZ_EQUIP_NO else [Plan, RecipeMaterial]
     if planid:
         ids = planid.split(',')
-        all_recipe = Plan.objects.using(equip_no).filter(planid__in=ids).values('recipe').annotate(
+        all_recipe = plan_model.objects.using(equip_no).filter(planid__in=ids).values('recipe').annotate(
             setno_trains=Sum('setno'), actno_trains=Sum('actno'))
     else:
         date_now = datetime.now().date()
         date_before = date_now - timedelta(days=1)
-        date_now_planid = ''.join(str(date_now).split('-'))[2:]
-        date_before_planid = ''.join(str(date_before).split('-'))[2:]
-        # 从称量系统同步料罐状态到mes表中
-        tank_status_sync = TankStatusSync(equip_no=equip_no)
         try:
+            if equip_no in JZ_EQUIP_NO:
+                date_now_planid = date_now.strftime('%Y%m%d')
+                date_before_planid = date_before.strftime('%Y%m%d')
+                tank_status_sync = JZTankStatusSync(equip_no=equip_no)
+            else:
+                date_now_planid = ''.join(str(date_now).split('-'))[2:]
+                date_before_planid = ''.join(str(date_before).split('-'))[2:]
+                tank_status_sync = TankStatusSync(equip_no=equip_no)
+            # 从称量系统同步料罐状态到mes表中
             tank_status_sync.sync()
         except:
             return 'mes同步称量系统料罐状态失败'
         try:
             # 当天称量计划的所有配方名称
-            all_recipe = Plan.objects.using(equip_no).filter(
+            all_recipe = plan_model.objects.using(equip_no).filter(
                 Q(planid__startswith=date_now_planid) | Q(planid__startswith=date_before_planid),
-                state__in=['运行中', '等待']).values('recipe').annotate(setno_trains=Sum('setno'), actno_trains=Sum('actno'))
+                state__in=['运行中', '等待', '运行']).values('recipe').annotate(setno_trains=Sum('setno'), actno_trains=Sum('actno'))
         except:
             return f'称量机台{equip_no}错误'
         if not all_recipe:
@@ -730,7 +954,7 @@ def xl_c_calculate(equip_no, planid, queryset):
     for single_recipe in all_recipe:
         need_trains = single_recipe.get('setno_trains') - (
             single_recipe.get('actno_trains') if single_recipe.get('actno_trains') else 0)
-        material_details = RecipeMaterial.objects.using(equip_no).filter(recipe_name=single_recipe.get('recipe'))
+        material_details = material_model.objects.using(equip_no).filter(recipe_name=single_recipe.get('recipe'))
         name_weight = {i.name: i.weight for i in material_details}
         same_materials = queryset.filter(equip_no=equip_no, material_name__in=name_weight.keys()).values(
             'tank_no', 'material_name', 'status')
@@ -765,3 +989,23 @@ def get_real_ip(meta_data):
     else:
         real_ip = meta_data.get('REMOTE_ADDR')
     return real_ip
+
+
+def send_dk(equip_no, dk_signal):
+    """
+    发送消息控制导开机 ex: equip_no=Z11 dk_signal in ['Start', 'Stop']
+    """
+    if "0" in equip_no and not equip_no.endswith('0'):
+        ext_str = equip_no[-1]
+    else:
+        ext_str = equip_no[1:]
+    try:
+        status, text = WebService.issue({"status": dk_signal}, 'daokaiji_ctrl', equip_no=ext_str, equip_name="上辅机", default_url_name='planService')
+    except Exception as e:
+        logger.error(f'{equip_no}导开机信号发送失败: {e.args[0]}')
+        return False, f"{equip_no} 网络连接异常"
+    if not status:
+        logger.error(f'{equip_no}导开机信号发送失败: {text}')
+        return False, f"{equip_no}导开机信号发送失败"
+    logger.info(f"{equip_no}导开机{'启动' if dk_signal == 'Start' else '停止'}信号发送成功")
+    return True, f"{equip_no}导开机{'启动' if dk_signal == 'Start' else '停止'}信号发送成功"

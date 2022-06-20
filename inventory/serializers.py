@@ -864,11 +864,11 @@ class WmsInventoryStockSerializer(serializers.ModelSerializer):
         l_lower_limit_value = wms_mooney_level.l_lower_limit_value if wms_mooney_level.l_lower_limit_value else 0
         l_upper_limit_value = wms_mooney_level.l_upper_limit_value if wms_mooney_level.l_upper_limit_value else 0
         if h_lower_limit_value <= ml_test_value <= h_upper_limit_value:
-            return '高级'
+            return '高门尼'
         elif m_lower_limit_value <= ml_test_value <= m_upper_limit_value:
-            return '中级'
+            return '标准门尼'
         elif l_lower_limit_value <= ml_test_value <= l_upper_limit_value:
-            return '低级'
+            return '低门尼'
         else:
             return ""
 
@@ -1464,17 +1464,24 @@ class InOutCommonSerializer(serializers.Serializer):
     initiator = serializers.SerializerMethodField()
     start_time = serializers.DateTimeField(source='task.start_time', read_only=True)
     fin_time = serializers.DateTimeField(source='task.fin_time', read_only=True)
+    task_no = serializers.CharField(source='task.order_no', read_only=True)
     order_type = serializers.SerializerMethodField()
     batch_no = serializers.CharField(max_length=64, read_only=True)
     is_entering = serializers.SerializerMethodField()
+    sl = serializers.DecimalField(max_digits=18, decimal_places=4, read_only=True)
+    zl = serializers.DecimalField(max_digits=18, decimal_places=4, read_only=True)
+    task_status_name = serializers.SerializerMethodField()
 
     def get_initiator(self, obj):
-        if obj.task.initiator == 'MES':
-            order = MaterialOutboundOrder.objects.filter(order_no=obj.task.order_no).first()
-            if order:
-                return order.created_username
+        try:
+            if obj.task.initiator == 'MES':
+                order = MaterialOutboundOrder.objects.filter(order_no=obj.task.order_no).first()
+                if order:
+                    return order.created_username
+                return obj.task.initiator
             return obj.task.initiator
-        return obj.task.initiator
+        except Exception:
+            return ""
 
     def get_is_entering(self, object):
         if object.pallet_no.startswith('5'):
@@ -1487,6 +1494,16 @@ class InOutCommonSerializer(serializers.Serializer):
             return "入库"
         else:
             return "出库"
+
+    def get_task_status_name(self, obj):
+        status_dict = {1: '待处理',
+                       2: '处理中',
+                       3: '完成',
+                       4: '已解绑',
+                       5: '取消',
+                       6: '异常',
+                       12: '强制完成'}
+        return status_dict.get(obj.task_status, '未知')
 
 
 class DepotModelSerializer(serializers.ModelSerializer):
@@ -2000,6 +2017,9 @@ class WMSExceptHandleSerializer(BaseModelSerializer):
 
 class MaterialOutHistoryOtherSerializer(serializers.ModelSerializer):
     initiator = serializers.SerializerMethodField()
+    qty = serializers.SerializerMethodField()
+    task_type_name = serializers.SerializerMethodField()
+    task_status_name = serializers.SerializerMethodField()
 
     def get_initiator(self, obj):
         db = self.context['db']
@@ -2011,6 +2031,19 @@ class MaterialOutHistoryOtherSerializer(serializers.ModelSerializer):
                 return order.created_username
             return obj.initiator
         return obj.initiator
+
+    def get_qty(self, obj):
+        try:
+            qty = obj.moh.aggregate(qty=Sum('qty'))['qty']
+            return qty if qty else 0
+        except Exception:
+            return 0
+
+    def get_task_status_name(self, obj):
+        return obj.get_task_status_display()
+
+    def get_task_type_name(self, obj):
+        return obj.get_task_type_display()
 
     class Meta:
         model = MaterialOutHistoryOther

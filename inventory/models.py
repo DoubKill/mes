@@ -864,6 +864,8 @@ class MaterialInHistory(models.Model):
     material_name = models.CharField(max_length=64, db_column='MaterialName')
     task = models.ForeignKey("MaterialInHistoryOther", on_delete=models.CASCADE, related_name="mih",
                              db_column="StockInTaskEntityId")
+    sl = models.DecimalField(max_digits=18, decimal_places=4, db_column='SL')
+    zl = models.DecimalField(max_digits=18, decimal_places=4, db_column='ZL')
 
     class Meta:
         db_table = 't_stock_in_task_upper'
@@ -872,14 +874,28 @@ class MaterialInHistory(models.Model):
 
 class MaterialOutHistoryOther(models.Model):
     """原材料出库记录"""
+    TASK_STATUS_CHOICE = (
+        (1, '已创建'),
+        (2, '等待出库'),
+        (3, '出库中'),
+        (4, '已出库'),
+        (5, '异常出库'),
+        (6, '取消'),
+    )
+    TASK_TYPE_CHOICE = (
+        (1, '生产正常出库'),
+        (2, 'mes指定库位出库'),
+        (3, 'mes指定重量出库'),
+        (4, '自主创建'),
+    )
     id = models.BigIntegerField(primary_key=True, db_column='Id')
     order_no = models.CharField(max_length=64, db_column='TaskNumber')
     initiator = models.CharField(max_length=64, db_column='LastUserId',help_text='创建人')
     start_time = models.DateTimeField(verbose_name='创建时间', help_text='创建时间', blank=True, null=True,
                                       db_column='CreaterTime')
     fin_time = models.DateTimeField(verbose_name='完成时间', help_text='完成时间', blank=True, null=True, db_column='LastTime')
-    task_type = models.IntegerField(db_column='StockOutTaskType', help_text='出库类型')
-    task_status = models.IntegerField(db_column='StockOutTaskState', help_text='出库状态')
+    task_type = models.IntegerField(db_column='StockOutTaskType', help_text='出库类型', choices=TASK_TYPE_CHOICE)
+    task_status = models.IntegerField(db_column='StockOutTaskState', help_text='出库状态', choices=TASK_STATUS_CHOICE)
 
     class Meta:
         db_table = 't_stock_out_task'
@@ -908,6 +924,8 @@ class MaterialOutHistory(models.Model):
     standard_unit = models.CharField(max_length=64, db_column='StandardUnit', help_text='标准单位')
     piece_count = models.DecimalField(max_digits=18, decimal_places=2, db_column='PieceCount')
     zc_num = models.CharField(max_length=64, db_column='ZcdNumber')
+    sl = models.DecimalField(max_digits=18, decimal_places=4, db_column='SL')
+    zl = models.DecimalField(max_digits=18, decimal_places=4, db_column='ZL')
 
     class Meta:
         db_table = 't_stock_out_task_down'
@@ -1282,7 +1300,7 @@ class WMSOutboundHistory(models.Model):
     zc_test_result = models.CharField(max_length=8, help_text='总厂检测结果(合格/不合格/待检/未知)')
     hs_status = models.CharField(max_length=8, help_text='核酸管控结果(已锁定/已解锁/未锁定)')
     mooney_value = models.IntegerField(help_text='门尼检测值', blank=True, null=True)
-    mooney_level = models.CharField(max_length=8, help_text='门尼等级(高级/中级/低级)', blank=True, null=True)
+    mooney_level = models.CharField(max_length=8, help_text='门尼等级(高门尼/标准门尼/低门尼)', blank=True, null=True)
 
     class Meta:
         db_table = 'wms_outbond_history'

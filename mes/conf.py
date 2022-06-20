@@ -62,3 +62,5 @@ INVENTORY_MAP = {
 
 
 SEND_COUNT = 3
+
+JZ_EQUIP_NO = ['F02']
