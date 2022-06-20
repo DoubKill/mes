@@ -452,6 +452,7 @@ class CutTimeCollect(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class IndexOverview(APIView):
     """首页-今日概况"""
+    authentication_classes = ()
 
     @staticmethod
     def get_current_factory_date():
@@ -586,6 +587,7 @@ class IndexOverview(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class IndexProductionAnalyze(APIView):
     """首页-产量分析/合格率分析，参数?dimension=xxx   1:周；2:月"""
+    authentication_classes = ()
 
     def get(self, request):
         dimension = self.request.query_params.get('dimension', '1')
@@ -737,6 +739,7 @@ class IndexProductionAnalyze(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class IndexEquipProductionAnalyze(IndexOverview):
     """首页-机台产量分析, 参数?dimension=1:今天；2:昨天&st=开始日期&et=结束日期"""
+    authentication_classes = ()
 
     def get(self, request):
         dimension = self.request.query_params.get('dimension')
@@ -792,6 +795,7 @@ class IndexEquipProductionAnalyze(IndexOverview):
 @method_decorator([api_recorder], name="dispatch")
 class IndexEquipMaintenanceAnalyze(IndexOverview):
     """首页-机台停机时间分析,参数?dimension=1:今天；2:昨天&st=开始日期&et=结束日期"""
+    authentication_classes = ()
 
     def get(self, request):
         dimension = self.request.query_params.get('dimension')

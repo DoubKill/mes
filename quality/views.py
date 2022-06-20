@@ -54,7 +54,7 @@ from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod
     QualifiedRangeDisplay, IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, \
     ProductReportEquip, ProductReportValue, ProductTestPlan, ProductTestPlanDetail, RubberMaxStretchTestResult, \
     LabelPrintLog, MaterialTestPlan, MaterialTestPlanDetail, MaterialDataPointIndicatorHistory, \
-    MaterialInspectionRegistration, WMSMooneyLevel
+    MaterialInspectionRegistration, WMSMooneyLevel, UnqualifiedDealOrderDetail
 
 from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestOrderSerializer, MaterialTestOrderListSerializer, \
@@ -760,7 +760,7 @@ class LabelPrintViewSet(mixins.CreateModelMixin,
         if ip_address:
             instance = self.get_queryset().filter(label_type=station_dict.get(station), status=0, ip_address=ip_address).order_by('id').first()
         else:
-            instance = self.get_queryset().filter(label_type=station_dict.get(station), status=0).order_by('id').first()
+            instance = self.get_queryset().filter(label_type=station_dict.get(station), status=0, ip_address__isnull=True).order_by('id').first()
         if instance:
             instance.status = 2
             instance.save()
@@ -1038,6 +1038,10 @@ class UnqualifiedDealOrderViewSet(ModelViewSet):
         queryset = UnqualifiedDealOrder.objects.order_by('-id')
         t_deal = self.request.query_params.get('t_solved')
         c_deal = self.request.query_params.get('c_solved')
+        factory_date = self.request.query_params.get('factory_date')
+        equip_no = self.request.query_params.get('equip_no')
+        classes = self.request.query_params.get('classes')
+        product_no = self.request.query_params.get('product_no')
         if t_deal == 'Y':  # 技术部门已处理
             queryset = queryset.filter(t_deal_user__isnull=False)
         elif t_deal == 'N':  # 技术部门未处理
@@ -1046,7 +1050,23 @@ class UnqualifiedDealOrderViewSet(ModelViewSet):
             queryset = queryset.filter(c_deal_user__isnull=False)
         elif c_deal == 'N':  # 检查部门未处理
             queryset = queryset.filter(c_deal_user__isnull=True)
-        return queryset
+        if factory_date:
+            ids1 = UnqualifiedDealOrderDetail.objects.filter(
+                factory_date=factory_date).values_list('unqualified_deal_order_id', flat=True)
+            queryset = queryset.filter(id__in=ids1)
+        if equip_no:
+            ids2 = UnqualifiedDealOrderDetail.objects.filter(
+                equip_no=equip_no).values_list('unqualified_deal_order_id', flat=True)
+            queryset = queryset.filter(id__in=ids2)
+        if classes:
+            ids3 = UnqualifiedDealOrderDetail.objects.filter(
+                classes=classes).values_list('unqualified_deal_order_id', flat=True)
+            queryset = queryset.filter(id__in=ids3)
+        if product_no:
+            ids4 = UnqualifiedDealOrderDetail.objects.filter(
+                product_no=product_no).values_list('unqualified_deal_order_id', flat=True)
+            queryset = queryset.filter(id__in=ids4)
+        return queryset.distinct()
 
     def get_serializer_class(self):
         if self.action == 'create':
@@ -1200,9 +1220,7 @@ class ImportAndExportView(APIView):
         if not pallet_data:
             raise ValidationError('未找到该批次生产数据：【{}】-【{}】-【{}】-【{}】！！'.format(factory_date, classes, equip_no, product_no))
         pallet_trains_map = {}  # 车次与收皮条码map数据
-        lot_nos = []
         for pallet in pallet_data:
-            lot_nos.append(pallet['lot_no'])
             for j in range(pallet['begin_trains'], pallet['end_trains']+1):
                 if j not in pallet_trains_map:
                     pallet_trains_map[j] = {'lot_no': [pallet['lot_no']],
@@ -1212,6 +1230,7 @@ class ImportAndExportView(APIView):
 
         del j, data_points, pallet_data, production_data, reverse_dict
 
+        lot_nos = []
         for item in data:
             try:
                 actual_trains = int(item[6])
@@ -1220,6 +1239,7 @@ class ImportAndExportView(APIView):
             if not pallet_trains_map.get(actual_trains):  # 未找到收皮条码
                 continue
             for lot_no in pallet_trains_map[actual_trains]['lot_no']:
+                lot_nos.append(lot_no)
                 plan_classes_uid = pallet_trains_map[actual_trains]['plan_classes_uid']
                 validated_data = dict()
                 validated_data['material_test_order_uid'] = uuid.uuid1()
@@ -2713,6 +2733,61 @@ order by temp.PRODUCT_NO, temp.TEST_INDICATOR_NAME;""".format(where_str)
                 ret[product_type]['TC50_upper'] += tc50_upper_count
                 ret[product_type]['TC90_lower'] += tc90_lower_count
                 ret[product_type]['TC90_upper'] += tc90_upper_count
+
+        # 补充全部合格的胶料规格数据
+        for k, v in mto_data_dict.items():
+            product_type = k
+            unqualified_qty = v['unqualified_qty']
+            check_qty = v['total_qty']
+            qualified_qty = v['qualified_qty']
+            if unqualified_qty == 0:
+                if product_type not in ret:
+                    rate = round(qualified_qty / check_qty * 100, 2) if check_qty else ''
+                    rate_date1 = data1.get(product_type)
+                    rate_dates = datas.get(product_type)
+                    if rate_date1:
+                        rate1 = round((rate_date1[0] - rate_date1[1]) / rate_date1[0] * 100, 2) if rate_date1[0] else ''
+                    else:
+                        rate1 = ''
+                    if rate_dates:
+                        rates = round((rate_dates[0] - rate_dates[1]) / rate_dates[0] * 100, 2) if rate_dates[0] else ''
+                    else:
+                        rates = ''
+                    ret[product_type] = {
+                        "product_type": product_type,  # 胶料
+                        "JC": check_qty,  # 检查数量
+                        "HG": qualified_qty,  # 合格数量
+                        "cp_all": 0,  # 次品合计
+                        "MN": '',  # 门尼不合格数量
+                        "YD": '',  # 硬度不合格数量
+                        "BZ": '',  # 比重不合格数量
+                        "MH": '',  # 流变MH不合格数量
+                        "ML": '',  # 流变ML不合格数量
+                        "TC10": '',  # 流变TC10不合格数量
+                        "TC50": '',  # 流变TC50不合格数量
+                        "TC90": '',  # 流变TC90不合格数量
+                        "sum_s": '',  # 流变合计
+                        "mn_lower": '',  # 门尼低于下限不合格数量
+                        "mn_upper": '',  # 门尼高于上限不合格数量
+                        "bz_lower": '',  # 比重低于下限不合格数量
+                        "bz_upper": '',  # 门尼高于上限不合格数量
+                        "yd_lower": '',  # 硬度低于下限不合格数量
+                        "yd_upper": '',  # 硬度高于上限不合格数量
+                        "MH_lower": '',  # MH低于下限不合格数量
+                        "MH_upper": '',  # MH高于上限不合格数量
+                        "ML_lower": '',  # ML低于下限不合格数量
+                        "ML_upper": '',  # ML高于上限不合格数量
+                        "TC10_lower": '',  # ML低于下限不合格数量
+                        "TC10_upper": '',  # ML高于上限不合格数量
+                        "TC50_lower": '',  # ML低于下限不合格数量
+                        "TC50_upper": '',  # ML高于上限不合格数量
+                        "TC90_lower": '',  # ML低于下限不合格数量
+                        "TC90_upper": '',  # ML高于上限不合格数量
+                        'RATE_1_PASS': rate1,
+                        'RATE_S_PASS': rates,
+                        "rate": rate
+                    }
+
         resp_data = ret.values()
         for dt in resp_data:
             for k, v in dt.items():

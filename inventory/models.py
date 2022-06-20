@@ -864,6 +864,8 @@ class MaterialInHistory(models.Model):
     material_name = models.CharField(max_length=64, db_column='MaterialName')
     task = models.ForeignKey("MaterialInHistoryOther", on_delete=models.CASCADE, related_name="mih",
                              db_column="StockInTaskEntityId")
+    sl = models.DecimalField(max_digits=18, decimal_places=4, db_column='SL')
+    zl = models.DecimalField(max_digits=18, decimal_places=4, db_column='ZL')
 
     class Meta:
         db_table = 't_stock_in_task_upper'
@@ -922,6 +924,8 @@ class MaterialOutHistory(models.Model):
     standard_unit = models.CharField(max_length=64, db_column='StandardUnit', help_text='标准单位')
     piece_count = models.DecimalField(max_digits=18, decimal_places=2, db_column='PieceCount')
     zc_num = models.CharField(max_length=64, db_column='ZcdNumber')
+    sl = models.DecimalField(max_digits=18, decimal_places=4, db_column='SL')
+    zl = models.DecimalField(max_digits=18, decimal_places=4, db_column='ZL')
 
     class Meta:
         db_table = 't_stock_out_task_down'

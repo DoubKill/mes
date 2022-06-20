@@ -313,7 +313,7 @@ class ReplaceMaterial(AbstractEntity):
     real_material = models.CharField(max_length=64, help_text='实际投入物料名')
     material_type = models.CharField(max_length=64, help_text='扫码物料类别')
     bra_code = models.CharField(max_length=64, help_text='实际投入物料条码')
-    status = models.CharField(max_length=8, help_text='状态:已处理,未处理')
+    status = models.CharField(max_length=8, help_text='状态:已处理,未处理,超期失效')
     result = models.BooleanField(help_text='处理结果', default=False)
 
     class Meta:
@@ -517,7 +517,7 @@ class Plan(models.Model):
     starttime = models.CharField(max_length=19, help_text='起始时间，写入后会被上位机更新', blank=True, null=True)
     stoptime = models.CharField(max_length=19, help_text='结束时间，不用写上位机更新', blank=True, null=True)
     grouptime = models.CharField(max_length=4, help_text='班时：早班、中班、晚班', blank=True, null=True)
-    oper = models.CharField(max_length=8, help_text='操作员', blank=True, null=True)
+    oper = models.CharField(max_length=16, help_text='操作员', blank=True, null=True)
     state = models.CharField(max_length=4, help_text='完成、终止、等待、运行中', blank=True, null=True)
     setno = models.IntegerField(blank=True, help_text='设定车次', null=True)
     actno = models.IntegerField(blank=True, help_text='完成车次，写0', null=True)
@@ -608,6 +608,144 @@ class ReportWeight(models.Model):
     class Meta:
         managed = False
         db_table = 'report_weight'
+
+
+"""嘉正称量系统"""
+
+
+class JZBin(models.Model):
+    """料仓物料信息表"""
+    id = models.BigAutoField(db_column='id', primary_key=True)  # Field name made lowercase.
+    bin = models.IntegerField(db_column='bin', help_text='料仓位置', max_length=3, blank=True,
+                              null=True)  # 整数类型1-19[1:1A 2:1B 3:2A 4:2B...]
+    name = models.CharField(max_length=50, help_text='物料名称', blank=True, null=True)
+    code = models.CharField(max_length=50, help_text='物料代码', blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'mes_bin'
+
+
+class JZMaterialInfo(models.Model):
+    """原材料信息表"""
+    id = models.BigAutoField(db_column='id', primary_key=True)  # Field name made lowercase.
+    name = models.CharField(max_length=50, help_text='物料名称', blank=True, null=True)
+    code = models.CharField(max_length=50, help_text='物料代码', blank=True, null=True)
+    time = models.CharField(max_length=19, help_text='更新时间', blank=True, null=True)
+    remark = models.CharField(max_length=10, help_text='备注', blank=True, null=True)
+    use_not = models.IntegerField(help_text='是否使用，0是1否', default=0)
+
+    class Meta:
+        managed = False
+        db_table = 'mes_material'
+
+
+class JZPlan(models.Model):
+    """称量计划"""
+    id = models.BigAutoField(db_column='id', help_text='自增字段', primary_key=True)  # Field name made lowercase.
+    planid = models.CharField(max_length=14, help_text='mes传唯一码')
+    recipe = models.CharField(max_length=50, help_text='配方名称')
+    recipe_id = models.CharField(max_length=10, help_text='配方id', blank=True, null=True)
+    recipe_ver = models.CharField(max_length=10, blank=True, help_text='配方版本', null=True)
+    starttime = models.CharField(max_length=19, help_text='起始时间，写入后会被上位机更新', blank=True, null=True)
+    stoptime = models.CharField(max_length=19, help_text='结束时间，不用写上位机更新', blank=True, null=True)
+    grouptime = models.CharField(max_length=4, help_text='班时：早班、中班、晚班', blank=True, null=True)
+    oper = models.CharField(max_length=16, help_text='操作员', blank=True, null=True)
+    state = models.CharField(max_length=4, help_text='完成、终止、等待、运行')
+    setno = models.IntegerField(help_text='设定车次')
+    actno = models.IntegerField(blank=True, help_text='完成车次，写0', null=True)
+    order_by = models.IntegerField(blank=True, help_text='写1', null=True)
+    date_time = models.CharField(max_length=10, help_text='日期', blank=True, null=True)
+    addtime = models.CharField(max_length=19, help_text='创建时间', blank=True, null=True)
+    merge_flag = models.BooleanField(help_text='是否合包', default=False)
+    downtime = models.CharField(max_length=19, help_text='下达时间', null=True, blank=True)
+    create_flag = models.IntegerField(help_text='创建标记: 0未创建, 1已创建', default=False)
+
+    class Meta:
+        managed = False
+        db_table = 'mes_plan'
+
+
+class JZRecipeMaterial(models.Model):
+    """配方物料数据"""
+    id = models.BigAutoField(db_column='id', primary_key=True)
+    recipe_name = models.CharField(max_length=50, help_text='recipe_pre中配方名称', blank=True, null=True)
+    name = models.CharField(max_length=50, help_text='物料名称', blank=True, null=True)
+    weight = models.DecimalField(max_digits=5, decimal_places=3, blank=True, null=True)
+    error = models.DecimalField(max_digits=4, decimal_places=3, blank=True, null=True)
+    time = models.CharField(max_length=19, blank=True, null=True)
+    order_by = models.IntegerField(help_text='物料在配方中的顺序')
+    material_id = models.BigIntegerField(help_text='配方物料在原材料表的id')
+    recipe_id = models.BigIntegerField(help_text='关联配方的id')
+
+    class Meta:
+        managed = False
+        db_table = 'mes_recipe_material'
+
+
+class JZRecipePre(models.Model):
+    """配方基础数据(表头数据)"""
+    id = models.BigAutoField(db_column='id', primary_key=True)
+    name = models.CharField(max_length=50, help_text='配方名称，唯一', blank=True, null=True)
+    ver = models.CharField(max_length=10, blank=True, help_text='配方版本', null=True)
+    remark1 = models.CharField(max_length=50, blank=True, null=True)
+    remark2 = models.CharField(max_length=50, blank=True, null=True)
+    weight = models.DecimalField(max_digits=6, help_text='原材料总重量，计算得出', decimal_places=3, blank=True, null=True)
+    error = models.DecimalField(max_digits=5, help_text='总误差，界面写入', decimal_places=3, blank=True, null=True)
+    time = models.CharField(max_length=19, help_text='修改时间', blank=True, null=True)
+    use_not = models.IntegerField(help_text='是否使用，0是1否', default=0)
+    merge_flag = models.BooleanField(help_text='是否合包', default=False)
+    split_count = models.IntegerField(help_text='机配分包数', default=1)
+
+    class Meta:
+        managed = False
+        db_table = 'mes_recipe_pre'
+
+
+class JZReportBasic(models.Model):
+    """称量车次报表数据"""
+    id = models.BigAutoField(db_column='id', primary_key=True)
+    planid = models.CharField(max_length=14, help_text='mes写入计划唯一码', blank=True, null=True)
+    starttime = models.CharField(max_length=19, blank=True, null=True)
+    savetime = models.CharField(max_length=19, blank=True, null=True)
+    grouptime = models.CharField(max_length=4, blank=True, null=True)
+    recipe = models.CharField(max_length=50, blank=True, null=True)
+    recipe_ver = models.CharField(max_length=10, blank=True, null=True)
+    setno = models.IntegerField(blank=True, null=True)
+    actno = models.IntegerField(blank=True, null=True)
+    set_weight = models.DecimalField(max_digits=5, decimal_places=3, blank=True, null=True)
+    act_weight = models.DecimalField(max_digits=5, decimal_places=3, blank=True, null=True)
+    warning = models.IntegerField(blank=True, help_text='检量是否报警，1：不合格，0：合格', null=True)
+    set_error = models.DecimalField(max_digits=6, decimal_places=3, blank=True, null=True)
+    act_error = models.DecimalField(max_digits=6, decimal_places=3, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'mes_rpt_recipe_basic'
+
+
+class JZReportWeight(models.Model):
+    """物料消耗报表数据"""
+    id = models.BigAutoField(db_column='id', primary_key=True)
+    planid = models.CharField(max_length=14, blank=True, null=True)
+    recipe = models.CharField(max_length=50, blank=True, null=True)
+    setno = models.IntegerField(blank=True, null=True)
+    车次 = models.IntegerField(db_column='act_no', blank=True, help_text='实际车次', null=True)
+    recipe_ver = models.CharField(max_length=10, blank=True, null=True)
+    时间 = models.CharField(db_column='weight_time', max_length=19, help_text='称量耗时', blank=True, null=True)
+    grouptime = models.CharField(max_length=4, blank=True, null=True)
+    material = models.CharField(max_length=50, blank=True, null=True)
+    set_weight = models.DecimalField(max_digits=5, decimal_places=3, blank=True, null=True)
+    set_error = models.DecimalField(max_digits=4, decimal_places=3, blank=True, null=True)
+    act_weight = models.DecimalField(max_digits=5, decimal_places=3, blank=True, null=True)
+    warning = models.IntegerField(blank=True, null=True)
+    back1 = models.CharField(max_length=10, help_text='没用', blank=True, null=True)
+    act_error = models.DecimalField(max_digits=6, decimal_places=3, blank=True, null=True)
+    time = models.IntegerField(blank=True, help_text='没用', null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'mes_rpt_recipe_weight'
 
 
 class ToleranceDistinguish(AbstractEntity):

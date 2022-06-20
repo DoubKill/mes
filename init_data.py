@@ -741,7 +741,7 @@ permission_data = [
     {'id': 788, 'code': 'view_replace_material', 'name': '查看', 'parent_id': 787},
     {'id': 789, 'code': 'opera_replace_material', 'name': '操作按钮', 'parent_id': 787},
 
-    {'id': 790, 'code': 'return_rubber', 'name': '胶片补打卡片', 'parent_id': None},
+    {'id': 790, 'code': 'return_rubber', 'name': '返回胶/无名胶卡片补打', 'parent_id': None},
     {'id': 791, 'code': 'view_return_rubber', 'name': '查看', 'parent_id': 790},
     {'id': 792, 'code': 'add_return_rubber', 'name': '新建', 'parent_id': 790},
     {'id': 793, 'code': 'print_return_rubber', 'name': '打印', 'parent_id': 790},

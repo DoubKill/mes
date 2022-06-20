@@ -13,6 +13,7 @@ from mes.conf import COMMON_READ_ONLY_FIELDS
 from recipe.models import Material, ProductInfo, ProductBatching, ProductBatchingDetail, \
     MaterialAttribute, MaterialSupplier, WeighBatchingDetail, WeighCntType, ZCMaterial, ERPMESMaterialRelation, \
     ProductBatchingEquip, ProductBatchingMixed, MultiReplaceMaterial
+from recipe.utils import get_mixed
 
 sync_logger = logging.getLogger('sync_log')
 
@@ -181,7 +182,7 @@ class ProductBatchingListSerializer(BaseModelSerializer):
         if '_NEW' in product_no:
             new_recipe_id = instance.id
         else:
-            new_recipe = ProductBatching.objects.exclude(used_type__in=[6, 7]).filter(
+            new_recipe = ProductBatching.objects.exclude(used_type__in=[6]).filter(
                 stage_product_batch_no=f'{instance.stage_product_batch_no}_NEW', dev_type=instance.dev_type).first()
             new_recipe_id = new_recipe.id if new_recipe else 0
         res['new_recipe_id'] = new_recipe_id
@@ -327,14 +328,14 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
                                 ProductBatchingEquip.objects.create(**data)
         if mixed_ratio:
             feeds, ratios = mixed_ratio['stage'], mixed_ratio['ratio']
-            f_s = instance.batching_details.filter(Q(material__material_name__icontains=feeds['f_feed']) | Q(material__material_name__icontains=feeds['s_feed'])).last()
+            f_s, f_stage = get_mixed(instance)
             if not f_s:
                 raise serializers.ValidationError('对搭设置的段次信息在配方中不存在')
-            f_weight, s_weight = round(float(f_s.actual_weight) * (ratios['f_ratio'] / sum(ratios.values())), 3), round(float(f_s.actual_weight) * (ratios['s_ratio'] / sum(ratios.values())), 3)
+            f_name, f_weight, s_weight = f_s.material.material_name, round(float(f_s.actual_weight) * (ratios['f_ratio'] / sum(ratios.values())), 3), round(float(f_s.actual_weight) * (ratios['s_ratio'] / sum(ratios.values())), 3)
             created_data = {'product_batching': instance, 'f_feed': feeds['f_feed'], 's_feed': feeds['s_feed'],
-                            'f_feed_name': stage_product_batch_no.replace(instance.stage.global_name, feeds['f_feed']),
-                            's_feed_name': stage_product_batch_no.replace(instance.stage.global_name, feeds['s_feed']),
-                            'f_ratio': ratios['f_ratio'], 's_ratio': ratios['s_ratio'], 'f_weight': f_weight, 's_weight': s_weight}
+                            'f_feed_name': f_name.replace(f_stage, feeds['f_feed']), 'f_ratio': ratios['f_ratio'],
+                            's_feed_name': f_name.replace(f_stage, feeds['s_feed']), 's_ratio': ratios['s_ratio'],
+                            'f_weight': f_weight, 's_weight': s_weight, 'origin_material_name': f_name}
             ProductBatchingMixed.objects.create(**created_data)
         if not mes_recipe_name.endswith('_NEW'):
             try:
@@ -570,15 +571,15 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
                             ProductBatchingEquip.objects.filter(product_batching=instance, equip_no__in=master.keys()).update(send_recipe_flag=False)
         if mixed_ratio:
             feeds, ratios = mixed_ratio['stage'], mixed_ratio['ratio']
-            f_s = instance.batching_details.filter(Q(material__material_name__icontains=feeds['f_feed']) | Q(material__material_name__icontains=feeds['s_feed'])).last()
+            f_s, f_stage = get_mixed(instance)
             if not f_s:
                 raise serializers.ValidationError('对搭设置的段次信息在配方中不存在')
-            f_weight, s_weight = round(float(f_s.actual_weight) * (ratios['f_ratio'] / sum(ratios.values())), 3), round(float(f_s.actual_weight) * (ratios['s_ratio'] / sum(ratios.values())), 3)
+            f_name, f_weight, s_weight = f_s.material.material_name, round(float(f_s.actual_weight) * (ratios['f_ratio'] / sum(ratios.values())), 3), round(float(f_s.actual_weight) * (ratios['s_ratio'] / sum(ratios.values())), 3)
             mixed_recipe = ProductBatchingMixed.objects.filter(product_batching=instance)
             ready_data = {'f_feed': feeds['f_feed'], 's_feed': feeds['s_feed'], 's_weight': s_weight,
-                          'f_feed_name': instance.stage_product_batch_no.replace(instance.stage.global_name, feeds['f_feed']),
-                          's_feed_name': instance.stage_product_batch_no.replace(instance.stage.global_name, feeds['s_feed']),
-                          'f_ratio': ratios['f_ratio'], 's_ratio': ratios['s_ratio'], 'f_weight': f_weight}
+                          'f_feed_name': f_name.replace(f_stage, feeds['f_feed']), 'f_ratio': ratios['f_ratio'],
+                          's_feed_name': f_name.replace(f_stage, feeds['s_feed']), 's_ratio': ratios['s_ratio'],
+                          'f_weight': f_weight, 'origin_material_name': f_name}
             if mixed_recipe:
                 mixed_recipe.update(**ready_data)
             else:
