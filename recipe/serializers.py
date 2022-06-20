@@ -182,7 +182,7 @@ class ProductBatchingListSerializer(BaseModelSerializer):
         if '_NEW' in product_no:
             new_recipe_id = instance.id
         else:
-            new_recipe = ProductBatching.objects.exclude(used_type__in=[6, 7]).filter(
+            new_recipe = ProductBatching.objects.exclude(used_type__in=[6]).filter(
                 stage_product_batch_no=f'{instance.stage_product_batch_no}_NEW', dev_type=instance.dev_type).first()
             new_recipe_id = new_recipe.id if new_recipe else 0
         res['new_recipe_id'] = new_recipe_id

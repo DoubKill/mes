@@ -176,8 +176,8 @@ class ValidateProductVersionsView(APIView):
         stage_product_batch_no = self.request.query_params.get('stage_product_batch_no')
         if stage_product_batch_no:
             if ProductBatching.objects.exclude(
-                    used_type__in=[6, 7]).filter(stage_product_batch_no=stage_product_batch_no, factory__isnull=True,
-                                                 batching_type=2, dev_type_id=dev_type).exists():
+                    used_type__in=[6]).filter(stage_product_batch_no=stage_product_batch_no, factory__isnull=True,
+                                              batching_type=2, dev_type_id=dev_type).exists():
                 raise ValidationError('该配方已存在')
             return Response('OK')
         if not all([versions, site, product_info, stage]):
@@ -189,13 +189,13 @@ class ValidateProductVersionsView(APIView):
             dev_type = int(dev_type)
         except Exception:
             raise ValidationError('参数错误')
-        product_batching = ProductBatching.objects.exclude(used_type__in=[6, 7]).filter(site_id=site,
-                                                                                        stage_id=stage,
-                                                                                        product_info_id=product_info,
-                                                                                        versions=versions,
-                                                                                        batching_type=2,
-                                                                                        dev_type_id=dev_type,
-                                                                                        ).first()
+        product_batching = ProductBatching.objects.exclude(used_type__in=[6]).filter(site_id=site,
+                                                                                     stage_id=stage,
+                                                                                     product_info_id=product_info,
+                                                                                     versions=versions,
+                                                                                     batching_type=2,
+                                                                                     dev_type_id=dev_type,
+                                                                                     ).first()
         if product_batching:
             raise ValidationError('该配方已存在')
             # if product_batching.versions >= versions:
@@ -590,7 +590,7 @@ class RecipeNoticeAPiView(APIView):
             raise ValidationError('请选择机型')
         if not notice_flag:
             # 查询群控是否存在同名配方
-            sfj_same_recipe = ProductBatching.objects.using('SFJ').exclude(used_type__in=[6, 7]).filter(stage_product_batch_no=real_product_no)
+            sfj_same_recipe = ProductBatching.objects.using('SFJ').exclude(used_type__in=[6]).filter(stage_product_batch_no=real_product_no)
             if sfj_same_recipe:
                 return Response({'notice_flag': True})
         # 发送配方的返回信息
@@ -783,9 +783,8 @@ class ProductDevBatchingReceive(APIView):
         # }
         data = self.request.data
         product_batching = ProductBatching.objects.exclude(
-            used_type__in=[6, 7]).filter(stage_product_batch_no=data['stage_product_batch_no'],
-                                         batching_type=2,
-                                         dev_type__category_no=data['dev_type__category_no']).first()
+            used_type__in=[6]).filter(stage_product_batch_no=data['stage_product_batch_no'], batching_type=2,
+                                      dev_type__category_no=data['dev_type__category_no']).first()
         try:
             dev_type = EquipCategoryAttribute.objects.get(category_no=data['dev_type__category_no'])
             if data['factory__global_no']:
@@ -859,7 +858,7 @@ class DevTypeProductBatching(APIView):
         if not all([dev_type, product_no]):
             raise ValidationError('参数不足')
         instance = ProductBatching.objects.exclude(
-            used_type__in=[6, 7]).filter(
+            used_type__in=[6]).filter(
             dev_type__category_no=dev_type,
             stage_product_batch_no=product_no,
             batching_type=2
