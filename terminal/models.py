@@ -616,8 +616,7 @@ class ReportWeight(models.Model):
 class JZBin(models.Model):
     """料仓物料信息表"""
     id = models.BigAutoField(db_column='id', primary_key=True)  # Field name made lowercase.
-    bin = models.IntegerField(db_column='bin', help_text='料仓位置', max_length=3, blank=True,
-                              null=True)  # 整数类型1-19[1:1A 2:1B 3:2A 4:2B...]
+    bin = models.IntegerField(db_column='bin', help_text='料仓位置', blank=True, null=True)  # 整数类型1-19[1:1A 2:1B 3:2A 4:2B...]
     name = models.CharField(max_length=50, help_text='物料名称', blank=True, null=True)
     code = models.CharField(max_length=50, help_text='物料代码', blank=True, null=True)
 
