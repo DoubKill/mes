@@ -5129,6 +5129,89 @@ class OutBoundDeliveryOrderViewSet(ModelViewSet):
 
 
 @method_decorator([api_recorder], name="dispatch")
+class OutboundStock(APIView):
+    permission_classes = (IsAuthenticated, PermissionClass({'add': 'outbound_product_inventory'}))
+
+    def post(self, request):
+        data = self.request.data
+        warehouse = data.get('warehouse')
+        quality_status = data.get('quality_status')
+        product_no = data.get('product_no')
+        station = data.get('station')
+        stock_data = data.get('stock_data')
+
+        last_order = OutBoundDeliveryOrder.objects.filter(
+            created_date__date=datetime.datetime.now().date()
+        ).order_by('created_date').last()
+        if last_order:
+            last_ordering = str(int(last_order.order_no[12:])+1)
+            if len(last_ordering) <= 5:
+                ordering = last_ordering.zfill(5)
+            else:
+                ordering = last_ordering.zfill(len(last_ordering))
+        else:
+            ordering = '00001'
+        order_no = 'MES{}{}{}'.format('Z' if warehouse == '终炼胶库' else 'H',
+                                      datetime.datetime.now().date().strftime('%Y%m%d'),
+                                      ordering)
+        instance = OutBoundDeliveryOrder.objects.create(
+            warehouse=warehouse,
+            order_no=order_no,
+            order_qty=9999,
+            station=station,
+            quality_status=quality_status,
+            product_no=product_no,
+            created_user=self.request.user
+        )
+
+        detail_ids = []
+        items = []
+        for item in stock_data:
+            item['sub_no'] = '00001'
+            item['outbound_delivery_order'] = instance.id
+            s = OutBoundDeliveryOrderDetailSerializer(data=item, context={'request': request})
+            s.is_valid(raise_exception=True)
+            detail = s.save()
+            detail_ids.append(detail.id)
+            dict1 = {'WORKID': detail.order_no,
+                     'MID': instance.product_no,
+                     'PICI': "1",
+                     'RFID': detail.pallet_no,
+                     'STATIONID': instance.station,
+                     'SENDDATE': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+            if instance.warehouse == '终炼胶库':
+                dict1['STOREDEF_ID'] = 1
+            items.append(dict1)
+        username = self.request.user.username
+        json_data = {
+            'msgId': instance.order_no,
+            'OUTTYPE': '快检出库',
+            "msgConut": str(len(items)),
+            "SENDUSER": self.request.user.username,
+            "items": items
+        }
+        if not DEBUG:
+            json_data = json.dumps(json_data, ensure_ascii=False)
+            if instance.warehouse == '混炼胶库':
+                sender = OUTWORKUploader(end_type="指定出库")
+            else:
+                sender = OUTWORKUploaderLB(end_type="指定出库")
+            result = sender.request(instance.order_no, '指定出库', str(len(items)), username, json_data)
+            if result is not None:
+                try:
+                    items = result['items']
+                    msg = items[0]['msg']
+                except:
+                    msg = result[0]['msg']
+                if "TRUE" in msg:  # 成功
+                    OutBoundDeliveryOrderDetail.objects.filter(id__in=detail_ids).update(status=2)
+                else:  # 失败
+                    OutBoundDeliveryOrderDetail.objects.filter(id__in=detail_ids).update(status=5)
+                    raise ValidationError('出库失败：{}'.format(msg))
+        return Response('ok')
+
+
+@method_decorator([api_recorder], name="dispatch")
 class OutBoundDeliveryOrderDetailViewSet(ModelViewSet):
     queryset = OutBoundDeliveryOrderDetail.objects.all().order_by('-created_date')
     serializer_class = OutBoundDeliveryOrderDetailSerializer
@@ -5471,6 +5554,13 @@ class WMSOutTaskView(ListAPIView):
     serializer_class = MaterialOutHistoryOtherSerializer
     permission_classes = (IsAuthenticated,)
     DB = 'wms'
+    EXPORT_FIELDS_DICT = {'出库单据号': 'order_no',
+                          '单据类型': 'task_type_name',
+                          '创建时间': 'start_time',
+                          '状态': 'task_status_name',
+                          '数量': 'qty',
+                          '创建人': 'initiator'
+                          }
 
     def get_serializer_context(self):
         """
@@ -5489,18 +5579,44 @@ class WMSOutTaskView(ListAPIView):
         task_status = self.request.query_params.get('task_status')
         material_no = self.request.query_params.get('material_no')
         material_name = self.request.query_params.get('material_name')
+        st = self.request.query_params.get('st')
+        et = self.request.query_params.get('et')
         filter_kwargs = {}
         if order_no:
             filter_kwargs['order_no__icontains'] = order_no
         if task_status:
             filter_kwargs['task_status'] = task_status
         if material_no:
-            task_ids = MaterialOutHistory.objects.using(self.DB).filter(material_no__icontains=material_no).values_list('task_id', flat=True)
+            task_ids = MaterialOutHistory.objects.using(self.DB).filter(material_no=material_no).values_list('task_id', flat=True)
             filter_kwargs['id__in'] = task_ids
         if material_name:
-            task_ids = MaterialOutHistory.objects.using(self.DB).filter(material_name__icontains=material_name).values_list('task_id', flat=True)
+            task_ids = MaterialOutHistory.objects.using(self.DB).filter(material_name=material_name).values_list('task_id', flat=True)
             filter_kwargs['id__in'] = task_ids
+        if st:
+            filter_kwargs['start_time__gte'] = st
+        if et:
+            filter_kwargs['start_time__lte'] = et
         return query_set.filter(**filter_kwargs)
+
+    def list(self, request, *args, **kwargs):
+        export = self.request.query_params.get('export')
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if export:
+            et = self.request.query_params.get('et')
+            st = self.request.query_params.get('st')
+            if not all([st, et]):
+                raise ValidationError('请选择导出的时间范围！')
+            diff = datetime.datetime.strptime(et, '%Y-%m-%d %H:%M:%S') - datetime.datetime.strptime(st, '%Y-%m-%d %H:%M:%S')
+            if diff.days > 31:
+                raise ValidationError('导出数据的日期跨度不得超过一个月！')
+            data = self.get_serializer(queryset, many=True).data
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, '出库单据')
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -6716,9 +6832,9 @@ class WMSMnLevelSearchView(APIView):
                     mn_level = level
                 else:
                     if value:
-                        mn_level = "无等级"
+                        mn_level = "未设置等级标准"
                     else:
-                        mn_level = "待检"
+                        mn_level = "门尼未检测"
             ret.append(
                 {"order_no": order_no,
                  "material_name": material_name,

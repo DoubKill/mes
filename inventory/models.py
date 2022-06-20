@@ -874,14 +874,28 @@ class MaterialInHistory(models.Model):
 
 class MaterialOutHistoryOther(models.Model):
     """原材料出库记录"""
+    TASK_STATUS_CHOICE = (
+        (1, '已创建'),
+        (2, '等待出库'),
+        (3, '出库中'),
+        (4, '已出库'),
+        (5, '异常出库'),
+        (6, '取消'),
+    )
+    TASK_TYPE_CHOICE = (
+        (1, '生产正常出库'),
+        (2, 'mes指定库位出库'),
+        (3, 'mes指定重量出库'),
+        (4, '自主创建'),
+    )
     id = models.BigIntegerField(primary_key=True, db_column='Id')
     order_no = models.CharField(max_length=64, db_column='TaskNumber')
     initiator = models.CharField(max_length=64, db_column='LastUserId',help_text='创建人')
     start_time = models.DateTimeField(verbose_name='创建时间', help_text='创建时间', blank=True, null=True,
                                       db_column='CreaterTime')
     fin_time = models.DateTimeField(verbose_name='完成时间', help_text='完成时间', blank=True, null=True, db_column='LastTime')
-    task_type = models.IntegerField(db_column='StockOutTaskType', help_text='出库类型')
-    task_status = models.IntegerField(db_column='StockOutTaskState', help_text='出库状态')
+    task_type = models.IntegerField(db_column='StockOutTaskType', help_text='出库类型', choices=TASK_TYPE_CHOICE)
+    task_status = models.IntegerField(db_column='StockOutTaskState', help_text='出库状态', choices=TASK_STATUS_CHOICE)
 
     class Meta:
         db_table = 't_stock_out_task'
