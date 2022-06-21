@@ -611,14 +611,18 @@ class JZCLSystem(object):
         res = door_info.content.decode('utf-8')
         result_flag = re.findall(r'<ns1:SetRealDataResult>(.*)</ns1:SetRealDataResult>', res)[0]
         if result_flag != 'true':
+            logger.error(f'{plan_no}:新建计划设置组态失败')
             raise ValueError(f'{plan_no}:新建计划设置组态失败')
         rep = self.execute_result('MES_01_RESP.PV')
         if rep == -1:
+            logger.error(f'{plan_no}:获取结果失败')
             raise ValueError(f'{plan_no}:获取结果失败')
         resp_string = response_data.get(rep)
         if not resp_string:
+            logger.error(f'{plan_no}:未知响应码{rep}')
             raise ValueError(f'{plan_no}:未知响应码{rep}')
         if rep != 1:
+            logger.error(f'{plan_no}:新建计划异常: {resp_string}')
             raise ValueError(f'{plan_no}:新建计划异常: {resp_string}')
         return resp_string
 
@@ -648,14 +652,18 @@ class JZCLSystem(object):
         res = door_info.content.decode('utf-8')
         result_flag = re.findall(r'<ns1:SetRealDataResult>(.*)</ns1:SetRealDataResult>', res)[0]
         if result_flag != 'true':
+            logger.error(f'{plan_no}:下达计划设置组态失败')
             raise ValueError(f'{plan_no}:下达计划设置组态失败')
         rep = self.execute_result('MES_02_RESP.PV')
         if rep == -1:
+            logger.error(f'{plan_no}:获取结果失败')
             raise ValueError(f'{plan_no}:获取结果失败')
         resp_string = response_data.get(rep)
         if not resp_string:
+            logger.error(f'{plan_no}:未知响应码{rep}')
             raise ValueError(f'{plan_no}:未知响应码{rep}')
         if rep != 1:
+            logger.error(f'{plan_no}:下达计划异常: {resp_string}')
             raise ValueError(f'{plan_no}:下达计划异常: {resp_string}')
         return resp_string
 
@@ -681,14 +689,18 @@ class JZCLSystem(object):
         res = door_info.content.decode('utf-8')
         result_flag = re.findall(r'<ns1:SetRealDataResult>(.*)</ns1:SetRealDataResult>', res)[0]
         if result_flag != 'true':
+            logger.error(f'{plan_no}:停止计划设置组态失败')
             raise ValueError(f'{plan_no}:停止计划设置组态失败')
         rep = self.execute_result('MES_04_RESP.PV')
         if rep == -1:
+            logger.error(f'{plan_no}:获取结果失败')
             raise ValueError(f'{plan_no}:获取结果失败')
         resp_string = response_data.get(rep)
         if not resp_string:
+            logger.error(f'{plan_no}:未知响应码{rep}')
             raise ValueError(f'{plan_no}:未知响应码{rep}')
         if rep != 1:
+            logger.error(f'{plan_no}:停止计划异常: {resp_string}')
             raise ValueError(f'{plan_no}:停止计划异常: {resp_string}')
         return resp_string
 
@@ -716,14 +728,18 @@ class JZCLSystem(object):
         res = door_info.content.decode('utf-8')
         result_flag = re.findall(r'<ns1:SetRealDataResult>(.*)</ns1:SetRealDataResult>', res)[0]
         if result_flag != 'true':
+            logger.error(f'{plan_no}:修改车次设置组态失败')
             raise ValueError(f'{plan_no}:修改车次设置组态失败')
         rep = self.execute_result('MES_05_RESP.PV')
         if rep == -1:
+            logger.error(f'{plan_no}:获取结果失败')
             raise ValueError(f'{plan_no}:获取结果失败')
         resp_string = response_data.get(rep)
         if not resp_string:
+            logger.error(f'{plan_no}:未知响应码{rep}')
             raise ValueError(f'{plan_no}:未知响应码{rep}')
         if rep != 1:
+            logger.error(f'{plan_no}:修改车次异常: {resp_string}')
             raise ValueError(f'{plan_no}:修改车次异常: {resp_string}')
         return resp_string
 
@@ -756,14 +772,18 @@ class JZCLSystem(object):
         res = door_info.content.decode('utf-8')
         result_flag = re.findall(r'<ns1:SetRealDataResult>(.*)</ns1:SetRealDataResult>', res)[0]
         if result_flag != 'true':
+            logger.error(f'通知接口设置组态失败: table_seq[{table_seq}]-table_id[{table_id}]-opera_type[{opera_type}]')
             raise ValueError(f'通知接口设置组态失败: table_seq[{table_seq}]-table_id[{table_id}]-opera_type[{opera_type}]')
         rep = self.execute_result('MES_06_RESP.PV')
         if rep == -1:
+            logger.error(f'获取结果失败: table_seq[{table_seq}]-table_id[{table_id}]-opera_type[{opera_type}]')
             raise ValueError(f'获取结果失败: table_seq[{table_seq}]-table_id[{table_id}]-opera_type[{opera_type}]')
         resp_string = response_data.get(rep)
         if not resp_string:
+            logger.error(f'未知响应码{rep}: table_seq[{table_seq}]-table_id[{table_id}]-opera_type[{opera_type}]')
             raise ValueError(f'未知响应码{rep}: table_seq[{table_seq}]-table_id[{table_id}]-opera_type[{opera_type}]')
         if rep != 1:
+            logger.error(f'通知接口异常: {resp_string}, detail: table_seq[{table_seq}]-table_id[{table_id}]-opera_type[{opera_type}]')
             raise ValueError(f'通知接口异常: {resp_string}, detail: table_seq[{table_seq}]-table_id[{table_id}]-opera_type[{opera_type}]')
         return resp_string
 

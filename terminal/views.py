@@ -1972,7 +1972,7 @@ class XLPlanVIewSet(ModelViewSet):
                 res = jz.add_plan(plan_no=instance.planid, recipe_name=instance.recipe, plan_num=instance.setno)
             except Exception as e:
                 instance.delete()
-                raise ValidationError(f'通知称量系统{equip_no}新建计划失败')
+                raise ValidationError(f'{equip_no}新建计划失败{e.args[0]}]')
         return Response('新建计划成功')
 
     def destroy(self, request, *args, **kwargs):

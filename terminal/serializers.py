@@ -28,7 +28,7 @@ from terminal.models import EquipOperationLog, WeightBatchingLog, FeedingLog, We
     FeedingOperationLog, CarbonTankFeedingPrompt, PowderTankSetting, OilTankSetting, ReplaceMaterial, ReturnRubber, \
     ToleranceRule, WeightPackageManual, WeightPackageManualDetails, WeightPackageSingle, OtherMaterialLog, \
     WeightPackageWms, MachineManualRelation, WeightPackageLogDetails, WeightPackageLogManualDetails, WmsAddPrint, \
-    JZMaterialInfo, JZBin, JZPlan, JZRecipeMaterial, JZRecipePre
+    JZMaterialInfo, JZBin, JZPlan, JZRecipeMaterial, JZRecipePre, JZExecutePlan
 from terminal.utils import TankStatusSync, CLSystem, material_out_barcode, get_tolerance, get_common_equip, get_real_ip, \
     JZTankStatusSync, JZCLSystem, send_dk
 
@@ -636,7 +636,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                     num = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, material_name=material_name, scan_time__gte=limit_time).count()
                     if num >= limit_nums:
                         check_flag = False
-                        attrs['tank_data'].update({'msg': '扫码过快: 胶皮4分钟不超过4架/胶块6分钟4框'})
+                        attrs['tank_data'].update({'msg': f'扫码过快: {n_scan_material_type}{limit_minutes}分钟不超过{limit_nums}次'})
                         attrs['status'] = 2
                 if check_flag:
                     last_same_material = add_materials.first()
@@ -1741,7 +1741,19 @@ class JZPlanSerializer(serializers.ModelSerializer):
         now_time = datetime.now().strftime('%Y%m%d%H%M%S')
         prefix = f'{now_time[:8]}X'
         max_plan_id = plan_model.objects.using(equip_no).filter(planid__startswith=prefix).aggregate(plan_id=Max('planid'))['plan_id']
-        validated_data['planid'] = prefix + ('0001' if not max_plan_id else '%04d' % (int(max_plan_id[-4:]) + 1))
+        # 比对嘉正称量本地计划号与顺序
+        max_local = JZExecutePlan.objects.using(equip_no).filter(planid__startswith=prefix).aggregate(max_plan_id=Max('planid'), max_order_by=Max('order_by'))
+        if max_local['max_order_by'] and max_local['max_order_by'] > validated_data['order_by'] - 1:
+            validated_data['order_by'] = max_local['max_order_by'] + 1
+        if max_plan_id and not max_local['max_plan_id']:
+            plan_id = prefix + '%04d' % (int(max_plan_id[-4:]) + 1)
+        elif not max_plan_id and max_local['max_plan_id']:
+            plan_id = prefix + '%04d' % (int(max_local['max_plan_id'][-4:]) + 1)
+        elif not max_plan_id and not max_local['max_plan_id']:
+            plan_id = prefix + '0001'
+        else:
+            plan_id = prefix + ('%04d' % (int(max_plan_id[-4:]) + 1) if max_plan_id > max_local['max_plan_id'] else '%04d' % (int(max_local['max_plan_id'][-4:]) + 1))
+        validated_data['planid'] = plan_id
         validated_data['state'] = '等待'
         validated_data['actno'] = 0
         validated_data['starttime'] = None
