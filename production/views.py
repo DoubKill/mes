@@ -2263,7 +2263,7 @@ class DailyProductionCompletionReport(APIView):
 
         # 当月190E所有产量
         queryset_190e = Equip190EWeight.objects.exclude(
-            setup__specification='洗车胶').filter(
+            setup__specification__in=('洗车胶', 'XCJ')).filter(
             factory_date__year=year, factory_date__month=month)
         total_queryset_190e_dict = dict(queryset_190e.values(
             'factory_date__day').annotate(
