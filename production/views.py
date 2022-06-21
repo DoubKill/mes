@@ -2274,8 +2274,8 @@ class DailyProductionCompletionReport(APIView):
 
         data_190e = {
             'dates': [i for i in range(1, days+1)],
-            'wl': [None] * days,
-            'jl': [None] * days,
+            'wl': [0] * days,
+            'jl': [0] * days,
             'total': [total_queryset_190e_dict.get(i, 0) for i in range(1, days+1)],
             'fm': [fm_queryset_190e_dict.get(i, 0) for i in range(1, days+1)]
         }
