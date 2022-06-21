@@ -554,6 +554,15 @@ class OuterMaterial(models.Model):
         verbose_name_plural = verbose_name = '外发无硫料'
 
 
+class ActualWorkingDay(models.Model):
+    factory_date = models.DateField(help_text='工厂时间')
+    num = models.FloatField(help_text='天数', blank=True, null=True)
+
+    class Meta:
+        db_table = 'actual_working_days'
+        verbose_name_plural = verbose_name = '实际生产工作日数'
+
+
 class Equip190E(models.Model):
     specification = models.CharField(max_length=12, help_text='规格')
     state = models.CharField(max_length=12, help_text='段次')

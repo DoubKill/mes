@@ -48,7 +48,7 @@ from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, Pla
     RubberCannotPutinReason, MachineTargetYieldSettings, EmployeeAttendanceRecords, PerformanceJobLadder, \
     PerformanceUnitPrice, ProductInfoDingJi, SetThePrice, SubsidyInfo, IndependentPostTemplate, AttendanceGroupSetup, \
     FillCardApply, ApplyForExtraWork, EquipMaxValueCache, Equip190EWeight, OuterMaterial, Equip190E, \
-    AttendanceClockDetail, AttendanceResultAudit, ManualInputTrains
+    AttendanceClockDetail, AttendanceResultAudit, ManualInputTrains, ActualWorkingDay
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, \
@@ -2270,6 +2270,10 @@ class DailyProductionCompletionReport(APIView):
                                                                      'CMB', 'HMB', '1MB', '2MB', '3MB'
                                                                  )).values('factory_date__day').annotate(
             sum_weight=Sum(F('setup__weight') * F('qty') / 1000, output_field=DecimalField()))
+        actual_working_day_dict = dict(
+            ActualWorkingDay.objects.filter(
+                factory_date__year=year,
+                factory_date__month=month).values_list('factory_date__day', 'num'))
         for item in mix_queryset:
             mixin_weight = round(item['weight'] / 100000, 2)
             results['name_1']['weight'] += mixin_weight
@@ -2303,17 +2307,17 @@ class DailyProductionCompletionReport(APIView):
             results['name_3']['weight'] += round(item['weight'], 2)
             results['name_4']['weight'] += round((item['weight']) * decimal.Decimal(0.7), 2)
             results['name_5']['weight'] += round(item['weight'], 2)
-        shot_down_dic = {}
-        shot_down = SchedulingEquipShutDownPlan.objects.filter(begin_time__year=year, begin_time__month=month).\
-            values('begin_time__day', 'equip_no', 'duration')
-        for item in shot_down:
-            if shot_down_dic.get(item['begin_time__day']):
-                if shot_down_dic[item['begin_time__day']].get(item['equip_no']):
-                    shot_down_dic[item['begin_time__day']][item['equip_no']] += item['duration']
-                else:
-                    shot_down_dic[item['begin_time__day']][item['equip_no']] = item['duration']
-            else:
-                shot_down_dic[item['begin_time__day']] = {item['equip_no']: item['duration']}
+        # shot_down_dic = {}
+        # shot_down = SchedulingEquipShutDownPlan.objects.filter(begin_time__year=year, begin_time__month=month).\
+        #     values('begin_time__day', 'equip_no', 'duration')
+        # for item in shot_down:
+        #     if shot_down_dic.get(item['begin_time__day']):
+        #         if shot_down_dic[item['begin_time__day']].get(item['equip_no']):
+        #             shot_down_dic[item['begin_time__day']][item['equip_no']] += item['duration']
+        #         else:
+        #             shot_down_dic[item['begin_time__day']][item['equip_no']] = item['duration']
+        #     else:
+        #         shot_down_dic[item['begin_time__day']] = {item['equip_no']: item['duration']}
         # 开机机台
         equip_queryset1 = queryset1.values('equip_no', 'factory_date__day').annotate(a=Count('id')).values('equip_no', 'factory_date__day')
         equip_queryset2 = queryset2.values('equip_no', 'factory_date__day').annotate(a=Count('id')).values_list('equip_no', 'factory_date__day')
@@ -2329,21 +2333,24 @@ class DailyProductionCompletionReport(APIView):
                     equip_dic[day].append(equip_no)
             else:
                 equip_dic[day] = [equip_no]
-        for day, lst in equip_dic.items():
-            equip_lst = shot_down_dic.get(day)
+
+        for k, v in actual_working_day_dict.items():
+            results['name_6'][f"{k}日"] = v
+            results['name_6']['weight'] += 0 if not v else v
+            # equip_lst = shot_down_dic.get(day)
             # 相交的为发生故障的机台
-            down_equip = list(set(lst).intersection(set(equip_lst))) if equip_lst else []
-            down_time = sum([shot_down_dic[day].get(e, 0) for e in down_equip]) if shot_down_dic.get(day) else 0
-            results['name_6'][f"{day}日"] = round(((24 * len(equip_dic.get(day))) - down_time) / (24 * len(equip_dic.get(day))), 2)
+            # down_equip = list(set(lst).intersection(set(equip_lst))) if equip_lst else []
+            # down_time = sum([shot_down_dic[day].get(e, 0) for e in down_equip]) if shot_down_dic.get(day) else 0
+            # results['name_6'][f"{day}日"] = round(((24 * len(equip_dic.get(day))) - down_time) / (24 * len(equip_dic.get(day))), 2)
         if len(results['name_6']) - 2 != 0:
-            results['name_6']['weight'] = round(sum([v for k, v in results['name_6'].items() if k[0].isdigit()]), 2)
+            # results['name_6']['weight'] = round(sum([v for k, v in results['name_6'].items() if k[0].isdigit() and v is not null]), 2)
             for key, value in results['name_4'].items():
                 if key[0].isdigit():
                     if results['name_6'].get(key):
                         results['name_7'][key] = round(results['name_4'][key] / decimal.Decimal(results['name_6'][key]), 2)
                         results['name_8'][key] = round(results['name_5'][key] / decimal.Decimal(results['name_6'][key]), 2)
-            results['name_7']['weight'] = round(results['name_4']['weight'] / decimal.Decimal(results['name_6']['weight']), 2)
-            results['name_8']['weight'] = round(results['name_5']['weight'] / decimal.Decimal(results['name_6']['weight']), 2)
+            results['name_7']['weight'] = 0 if results['name_6']['weight'] == 0 else round(results['name_4']['weight'] / decimal.Decimal(results['name_6']['weight']), 2)
+            results['name_8']['weight'] = 0 if results['name_6']['weight'] == 0 else round(results['name_5']['weight'] / decimal.Decimal(results['name_6']['weight']), 2)
         if self.request.query_params.get('export', None):
             results2 = {}
             equip_query = Equip.objects.filter(category__equip_type__global_name='密炼设备').values('equip_no',
@@ -2428,7 +2435,7 @@ class DailyProductionCompletionReport(APIView):
                        'factory_date': factory_date,
                         'classes': classes,
                         'qty': item['qty']})
-        if data == []:
+        if not data:
             Equip190EWeight.objects.filter(factory_date=factory_date, classes=classes).delete()
 
         if date:
@@ -2437,6 +2444,20 @@ class DailyProductionCompletionReport(APIView):
             for item in outer_data:
                 OuterMaterial.objects.create(factory_date=item['factory_date'],
                                              weight=item['weight'])
+        return Response('ok')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ActualWorkingDayView(APIView):
+    permission_classes = (IsAuthenticated,)
+    pagination_class = None
+
+    def post(self, request):
+        data = self.request.data
+        for item in data:
+            ActualWorkingDay.objects.update_or_create(
+                defaults={'num': item['num']},
+                factory_date=item['factory_date'])
         return Response('ok')
 
 
