@@ -2152,14 +2152,14 @@ class DailyProductionCompletionReport(APIView):
         sheet1 = wb.add_sheet('月产量完成', cell_overwrite_ok=True)
         sheet2 = wb.add_sheet('班次车数', cell_overwrite_ok=True)
         sheet3 = wb.add_sheet('月产量吨位', cell_overwrite_ok=True)
-        title1 = ['项目/日期']
+        title1 = ['项目/日期', '汇总', '平均']
         title2 = ['序号', '规格', '段数', '机台', '型号', '班别']
         title3 = ['序号', '规格', '段数', '机台', '型号', '班别']
         for day in range(1, days + 1):
             title1.append(f'{day}日')
             title2.append(f'{month}/{day}')
             title3.append(f'{month}/{day}')
-        title1.append('汇总')
+        # title1.append('汇总')
         title2.append('汇总')
         title3.append('汇总')
 
@@ -2179,9 +2179,11 @@ class DailyProductionCompletionReport(APIView):
                 if key == 'name':
                     sheet1.write(index + 1, 0, dic['name'])
                 elif key == 'weight':
-                    sheet1.write(index + 1, len(title1) - 1, dic['weight'])
+                    sheet1.write(index + 1, 1, dic['weight'])
+                elif key == 'avg':
+                    sheet1.write(index + 1, 2, dic['avg'])
                 else:
-                    sheet1.write(index + 1, int(key[:-1]), value)
+                    sheet1.write(index + 1, int(key[:-1])+2, value)
         for index, dic in enumerate(data2):
             sheet2.write(index + 1, 0, index + 1)
             sheet3.write(index + 1, 0, index + 1)
@@ -2206,7 +2208,7 @@ class DailyProductionCompletionReport(APIView):
                 elif key == '汇总_weight':
                     sheet3.write(index + 1, len(title3) - 1, value)
                 else:
-                    day, s =key.split('_')
+                    day, s = key.split('_')
                     if s == 'qty':
                         sheet2.write(index + 1, int(day) + 5, value)
                     else:
@@ -2307,43 +2309,11 @@ class DailyProductionCompletionReport(APIView):
             results['name_3']['weight'] += round(item['weight'], 2)
             results['name_4']['weight'] += round((item['weight']) * decimal.Decimal(0.7), 2)
             results['name_5']['weight'] += round(item['weight'], 2)
-        # shot_down_dic = {}
-        # shot_down = SchedulingEquipShutDownPlan.objects.filter(begin_time__year=year, begin_time__month=month).\
-        #     values('begin_time__day', 'equip_no', 'duration')
-        # for item in shot_down:
-        #     if shot_down_dic.get(item['begin_time__day']):
-        #         if shot_down_dic[item['begin_time__day']].get(item['equip_no']):
-        #             shot_down_dic[item['begin_time__day']][item['equip_no']] += item['duration']
-        #         else:
-        #             shot_down_dic[item['begin_time__day']][item['equip_no']] = item['duration']
-        #     else:
-        #         shot_down_dic[item['begin_time__day']] = {item['equip_no']: item['duration']}
-        # 开机机台
-        equip_queryset1 = queryset1.values('equip_no', 'factory_date__day').annotate(a=Count('id')).values('equip_no', 'factory_date__day')
-        equip_queryset2 = queryset2.values('equip_no', 'factory_date__day').annotate(a=Count('id')).values_list('equip_no', 'factory_date__day')
-        equip_queryset = equip_queryset1 | equip_queryset2
-        equip_dic = {
-            #  day: []
-        }
-        for item in equip_queryset:
-            day = int(item['factory_date__day'])
-            equip_no = item['equip_no']
-            if equip_dic.get(day):
-                if equip_no not in equip_dic[day]:
-                    equip_dic[day].append(equip_no)
-            else:
-                equip_dic[day] = [equip_no]
 
         for k, v in actual_working_day_dict.items():
             results['name_6'][f"{k}日"] = v
             results['name_6']['weight'] += 0 if not v else v
-            # equip_lst = shot_down_dic.get(day)
-            # 相交的为发生故障的机台
-            # down_equip = list(set(lst).intersection(set(equip_lst))) if equip_lst else []
-            # down_time = sum([shot_down_dic[day].get(e, 0) for e in down_equip]) if shot_down_dic.get(day) else 0
-            # results['name_6'][f"{day}日"] = round(((24 * len(equip_dic.get(day))) - down_time) / (24 * len(equip_dic.get(day))), 2)
         if len(results['name_6']) - 2 != 0:
-            # results['name_6']['weight'] = round(sum([v for k, v in results['name_6'].items() if k[0].isdigit() and v is not null]), 2)
             for key, value in results['name_4'].items():
                 if key[0].isdigit():
                     if results['name_6'].get(key):
@@ -2351,6 +2321,13 @@ class DailyProductionCompletionReport(APIView):
                         results['name_8'][key] = round(results['name_5'][key] / decimal.Decimal(results['name_6'][key]), 2)
             results['name_7']['weight'] = 0 if results['name_6']['weight'] == 0 else round(results['name_4']['weight'] / decimal.Decimal(results['name_6']['weight']), 2)
             results['name_8']['weight'] = 0 if results['name_6']['weight'] == 0 else round(results['name_5']['weight'] / decimal.Decimal(results['name_6']['weight']), 2)
+        month_working_days = len(set([i for i in results['name_1'].keys() if i[0].isdigit()] + [i for i in results['name_2'].keys() if i[0].isdigit()]))
+        # 计算平均值
+        for item in results.values():
+            try:
+                item['avg'] = round(item['weight'] / month_working_days, 2)
+            except Exception:
+                item['avg'] = ""
         if self.request.query_params.get('export', None):
             results2 = {}
             equip_query = Equip.objects.filter(category__equip_type__global_name='密炼设备').values('equip_no',
