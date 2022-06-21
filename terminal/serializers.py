@@ -728,6 +728,12 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
 
 class ReplaceMaterialSerializer(BaseModelSerializer):
 
+    def to_representation(self, instance):
+        res = super().to_representation(instance)
+        if res['status'] != '已处理':
+            res['last_updated_date'] = None
+        return res
+
     class Meta:
         model = ReplaceMaterial
         fields = '__all__'
