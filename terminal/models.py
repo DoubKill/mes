@@ -616,8 +616,8 @@ class ReportWeight(models.Model):
 class JZExecutePlan(models.Model):
     """称量系统实时的计划号与执行顺序表"""
     id = models.IntegerField(db_column='Dosing_id', primary_key=True)
-    planid = models.CharField(db_column='Plan_Id', max_length=50, help_text='计划号', primary_key=True)
-    equip_code = models.CharField(db_column='Equip_Code', max_length=50, help_text='线体机台号', primary_key=True)
+    planid = models.CharField(db_column='Plan_Id', max_length=50, help_text='计划号')
+    equip_code = models.CharField(db_column='Equip_Code', max_length=50, help_text='线体机台号')
     order_by = models.IntegerField(db_column='Plan_Serial', help_text='计划执行顺序', null=True, blank=True)
     recipe_id = models.CharField(db_column='Recipe_ID', max_length=50, help_text='配方id', blank=True, null=True)
     recipe_code = models.CharField(db_column='Recipe_Code', max_length=50, help_text='配方编码', blank=True, null=True)
