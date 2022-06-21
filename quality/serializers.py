@@ -410,7 +410,7 @@ class UnqualifiedDealOrderUpdateSerializer(BaseModelSerializer):
                     if detail.is_release:
                         update_kwargs['update_store_test_flag'] = 4
                         update_kwargs['test_result'] = 'PASS'
-                    MaterialDealResult.objects.filter(lot_no=detail.lot_no).update(**update_kwargs)
+                    MaterialDealResult.objects.filter(lot_no=detail.lot_no, test_result='三等品').update(**update_kwargs)
             else:
                 # 不同意
                 for detail in instance.deal_details.all():
@@ -419,7 +419,7 @@ class UnqualifiedDealOrderUpdateSerializer(BaseModelSerializer):
                         'deal_time': datetime.now(),
                         'deal_user': instance.t_deal_user,
                     }
-                    MaterialDealResult.objects.filter(lot_no=detail.lot_no).update(**update_kwargs)
+                    MaterialDealResult.objects.filter(lot_no=detail.lot_no, test_result='三等品').update(**update_kwargs)
         return instance
 
     class Meta:
