@@ -2402,6 +2402,7 @@ class DailyProductionCompletionReport(APIView):
         data = self.request.data.get('data', [])
         date = self.request.data.get('date')
         outer_data = self.request.data.get('outer_data', [])  # 外发无硫料
+        working_data = self.request.data.get('working_data', [])  # 实际工作日期
         if data:
             serializer = Equip190EWeightSerializer(data=data, many=True)
             serializer.is_valid(raise_exception=True)
@@ -2416,25 +2417,20 @@ class DailyProductionCompletionReport(APIView):
             Equip190EWeight.objects.filter(factory_date=factory_date, classes=classes).delete()
 
         if date:
-            year, month = int(date.split('-')[0]), int(date.split('-')[1])
-            OuterMaterial.objects.filter(factory_date__year=year, factory_date__month=month).delete()
             for item in outer_data:
-                OuterMaterial.objects.create(factory_date=item['factory_date'],
-                                             weight=item['weight'])
-        return Response('ok')
-
-
-@method_decorator([api_recorder], name="dispatch")
-class ActualWorkingDayView(APIView):
-    permission_classes = (IsAuthenticated,)
-    pagination_class = None
-
-    def post(self, request):
-        data = self.request.data
-        for item in data:
-            ActualWorkingDay.objects.update_or_create(
-                defaults={'num': item['num']},
-                factory_date=item['factory_date'])
+                try:
+                    OuterMaterial.objects.update_or_create(
+                        defaults={'weight': item['weight']},
+                        factory_date=item['factory_date'])
+                except Exception:
+                    pass
+            for item in working_data:
+                try:
+                    ActualWorkingDay.objects.update_or_create(
+                        defaults={'num': item['num']},
+                        factory_date=item['factory_date'])
+                except Exception:
+                    pass
         return Response('ok')
 
 
