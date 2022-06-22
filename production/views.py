@@ -2247,18 +2247,15 @@ class DailyProductionCompletionReport(APIView):
             'name_7': {'name': '日均完成率1', 'weight': None},
             'name_8': {'name': '日均完成率2', 'weight': None},
         }
-        # 当月混炼实际完成吨  CMB HMB 1MB~4MB
-        queryset1 = TrainsFeedbacks.objects.filter(Q(factory_date__year=year, factory_date__month=month) &
-                                                   Q(Q(product_no__icontains='-CMB-') |
-                                                     Q(product_no__icontains='-HMB-') |
-                                                     Q(product_no__icontains='-1MB-') |
-                                                     Q(product_no__icontains='-2MB-') |
-                                                     Q(product_no__icontains='-3MB-')))
+        # 当月混炼实际完成吨(MB段次)  CMB HMB 1MB~4MB
+        queryset1 = TrainsFeedbacks.objects.filter(factory_date__year=year,
+                                                   factory_date__month=month,
+                                                   product_no__icontains='MB-')
         mix_queryset = queryset1.values('factory_date__day').annotate(weight=Sum('actual_weight', output_field=DecimalField()))
-        # 当月终炼实际完成（吨）  FM、RFM
-        queryset2 = TrainsFeedbacks.objects.filter(Q(factory_date__year=year, factory_date__month=month) &
-                                                   Q(Q(product_no__icontains='-FM-') |
-                                                     Q(product_no__icontains='-RFM-')))
+        # 当月终炼实际完成（FM段次）  FM、RFM
+        queryset2 = TrainsFeedbacks.objects.filter(factory_date__year=year,
+                                                   factory_date__month=month,
+                                                   product_no__icontains='FM-')
         fin_queryset = queryset2.values('factory_date__day').annotate(weight=Sum('actual_weight', output_field=DecimalField()))
 
         # 当月190E所有产量
