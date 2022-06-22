@@ -1143,7 +1143,6 @@ class ImportAndExportView(APIView):
         """快检数据导入模板"""
         return export_mto()
 
-    @atomic()
     def post(self, request, *args, **kwargs):
         """快检数据导入"""
         file = request.FILES.get('file')
