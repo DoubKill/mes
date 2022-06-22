@@ -2280,8 +2280,7 @@ class DailyProductionCompletionReport(APIView):
         equip_190e_weight = queryset_190e.filter(setup__state__in=('FM', 'RFM')).values('factory_date__day').annotate(
                 sum_weight=Sum(F('setup__weight')*F('qty')/1000, output_field=DecimalField()))
         # 当月190E混炼产量
-        equip_190e_mixin_weight = queryset_190e.filter(setup__state__in=(
-            'CMB', 'HMB', '1MB', '2MB', '3MB')).values('factory_date__day').annotate(
+        equip_190e_mixin_weight = queryset_190e.filter(setup__state__icontains='MB').values('factory_date__day').annotate(
             sum_weight=Sum(F('setup__weight') * F('qty') / 1000, output_field=DecimalField()))
         actual_working_day_dict = dict(
             ActualWorkingDay.objects.filter(
