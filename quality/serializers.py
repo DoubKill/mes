@@ -1407,7 +1407,7 @@ class MaterialInspectionRegistrationSerializer(BaseModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
         validators = [UniqueTogetherValidator(
             queryset=MaterialInspectionRegistration.objects.all(),
-            fields=('batch', 'material_no'), message='改批次送检数据已存在，请勿重复添加！')]
+            fields=('batch', 'material_no'), message='该批次送检数据已存在，请勿重复添加！')]
 
 
 class ProductTestPlanDetailSerializer(BaseModelSerializer):
