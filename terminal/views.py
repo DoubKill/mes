@@ -47,7 +47,7 @@ from terminal.models import TerminalLocation, EquipOperationLog, WeightBatchingL
     ReplaceMaterial, ReturnRubber, ToleranceDistinguish, ToleranceProject, ToleranceHandle, ToleranceRule, \
     WeightPackageManual, WeightPackageSingle, WeightPackageWms, OtherMaterialLog, EquipHaltReason, \
     WeightPackageLogManualDetails, WmsAddPrint, JZReportWeight, JZMaterialInfo, JZBin, JZReportBasic, JZPlan, \
-    JZRecipeMaterial, JZRecipePre
+    JZRecipeMaterial, JZRecipePre, JZExecutePlan
 from terminal.serializers import LoadMaterialLogCreateSerializer, \
     EquipOperationLogSerializer, BatchingClassesEquipPlanSerializer, WeightBatchingLogSerializer, \
     WeightBatchingLogCreateSerializer, FeedingLogSerializer, WeightTankStatusSerializer, \
@@ -3354,18 +3354,26 @@ class XlRecipeNoticeView(APIView):
         for single_equip_no in send_equip_list:
             send_materials = mes_xl_details.filter(equip_no=single_equip_no, feeding_mode__startswith=keywords, handle_material_name__in=same_material_list)
             send_recipe_name = f"{product_no.split('_NEW')[0]}({product_batching.dev_type.category_no}" + (")" if single_equip_no in common_equip else f"-{single_equip_no}-ONLY)")
-            processing_xl_plan = plan_model.objects.using(xl_equip).filter(Q(planid__startswith=n_prefix) | Q(planid__startswith=b_prefix), state__in=['运行中', '运行'], recipe=send_recipe_name)
-            if processing_xl_plan:
+            processing_xl_plan = plan_model.objects.using(xl_equip).filter(Q(planid__startswith=n_prefix) | Q(planid__startswith=b_prefix), state__in=['运行中', '运行', '等待'], recipe=send_recipe_name)
+            run_plan = None
+            if xl_equip in JZ_EQUIP_NO:  # 嘉正称量直接下发的计划需要找其他表数据
+                run_plan = JZExecutePlan.objects.using(xl_equip).filter(recipe=send_recipe_name)
+            if processing_xl_plan or run_plan:
                 detail_msg += f'{single_equip_no}: 预下发配方正在该线体进行配料 '
                 continue
             send_data[send_recipe_name] = send_materials
             detail_msg += f'{single_equip_no}: 配方下发成功 '
         # 下传配方
+        error_msg = '下发配方异常'
         try:
-            with atomic(using=xl_equip):
+            if xl_equip in JZ_EQUIP_NO:
                 self.issue_xl_system(xl_equip, send_data)
+                error_msg = '嘉正称量下发配方出现异常,请修正mes配方与称量配方'
+            else:
+                with atomic(using=xl_equip):
+                    self.issue_xl_system(xl_equip, send_data)
         except Exception as e:
-            raise ValidationError(e.args[0])
+            raise ValidationError(f"{error_msg}:{e.args[0]}")
         return Response(f'{xl_equip}:\n {detail_msg}')
 
     def issue_xl_system(self, xl_equip, data):
@@ -3380,18 +3388,16 @@ class XlRecipeNoticeView(APIView):
             if not total_weight:
                 total_weight = 0
             # 删除之前配方
-            o_recipe = material_model.objects.using(xl_equip).filter(recipe_name=recipe_name)
-            o_materials = pre_model.objects.using(xl_equip).filter(name=recipe_name)
-            if jz:
-                for k in o_materials:
-                    jz.notice(table_seq=2, table_id=k.id, opera_type=2)
-                for k in o_recipe:
-                    jz.notice(table_seq=3, table_id=k.id, opera_type=2)
-            else:
+            o_recipe = pre_model.objects.using(xl_equip).filter(name=recipe_name)
+            o_materials = material_model.objects.using(xl_equip).filter(recipe_name=recipe_name)
+            if o_recipe:  # 存在配方删除后新增
+                if jz:
+                    for k in o_materials:
+                        jz.notice(table_seq=2, table_id=k.id, opera_type=2)
+                    for k in o_recipe:
+                        jz.notice(table_seq=3, table_id=k.id, opera_type=2)
                 o_materials.delete()
                 o_recipe.delete()
-            o_materials.delete()
-            o_recipe.delete()
             split_count = 1 if total_weight <= 30 else 2
             weight = round(total_weight / split_count, 3)
             n_time = datetime.datetime.now().replace(microsecond=0).strftime('%Y-%m-%d %H:%M:%S')
@@ -3419,7 +3425,6 @@ class XlRecipeNoticeView(APIView):
                     jz.notice(table_seq=2, table_id=single_data.id, opera_type=1)
                 else:
                     single_data = material_model.objects.using(xl_equip).create(**create_data)
-
 
 
 @method_decorator([api_recorder], name='dispatch')

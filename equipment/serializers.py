@@ -1462,6 +1462,12 @@ class EquipWarehouseOrderListSerializer(BaseModelSerializer):
     order_id = serializers.CharField(help_text='单据条码', validators=[
         UniqueValidator(EquipWarehouseOrder.objects.all(), message='该条码已存在')])
 
+    def to_representation(self, instance):
+        res = super().to_representation(instance)
+        if res.get('barcode'):
+            res['created_username'] = instance.lluser
+        return res
+
     class Meta:
         model = EquipWarehouseOrder
         fields = ("id", "created_username", "order_id", "submission_department",

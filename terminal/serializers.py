@@ -560,9 +560,16 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 logger.error('群控服务器错误！')
                 raise serializers.ValidationError(e.args[0])
         if scan_material_msg:
-            if scan_material_type == '胶皮':
-                dk_control = 'Start' if '成功' in scan_material_type else 'Stop'
+            dk_equip = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='导开机控制机台', global_name=classes_plan.equip.equip_no)
+            if scan_material_type == '胶皮' and dk_equip:
+                dk_control = 'Start' if '成功' in scan_material_msg else 'Stop'
                 status, text = send_dk(classes_plan.equip.equip_no, dk_control)
+                if not status:  # 发送导开机启停信号异常
+                    logger.error(f'发送导开机信号异常, 计划号: {plan_classes_uid}, 机台: {classes_plan.equip.equip_no}, 错误:{text}')
+                    raise serializers.ValidationError(f'发送导开机信号异常:{text}')
+                else:  # 失败信号发送成功需要终端阻断进程
+                    if dk_control == 'Stop':
+                        raise serializers.ValidationError('发送导开机停止信号成功')
             raise serializers.ValidationError(scan_material_msg)
         for i in details:
             msg = i['tank_data'].pop('msg')
@@ -626,10 +633,10 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 # 胶块6分钟内不超过4框, 胶皮4分钟内不超过4架
                 if n_scan_material_type in ['胶块', '胶皮']:
                     limit_minutes, limit_nums = [4, 4] if n_scan_material_type == '胶皮' else [6, 4]
-                    g_config = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='密炼扫码限制', global_no=f'{scan_dev}-{n_scan_material_type}').last()
+                    g_config = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='密炼扫码限制', global_name__startswith=f'{scan_dev}-{n_scan_material_type}').last()
                     if g_config:
                         try:
-                            limit_minutes, limit_nums = list(map(lambda x: int(x), g_config.global_name.split('-')))
+                            limit_minutes, limit_nums = list(map(lambda x: int(x), g_config.global_name.split('-')[-2:]))
                         except:
                             pass
                     limit_time = datetime.now() - timedelta(minutes=limit_minutes)
@@ -686,6 +693,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         return attrs
 
     def create(self, validated_data):
+        equip_no = None
         details = validated_data.get('attrs')
         scan_material_type = validated_data.pop('scan_material_type', '')
         plan_classes_uid, trains = '', 1
@@ -701,10 +709,14 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 LoadTankMaterialLog.objects.filter(plan_classes_uid=pre_material.plan_classes_uid, bra_code=pre_material.bra_code)\
                     .update(**{'actual_weight': pre_material.init_weight, 'adjust_left_weight': 0, 'real_weight': 0,
                                'useup_time': datetime.now()})
-            # 胶皮扫码正确发送消息给导开机
-            if scan_material_type == '胶皮':
-                status, text = send_dk(equip_no, 'Start')
             instance = LoadTankMaterialLog.objects.create(**tank_data)
+        # 胶皮扫码正确发送消息给导开机
+        dk_equip = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='导开机控制机台', global_name=equip_no)
+        if scan_material_type == '胶皮' and dk_equip:
+            status, text = send_dk(equip_no, 'Start')
+            if not status:  # 发送导开机启停信号异常只记录
+                logger.error(f'发送导开机信号异常, 计划号: {plan_classes_uid}, 机台: {equip_no}, 错误:{text}')
+                raise serializers.ValidationError(f'导开机启动信号发送失败: {text}')
         # 判断补充进料后是否能进上辅机
         fml = FeedingMaterialLog.objects.using('SFJ').filter(plan_classes_uid=plan_classes_uid, trains=int(trains)).last()
         if fml and fml.add_feed_result == 1:
