@@ -2017,6 +2017,9 @@ class WMSExceptHandleSerializer(BaseModelSerializer):
 
 class MaterialOutHistoryOtherSerializer(serializers.ModelSerializer):
     initiator = serializers.SerializerMethodField()
+    qty = serializers.SerializerMethodField()
+    task_type_name = serializers.SerializerMethodField()
+    task_status_name = serializers.SerializerMethodField()
 
     def get_initiator(self, obj):
         db = self.context['db']
@@ -2028,6 +2031,19 @@ class MaterialOutHistoryOtherSerializer(serializers.ModelSerializer):
                 return order.created_username
             return obj.initiator
         return obj.initiator
+
+    def get_qty(self, obj):
+        try:
+            qty = obj.moh.aggregate(qty=Sum('qty'))['qty']
+            return qty if qty else 0
+        except Exception:
+            return 0
+
+    def get_task_status_name(self, obj):
+        return obj.get_task_status_display()
+
+    def get_task_type_name(self, obj):
+        return obj.get_task_type_display()
 
     class Meta:
         model = MaterialOutHistoryOther
