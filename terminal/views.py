@@ -1957,9 +1957,8 @@ class XLPlanVIewSet(ModelViewSet):
                 if (e_time - s_time).days > 15:
                     raise ValidationError('筛选日期不可大于15天')
             filter_kwargs.update({'date_time__gte': s_time, 'date_time__lte': e_time})
-            new_queryset = plan_model.objects.using(equip_no).filter(**filter_kwargs).values('recipe').distinct()
-            serializer = self.get_serializer(new_queryset, many=True)
-            return Response(serializer.data)
+            data = list(plan_model.objects.using(equip_no).filter(**filter_kwargs).values('recipe').distinct())
+            return Response(data)
 
     def create(self, request, *args, **kwargs):
         equip_no = self.request.data.get('equip_no')
