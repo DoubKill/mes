@@ -1389,13 +1389,13 @@ class MaterialInspectionRegistrationSerializer(BaseModelSerializer):
         return ret
 
     def get_mes_quality_status(self, obj):
-        instance = ExamineMaterial.objects.filter(batch=obj.batch).first()
+        instance = ExamineMaterial.objects.filter(batch=obj.batch, wlxxid=obj.material_no).first()
         if instance:
             return '合格' if instance.qualified else '不合格'
         return '待检品'
 
     def get_locked_status(self, obj):
-        instance = WmsNucleinManagement.objects.filter(batch_no=obj.batch).first()
+        instance = WmsNucleinManagement.objects.filter(batch_no=obj.batch, material_no=obj.material_no).first()
         if instance:
             return instance.locked_status
         else:
@@ -1407,7 +1407,7 @@ class MaterialInspectionRegistrationSerializer(BaseModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
         validators = [UniqueTogetherValidator(
             queryset=MaterialInspectionRegistration.objects.all(),
-            fields=('batch', 'material_no'), message='改批次送检数据已存在，请勿重复添加！')]
+            fields=('batch', 'material_no'), message='该批次送检数据已存在，请勿重复添加！')]
 
 
 class ProductTestPlanDetailSerializer(BaseModelSerializer):

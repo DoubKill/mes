@@ -60,7 +60,8 @@ from inventory.serializers import PutPlanManagementSerializer, \
     DepotPalltInfoModelSerializer, OutBoundDeliveryOrderSerializer, OutBoundDeliveryOrderDetailSerializer, \
     OutBoundTasksSerializer, WmsInventoryMaterialSerializer, WmsNucleinManagementSerializer, \
     MaterialOutHistoryOtherSerializer, MaterialOutHistorySerializer, WMSExceptHandleSerializer, \
-    BzMixingRubberInventorySearchSerializer, BzFinalRubberInventorySearchSerializer
+    BzMixingRubberInventorySearchSerializer, BzFinalRubberInventorySearchSerializer, \
+    OutBoundDeliveryOrderUpdateSerializer
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
@@ -5079,10 +5080,15 @@ class LIBRARYINVENTORYView(ListAPIView):
 @method_decorator([api_recorder], name="dispatch")
 class OutBoundDeliveryOrderViewSet(ModelViewSet):
     queryset = OutBoundDeliveryOrder.objects.all().order_by("-created_date")
-    serializer_class = OutBoundDeliveryOrderSerializer
     filter_backends = (DjangoFilterBackend,)
     filter_class = OutBoundDeliveryOrderFilter
     permission_classes = (IsAuthenticated, )
+
+    def get_serializer_class(self):
+        if self.action in ('update', 'partial_update'):
+            return OutBoundDeliveryOrderUpdateSerializer
+        else:
+            return OutBoundDeliveryOrderSerializer
 
     @action(methods=['get'], detail=False, permission_classes=[], url_path='export',
             url_name='export')

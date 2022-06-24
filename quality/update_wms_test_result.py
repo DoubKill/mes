@@ -25,7 +25,7 @@ logger = logging.getLogger('quality_log')
 
 
 def main():
-    stocks = WmsInventoryStock.objects.using('wms').filter(
+    stocks = WmsInventoryStock.objects.using('wms').exclude(material_name__icontains='托盘').filter(
         quality_status=5).values('material_no', 'batch_no', 'material_name').annotate(lot_no=Min('lot_no'))
     inspection_url = 'http://10.1.10.136/zcxjws_web/zcxjws/pc/zc/getCkdtm.io'
     inspection_data_list = []
