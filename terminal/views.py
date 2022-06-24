@@ -2217,106 +2217,123 @@ class UpdateFlagCountView(APIView):
         use_not = self.request.data.get('use_not', '')
         delete_flag = self.request.data.get('delete_flag')
         now_date = datetime.datetime.now().date() - timedelta(days=1)
+        try:
+            if equip_no in JZ_EQUIP_NO:
+                self.handle_detail(rid, oper_type, equip_no, merge_flag, split_count, use_not, delete_flag, now_date)
+            else:
+                with atomic(using=equip_no):
+                    self.handle_detail(rid, oper_type, equip_no, merge_flag, split_count, use_not, delete_flag, now_date)
+        except Exception as e:
+            raise ValidationError(f'操作异常: {e.args[0]}')
+        return Response('操作成功')
+
+    def handle_detail(self, rid, oper_type, equip_no, merge_flag, split_count, use_not, delete_flag, now_date):
         plan_model, recipe_pre_model, recipe_material_model, pre_fix, jz = [JZPlan, JZRecipePre, JZRecipeMaterial, now_date.strftime('%Y%m%d'), JZCLSystem(equip_no)] if equip_no in JZ_EQUIP_NO else [Plan, RecipePre, RecipeMaterial, now_date.strftime('%Y%m%d')[2:], None]
-        with atomic(using=equip_no):
-            if isinstance(use_not, int):
-                recipe_instance = recipe_pre_model.objects.using(equip_no).filter(id=rid)
-                if not recipe_instance:
-                    raise ValidationError('数据发生变化，刷新后重试')
-                recipe_name = recipe_instance.first().name
-                if use_not == 1:  # 停用配方
-                    processing_plan = plan_model.objects.using(equip_no).filter(state__in=['运行中', '运行'], actno__gte=1).last()
-                    if not processing_plan:
-                        plan_recipes = plan_model.objects.using(equip_no).filter(planid__gte=pre_fix, state__in=['运行中', '等待', '运行'], recipe=recipe_name).last()
-                    else:
-                        plan_recipes = plan_model.objects.using(equip_no).filter(id__gte=processing_plan.id, state__in=['运行中', '等待', '运行'], recipe=recipe_name).last()
-                    if plan_recipes:
-                        raise ValidationError(f'该配方存在状态为{plan_recipes.state}计划, 无法停用')
-                else:  # 有同名配方不可启用
-                    if recipe_pre_model.objects.using(equip_no).filter(name=recipe_name, use_not=use_not):
-                        raise ValidationError('存在同名已经启用的配方')
-                recipe_instance.update(use_not=use_not)
-                if jz:  # 通知嘉正称量系统同步数据
-                    try:
-                        rep = jz.notice(table_seq=3, table_id=rid, opera_type=3)
-                    except Exception as e:
-                        raise ValidationError(f'通知称量系统{equip_no}修改数据失败')
-                return Response(f"{'停用' if use_not == 1 else '启用'}配方成功")
-            if delete_flag:
-                recipe_instance = recipe_pre_model.objects.using(equip_no).filter(id=rid).last()
-                if not recipe_instance:
-                    raise ValidationError('数据发生变化，刷新后重试')
-                # 运行中或者等待的配方不能删除
-                processing_plan = plan_model.objects.using(equip_no).filter(state__in=['运行中', '运行'], actno__gte=1).last()
+        if isinstance(use_not, int):
+            recipe_instance = recipe_pre_model.objects.using(equip_no).filter(id=rid)
+            if not recipe_instance:
+                raise ValidationError('数据发生变化，刷新后重试')
+            recipe_name = recipe_instance.first().name
+            if use_not == 1:  # 停用配方
+                processing_plan = plan_model.objects.using(equip_no).filter(state__in=['运行中', '运行'],
+                                                                            actno__gte=1).last()
                 if not processing_plan:
-                    plan_recipes = plan_model.objects.using(equip_no).filter(planid__gte=pre_fix, state__in=['运行中', '等待', '运行'],
-                                                                             recipe=recipe_instance.name).last()
+                    plan_recipes = plan_model.objects.using(equip_no).filter(planid__gte=pre_fix,
+                                                                             state__in=['运行中', '等待', '运行'],
+                                                                             recipe=recipe_name).last()
                 else:
-                    plan_recipes = plan_model.objects.using(equip_no).filter(id__gte=processing_plan.id, state__in=['运行中', '等待', '运行'],
-                                                                             recipe=recipe_instance.name).last()
+                    plan_recipes = plan_model.objects.using(equip_no).filter(id__gte=processing_plan.id,
+                                                                             state__in=['运行中', '等待', '运行'],
+                                                                             recipe=recipe_name).last()
                 if plan_recipes:
-                    raise ValidationError(f'该配方存在状态为{plan_recipes.state}计划, 无法删除')
-                details = recipe_material_model.objects.using(equip_no).filter(recipe_name=recipe_instance.name)
-                detail_ids = details.values_list('id', flat=True)
-                details.delete()
-                recipe_instance.delete()
-                if jz:  # 通知嘉正称量系统同步数据
-                    try:
-                        for i in detail_ids:
-                            rep_detail = jz.notice(table_seq=2, table_id=i, opera_type=2)
-                        rep_pre = jz.notice(table_seq=3, table_id=rid, opera_type=2)
-                    except Exception as e:
-                        raise ValidationError(e.args[0])
-                return Response("删除配方成功")
-            filter_kwargs = {}
-            if merge_flag is not None:
-                filter_kwargs['merge_flag'] = merge_flag
-            if split_count:
-                filter_kwargs['split_count'] = split_count
-            db_name = plan_model if oper_type == '计划' else recipe_pre_model
-            instance = db_name.objects.using(equip_no).filter(id=rid)
-            if not instance:
-                raise ValidationError('未找到编号对应的数据')
-            # 配方更新
-            f_instance = instance.first()
-            if oper_type != '计划' and f_instance.split_count != split_count:
-                now_time = datetime.datetime.now().replace(microsecond=0).strftime('%Y-%m-%d %H:%M:%S')
-                new_total_weight = 0
-                materials = recipe_material_model.objects.using(equip_no).filter(recipe_name=f_instance.name)
-                for material in materials:
-                    new_weight = round(material.weight * f_instance.split_count / split_count, 3)
-                    if new_weight >= 100:  # 数据库最大只能5位，其中3位为小数
-                        raise ValidationError('物料重量过大,无法修改')
-                    material.weight = new_weight
-                    material.error = get_tolerance(batching_equip=equip_no, standard_weight=new_weight, only_num=True)
-                    material.time = now_time
-                    material.save()
-                    new_total_weight += new_weight
-                    if jz:
-                        try:
-                            rep_detail = jz.notice(table_seq=2, table_id=material.id, opera_type=3)
-                        except Exception as e:
-                            raise ValidationError(e.args[0])
-                new_tolerance = get_tolerance(batching_equip=equip_no, standard_weight=new_total_weight, project_name='all', only_num=True)
-                filter_kwargs.update({'weight': new_total_weight, 'error': new_tolerance, 'time': now_time})
-                f_instance.weight = new_total_weight
-                f_instance.error = new_tolerance
-                f_instance.time = now_time
-                f_instance.split_count = split_count
-                f_instance.save()
-                if jz:
-                    try:
-                        rep_pre = jz.notice(table_seq=3, table_id=rid, opera_type=3)
-                    except Exception as e:
-                        raise ValidationError(e.args[0])
-                return Response('操作成功')
-            instance.update(**filter_kwargs)
-            if jz:
+                    raise ValidationError(f'该配方存在状态为{plan_recipes.state}计划, 无法停用')
+            else:  # 有同名配方不可启用
+                if recipe_pre_model.objects.using(equip_no).filter(name=recipe_name, use_not=use_not):
+                    raise ValidationError('存在同名已经启用的配方')
+            recipe_instance.update(use_not=use_not)
+            if jz:  # 通知嘉正称量系统同步数据
                 try:
-                    rep_plan = jz.notice(table_seq=4, table_id=rid, opera_type=3)
+                    rep = jz.notice(table_seq=3, table_id=rid, opera_type=3)
+                except Exception as e:
+                    raise ValidationError(f'通知称量系统{equip_no}修改数据失败')
+            return Response(f"{'停用' if use_not == 1 else '启用'}配方成功")
+        if delete_flag:
+            recipe_instance = recipe_pre_model.objects.using(equip_no).filter(id=rid).last()
+            if not recipe_instance:
+                raise ValidationError('数据发生变化，刷新后重试')
+            # 运行中或者等待的配方不能删除
+            processing_plan = plan_model.objects.using(equip_no).filter(state__in=['运行中', '运行'], actno__gte=1).last()
+            if not processing_plan:
+                plan_recipes = plan_model.objects.using(equip_no).filter(planid__gte=pre_fix,
+                                                                         state__in=['运行中', '等待', '运行'],
+                                                                         recipe=recipe_instance.name).last()
+            else:
+                plan_recipes = plan_model.objects.using(equip_no).filter(id__gte=processing_plan.id,
+                                                                         state__in=['运行中', '等待', '运行'],
+                                                                         recipe=recipe_instance.name).last()
+            if plan_recipes:
+                raise ValidationError(f'该配方存在状态为{plan_recipes.state}计划, 无法删除')
+            details = recipe_material_model.objects.using(equip_no).filter(recipe_name=recipe_instance.name)
+            detail_ids = list(details.values_list('id', flat=True))
+            details.delete()
+            recipe_instance.delete()
+            if jz:  # 通知嘉正称量系统同步数据
+                try:
+                    for i in detail_ids:
+                        rep_detail = jz.notice(table_seq=2, table_id=i, opera_type=2)
+                    rep_pre = jz.notice(table_seq=3, table_id=rid, opera_type=2)
                 except Exception as e:
                     raise ValidationError(e.args[0])
-        return Response('操作成功')
+            return Response("删除配方成功")
+        filter_kwargs = {}
+        if merge_flag is not None:
+            filter_kwargs['merge_flag'] = merge_flag
+        if split_count:
+            filter_kwargs['split_count'] = split_count
+        db_name = plan_model if oper_type == '计划' else recipe_pre_model
+        instance = db_name.objects.using(equip_no).filter(id=rid)
+        if not instance:
+            raise ValidationError('未找到编号对应的数据')
+        # 配方更新
+        f_instance = instance.first()
+        if oper_type != '计划' and f_instance.split_count != split_count:
+            now_time = datetime.datetime.now().replace(microsecond=0).strftime('%Y-%m-%d %H:%M:%S')
+            new_total_weight = 0
+            materials = recipe_material_model.objects.using(equip_no).filter(recipe_name=f_instance.name)
+            for material in materials:
+                new_weight = round(material.weight * f_instance.split_count / split_count, 3)
+                if new_weight >= 100:  # 数据库最大只能5位，其中3位为小数
+                    raise ValidationError('物料重量过大,无法修改')
+                material.weight = new_weight
+                material.error = get_tolerance(batching_equip=equip_no, standard_weight=new_weight, only_num=True)
+                material.time = now_time
+                material.save()
+                new_total_weight += new_weight
+                if jz:
+                    try:
+                        rep_detail = jz.notice(table_seq=2, table_id=material.id, opera_type=3)
+                    except Exception as e:
+                        raise ValidationError(e.args[0])
+            new_tolerance = get_tolerance(batching_equip=equip_no, standard_weight=new_total_weight, project_name='all',
+                                          only_num=True)
+            filter_kwargs.update({'weight': new_total_weight, 'error': new_tolerance, 'time': now_time})
+            f_instance.weight = new_total_weight
+            f_instance.error = new_tolerance
+            f_instance.time = now_time
+            f_instance.split_count = split_count
+            f_instance.save()
+            if jz:
+                try:
+                    rep_pre = jz.notice(table_seq=3, table_id=rid, opera_type=3)
+                except Exception as e:
+                    raise ValidationError(e.args[0])
+            return Response('操作成功')
+        instance.update(**filter_kwargs)
+        if jz:
+            try:
+                rep_plan = jz.notice(table_seq=4, table_id=rid, opera_type=3)
+            except Exception as e:
+                raise ValidationError(e.args[0])
 
 
 @method_decorator([api_recorder], name="dispatch")
