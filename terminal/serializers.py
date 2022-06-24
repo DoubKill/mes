@@ -28,7 +28,7 @@ from terminal.models import EquipOperationLog, WeightBatchingLog, FeedingLog, We
     FeedingOperationLog, CarbonTankFeedingPrompt, PowderTankSetting, OilTankSetting, ReplaceMaterial, ReturnRubber, \
     ToleranceRule, WeightPackageManual, WeightPackageManualDetails, WeightPackageSingle, OtherMaterialLog, \
     WeightPackageWms, MachineManualRelation, WeightPackageLogDetails, WeightPackageLogManualDetails, WmsAddPrint, \
-    JZMaterialInfo, JZBin, JZPlan, JZRecipeMaterial, JZRecipePre
+    JZMaterialInfo, JZBin, JZPlan, JZRecipeMaterial, JZRecipePre, JZExecutePlan
 from terminal.utils import TankStatusSync, CLSystem, material_out_barcode, get_tolerance, get_common_equip, get_real_ip, \
     JZTankStatusSync, JZCLSystem, send_dk
 
@@ -560,9 +560,16 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 logger.error('群控服务器错误！')
                 raise serializers.ValidationError(e.args[0])
         if scan_material_msg:
-            if scan_material_type == '胶皮':
-                dk_control = 'Start' if '成功' in scan_material_type else 'Stop'
+            dk_equip = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='导开机控制机台', global_name=classes_plan.equip.equip_no)
+            if scan_material_type == '胶皮' and dk_equip:
+                dk_control = 'Start' if '成功' in scan_material_msg else 'Stop'
                 status, text = send_dk(classes_plan.equip.equip_no, dk_control)
+                if not status:  # 发送导开机启停信号异常
+                    logger.error(f'发送导开机信号异常, 计划号: {plan_classes_uid}, 机台: {classes_plan.equip.equip_no}, 错误:{text}')
+                    raise serializers.ValidationError(f'发送导开机信号异常:{text}')
+                else:  # 失败信号发送成功需要终端阻断进程
+                    if dk_control == 'Stop':
+                        raise serializers.ValidationError('发送导开机停止信号成功')
             raise serializers.ValidationError(scan_material_msg)
         for i in details:
             msg = i['tank_data'].pop('msg')
@@ -626,17 +633,17 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 # 胶块6分钟内不超过4框, 胶皮4分钟内不超过4架
                 if n_scan_material_type in ['胶块', '胶皮']:
                     limit_minutes, limit_nums = [4, 4] if n_scan_material_type == '胶皮' else [6, 4]
-                    g_config = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='密炼扫码限制', global_no=f'{scan_dev}-{n_scan_material_type}').last()
+                    g_config = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='密炼扫码限制', global_name__startswith=f'{scan_dev}-{n_scan_material_type}').last()
                     if g_config:
                         try:
-                            limit_minutes, limit_nums = list(map(lambda x: int(x), g_config.global_name.split('-')))
+                            limit_minutes, limit_nums = list(map(lambda x: int(x), g_config.global_name.split('-')[-2:]))
                         except:
                             pass
                     limit_time = datetime.now() - timedelta(minutes=limit_minutes)
                     num = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, material_name=material_name, scan_time__gte=limit_time).count()
                     if num >= limit_nums:
                         check_flag = False
-                        attrs['tank_data'].update({'msg': '扫码过快: 胶皮4分钟不超过4架/胶块6分钟4框'})
+                        attrs['tank_data'].update({'msg': f'扫码过快: {n_scan_material_type}{limit_minutes}分钟不超过{limit_nums}次'})
                         attrs['status'] = 2
                 if check_flag:
                     last_same_material = add_materials.first()
@@ -686,6 +693,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         return attrs
 
     def create(self, validated_data):
+        equip_no = None
         details = validated_data.get('attrs')
         scan_material_type = validated_data.pop('scan_material_type', '')
         plan_classes_uid, trains = '', 1
@@ -701,10 +709,14 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 LoadTankMaterialLog.objects.filter(plan_classes_uid=pre_material.plan_classes_uid, bra_code=pre_material.bra_code)\
                     .update(**{'actual_weight': pre_material.init_weight, 'adjust_left_weight': 0, 'real_weight': 0,
                                'useup_time': datetime.now()})
-            # 胶皮扫码正确发送消息给导开机
-            if scan_material_type == '胶皮':
-                status, text = send_dk(equip_no, 'Start')
             instance = LoadTankMaterialLog.objects.create(**tank_data)
+        # 胶皮扫码正确发送消息给导开机
+        dk_equip = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='导开机控制机台', global_name=equip_no)
+        if scan_material_type == '胶皮' and dk_equip:
+            status, text = send_dk(equip_no, 'Start')
+            if not status:  # 发送导开机启停信号异常只记录
+                logger.error(f'发送导开机信号异常, 计划号: {plan_classes_uid}, 机台: {equip_no}, 错误:{text}')
+                raise serializers.ValidationError(f'导开机启动信号发送失败: {text}')
         # 判断补充进料后是否能进上辅机
         fml = FeedingMaterialLog.objects.using('SFJ').filter(plan_classes_uid=plan_classes_uid, trains=int(trains)).last()
         if fml and fml.add_feed_result == 1:
@@ -727,6 +739,12 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
 
 
 class ReplaceMaterialSerializer(BaseModelSerializer):
+
+    def to_representation(self, instance):
+        res = super().to_representation(instance)
+        if res['status'] != '已处理':
+            res['last_updated_date'] = None
+        return res
 
     class Meta:
         model = ReplaceMaterial
@@ -1741,7 +1759,19 @@ class JZPlanSerializer(serializers.ModelSerializer):
         now_time = datetime.now().strftime('%Y%m%d%H%M%S')
         prefix = f'{now_time[:8]}X'
         max_plan_id = plan_model.objects.using(equip_no).filter(planid__startswith=prefix).aggregate(plan_id=Max('planid'))['plan_id']
-        validated_data['planid'] = prefix + ('0001' if not max_plan_id else '%04d' % (int(max_plan_id[-4:]) + 1))
+        # 比对嘉正称量本地计划号与顺序
+        max_local = JZExecutePlan.objects.using(equip_no).filter(planid__startswith=prefix).aggregate(max_plan_id=Max('planid'), max_order_by=Max('order_by'))
+        if max_local['max_order_by'] and max_local['max_order_by'] > validated_data['order_by'] - 1:
+            validated_data['order_by'] = max_local['max_order_by'] + 1
+        if max_plan_id and not max_local['max_plan_id']:
+            plan_id = prefix + '%04d' % (int(max_plan_id[-4:]) + 1)
+        elif not max_plan_id and max_local['max_plan_id']:
+            plan_id = prefix + '%04d' % (int(max_local['max_plan_id'][-4:]) + 1)
+        elif not max_plan_id and not max_local['max_plan_id']:
+            plan_id = prefix + '0001'
+        else:
+            plan_id = prefix + ('%04d' % (int(max_plan_id[-4:]) + 1) if max_plan_id > max_local['max_plan_id'] else '%04d' % (int(max_local['max_plan_id'][-4:]) + 1))
+        validated_data['planid'] = plan_id
         validated_data['state'] = '等待'
         validated_data['actno'] = 0
         validated_data['starttime'] = None
