@@ -108,7 +108,7 @@ class WeightPackageLog(AbstractEntity):
     batch_time = models.DateTimeField(max_length=10, help_text='配料日期')
     batch_classes = models.CharField(max_length=8, help_text='配料班次')
     batch_group = models.CharField(max_length=8, help_text='配料班组')
-    batch_user = models.CharField(max_length=8, help_text='配料员', null=True, blank=True)
+    batch_user = models.CharField(max_length=16, help_text='配料员', null=True, blank=True)
     location_no = models.CharField(max_length=64, help_text='产线', null=True)
     dev_type = models.CharField(max_length=64, help_text='机型名称')
     begin_trains = models.IntegerField(help_text='开始包')
@@ -611,6 +611,37 @@ class ReportWeight(models.Model):
 
 
 """嘉正称量系统"""
+
+
+class JZExecutePlan(models.Model):
+    """称量系统实时的计划号与执行顺序表"""
+    id = models.IntegerField(db_column='Dosing_id', primary_key=True)
+    planid = models.CharField(db_column='Plan_Id', max_length=50, help_text='计划号')
+    equip_code = models.CharField(db_column='Equip_Code', max_length=50, help_text='线体机台号')
+    order_by = models.IntegerField(db_column='Plan_Serial', help_text='计划执行顺序', null=True, blank=True)
+    recipe_id = models.CharField(db_column='Recipe_ID', max_length=50, help_text='配方id', blank=True, null=True)
+    recipe_code = models.CharField(db_column='Recipe_Code', max_length=50, help_text='配方编码', blank=True, null=True)
+    recipe = models.CharField(db_column='Recipe_Name', max_length=50, help_text='配方名称', blank=True, null=True)
+    recipe_ver = models.CharField(db_column='Version', max_length=50, help_text='机型', blank=True, null=True)
+    mixer_line = models.CharField(db_column='Mixer_Line', max_length=50, help_text='线体', blank=True, null=True)
+    recipe_type = models.IntegerField(db_column='Recipe_Type', help_text='含义未知', null=True, blank=True)
+    shift_id = models.CharField(db_column='Shift_Id', max_length=10, help_text='含义未知', blank=True, null=True)
+    shift_class = models.CharField(db_column='Shift_Class', max_length=10, help_text='含义未知', blank=True, null=True)
+    setno = models.IntegerField(db_column='Plan_Num', help_text='计划车次', null=True, blank=True)
+    actno = models.IntegerField(db_column='Real_Num', help_text='实际车次', null=True, blank=True)
+    spend_time = models.IntegerField(db_column='Duration_Time', help_text='配料耗时(累加)', null=True, blank=True)
+    starttime = models.CharField(db_column='Start_Date', max_length=50, help_text='开始时间', blank=True, null=True)
+    stoptime = models.CharField(db_column='End_Date', max_length=50, help_text='结束时间', blank=True, null=True)
+    weight_man = models.CharField(db_column='Weight_Man', max_length=50, help_text='称量员', blank=True, null=True)
+    oper = models.CharField(db_column='Stock_Man', max_length=50, help_text='计划员', blank=True, null=True)
+    plan_batch = models.CharField(db_column='Plan_Batch', max_length=50, help_text='同计划号', blank=True, null=True)
+    state = models.IntegerField(db_column='Plan_State', help_text='计划状态', blank=True, null=True)
+    date_time = models.CharField(db_column='Plan_Date', max_length=50, help_text='配料日期', blank=True, null=True)
+    if_flag = models.IntegerField(db_column='IF_FLAG', help_text='含义未知', blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'RT_plan'
 
 
 class JZBin(models.Model):

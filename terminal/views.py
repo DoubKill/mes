@@ -1,4 +1,5 @@
 import datetime
+import math
 import re
 import time
 import logging
@@ -6,7 +7,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth.models import Permission
-from django.db.models import Max, Sum, Q, Prefetch, Count, F
+from django.db.models import Max, Sum, Q, Prefetch, Count, F, Value, CharField
 from django.db.transaction import atomic
 from django.db.utils import ConnectionDoesNotExist
 from django.shortcuts import get_object_or_404
@@ -25,6 +26,7 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 from basics.models import WorkSchedulePlan, Equip, GlobalCode
 from equipment.models import EquipMachineHaltType
 from equipment.serializers import EquipApplyRepairSerializer
+from equipment.utils import gen_template_response
 from inventory.models import MaterialOutHistory
 from mes.common_code import CommonDeleteMixin, TerminalCreateAPIView, response, SqlClient
 from mes.conf import TH_CONF, JZ_EQUIP_NO
@@ -45,7 +47,7 @@ from terminal.models import TerminalLocation, EquipOperationLog, WeightBatchingL
     ReplaceMaterial, ReturnRubber, ToleranceDistinguish, ToleranceProject, ToleranceHandle, ToleranceRule, \
     WeightPackageManual, WeightPackageSingle, WeightPackageWms, OtherMaterialLog, EquipHaltReason, \
     WeightPackageLogManualDetails, WmsAddPrint, JZReportWeight, JZMaterialInfo, JZBin, JZReportBasic, JZPlan, \
-    JZRecipeMaterial, JZRecipePre
+    JZRecipeMaterial, JZRecipePre, JZExecutePlan
 from terminal.serializers import LoadMaterialLogCreateSerializer, \
     EquipOperationLogSerializer, BatchingClassesEquipPlanSerializer, WeightBatchingLogSerializer, \
     WeightBatchingLogCreateSerializer, FeedingLogSerializer, WeightTankStatusSerializer, \
@@ -931,7 +933,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         total_weight = plan_weight * split_count
         product_no_dev = re.split(r'\(|\（|\[', i['product_no'])[0]
         msg, ml_equip_no = '', ''
-        type_name = '细料' if equip_no.startswith('F') else '硫磺'
+        type_name = '硫磺' if re.findall('FM|RFM|RE', product_no_dev) else '细料'
         if 'ONLY' in i['product_no']:
             ml_equip_no = i['product_no'].split('-')[-2]
         else:
@@ -1970,7 +1972,7 @@ class XLPlanVIewSet(ModelViewSet):
                 res = jz.add_plan(plan_no=instance.planid, recipe_name=instance.recipe, plan_num=instance.setno)
             except Exception as e:
                 instance.delete()
-                raise ValidationError(f'通知称量系统{equip_no}新建计划失败')
+                raise ValidationError(f'{equip_no}新建计划失败{e.args[0]}]')
         return Response('新建计划成功')
 
     def destroy(self, request, *args, **kwargs):
@@ -2374,8 +2376,15 @@ class ReportWeightViewStaticsView(APIView):
     物料消耗量统计
     """
     permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_xl_report_weight_statics'}))
+    FILE_NAME = '称量物料消耗汇总表'
+    EXPORT_FIELDS_DICT = {"机台": "s_equip_no",
+                          "配方": "recipe",
+                          "物料名称": "material",
+                          "实际重量(kg)": "material_total_weight"
+                          }
 
     def get(self, request):
+        t_report_flag = self.request.query_params.get('t_report_flag')  # 称量物料汇总标识
         equip_no = self.request.query_params.get('equip_no', 'F01')
         st = self.request.query_params.get('st')
         if not st:
@@ -2387,14 +2396,50 @@ class ReportWeightViewStaticsView(APIView):
         diff = (datetime.datetime.strptime(et, '%Y-%m-%d %H:%M:%S') - datetime.datetime.strptime(st, '%Y-%m-%d %H:%M:%S')).days
         if diff > 31:
             raise ValidationError('查询周期不可超过31天')
-        try:
-            weight_model = JZReportWeight if equip_no in JZ_EQUIP_NO else ReportWeight
-            data = weight_model.objects.using(equip_no).filter(~Q(material='总重量'), 时间__gte=st, 时间__lte=et)
-            results = data.values('material').annotate(material_total_weight=Sum('act_weight')).values('material', 'material_total_weight')
-            total_weight = sum(data.values_list('act_weight', flat=True))
-        except Exception as e:
-            raise ValidationError('称量机台{}服务错误！'.format(equip_no))
-        return Response({'results': results, 'total_weight': total_weight})
+        if not t_report_flag:
+            try:
+                weight_model = JZReportWeight if equip_no in JZ_EQUIP_NO else ReportWeight
+                data = weight_model.objects.using(equip_no).filter(~Q(material='总重量'), 时间__gte=st, 时间__lte=et)
+                results = data.values('material').annotate(material_total_weight=Sum('act_weight')).values('material', 'material_total_weight')
+                total_weight = sum(data.values_list('act_weight', flat=True))
+            except Exception as e:
+                raise ValidationError('称量机台{}服务错误！'.format(equip_no))
+            return Response({'results': results, 'total_weight': total_weight})
+        else:
+            results = []
+            product_no = self.request.query_params.get('product_no')
+            s_equip_no = self.request.query_params.get('s_equip_no')
+            material_name = self.request.query_params.get('material_name')
+            export = self.request.query_params.get('export')
+            filter_kwargs = {'时间__gte': st, '时间__lte': et}
+            if product_no:
+                filter_kwargs['recipe__icontains'] = product_no
+            if material_name:
+                filter_kwargs['material__icontains'] = material_name
+            # 获取机台
+            equip_no_list = [s_equip_no] if s_equip_no else [k for k, v in DATABASES.items() if 'YK_XL' in v.get('NAME') or 'MDWS' in v.get('NAME')]
+            for i in equip_no_list:
+                weight_model = JZReportWeight if i in JZ_EQUIP_NO else ReportWeight
+                s_data = weight_model.objects.using(i).filter(~Q(material='总重量'), **filter_kwargs).order_by('recipe')
+                s_res = s_data.values('recipe', 'material').annotate(material_total_weight=Sum('act_weight'), s_equip_no=Value(i, output_field=CharField())).values('s_equip_no', 'recipe', 'material', 'material_total_weight')
+                results.extend(list(s_res))
+            if export:  # 导出
+                return gen_template_response(self.EXPORT_FIELDS_DICT, results, self.FILE_NAME)
+            # 分页
+            page = self.request.query_params.get('page', 1)
+            page_size = self.request.query_params.get('page_size', 10)
+            try:
+                begin = (int(page) - 1) * int(page_size)
+                end = int(page) * int(page_size)
+            except:
+                raise ValidationError("page/page_size异常，请修正后重试")
+            else:
+                if begin not in range(0, 99999):
+                    raise ValidationError("page/page_size值异常")
+                if end not in range(0, 99999):
+                    raise ValidationError("page/page_size值异常")
+            return Response({'total_data': len(results), 'total_page': math.ceil(len(results) / int(page_size)),
+                             'page_result': results[begin: end]})
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -2643,7 +2688,7 @@ class FeedCheckOperationViewSet(ModelViewSet):
     list:
         查询投料防错操作履历
     """
-    queryset = FeedingOperationLog.objects.all().order_by('id')
+    queryset = FeedingOperationLog.objects.all().order_by('-id')
     serializer_class = FeedingOperationLogSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = [DjangoFilterBackend]
@@ -2973,11 +3018,15 @@ class FeedingErrorLampForCarbonView(APIView):
             return Response({'state': 0, 'msg': f'线路未设定机台号: {line}: {feed_port[:3]}', 'FeedingResult': 2})
         record = MaterialTankStatus.objects.using('SFJ').filter(delete_flag=False, tank_type="1", tank_no=tank_no,
                                                                 use_flag=1, equip_no='Z%02d' % equip_id).first()
-        if record.material_name != material_name:
-            data.update({'tank_material_name': record.material_name,
-                         'feed_reason': f'所投物料{material_name}与罐中{record.material_name}不一致'})
-            FeedingOperationLog.objects.create(**data)
-            return Response({'state': 0, 'msg': f'所投物料{material_name}与罐中{record.material_name}不一致', 'FeedingResult': 2})
+        update_msg = None
+        if not record:
+            update_msg = f'{equip_id}炭黑罐{tank_no}未设定物料'
+        else:
+            if record.material_name != material_name:
+                update_msg = f'所投物料{material_name}与罐中{record.material_name}不一致'
+        if update_msg:
+            data.update({'feed_reason': update_msg})
+            return Response({'state': 0, 'msg': update_msg, 'FeedingResult': 2})
         # 添加防错履历
         data.update({'tank_material_name': material_name, 'feed_result': 'Y'})
         FeedingOperationLog.objects.create(**data)
@@ -3309,18 +3358,26 @@ class XlRecipeNoticeView(APIView):
         for single_equip_no in send_equip_list:
             send_materials = mes_xl_details.filter(equip_no=single_equip_no, feeding_mode__startswith=keywords, handle_material_name__in=same_material_list)
             send_recipe_name = f"{product_no.split('_NEW')[0]}({product_batching.dev_type.category_no}" + (")" if single_equip_no in common_equip else f"-{single_equip_no}-ONLY)")
-            processing_xl_plan = plan_model.objects.using(xl_equip).filter(Q(planid__startswith=n_prefix) | Q(planid__startswith=b_prefix), state__in=['运行中', '运行'], recipe=send_recipe_name)
-            if processing_xl_plan:
+            processing_xl_plan = plan_model.objects.using(xl_equip).filter(Q(planid__startswith=n_prefix) | Q(planid__startswith=b_prefix), state__in=['运行中', '运行', '等待'], recipe=send_recipe_name)
+            run_plan = None
+            if xl_equip in JZ_EQUIP_NO:  # 嘉正称量直接下发的计划需要找其他表数据
+                run_plan = JZExecutePlan.objects.using(xl_equip).filter(recipe=send_recipe_name)
+            if processing_xl_plan or run_plan:
                 detail_msg += f'{single_equip_no}: 预下发配方正在该线体进行配料 '
                 continue
             send_data[send_recipe_name] = send_materials
             detail_msg += f'{single_equip_no}: 配方下发成功 '
         # 下传配方
+        error_msg = '下发配方异常'
         try:
-            with atomic(using=xl_equip):
+            if xl_equip in JZ_EQUIP_NO:
                 self.issue_xl_system(xl_equip, send_data)
+                error_msg = '嘉正称量下发配方出现异常,请修正mes配方与称量配方'
+            else:
+                with atomic(using=xl_equip):
+                    self.issue_xl_system(xl_equip, send_data)
         except Exception as e:
-            raise ValidationError(e.args[0])
+            raise ValidationError(f"{error_msg}:{e.args[0]}")
         return Response(f'{xl_equip}:\n {detail_msg}')
 
     def issue_xl_system(self, xl_equip, data):
@@ -3335,18 +3392,16 @@ class XlRecipeNoticeView(APIView):
             if not total_weight:
                 total_weight = 0
             # 删除之前配方
-            o_recipe = material_model.objects.using(xl_equip).filter(recipe_name=recipe_name)
-            o_materials = pre_model.objects.using(xl_equip).filter(name=recipe_name)
-            if jz:
-                for k in o_materials:
-                    jz.notice(table_seq=2, table_id=k.id, opera_type=2)
-                for k in o_recipe:
-                    jz.notice(table_seq=3, table_id=k.id, opera_type=2)
-            else:
+            o_recipe = pre_model.objects.using(xl_equip).filter(name=recipe_name)
+            o_materials = material_model.objects.using(xl_equip).filter(recipe_name=recipe_name)
+            if o_recipe:  # 存在配方删除后新增
+                if jz:
+                    for k in o_materials:
+                        jz.notice(table_seq=2, table_id=k.id, opera_type=2)
+                    for k in o_recipe:
+                        jz.notice(table_seq=3, table_id=k.id, opera_type=2)
                 o_materials.delete()
                 o_recipe.delete()
-            o_materials.delete()
-            o_recipe.delete()
             split_count = 1 if total_weight <= 30 else 2
             weight = round(total_weight / split_count, 3)
             n_time = datetime.datetime.now().replace(microsecond=0).strftime('%Y-%m-%d %H:%M:%S')
@@ -3374,7 +3429,6 @@ class XlRecipeNoticeView(APIView):
                     jz.notice(table_seq=2, table_id=single_data.id, opera_type=1)
                 else:
                     single_data = material_model.objects.using(xl_equip).create(**create_data)
-
 
 
 @method_decorator([api_recorder], name='dispatch')
