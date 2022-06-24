@@ -23,6 +23,7 @@ from mes.conf import JZ_EQUIP_NO
 from mes.settings import DATABASES
 from plan.models import BatchingClassesPlan
 from recipe.models import ProductBatching, ProductBatchingDetail, ProductBatchingEquip
+from system.models import ChildSystemInfo
 from terminal.models import WeightTankStatus, RecipePre, RecipeMaterial, Plan, Bin, ToleranceRule, JZRecipeMaterial, \
     JZPlan
 
@@ -256,12 +257,14 @@ class JZTankStatusSync(object):
 class CarbonDeliverySystem(object):
     """获取炭黑罐与输送线信息"""
     def __init__(self):
-        # url = "http://10.4.23.25:9000/shusong?wsdl"
-        # self.carbon_system = Client(url)
-        self.url = "http://10.4.23.25:9000/shusong"
+
+        child_system = ChildSystemInfo.objects.filter(system_name="炭黑").last()
+        remote_ip = '10.4.23.166' if not child_system else child_system.link_address
+        self.url = f"http://{remote_ip}:9000/shusong"
 
     def carbon_info(self):
-        # carbon_tank_details = json.loads(self.carbon_system.service.GetCarbonTankLevel())
+        """获取炭黑料罐信息"""
+
         headers = {"Content-Type": "text/xml; charset=utf-8",
                    "SOAPAction": "http://tempuri.org/INXWebService/GetCarbonTankLevel"}
         send_data = """<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
@@ -294,7 +297,7 @@ class CarbonDeliverySystem(object):
         return carbon_tank_info
 
     def line_info(self):
-        # line_info = json.loads(self.carbon_system.service.FeedingPortToCarbonTankRelation())
+        """获取输送线信息"""
         headers = {"Content-Type": "text/xml; charset=utf-8",
                    "SOAPAction": "http://tempuri.org/INXWebService/FeedingPortToCarbonTankRelation"}
         send_data = """<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">

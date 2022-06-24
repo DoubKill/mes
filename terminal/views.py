@@ -933,7 +933,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         total_weight = plan_weight * split_count
         product_no_dev = re.split(r'\(|\（|\[', i['product_no'])[0]
         msg, ml_equip_no = '', ''
-        type_name = '细料' if equip_no.startswith('F') else '硫磺'
+        type_name = '硫磺' if re.findall('FM|RFM|RE', product_no_dev) else '细料'
         if 'ONLY' in i['product_no']:
             ml_equip_no = i['product_no'].split('-')[-2]
         else:
@@ -2688,7 +2688,7 @@ class FeedCheckOperationViewSet(ModelViewSet):
     list:
         查询投料防错操作履历
     """
-    queryset = FeedingOperationLog.objects.all().order_by('id')
+    queryset = FeedingOperationLog.objects.all().order_by('-id')
     serializer_class = FeedingOperationLogSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = [DjangoFilterBackend]
@@ -3018,11 +3018,15 @@ class FeedingErrorLampForCarbonView(APIView):
             return Response({'state': 0, 'msg': f'线路未设定机台号: {line}: {feed_port[:3]}', 'FeedingResult': 2})
         record = MaterialTankStatus.objects.using('SFJ').filter(delete_flag=False, tank_type="1", tank_no=tank_no,
                                                                 use_flag=1, equip_no='Z%02d' % equip_id).first()
-        if record.material_name != material_name:
-            data.update({'tank_material_name': record.material_name,
-                         'feed_reason': f'所投物料{material_name}与罐中{record.material_name}不一致'})
-            FeedingOperationLog.objects.create(**data)
-            return Response({'state': 0, 'msg': f'所投物料{material_name}与罐中{record.material_name}不一致', 'FeedingResult': 2})
+        update_msg = None
+        if not record:
+            update_msg = f'{equip_id}炭黑罐{tank_no}未设定物料'
+        else:
+            if record.material_name != material_name:
+                update_msg = f'所投物料{material_name}与罐中{record.material_name}不一致'
+        if update_msg:
+            data.update({'feed_reason': update_msg})
+            return Response({'state': 0, 'msg': update_msg, 'FeedingResult': 2})
         # 添加防错履历
         data.update({'tank_material_name': material_name, 'feed_result': 'Y'})
         FeedingOperationLog.objects.create(**data)
