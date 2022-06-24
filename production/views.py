@@ -2024,29 +2024,116 @@ class MachineTargetValue(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class MonthlyOutputStatisticsReport(APIView):
+    queryset = TrainsFeedbacks.objects.filter(Q(~Q(equip_no='Z04')) | Q(equip_no='Z04', operation_user='Mixer1'))
     permission_classes = (IsAuthenticated,)
+
+    def my_order(self, result, order):
+        lst = []
+        for dic in result:
+            if dic['name'] in order:
+                lst.append(dic)
+        res = sorted(lst, key=lambda x: order.index(x['name']))
+        return res
 
     def get(self, request, *args, **kwargs):
         st = self.request.query_params.get('st')
         et = self.request.query_params.get('et')
-        if not all([st, et]):
-            raise ValidationError('请选择日期范围查询！')
-        try:
-            e_time = datetime.datetime.strptime(et, '%Y-%m-%d')
-            s_time = datetime.datetime.strptime(st, '%Y-%m-%d')
-        except Exception:
-            raise ValidationError('日期错误！')
-        diff = e_time - s_time
-        if diff.days > 31:
-            raise ValidationError('搜索日期跨度不得超过一个月！')
-        queryset = TrainsFeedbacks.objects.exclude(
-            operation_user='Mixer1'
-        ).filter(
-            factory_date__gte=st,
-            factory_date__lte=et
-        ).values('equip_no').annotate(weight=Sum('actual_weight')/100000,
-                                      value=Count('id')).order_by('equip_no')
-        return Response({'result': queryset, 'wl': {}, 'jl': {}})
+        a = datetime.datetime.strptime(st, '%Y-%m-%d')
+        b = datetime.datetime.strptime(et, '%Y-%m-%d')
+        ds = (b - a).days + 1
+        state = self.request.query_params.get('state')  # 段数
+        equip = self.request.query_params.get('equip')
+        space = self.request.query_params.get('space', '')  # 规格    C-FM-C101-02
+        if state:
+            kwargs = {'equip_no': equip, 'product_no__icontains': f"-{state}-{space}"} if equip else \
+                {'product_no__icontains': f"-{state}-{space}"}
+            spare_weight = self.queryset.filter(**kwargs, factory_date__lte=et,
+                                                factory_date__gte=st,
+                                                ).aggregate(spare_weight=Sum('actual_weight'))['spare_weight']
+            queryset = self.queryset.filter(**kwargs, factory_date__lte=et, factory_date__gte=st,
+                                            ).values('equip_no', 'product_no', 'factory_date')\
+                .annotate(value=Count('id'), weight=Sum('actual_weight'))
+
+            dic = {}
+            for item in queryset:
+                space_equip = f"{item['product_no'].split('-')[2]}-{item['equip_no']}-{datetime.datetime.strftime(item['factory_date'], '%Y%m%d')}"
+                if dic.get(space_equip):
+                    dic[space_equip]['value'] += item['value']
+                    dic[space_equip]['weight'] += round(item['weight'] / 100000, 2)
+                    dic[space_equip]['ratio'] += round(item['weight'] / spare_weight, 2)
+                else:
+                    dic[space_equip] = {'space': item['product_no'].split('-')[2],
+                                        'equip_no': item['equip_no'],
+                                        'time': datetime.datetime.strftime(item['factory_date'], '%m/%d'),
+                                        'value': item['value'],
+                                        'weight': round(item['weight'] / 100000, 2),
+                                        'ratio': round(item['weight'] / spare_weight, 2)
+                                        }
+            result = sorted(dic.values(), key=lambda x: (x['space'], x['equip_no'], x['time']))
+            return Response({'result': result})
+        else:
+            # 取每个机台的历史最大值
+            dic = {}
+            equip_max_value = TrainsFeedbacks.objects.filter(Q(~Q(equip_no='Z04')) |
+                                                             Q(equip_no='Z04', operation_user='Mixer1')).\
+                values('equip_no', 'factory_date').annotate(
+                qty=Count('id')).order_by('-qty')
+            for item in equip_max_value:
+                if not dic.get(f"{item['equip_no']}"):
+                    dic[f"{item['equip_no']}"] = item['qty']
+
+            # 取每个机台设定的目标值
+            settings_value = MachineTargetYieldSettings.objects.order_by('id').last()
+            # 获取起止时间内总重量和总数量
+            result = self.queryset.filter(factory_date__gte=st, factory_date__lte=et).values('equip_no').annotate(value=Count('id'),
+                                                                 weight=Sum('actual_weight'))
+
+            for item in result:
+                item['weight'] = round(item['weight'] / 100000, 2)
+                item['max_value'] = dic[item['equip_no']] if dic.get(item['equip_no']) else None
+                if settings_value:
+                    item['settings_value'] = settings_value.__dict__.get('E190') if item['equip_no'] == '190E' else\
+                        settings_value.__dict__.get(item['equip_no'])
+                    item['settings_value'] *= ds * 2
+                else:
+                    item['settings_value'] = None
+            # 获取不同段次的总重量
+            state_value = self.queryset.filter(factory_date__gte=st, factory_date__lte=et).values('product_no').annotate(weight=Sum('actual_weight'))
+            jl = {'jl': 0}
+            wl = {'wl': 0}
+
+            for item in state_value:
+                if item['product_no'].split('-')[1] in ['RE', 'FM', 'RFM']:
+                    if jl.get(item['product_no'].split('-')[1]):
+                        jl[item['product_no'].split('-')[1]] += round(item['weight'] / 100000, 2)
+                    else:
+                        jl[item['product_no'].split('-')[1]] = round(item['weight'] / 100000, 2)
+                    jl['jl'] += round(item['weight'] / 100000, 2)
+                else:
+                    if wl.get(item['product_no'].split('-')[1]):
+                        wl[item['product_no'].split('-')[1]] += round(item['weight'] / 100000, 2)
+                    else:
+                        wl[item['product_no'].split('-')[1]] = round(item['weight'] / 100000, 2)
+                    wl['wl'] += round(item['weight'] / 100000, 2)
+
+            jl = [{'name': key, 'value': value} for key, value in jl.items()]
+            wl = [{'name': key, 'value': value} for key, value in wl.items()]
+            # 按照机台和段次排序
+            all_state = GlobalCode.objects.filter(global_type__type_name='胶料段次').values_list('global_name')
+            state_list = [i[0] for i in all_state]
+            jl_order = ['RE', 'FM', 'RFM', 'jl']
+            # 去除加硫的
+            ret = [i for i in state_list if i not in jl_order]
+            wl_order = ['1MB', '2MB', '3MB', 'HMB', 'CMB', 'RMB']
+            # 新增的添加到最后
+            new_state = [i for i in ret if i not in wl_order]
+            wl_order = wl_order + new_state + ['wl']
+            equip_order = ['Z01', 'Z02', 'Z03', 'Z04', 'Z05', 'Z06', 'Z07', 'Z08', 'Z09', 'Z10', 'Z11', 'Z12', 'Z13', 'Z14', 'Z15', '190E']
+            result = sorted(result, key=lambda x: equip_order.index(x['equip_no']))
+            wl = self.my_order(wl, wl_order)
+            jl = self.my_order(jl, jl_order)
+
+            return Response({'result': result, 'wl': wl, 'jl': jl})
 
 
 @method_decorator([api_recorder], name="dispatch")
