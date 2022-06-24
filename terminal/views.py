@@ -1323,7 +1323,7 @@ class PackageExpireView(APIView):
         package_expire_recipe = PackageExpire.objects.all().values_list('product_name', flat=True).distinct()
         all_product_no = []
         # 获取所有称量系统配方号
-        equip_list = [k for k, v in DATABASES.items() if 'YK_XL' in v.get('NAME') or 'MDWS' in v.get('NAME')]
+        equip_list = [k for k, v in DATABASES.items() if 'YK_XL' in v.get('NAME') or 'MWDS' in v.get('NAME')]
         for equip in equip_list:
             try:
                 pre_model = JZRecipePre if equip in JZ_EQUIP_NO else RecipePre
@@ -2416,7 +2416,7 @@ class ReportWeightViewStaticsView(APIView):
             if material_name:
                 filter_kwargs['material__icontains'] = material_name
             # 获取机台
-            equip_no_list = [s_equip_no] if s_equip_no else [k for k, v in DATABASES.items() if 'YK_XL' in v.get('NAME') or 'MDWS' in v.get('NAME')]
+            equip_no_list = [s_equip_no] if s_equip_no else [k for k, v in DATABASES.items() if 'YK_XL' in v.get('NAME') or 'MWDS' in v.get('NAME')]
             for i in equip_no_list:
                 weight_model = JZReportWeight if i in JZ_EQUIP_NO else ReportWeight
                 s_data = weight_model.objects.using(i).filter(~Q(material='总重量'), **filter_kwargs).order_by('recipe')
