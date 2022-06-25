@@ -1781,6 +1781,24 @@ class FinalRubberyOutBoundOrderSerializer(BaseModelSerializer):
         read_only_fields = ('order_no', 'warehouse_name', 'order_type')
 
 
+class OutBoundDeliveryOrderUpdateSerializer(BaseModelSerializer):
+
+    def update(self, instance, validated_data):
+        if 'status' in validated_data:
+            if validated_data['status'] == 4:
+                instance.outbound_delivery_details.exclude(status=3).update(status=4)
+        return super().update(instance, validated_data)
+
+    class Meta:
+        model = OutBoundDeliveryOrder
+        fields = '__all__'
+        read_only_fields = ('created_date', 'last_updated_date', 'delete_date',
+                            'delete_flag', 'created_user', 'last_updated_user',
+                            'delete_user', 'order_no', 'need_qty',
+                            'work_qty', 'finished_qty', 'need_weight', 'finished_weight',
+                            'inventory_type', 'inventory_reason')
+
+
 class OutBoundDeliveryOrderSerializer(BaseModelSerializer):
     work_qty = serializers.SerializerMethodField(read_only=True)
     finished_qty = serializers.SerializerMethodField(read_only=True)
@@ -1876,12 +1894,6 @@ class OutBoundDeliveryOrderSerializer(BaseModelSerializer):
                                                          datetime.datetime.now().date().strftime('%Y%m%d'),
                                                          ordering)
         return super(OutBoundDeliveryOrderSerializer, self).create(validated_data)
-
-    def update(self, instance, validated_data):
-        if 'status' in validated_data:
-            if validated_data['status'] == 4:
-                instance.outbound_delivery_details.exclude(status=1).update(status=1)
-        return super(OutBoundDeliveryOrderSerializer, self).update(instance, validated_data)
 
     class Meta:
         model = OutBoundDeliveryOrder

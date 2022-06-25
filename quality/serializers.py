@@ -410,7 +410,7 @@ class UnqualifiedDealOrderUpdateSerializer(BaseModelSerializer):
                     if detail.is_release:
                         update_kwargs['update_store_test_flag'] = 4
                         update_kwargs['test_result'] = 'PASS'
-                    MaterialDealResult.objects.filter(lot_no=detail.lot_no).update(**update_kwargs)
+                    MaterialDealResult.objects.filter(lot_no=detail.lot_no, test_result='三等品').update(**update_kwargs)
             else:
                 # 不同意
                 for detail in instance.deal_details.all():
@@ -419,7 +419,7 @@ class UnqualifiedDealOrderUpdateSerializer(BaseModelSerializer):
                         'deal_time': datetime.now(),
                         'deal_user': instance.t_deal_user,
                     }
-                    MaterialDealResult.objects.filter(lot_no=detail.lot_no).update(**update_kwargs)
+                    MaterialDealResult.objects.filter(lot_no=detail.lot_no, test_result='三等品').update(**update_kwargs)
         return instance
 
     class Meta:
@@ -1389,13 +1389,13 @@ class MaterialInspectionRegistrationSerializer(BaseModelSerializer):
         return ret
 
     def get_mes_quality_status(self, obj):
-        instance = ExamineMaterial.objects.filter(batch=obj.batch).first()
+        instance = ExamineMaterial.objects.filter(batch=obj.batch, wlxxid=obj.material_no).first()
         if instance:
             return '合格' if instance.qualified else '不合格'
         return '待检品'
 
     def get_locked_status(self, obj):
-        instance = WmsNucleinManagement.objects.filter(batch_no=obj.batch).first()
+        instance = WmsNucleinManagement.objects.filter(batch_no=obj.batch, material_no=obj.material_no).first()
         if instance:
             return instance.locked_status
         else:
@@ -1407,7 +1407,7 @@ class MaterialInspectionRegistrationSerializer(BaseModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
         validators = [UniqueTogetherValidator(
             queryset=MaterialInspectionRegistration.objects.all(),
-            fields=('batch', 'material_no'), message='改批次送检数据已存在，请勿重复添加！')]
+            fields=('batch', 'material_no'), message='该批次送检数据已存在，请勿重复添加！')]
 
 
 class ProductTestPlanDetailSerializer(BaseModelSerializer):

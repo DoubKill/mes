@@ -23,6 +23,7 @@ from mes.conf import JZ_EQUIP_NO
 from mes.settings import DATABASES
 from plan.models import BatchingClassesPlan
 from recipe.models import ProductBatching, ProductBatchingDetail, ProductBatchingEquip
+from system.models import ChildSystemInfo
 from terminal.models import WeightTankStatus, RecipePre, RecipeMaterial, Plan, Bin, ToleranceRule, JZRecipeMaterial, \
     JZPlan
 
@@ -256,12 +257,14 @@ class JZTankStatusSync(object):
 class CarbonDeliverySystem(object):
     """获取炭黑罐与输送线信息"""
     def __init__(self):
-        # url = "http://10.4.23.25:9000/shusong?wsdl"
-        # self.carbon_system = Client(url)
-        self.url = "http://10.4.23.25:9000/shusong"
+
+        child_system = ChildSystemInfo.objects.filter(system_name="炭黑").last()
+        remote_ip = '10.4.23.166' if not child_system else child_system.link_address
+        self.url = f"http://{remote_ip}:9000/shusong"
 
     def carbon_info(self):
-        # carbon_tank_details = json.loads(self.carbon_system.service.GetCarbonTankLevel())
+        """获取炭黑料罐信息"""
+
         headers = {"Content-Type": "text/xml; charset=utf-8",
                    "SOAPAction": "http://tempuri.org/INXWebService/GetCarbonTankLevel"}
         send_data = """<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
@@ -294,7 +297,7 @@ class CarbonDeliverySystem(object):
         return carbon_tank_info
 
     def line_info(self):
-        # line_info = json.loads(self.carbon_system.service.FeedingPortToCarbonTankRelation())
+        """获取输送线信息"""
         headers = {"Content-Type": "text/xml; charset=utf-8",
                    "SOAPAction": "http://tempuri.org/INXWebService/FeedingPortToCarbonTankRelation"}
         send_data = """<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
@@ -611,14 +614,18 @@ class JZCLSystem(object):
         res = door_info.content.decode('utf-8')
         result_flag = re.findall(r'<ns1:SetRealDataResult>(.*)</ns1:SetRealDataResult>', res)[0]
         if result_flag != 'true':
+            logger.error(f'{plan_no}:新建计划设置组态失败')
             raise ValueError(f'{plan_no}:新建计划设置组态失败')
         rep = self.execute_result('MES_01_RESP.PV')
         if rep == -1:
+            logger.error(f'{plan_no}:获取结果失败')
             raise ValueError(f'{plan_no}:获取结果失败')
         resp_string = response_data.get(rep)
         if not resp_string:
+            logger.error(f'{plan_no}:未知响应码{rep}')
             raise ValueError(f'{plan_no}:未知响应码{rep}')
         if rep != 1:
+            logger.error(f'{plan_no}:新建计划异常: {resp_string}')
             raise ValueError(f'{plan_no}:新建计划异常: {resp_string}')
         return resp_string
 
@@ -648,14 +655,18 @@ class JZCLSystem(object):
         res = door_info.content.decode('utf-8')
         result_flag = re.findall(r'<ns1:SetRealDataResult>(.*)</ns1:SetRealDataResult>', res)[0]
         if result_flag != 'true':
+            logger.error(f'{plan_no}:下达计划设置组态失败')
             raise ValueError(f'{plan_no}:下达计划设置组态失败')
         rep = self.execute_result('MES_02_RESP.PV')
         if rep == -1:
+            logger.error(f'{plan_no}:获取结果失败')
             raise ValueError(f'{plan_no}:获取结果失败')
         resp_string = response_data.get(rep)
         if not resp_string:
+            logger.error(f'{plan_no}:未知响应码{rep}')
             raise ValueError(f'{plan_no}:未知响应码{rep}')
         if rep != 1:
+            logger.error(f'{plan_no}:下达计划异常: {resp_string}')
             raise ValueError(f'{plan_no}:下达计划异常: {resp_string}')
         return resp_string
 
@@ -681,14 +692,18 @@ class JZCLSystem(object):
         res = door_info.content.decode('utf-8')
         result_flag = re.findall(r'<ns1:SetRealDataResult>(.*)</ns1:SetRealDataResult>', res)[0]
         if result_flag != 'true':
+            logger.error(f'{plan_no}:停止计划设置组态失败')
             raise ValueError(f'{plan_no}:停止计划设置组态失败')
         rep = self.execute_result('MES_04_RESP.PV')
         if rep == -1:
+            logger.error(f'{plan_no}:获取结果失败')
             raise ValueError(f'{plan_no}:获取结果失败')
         resp_string = response_data.get(rep)
         if not resp_string:
+            logger.error(f'{plan_no}:未知响应码{rep}')
             raise ValueError(f'{plan_no}:未知响应码{rep}')
         if rep != 1:
+            logger.error(f'{plan_no}:停止计划异常: {resp_string}')
             raise ValueError(f'{plan_no}:停止计划异常: {resp_string}')
         return resp_string
 
@@ -716,14 +731,18 @@ class JZCLSystem(object):
         res = door_info.content.decode('utf-8')
         result_flag = re.findall(r'<ns1:SetRealDataResult>(.*)</ns1:SetRealDataResult>', res)[0]
         if result_flag != 'true':
+            logger.error(f'{plan_no}:修改车次设置组态失败')
             raise ValueError(f'{plan_no}:修改车次设置组态失败')
         rep = self.execute_result('MES_05_RESP.PV')
         if rep == -1:
+            logger.error(f'{plan_no}:获取结果失败')
             raise ValueError(f'{plan_no}:获取结果失败')
         resp_string = response_data.get(rep)
         if not resp_string:
+            logger.error(f'{plan_no}:未知响应码{rep}')
             raise ValueError(f'{plan_no}:未知响应码{rep}')
         if rep != 1:
+            logger.error(f'{plan_no}:修改车次异常: {resp_string}')
             raise ValueError(f'{plan_no}:修改车次异常: {resp_string}')
         return resp_string
 
@@ -752,18 +771,23 @@ class JZCLSystem(object):
                                     </SetRealData>
                                 </soap:Body>
                             </soap:Envelope>"""
+        time.sleep(0.4)  # 增加延时，防止频繁调用导致失败
         door_info = requests.post(self.url, data=send_data.encode('utf-8'), timeout=1)
         res = door_info.content.decode('utf-8')
         result_flag = re.findall(r'<ns1:SetRealDataResult>(.*)</ns1:SetRealDataResult>', res)[0]
         if result_flag != 'true':
+            logger.error(f'通知接口设置组态失败: table_seq[{table_seq}]-table_id[{table_id}]-opera_type[{opera_type}]')
             raise ValueError(f'通知接口设置组态失败: table_seq[{table_seq}]-table_id[{table_id}]-opera_type[{opera_type}]')
         rep = self.execute_result('MES_06_RESP.PV')
         if rep == -1:
+            logger.error(f'获取结果失败: table_seq[{table_seq}]-table_id[{table_id}]-opera_type[{opera_type}]')
             raise ValueError(f'获取结果失败: table_seq[{table_seq}]-table_id[{table_id}]-opera_type[{opera_type}]')
         resp_string = response_data.get(rep)
         if not resp_string:
+            logger.error(f'未知响应码{rep}: table_seq[{table_seq}]-table_id[{table_id}]-opera_type[{opera_type}]')
             raise ValueError(f'未知响应码{rep}: table_seq[{table_seq}]-table_id[{table_id}]-opera_type[{opera_type}]')
         if rep != 1:
+            logger.error(f'通知接口异常: {resp_string}, detail: table_seq[{table_seq}]-table_id[{table_id}]-opera_type[{opera_type}]')
             raise ValueError(f'通知接口异常: {resp_string}, detail: table_seq[{table_seq}]-table_id[{table_id}]-opera_type[{opera_type}]')
         return resp_string
 
@@ -779,7 +803,7 @@ class JZCLSystem(object):
                                 </GetRealData>
                             </soap:Body>
                         </soap:Envelope>"""
-        time.sleep(0.5)  # 增加延时，防止频繁调用导致失败
+        time.sleep(0.1)  # 增加延时，防止频繁调用导致失败
         door_info = requests.post(self.url, data=send_data.encode('utf-8'), timeout=1)
         res = door_info.content.decode('utf-8')
         result_flag = re.findall(r'<ns1:GetRealDataResult>(.*)</ns1:GetRealDataResult>', res)[0]

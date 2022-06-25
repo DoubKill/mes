@@ -279,12 +279,16 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
             return MaterialTestOrderListSerializer
 
     def export_xls(self, result):
-        wb = load_workbook('xlsx_template/product_test_result.xlsx')
-        ws = wb.worksheets[0]
-        sheet = wb.copy_worksheet(ws)
-        data_row = 7
         if not result:
             return Response('暂无数据！')
+        wb = load_workbook('xlsx_template/product_test_result.xlsx')
+        ws = wb.worksheets[0]
+        sheet0 = wb.copy_worksheet(ws)
+        sheet0.title = '汇总'
+        sheet0.delete_rows(2, 5)
+        sheet = wb.copy_worksheet(ws)
+        data_row0 = 2
+        data_row = 7
         product_no = result[0]['product_no']
         sheet.title = product_no
         indicators_data = MaterialDataPointIndicator.objects.filter(
@@ -356,7 +360,24 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
             sheet.cell(data_row, 13).value = ret.get('ML(1+4)')
             sheet.cell(data_row, 14).value = ret.get('硬度值')
             sheet.cell(data_row, 15).value = 'Y' if i['is_qualified'] else 'N'
-            data_row = data_row + 1
+            # 写入汇总
+            sheet0.cell(data_row0, 1).value = i['product_no']
+            sheet0.cell(data_row0, 2).value = i['production_factory_date']
+            sheet0.cell(data_row0, 3).value = i['production_class']
+            sheet0.cell(data_row0, 4).value = i['production_group']
+            sheet0.cell(data_row0, 5).value = i['production_equip_no']
+            sheet0.cell(data_row0, 6).value = i['actual_trains']
+            sheet0.cell(data_row0, 7).value = ret.get('MH')
+            sheet0.cell(data_row0, 8).value = ret.get('ML')
+            sheet0.cell(data_row0, 9).value = ret.get('TC10')
+            sheet0.cell(data_row0, 10).value = ret.get('TC50')
+            sheet0.cell(data_row0, 11).value = ret.get('TC90')
+            sheet0.cell(data_row0, 12).value = ret.get('比重值')
+            sheet0.cell(data_row0, 13).value = ret.get('ML(1+4)')
+            sheet0.cell(data_row0, 14).value = ret.get('硬度值')
+            sheet0.cell(data_row0, 15).value = 'Y' if i['is_qualified'] else 'N'
+            data_row += 1
+            data_row0 += 1
         wb.remove_sheet(ws)
         output = BytesIO()
         wb.save(output)
@@ -1143,7 +1164,6 @@ class ImportAndExportView(APIView):
         """快检数据导入模板"""
         return export_mto()
 
-    @atomic()
     def post(self, request, *args, **kwargs):
         """快检数据导入"""
         file = request.FILES.get('file')
