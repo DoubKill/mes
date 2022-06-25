@@ -2245,7 +2245,9 @@ class UpdateFlagCountView(APIView):
                     plan_recipes = plan_model.objects.using(equip_no).filter(id__gte=processing_plan.id,
                                                                              state__in=['运行中', '等待', '运行'],
                                                                              recipe=recipe_name).last()
-                if plan_recipes:
+                # 嘉正称量直接下发的计划需要找其他表数据
+                run_plan = JZExecutePlan.objects.using(equip_no).filter(recipe=recipe_name, state__in=[1, 2]) if equip_no in JZ_EQUIP_NO else None
+                if plan_recipes or run_plan:
                     raise ValidationError(f'该配方存在状态为{plan_recipes.state}计划, 无法停用')
             else:  # 有同名配方不可启用
                 if recipe_pre_model.objects.using(equip_no).filter(name=recipe_name, use_not=use_not):
@@ -2271,7 +2273,9 @@ class UpdateFlagCountView(APIView):
                 plan_recipes = plan_model.objects.using(equip_no).filter(id__gte=processing_plan.id,
                                                                          state__in=['运行中', '等待', '运行'],
                                                                          recipe=recipe_instance.name).last()
-            if plan_recipes:
+            # 嘉正称量直接下发的计划需要找其他表数据
+            run_plan = JZExecutePlan.objects.using(equip_no).filter(recipe=recipe_instance.name, state__in=[1, 2]) if equip_no in JZ_EQUIP_NO else None
+            if plan_recipes or run_plan:
                 raise ValidationError(f'该配方存在状态为{plan_recipes.state}计划, 无法删除')
             details = recipe_material_model.objects.using(equip_no).filter(recipe_name=recipe_instance.name)
             detail_ids = list(details.values_list('id', flat=True))
@@ -3375,9 +3379,8 @@ class XlRecipeNoticeView(APIView):
             send_materials = mes_xl_details.filter(equip_no=single_equip_no, feeding_mode__startswith=keywords, handle_material_name__in=same_material_list)
             send_recipe_name = f"{product_no.split('_NEW')[0]}({product_batching.dev_type.category_no}" + (")" if single_equip_no in common_equip else f"-{single_equip_no}-ONLY)")
             processing_xl_plan = plan_model.objects.using(xl_equip).filter(Q(planid__startswith=n_prefix) | Q(planid__startswith=b_prefix), state__in=['运行中', '运行', '等待'], recipe=send_recipe_name)
-            run_plan = None
-            if xl_equip in JZ_EQUIP_NO:  # 嘉正称量直接下发的计划需要找其他表数据
-                run_plan = JZExecutePlan.objects.using(xl_equip).filter(recipe=send_recipe_name)
+            # 嘉正称量直接下发的计划需要找其他表数据
+            run_plan = JZExecutePlan.objects.using(xl_equip).filter(recipe=send_recipe_name, state__in=[1, 2]) if xl_equip in JZ_EQUIP_NO else None
             if processing_xl_plan or run_plan:
                 detail_msg += f'{single_equip_no}: 预下发配方正在该线体进行配料 '
                 continue
