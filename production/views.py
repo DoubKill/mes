@@ -2427,13 +2427,16 @@ class DailyProductionCompletionReport(APIView):
         month_total = TrainsFeedbacks.objects.exclude(product_no__icontains='XCJ').filter(
             factory_date__year=year, factory_date__month=month)
         fm_total = month_total.filter(product_no__icontains='-FM-')
-        month_total_dict = dict(month_total.values('factory_date__day').annotate(weight=Sum('actual_weight', output_field=DecimalField())).values_list('factory_date__day', 'weight'))
-        fm_total_dict = dict(fm_total.values('factory_date__day').annotate(weight=Sum('actual_weight', output_field=DecimalField())).values_list('factory_date__day', 'weight'))
+        month_total_dict = dict(month_total.values('factory_date__day').annotate(weight=Sum('actual_weight', output_field=DecimalField())/100000).values_list('factory_date__day', 'weight'))
+        fm_total_dict = dict(fm_total.values('factory_date__day').annotate(weight=Sum('actual_weight', output_field=DecimalField())/100000).values_list('factory_date__day', 'weight'))
 
         cnt2 = 0
         sum_ds2 = 0
-        for t_day, t_weight in month_total_dict.items():
-            fm_weight = fm_total_dict.get(t_day, 0)
+        for t_day in range(1, days+1):
+            t_weight = month_total_dict.get(t_day, 0) + total_queryset_190e_dict.get(t_day, 0)
+            if not t_weight:
+                continue
+            fm_weight = fm_total_dict.get(t_day, 0) + fm_queryset_190e_dict.get(t_day, 0)
             try:
                 ds2 = t_weight / fm_weight
             except Exception:
