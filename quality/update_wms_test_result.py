@@ -28,10 +28,11 @@ def main():
     stocks = WmsInventoryStock.objects.using('wms').exclude(material_name__icontains='托盘').filter(
         quality_status=5).values('material_no', 'batch_no', 'material_name').annotate(lot_no=Min('lot_no'))
     inspection_url = 'http://10.1.10.136/zcxjws_web/zcxjws/pc/zc/getCkdtm.io'
-    inspection_data_list = []
     for item in stocks:
         lot_no = item['lot_no']
         batch_no = item['batch_no']
+        if not batch_no:
+            continue
         material_no = item['material_no']
         material_name = item['material_name']
         try:
@@ -43,40 +44,36 @@ def main():
         inspection_data = json.loads(ret.text)
         obj = inspection_data.get('obj')
         if not obj:
-            logger.error('未查到此条码检测信息{}！'.format(lot_no))
+            logger.error('未查到此条码检测信息:{}！'.format(lot_no))
             continue
         else:
             zjzt = obj[0].get('zjzt')
             logger.error('原材料:{} 批次号:{} 总部检测结果为:{}！'.format(material_no, batch_no, zjzt))
             if not zjzt:
-                result = 2
+                quality_status = 3
             else:
-                if zjzt in ('合格品', '紧急放行'):
-                    result = 1
+                if zjzt in ('合格品', '紧急放行', '免检'):
+                    quality_status = 1
                 elif zjzt == '待检品':
                     continue
                 else:
-                    result = 2
+                    quality_status = 3
             rest = MaterialInspectionRegistration.objects.filter(
                 material_no=material_no, batch=batch_no).first()
             if rest:
-                rest.quality_status = '合格' if result == 1 else '不合格'
+                rest.quality_status = '合格' if quality_status == 1 else '不合格'
                 rest.save()
             else:
                 MaterialInspectionRegistration.objects.create(
                     material_no=material_no,
                     batch=batch_no,
-                    quality_status='合格' if result == 1 else '不合格',
+                    quality_status='合格' if quality_status == 1 else '不合格',
                     tracking_num=lot_no,
                     material_name=material_name
                 )
-        inspection_data_list.append({
-                        "BatchNo": batch_no,
-                        "MaterialCode": material_no,
-                        "CheckResult": result
-                    })
-    if inspection_data_list:
-        update_wms_quality_result(inspection_data_list)
+            WmsInventoryStock.objects.using('wms').filter(
+                material_no=material_no,
+                batch_no=batch_no).update(quality_status=quality_status)
 
     ex_time = datetime.now() - timedelta(days=7)
     # 核酸检测锁定（设定不合格）
