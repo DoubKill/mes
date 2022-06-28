@@ -2407,7 +2407,50 @@ class DailyProductionCompletionReport(APIView):
             )
             return self.export(month, days, excel_sheet_1_data, excel_sheet_23_data)
 
-        return Response({'results': results.values(), 'data_190e': data_190e})
+        cnt = 0
+        sum_ds = 0
+        for idx in range(1, days):
+            fm = data_190e['fm'][idx]
+            total = data_190e['total'][idx]
+            if not total:
+                continue
+            try:
+                ds = total/fm
+            except Exception:
+                ds = 0
+            sum_ds += ds
+            cnt += 1
+        avg_190e = {'jl': 0 if sum(data_190e['jl']) == 0 else round(sum(data_190e['jl']) / len([i for i in data_190e['jl'] if i > 0]), 1),
+                    'wl': 0 if sum(data_190e['wl']) == 0 else round(sum(data_190e['wl']) / len([i for i in data_190e['wl'] if i > 0]), 1),
+                    'ds': 0 if not cnt else round(sum_ds/cnt, 1)}
+
+        month_total = TrainsFeedbacks.objects.exclude(product_no__icontains='XCJ').filter(
+            factory_date__year=year, factory_date__month=month)
+        fm_total = month_total.filter(product_no__icontains='-FM-')
+        month_total_dict = dict(month_total.values('factory_date__day').annotate(weight=Sum('actual_weight', output_field=DecimalField())/100000).values_list('factory_date__day', 'weight'))
+        fm_total_dict = dict(fm_total.values('factory_date__day').annotate(weight=Sum('actual_weight', output_field=DecimalField())/100000).values_list('factory_date__day', 'weight'))
+
+        cnt2 = 0
+        sum_ds2 = 0
+        for t_day in range(1, days+1):
+            t_weight = month_total_dict.get(t_day, 0) + total_queryset_190e_dict.get(t_day, 0)
+            if not t_weight:
+                continue
+            fm_weight = fm_total_dict.get(t_day, 0) + fm_queryset_190e_dict.get(t_day, 0)
+            try:
+                ds2 = t_weight / fm_weight
+            except Exception:
+                ds2 = 0
+            sum_ds2 += ds2
+            cnt2 += 1
+        avg_results = {'jl': results['name_2']['avg'],
+                       'wl': results['name_1']['avg'],
+                       'ds': 0 if not cnt2 else round(sum_ds2/cnt2, 1)}
+        return Response({'results': results.values(),
+                         'data_190e': data_190e,
+                         'avg_190e': avg_190e,
+                         'avg_results': avg_results
+                         })
 
     def post(self, request):
         # 190E机台产量录入
