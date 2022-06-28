@@ -28,7 +28,7 @@ class OpreationLogRecorder(object):
 
 def get_standard_time(user_name, factory_date, global_name='密炼'):
     """根据参数获取当天的上下班时间"""
-    begin_time, end_time, now_time = None, None, datetime.now()
+    begin_time, end_time, now_time = None, None, f'{factory_date} {datetime.now().time()}'
     last_obj = EmployeeAttendanceRecords.objects.filter(user__username=user_name, factory_date=factory_date).last()
     if last_obj:  # 有打卡记录
         filter_kwargs = {'classes__global_name': last_obj.classes, 'group__global_name': last_obj.group,

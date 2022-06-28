@@ -32,7 +32,7 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet, ViewSet
 from basics.models import GlobalCode, WorkSchedulePlan
 from equipment.models import EquipMaintenanceOrder
 from mes.common_code import OSum, date_range, days_cur_month_dates
-from mes.conf import EQUIP_LIST
+from mes.conf import EQUIP_LIST, JZ_EQUIP_NO
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
 from mes.permissions import PermissionClass
@@ -69,7 +69,7 @@ from quality.utils import get_cur_sheet, get_sheet_data
 from system.models import User, Section
 from recipe.models import Material
 from system.models import User
-from terminal.models import Plan
+from terminal.models import Plan, JZPlan
 from equipment.utils import DinDinAPI
 
 
@@ -2641,9 +2641,8 @@ class SummaryOfWeighingOutput(APIView):
             raise ValidationError('请先去添加细料/硫磺单价')
         for equip_no in equip_list:
             dic = {'equip_no': equip_no, 'hj': 0}
-            data = Plan.objects.using(equip_no).filter(actno__gt=1, state='完成',
-                                                       date_time__istartswith=factory_date
-                                                       ).values('date_time', 'grouptime').annotate(count=Sum('actno'))
+            plan_model = JZPlan if equip_no in JZ_EQUIP_NO else Plan
+            data = plan_model.objects.using(equip_no).filter(actno__gt=1, state='完成', date_time__istartswith=factory_date).values('date_time', 'grouptime').annotate(count=Sum('actno'))
             for item in data:
                 date = item['date_time']
                 day = int(date.split('-')[2])    # 2  早班
@@ -2709,7 +2708,9 @@ class EmployeeAttendanceRecordsView(APIView):
         else:
             this_month_end = datetime.datetime(year, month + 1, 1) - timedelta(days=1)
         group = WorkSchedulePlan.objects.filter(start_time__date__gte=this_month_start,
-                                                start_time__date__lte=this_month_end).values('group__global_name', 'start_time__date').order_by('start_time')
+                                                start_time__date__lte=this_month_end,
+                                                plan_schedule__work_schedule__work_procedure__global_name='密炼')\
+            .values('group__global_name', 'start_time__date').order_by('start_time')
         group_list = []
         for key, group in groupby(list(group), key=lambda x: x['start_time__date']):
             group_list.append([item['group__global_name'] for item in group])
@@ -3101,17 +3102,17 @@ class PerformanceSummaryView(APIView):
                     user_dic[key]['actual_time'] += item[5]
                 else:
                     user_dic[key] = {'name': item[0], 'section': item[1], 'day': item[2], 'group': item[3], 'equip': equip, 'actual_time': item[5], 'classes': item[6]}
-        group = WorkSchedulePlan.objects.filter(start_time__year=year,
-                                                start_time__month=month).values_list('group__global_name', 'classes__global_name', 'start_time__day').order_by('start_time')
+        group = WorkSchedulePlan.objects.filter(start_time__year=year, start_time__month=month,
+                                                plan_schedule__work_schedule__work_procedure__global_name='密炼')\
+            .values_list('group__global_name', 'classes__global_name', 'start_time__day').order_by('start_time')
         group_list = []
         for key, g in groupby(list(group), key=lambda x: x[2]):
             group_list.append([item[0] for item in g])
 
         # 密炼的产量
         queryset = TrainsFeedbacks.objects.filter(Q(~Q(equip_no='Z04')) | Q(equip_no='Z04', operation_user='Mixer1'))
-        product_qty = list(queryset.filter(**kwargs2
-                                                     ).values('classes', 'equip_no', 'factory_date__day', 'product_no').\
-            annotate(actual_trains=Count('id')).values('actual_trains', 'classes', 'equip_no', 'factory_date__day', 'product_no'))
+        product_qty = list(queryset.filter(**kwargs2).values('classes', 'equip_no', 'factory_date__day', 'product_no')
+                           .annotate(actual_trains=Count('id')).values('actual_trains', 'classes', 'equip_no', 'factory_date__day', 'product_no'))
         # 人工录入产量
         add_qty = list(ManualInputTrains.objects.filter(**kwargs2).values('actual_trains', 'classes', 'equip_no', 'factory_date__day', 'product_no'))
         product_qty = product_qty + add_qty
@@ -3574,8 +3575,9 @@ class AttendanceClockViewSet(ModelViewSet):
         else:
             date_now = str(now.date())
         # 获取班次班组
-        queryset = WorkSchedulePlan.objects.filter(plan_schedule__day_time=date_now).values('group__global_name',
-                                                                                     'classes__global_name')
+        queryset = WorkSchedulePlan.objects.filter(plan_schedule__day_time=date_now,
+                                                   plan_schedule__work_schedule__work_procedure__global_name='密炼')\
+            .values('group__global_name', 'classes__global_name')
         group_list = [{'group': item['group__global_name'], 'classes': item['classes__global_name']} for item in queryset]
         return attendance_group_obj, list(section_list), list(equip_list), date_now, group_list
 
@@ -3711,7 +3713,7 @@ class AttendanceClockViewSet(ModelViewSet):
                 raise ValidationError(f'上班{attendance_group_obj.range_time}分钟内不能打下班卡')
             # 下班半小时后不能再打卡
             if time_now > standard_end_time + datetime.timedelta(minutes=30):
-                raise ValidationError('下班超过半小时不可在打卡')
+                raise ValidationError('下班超过半小时不可再打卡')
             end_date = time_now
             # 计算实际工时(打卡时间)
             actual_begin_time = begin_date if standard_end_time > begin_date > standard_begin_time else standard_begin_time
@@ -4171,12 +4173,12 @@ class AttendanceRecordSearch(APIView):
             if not group_setup:
                 raise ValidationError(f'{username}不在考勤组')
             # 标准上下班时间
-            standard_begin_time, standard_end_time = get_standard_time(username, f"{date}-{day}")
+            standard_begin_time, standard_end_time = get_standard_time(username, f"{date}-{day if len(day) > 1 else ('0' + day)}")
             if not standard_begin_time:
                 raise ValidationError('未找到排班信息')
             results = {
-                'attendance_st': standard_begin_time,
-                'attendance_et': standard_end_time
+                'attendance_st': str(standard_begin_time),
+                'attendance_et': str(standard_end_time)
             }
             if record:
                 begin_date = record.first().begin_date
