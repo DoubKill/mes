@@ -31,7 +31,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet, ViewSet
 from basics.models import GlobalCode, WorkSchedulePlan
 from equipment.models import EquipMaintenanceOrder
-from mes.common_code import OSum, date_range
+from mes.common_code import OSum, date_range, days_cur_month_dates
 from mes.conf import EQUIP_LIST
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
@@ -48,7 +48,7 @@ from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, Pla
     RubberCannotPutinReason, MachineTargetYieldSettings, EmployeeAttendanceRecords, PerformanceJobLadder, \
     PerformanceUnitPrice, ProductInfoDingJi, SetThePrice, SubsidyInfo, IndependentPostTemplate, AttendanceGroupSetup, \
     FillCardApply, ApplyForExtraWork, EquipMaxValueCache, Equip190EWeight, OuterMaterial, Equip190E, \
-    AttendanceClockDetail, AttendanceResultAudit, ManualInputTrains, ActualWorkingDay
+    AttendanceClockDetail, AttendanceResultAudit, ManualInputTrains, ActualWorkingDay, EmployeeAttendanceRecordsLog
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, \
@@ -2719,17 +2719,18 @@ class EmployeeAttendanceRecordsView(APIView):
             Q(factory_date__year=year, factory_date__month=month, user__username__icontains=name) &
             ~Q(is_use='废弃')
             ).values(
-            'equip', 'section', 'group', 'factory_date__day', 'user__username', 'actual_time')
+            'equip', 'section', 'group', 'factory_date__day', 'user__username', 'actual_time', 'record_status')
         for item in data:
             equip = item['equip']
             section = item['section']
             if not results.get(f'{equip}_{section}'):
                 results[f'{equip}_{section}'] = {'equip': equip, 'section': section}
             value = item['user__username'] if item['actual_time'] == 12 else '%s(%.2f)' % (item['user__username'], item['actual_time'])
+            detail = {'name': value, 'color': item['record_status']}
             if results[f'{equip}_{section}'].get(f"{item['factory_date__day']}{item['group']}"):
-                results[f'{equip}_{section}'][f"{item['factory_date__day']}{item['group']}"].append(value)
+                results[f'{equip}_{section}'][f"{item['factory_date__day']}{item['group']}"].append(detail)
             else:
-                results[f'{equip}_{section}'][f"{item['factory_date__day']}{item['group']}"] = [value]
+                results[f'{equip}_{section}'][f"{item['factory_date__day']}{item['group']}"] = [detail]
         res = list(results.values())
         for item in res:
             item['equip'] = '' if not item.get('equip') else item['equip']
@@ -3537,7 +3538,7 @@ class AttendanceClockViewSet(ModelViewSet):
         # 获取登陆用户所在考勤组
         attendance_group_obj = None
         for obj in AttendanceGroupSetup.objects.all():
-            if obj.principal == username:
+            if username in obj.principal:
                 attendance_group_obj = obj
                 break
             if username in obj.users.all().values_list('username', flat=True):
@@ -4281,17 +4282,53 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
         return Response({'results': data, 'principal': principal if data else None,
                      'id_card_num': id_card_num if data else None})
 
+    @atomic
     def create(self, request, *args, **kwargs):
         report_list = self.request.data.get('report_list', [])
         confirm_list = self.request.data.get('confirm_list', [])
-        if report_list:
+        reject_list = self.request.data.get('reject_list', [])
+        opera_user = self.request.user.username
+        factory_date, opera_type = None, None
+        if report_list:  # 添加考勤数据
             serializer = self.get_serializer(data=report_list, many=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
-        elif confirm_list:
-            for item in confirm_list:
-                EmployeeAttendanceRecords.objects.filter(pk=item['id']).update(actual_time=item.get('actual_time', 0))
+        elif confirm_list:  # 确认某一天的考勤数据
+            opera_type = '确认'
+            for item in confirm_list:  # #51A651绿色
+                is_use, factory_date = item.get('is_use'), item.get('factory_date')
+                EmployeeAttendanceRecords.objects.filter(pk=item['id']).update(actual_time=item.get('actual_time', 0),
+                                                                               is_use=is_use, record_status='#51A651')
+        elif reject_list:  # 审批驳回某一天的数据 #DA1F27 红色
+            opera_type = '单天驳回'
+            for item in reject_list:
+                is_use, factory_date = item.get('is_use'), item.get('factory_date')
+                EmployeeAttendanceRecords.objects.filter(pk=item['id']).update(is_use=is_use, record_status='#DA1F27')
+        else:
+            raise ValidationError('不支持的操作')
+        # 记录操作履历
+        if factory_date and opera_type:
+            EmployeeAttendanceRecordsLog.objects.create(**{'opera_user': opera_user, 'opera_type': opera_type,
+                                                           'record_date': factory_date})
         return Response('ok')
+
+    @atomic
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        if getattr(instance, '_prefetched_objects_cache', None):
+            # If 'prefetch_related' has been applied to a queryset, we need to
+            # forcibly invalidate the prefetch cache on the instance.
+            instance._prefetched_objects_cache = {}
+        # 废弃操作履历
+        EmployeeAttendanceRecordsLog.objects.create(**{'opera_user': self.request.user.username, 'delete_id': instance.id,
+                                                       'opera_type': '废弃', 'record_date': instance.factory_date})
+
+        return Response(serializer.data)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -4326,16 +4363,30 @@ class AttendanceResultAuditView(APIView):
                 'result_desc': last.result_desc} if last else {}
         return Response({"results": data})
 
+    @atomic
     def post(self, request):
         data = self.request.data
-        audit = data.pop('audit', None)
-        approve = data.pop('approve', None)
-        is_user = self.request.user
-        if audit:
-            data['audit_user'] = is_user.username
-        if approve:
-            data['approve_user'] = is_user.username
-        AttendanceResultAudit.objects.create(**data)
+        overall = data.pop('overall', None)  # 整体提交
+        audit = data.pop('audit', None)  # 审核人
+        approve = data.pop('approve', None)  # 审批人
+        is_user = self.request.user.username
+        opera_type = None
+        if overall:  # #141414 黑色
+            opera_type = '整体提交'
+            EmployeeAttendanceRecords.objects.filter(factory_date__in=days_cur_month_dates()).update(record_status='#141414')
+        else:
+            if audit:
+                opera_type = '审核'
+                data['audit_user'] = is_user
+            if approve:
+                opera_type = '审批'
+                data['approve_user'] = is_user
+            AttendanceResultAudit.objects.create(**data)
+            # 审核或审批不通过,当月考勤数据全为红色 #DA1F27 红色
+            if not data.get('result'):
+                EmployeeAttendanceRecords.objects.filter(factory_date__in=days_cur_month_dates()).update(record_status='#DA1F27')
+        # 记录履历
+        EmployeeAttendanceRecordsLog.objects.create(**{'opera_user': is_user, 'opera_type': opera_type})
         return Response('ok')
 
 

@@ -453,6 +453,7 @@ class SubsidyInfoSerializer(serializers.ModelSerializer):
 
 class AttendanceGroupSetupSerializer(serializers.ModelSerializer):
     attendance_users = serializers.SerializerMethodField()
+    work_schedule_name = serializers.ReadOnlyField(source='work_schedule.schedule_name', help_text='倒班名称')
 
     class Meta:
         model = AttendanceGroupSetup

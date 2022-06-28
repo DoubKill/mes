@@ -364,7 +364,9 @@ class CurrentClassView(APIView):
 class CurrentFactoryDate(APIView):
 
     def get(self, request):
-        res = get_current_factory_date()
+        select_date = self.request.query_params.get('select_date')
+        group = self.request.query_params.get('group')
+        res = get_current_factory_date(select_date, group)
         return Response(res)
 
 

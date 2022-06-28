@@ -24,7 +24,7 @@ from mes.conf import WMS_URL, TH_URL
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
 from plan.models import ProductClassesPlan, MaterialDemanded, ProductDayPlan
-from production.models import PlanStatus
+from production.models import PlanStatus, AttendanceGroupSetup
 from quality.utils import get_cur_sheet, get_sheet_data
 from recipe.models import Material
 from system.filters import UserFilter, GroupExtensionFilter, SectionFilter
@@ -78,7 +78,11 @@ class UserViewSet(ModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         export = self.request.query_params.get('export')
         if self.request.query_params.get('all'):
-            data = queryset.values('id', 'username', 'num', 'is_active')
+            if self.request.query_params.get('attendance'):  # 是否在考勤组
+                user_ids = list(AttendanceGroupSetup.objects.filter(users__is_active=True).values_list('users', flat=True))
+                data = queryset.filter(id__in=user_ids).values('id', 'username', 'num', 'is_active', 'section__name', 'id_card_num')
+            else:
+                data = queryset.values('id', 'username', 'num', 'is_active', 'section__name', 'id_card_num')
             return Response({'results': data})
         else:
             if export:
