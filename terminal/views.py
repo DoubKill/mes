@@ -2368,13 +2368,13 @@ class ReportWeightView(ListAPIView):
 
         plan_model, weight_model = [JZPlan, JZReportWeight] if equip_no in JZ_EQUIP_NO else [Plan, ReportWeight]
         if st or et:
-            plan_queryset = plan_model.objects.using(equip_no).all()
+            filter_plan = {}
             if st:
-                plan_queryset = plan_queryset.filter(date_time__gte=st)
+                filter_plan['date_time__gte'] = st
             if et:
-                plan_queryset = plan_queryset.filter(date_time__lte=et)
+                filter_plan['date_time__lte'] = et
             try:
-                plan_ids = plan_queryset.values_list('planid', flat=True)
+                plan_ids = plan_model.objects.using(equip_no).filter(**filter_plan).values_list('planid', flat=True)
             except Exception:
                 raise ValidationError('称量机台{}服务错误！'.format(equip_no))
             filter_kwargs['planid__in'] = list(plan_ids)

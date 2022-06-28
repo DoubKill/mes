@@ -535,7 +535,7 @@ class IndependentPostTemplate(models.Model):
 class AttendanceGroupSetup(models.Model):
     attendance_group = models.CharField(max_length=64, help_text='考勤组名称')
     users = models.ManyToManyField(to=User, related_name='attendance_group', help_text='考勤组人员')
-    principal = models.CharField(max_length=64, help_text='考勤负责人')
+    principal = models.CharField(max_length=1024, help_text='考勤负责人')
     range_time = models.IntegerField(help_text='上班多久后可打下班卡', null=True, blank=True)
     lead_time = models.IntegerField(help_text='提前几分钟可打工卡', null=True, blank=True)
     type = models.CharField(help_text='类别', max_length=64, null=True, blank=True)
