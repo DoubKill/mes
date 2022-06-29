@@ -3137,8 +3137,10 @@ class PerformanceSummaryView(APIView):
                                 state = 'RFM'
                             elif item['product_no'].split('-')[0] == 'WL':
                                 state = 'RMB'
-                            else: continue
-                    except: continue
+                            else:
+                                continue
+                    except:
+                        continue
                     if not price_dic.get(f"{equip_type}_{state}"):
                         PerformanceUnitPrice.objects.create(state=state, equip_type=equip_type, dj=1.2, pt=1.1)
                         price_dic[f"{equip_type}_{state}"] = {'pt': 1.2, 'dj': 1.1}
@@ -3365,16 +3367,13 @@ class PerformanceSummaryView(APIView):
         if ccjl:  # 超产奖励详情
             return Response({'results': ccjl_dic.get(name_d, None)})
         for item in list(results.values()):
-            # 其他奖惩
-            price1 = SubsidyInfo.objects.filter(type=1, name=item['name'], date__year=year,
-                                                date__month=month).aggregate(price=Sum('price'))['price']
-            # 生产补贴
-            price2 = SubsidyInfo.objects.filter(type=2, name=item['name'], date__year=year,
-                                                date__month=month).aggregate(price=Sum('price'))['price']
-            item['其他奖惩'] = price1
-            item['生产补贴'] = price2
-            item['all'] += price1 if price1 else 0
-            item['all'] += price2 if price2 else 0
+            # 其他奖惩+生产补贴
+            additional = SubsidyInfo.objects.filter(name=item['name'], type__in=[1, 2], date__year=year,
+                                                    date__month=month).aggregate(others=Sum('price', filter=Q(type=1)),
+                                                                                 prods=Sum('price', filter=Q(type=2)))
+            item['其他奖惩'] = additional['others'] if additional['others'] else 0
+            item['生产补贴'] = additional['prods'] if additional['prods'] else 0
+            item['all'] += (item['其他奖惩'] + item['生产补贴'])
             # 乘员工类别系数
             if independent.get(item['name']):
                 work_type = independent[item['name']].get('work_type')
