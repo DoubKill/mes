@@ -1134,14 +1134,14 @@ class TestDataPointCurveView(APIView):
             data_point_name: {
                 'name': data_point_name,
                 'type': 'line',
-                'data': [[]] * len(days)}
+                'data': [[day, []] for day in days]}
             for data_point_name in data_point_names
         }
         for item in ret:
             factory_date = item['material_test_order__production_factory_date'].strftime("%Y-%m-%d")
             data_point_name = item['data_point_name']
             value = item['value'].split(',')
-            y_axis[data_point_name]['data'][days.index(factory_date)] = value
+            y_axis[data_point_name]['data'][days.index(factory_date)][1] = value
         indicators = {}
         for data_point_name in data_point_names:
             indicator = MaterialDataPointIndicator.objects.filter(
