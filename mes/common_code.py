@@ -282,16 +282,11 @@ class OMin(Min):
 
 
 class GroupConcat(Aggregate):
-    """ORM用来分组显示其他字段 相当于group_concat"""
-    function = 'GROUP_CONCAT'
-    template = '%(function)s(%(distinct)s%(expressions)s)'
+    function = ''
+    template = "LISTAGG(%(expressions)s, ',') WITHIN GROUP(ORDER BY %(order_by)s)"
 
-    def __init__(self, expression, distinct=False, **extra):
-        super(GroupConcat, self).__init__(
-            expression,
-            distinct='DISTINCT ' if distinct else '',
-            output_field=CharField(),
-            **extra)
+    def __init__(self, expression, order_by, **extra):
+        super().__init__(expression, order_by=order_by, output_field=CharField(), **extra)
 
 
 class WebService(object):

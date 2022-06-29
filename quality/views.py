@@ -1127,21 +1127,21 @@ class TestDataPointCurveView(APIView):
                                                 material_test_order__production_factory_date__lte=et,
                                                 material_test_order__product_no=product_no
                                                 ).values('material_test_order__production_factory_date',
-                                                         'data_point_name').annotate(value=GroupConcat('value'))
+                                                         'data_point_name').annotate(value=GroupConcat('value', order_by='value'))
 
         data_point_names = [item['data_point_name'] for item in ret]
         y_axis = {
             data_point_name: {
                 'name': data_point_name,
                 'type': 'line',
-                'data': [[day, []] for day in days]}
+                'data': [[]] * len(days)}
             for data_point_name in data_point_names
         }
         for item in ret:
             factory_date = item['material_test_order__production_factory_date'].strftime("%Y-%m-%d")
             data_point_name = item['data_point_name']
             value = item['value'].split(',')
-            y_axis[data_point_name]['data'][days.index(factory_date)][1] = value
+            y_axis[data_point_name]['data'][days.index(factory_date)] = value
         indicators = {}
         for data_point_name in data_point_names:
             indicator = MaterialDataPointIndicator.objects.filter(
