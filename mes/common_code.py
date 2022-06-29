@@ -10,7 +10,7 @@ import requests
 import xlwt
 from DBUtils.PooledDB import PooledDB
 from django.contrib.auth.backends import ModelBackend
-from django.db.models import Min, Max, Sum, Q
+from django.db.models import Min, Max, Sum, Q, Aggregate, CharField
 from django.http import HttpResponse
 from rest_framework import status, mixins
 from rest_framework.generics import CreateAPIView
@@ -278,6 +278,21 @@ class OMin(Min):
         from django.db.backends.oracle.functions import IntervalToSeconds, SecondsToInterval
         return compiler.compile(
             SecondsToInterval(Min(IntervalToSeconds(expression), filter=self.filter))
+        )
+
+
+class GroupConcat(Aggregate):
+    function = 'GROUP_CONCAT'
+    template = '%(function)s(%(distinct)s%(expressions)s%(ordering)s%(separator)s)'
+
+    def __init__(self, expression, distinct=False, ordering=None, separator=',', **extra):
+        super(GroupConcat, self).__init__(
+            expression,
+            distinct='DISTINCT ' if distinct else '',
+            ordering=' ORDER BY %s' % ordering if ordering is not None else '',
+            separator=' SEPARATOR "%s"' % separator,
+            output_field=CharField(),
+            **extra
         )
 
 

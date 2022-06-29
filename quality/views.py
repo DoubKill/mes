@@ -32,7 +32,7 @@ import uuid
 from equipment.utils import gen_template_response
 from inventory.models import WmsNucleinManagement
 from mes import settings
-from mes.common_code import CommonDeleteMixin, date_range, get_template_response
+from mes.common_code import CommonDeleteMixin, date_range, get_template_response, GroupConcat
 from mes.conf import WMS_URL
 from mes.paginations import SinglePageNumberPagination
 from mes.derorators import api_recorder
@@ -1127,21 +1127,21 @@ class TestDataPointCurveView(APIView):
                                                 material_test_order__production_factory_date__lte=et,
                                                 material_test_order__product_no=product_no
                                                 ).values('material_test_order__production_factory_date',
-                                                         'data_point_name').annotate(avg_value=Avg('value'))
+                                                         'data_point_name').annotate(value=GroupConcat('value'))
 
         data_point_names = [item['data_point_name'] for item in ret]
         y_axis = {
             data_point_name: {
                 'name': data_point_name,
                 'type': 'line',
-                'data': [0] * len(days)}
+                'data': [[]] * len(days)}
             for data_point_name in data_point_names
         }
         for item in ret:
             factory_date = item['material_test_order__production_factory_date'].strftime("%Y-%m-%d")
             data_point_name = item['data_point_name']
-            avg_value = round(item['avg_value'], 2)
-            y_axis[data_point_name]['data'][days.index(factory_date)] = avg_value
+            value = item['value'].split(',')
+            y_axis[data_point_name]['data'][days.index(factory_date)] = value
         indicators = {}
         for data_point_name in data_point_names:
             indicator = MaterialDataPointIndicator.objects.filter(
@@ -3570,3 +3570,29 @@ class WMSMooneyLevelView(ModelViewSet):
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+
+
+class Demo(APIView):
+
+    def get(self, request):
+        year = self.request.query_params.get('year')
+        month = self.request.query_params.get('month')
+        filter_kwargs = {'production_factory_date__year': year,
+                         'production_factory_date__month': month}
+        mto_data = MaterialTestOrder.objects.filter(
+            **filter_kwargs).values('production_factory_date').annotate(qty=Count('id'))
+
+        # 流变总检查车次
+        lb_check_cnt = MaterialTestOrder.objects.filter(**filter_kwargs).filter(
+            order_results__test_indicator_name='流变').distinct().values('id').count()
+        # 流变总检查不合格车次
+        lb_qualified_cnt = MaterialTestOrder.objects.filter(**filter_kwargs).filter(
+            order_results__test_indicator_name='流变', order_results__level=2).values('id').distinct().count()
+
+        # 一次总检查车次
+        yc_check_cnt = MaterialTestOrder.objects.filter(**filter_kwargs).filter(
+            order_results__test_indicator_name__in=('门尼', '比重', '硬度')).values('id').distinct().count()
+        # 一次总检查不合格车次
+        yc_qualified_cnt = MaterialTestOrder.objects.filter(**filter_kwargs).filter(
+            order_results__test_indicator_name__in=('门尼', '比重', '硬度'),
+            order_results__level=2).values('id').distinct().count()
