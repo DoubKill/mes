@@ -3676,9 +3676,13 @@ class AttendanceClockViewSet(ModelViewSet):
             'ids': [],
         }
         # 标准上下班时间
-        standard_begin_time, standard_end_time = get_standard_time(user.username, date_now)
+        standard_begin_time, standard_end_time = get_standard_time(user.username, date_now, group=data['group'], classes=data['classes'])
         if not standard_begin_time:
             raise ValidationError('未找到排班信息')
+        # 需要和加班申请做交集
+        extra_work = ApplyForExtraWork.objects.filter(factory_date=date_now, user=user, group=data['group'],
+                                                      classes=data['classes'], section=data['section'],
+                                                      handling_result=True).last()
         if status == '上岗':
             begin_date = time_now
             lead_time = datetime.timedelta(minutes=attendance_group_obj.lead_time)
@@ -3717,6 +3721,9 @@ class AttendanceClockViewSet(ModelViewSet):
             # 计算实际工时(打卡时间)
             actual_begin_time = begin_date if standard_end_time > begin_date > standard_begin_time else standard_begin_time
             actual_end_time = end_date if standard_end_time > end_date > standard_begin_time else standard_end_time
+            if extra_work:
+                actual_begin_time = actual_begin_time if actual_begin_time < extra_work.begin_date else extra_work.begin_date
+                actual_end_time = actual_end_time if actual_end_time < extra_work.end_date else extra_work.end_date
             work_time = round((actual_end_time - actual_begin_time).seconds / 3600, 2)
             EmployeeAttendanceRecords.objects.filter(id__in=ids).update(
                 end_date=end_date, work_time=work_time, actual_time=work_time
@@ -3770,7 +3777,7 @@ class AttendanceClockViewSet(ModelViewSet):
         # 离岗时间
         equip_list = data.pop('equip_list')
         # 标准上下班时间
-        standard_begin_time, standard_end_time = get_standard_time(user.username, now.date())
+        standard_begin_time, standard_end_time = get_standard_time(user.username, now.date(), group=data['group'], classes=data['classes'])
         if not standard_begin_time:
             raise ValidationError('未找到排班信息')
         if standard_end_time.hour > 12:  # 白班
@@ -3824,7 +3831,7 @@ class AttendanceClockViewSet(ModelViewSet):
             **data
         )
         # 钉钉提醒
-        principal_obj = User.objects.filter(username__in=principal)
+        principal_obj = User.objects.filter(username__in=principal.split(','))
         if not principal_obj:
             raise ValidationError('考勤负责人不存在')
         serializer_data = FillCardApplySerializer(apply).data
@@ -3861,7 +3868,7 @@ class AttendanceClockViewSet(ModelViewSet):
             **data
         )
         # 钉钉提醒
-        principal_obj = User.objects.filter(username__in=principal)
+        principal_obj = User.objects.filter(username__in=principal.split(','))
         if not principal_obj:
             raise ValidationError('考勤负责人不存在')
         serializer_data = ApplyForExtraWorkSerializer(apply).data

@@ -2554,6 +2554,13 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipWarehouseOrderDetailFilter
 
+    def get_queryset(self):
+        order_id = self.request.query_params.get('order_id')
+        if order_id and order_id.startswith('RK'):
+            return self.queryset.exclude(status=3)
+        else:
+            return self.queryset
+
     @atomic
     def create(self, request, *args, **kwargs):
         data = self.request.data
