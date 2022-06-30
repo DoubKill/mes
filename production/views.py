@@ -2157,8 +2157,8 @@ class MonthlyOutputStatisticsReport(APIView):
                     wl_stage_output[stage]['value'] += weight
         wl_data = wl_stage_output.values()
         jl_data = jl_stage_output.values()
-        wl_sort_rules = {'1MB': 1, '2MB': 2, '3MB': 3, '4MB': 4, 'HMB': 5, 'CMB': 6, 'RMB': 7}
-        jl_sort_rules = {'RE': 1, 'FM': 2, 'RFM': 3}
+        wl_sort_rules = {'1MB': 1, '2MB': 2, '3MB': 3, '4MB': 4, 'HMB': 5, 'CMB': 6, 'RMB': 7, 'wl': 99999}
+        jl_sort_rules = {'RE': 1, 'FM': 2, 'RFM': 3, 'jl': 99999}
         wl_data = sorted(wl_data, key=lambda d: wl_sort_rules.get(d['name'], 999))
         jl_data = sorted(jl_data, key=lambda d: jl_sort_rules.get(d['name'], 999))
         return Response({'result': queryset, 'wl': wl_data, 'jl': jl_data})
