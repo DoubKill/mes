@@ -595,13 +595,13 @@ class RecipeNoticeAPiView(APIView):
                 return Response({'notice_flag': True})
         # 发送配方的返回信息
         receive_msg = ""
-        enable_equip = list(ProductBatchingEquip.objects.filter(product_batching_id=product_batching_id, is_used=True, send_recipe_flag=False)
-                            .values_list('equip_no', flat=True).distinct())
+        enable_equip_info = ProductBatchingEquip.objects.filter(product_batching_id=product_batching_id, is_used=True, send_recipe_flag=False)
+        enable_equip = list(enable_equip_info.values_list('equip_no', flat=True).distinct())
         if not enable_equip:
             raise ValidationError('配方已经发送到相应机台或未找到配方投料设置信息')
         # 过滤掉有等待或者运行中的群控配方
         n_date = datetime.datetime.now().date() - datetime.timedelta(days=1)
-        send_equip = []
+        send_equip, check_msg = [], ''
         for single_equip_no in enable_equip:
             pcp_obj = ProductClassesPlan.objects.using('SFJ').filter(delete_flag=False, created_date__date__gte=n_date,
                                                                      product_batching__stage_product_batch_no=real_product_no,
@@ -609,13 +609,25 @@ class RecipeNoticeAPiView(APIView):
             if pcp_obj:
                 plan_status = PlanStatus.objects.using('SFJ').filter(plan_classes_uid=pcp_obj.plan_classes_uid).last()
                 if plan_status.status in ['运行中', '等待']:
+                    check_msg += f"{single_equip_no}: 配方正在密炼, 无法下发 "
                     receive_msg += f"{single_equip_no}: 配方正在密炼, 无法下发 "
                 else:
                     send_equip.append(single_equip_no)
-            else:
-                send_equip.append(single_equip_no)
+            else:  # 炭黑罐或者油料罐物料不一致时无法发送
+                c_o = enable_equip_info.filter(Q(feeding_mode__startswith='C', type=2) | Q(feeding_mode__startswith='O', type=3), equip_no=single_equip_no)
+                if c_o:
+                    for s_c_o in c_o:
+                        tank = MaterialTankStatus.objects.using('SFJ').filter(equip_no=single_equip_no, use_flag=True, tank_type=s_c_o.type - 1, material_no=s_c_o.handle_material_name).first()
+                        if not tank:
+                            check_msg += f"{single_equip_no}: 物料设定异常:{s_c_o.handle_material_name} "
+                            receive_msg += f"{single_equip_no}: 物料设定异常:{s_c_o.handle_material_name} "
+                            break
+                    else:
+                        send_equip.append(single_equip_no)
+                else:
+                    send_equip.append(single_equip_no)
         if not send_equip:
-            raise ValidationError(f"该配方在所选{'、'.join(enable_equip)}机台密炼, 无法下发")
+            raise ValidationError(check_msg)
         interface = ProductBatchingSyncInterface(instance=product_batching, context={'enable_equip': send_equip})
         try:
             interface.request()
