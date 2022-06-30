@@ -2116,7 +2116,7 @@ class MonthlyOutputStatisticsReport(APIView):
             max_weight = ""
             equip_max_classes_data = equip_max_classes_dict.get(item['equip_no'])
             if equip_max_classes_data:
-                max_weight = equip_max_classes_data['weight']
+                max_weight = round(equip_max_classes_data['weight'], 2)
                 work_schedule_plan = WorkSchedulePlan.objects.filter(
                     plan_schedule__work_schedule__work_procedure__global_name='密炼',
                     plan_schedule__day_time=equip_max_classes_data['factory_date'],
@@ -2127,6 +2127,7 @@ class MonthlyOutputStatisticsReport(APIView):
             item['target'] = equip_target.get(item['equip_no'], 0)
             item['group'] = group
             item['max_weight'] = max_weight
+            item['total_weight'] = round(item['total_weight'], 2)
 
         wl_stage_output = {'wl': {'name': "wl", 'value': 0}}
         jl_stage_output = {'jl': {'name': "jl", 'value': 0}}
@@ -2142,7 +2143,7 @@ class MonthlyOutputStatisticsReport(APIView):
                 stage = item['product_no'].split('-')[1]
             except Exception:
                 continue
-            weight = item['total_weight']
+            weight = round(item['total_weight'], 2)
             if stage in ('RE', 'FM', 'RFM'):
                 jl_stage_output['jl']['value'] += weight
                 if stage not in jl_stage_output:
