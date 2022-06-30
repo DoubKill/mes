@@ -2772,8 +2772,19 @@ class EmployeeAttendanceRecordsView(APIView):
                 results[f'{equip}_{section}'] = {'equip': equip, 'section': section}
             value = item['user__username'] if item['actual_time'] == 12 else '%s(%.2f)' % (item['user__username'], item['actual_time'])
             detail = {'name': value, 'color': item['record_status']}
-            if results[f'{equip}_{section}'].get(f"{item['factory_date__day']}{item['group']}"):
-                results[f'{equip}_{section}'][f"{item['factory_date__day']}{item['group']}"].append(detail)
+            data = results[f'{equip}_{section}'].get(f"{item['factory_date__day']}{item['group']}")
+            if data:
+                # 同一天同班组同一人同岗位同机台时间累加
+                for i in data:
+                    split_name = re.split('[(|)]', i['name'])
+                    if split_name == 1:  # 工作12小时没有时间显示
+                        break
+                    if split_name[0] == item['user__username']:
+                        total_time = item['actual_time'] + float(split_name[1])
+                        i.update(name='%s(%.2f)' % (item['user__username'], total_time))
+                        break
+                else:
+                    data.append(detail)
             else:
                 results[f'{equip}_{section}'][f"{item['factory_date__day']}{item['group']}"] = [detail]
         res = list(results.values())
@@ -4336,6 +4347,7 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
         queryset = self.get_queryset().filter(factory_date__year=year,
                                               factory_date__month=month, user__username=name)
         data = self.get_serializer(queryset, many=True).data
+        principal, id_card_num = None, None
         if data:
             user = User.objects.filter(username=name).first()
             id_card_num = user.id_card_num
@@ -4349,9 +4361,9 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
                     break
             if not principal_obj:
                 raise ValidationError(f'{user.username}不在考勤组')
-            principal = principal_obj.principal if principal_obj else None
-        return Response({'results': data, 'principal': principal if data else None,
-                     'id_card_num': id_card_num if data else None})
+            if principal_obj:
+                principal = principal_obj.principal
+        return Response({'results': data, 'principal': principal, 'id_card_num': id_card_num})
 
     @atomic
     def create(self, request, *args, **kwargs):

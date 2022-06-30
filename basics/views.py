@@ -79,7 +79,14 @@ class GlobalCodeViewSet(CommonDeleteMixin, ModelViewSet):
                                                                                'global_type__type_name')
             return Response({'results': data})
         else:
-            return super().list(request, *args, **kwargs)
+            # 获取当天的班组
+            factory_date = self.request.query_params.get('factory_date')
+            if factory_date:
+                work_day = WorkSchedulePlan.objects.filter(plan_schedule__day_time=factory_date,
+                                                           plan_schedule__work_schedule__work_procedure__global_name='密炼').values('group__global_name', 'classes__global_name')
+                return Response({"results": list(work_day)})
+            else:
+                return super().list(request, *args, **kwargs)
 
 
 @method_decorator([api_recorder], name="dispatch")
