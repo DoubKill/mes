@@ -185,14 +185,12 @@ def gen_pallet_test_result(lot_nos):
         test_product_flat = False  # 是否为试验料标记
         pn = pfb_obj.product_no.split('-')[2]
         if pn.startswith('T'):
+            test_orders.update(is_experiment=True)
             # 判断是否所有项目都不判级
             if not MaterialTestMethod.objects.filter(delete_flag=False,
                                                      is_judged=True,
                                                      material__material_no=pfb_obj.product_no).exists():
                 test_product_flat = True
-                test_orders.update(is_experiment=True)
-            else:
-                test_orders.update(is_experiment=False)
 
         for test_order in test_orders:
             test_results = test_order.order_results.filter()
