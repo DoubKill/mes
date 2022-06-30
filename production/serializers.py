@@ -486,9 +486,20 @@ class EmployeeAttendanceRecordsSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def validate(self, attrs):
-
         attrs['user'] = User.objects.filter(username=attrs.pop('username')).first()
         return attrs
+
+    def create(self, validated_data):
+        # 已经确认过或者整体提交不能添加考勤数据 绿色[#51A651] 黑色[#141414]
+        r_exist = EmployeeAttendanceRecords.objects.filter(factory_date=validated_data['factory_date'],
+                                                           group=validated_data['group'],
+                                                           equip=validated_data['equip'],
+                                                           section=validated_data['section'],
+                                                           user__username=validated_data['user'].username,
+                                                           record_status__in=['#51A651', '#141414'])
+        if r_exist:
+            raise serializers.ValidationError('添加失败: 该考勤数据已锁定!')
+        return super().create(validated_data)
 
 
 class FillCardApplySerializer(serializers.ModelSerializer):
