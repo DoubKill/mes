@@ -3846,7 +3846,7 @@ class ProductSynthesisGroupRate(APIView):
             ).order_by('global_name').values_list("global_name", flat=True))):
                 q_qty = mto_group_qualified_data_dict.get(group, {}).get(i, 0)
                 t_qty = mto_group_data_dict.get(group, {}).get(i, 0)
-                data3[idx][str(i)] = '' if not t_qty else round(q_qty / t_qty * 100, 2)
+                data3[idx][str(i)] = '' if not t_qty else round(q_qty / t_qty * 100, 1)
         return Response({'data': data3})
 
 
