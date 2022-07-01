@@ -1010,7 +1010,13 @@ permission_data = [
     {'id': 1015, 'code': 'view_wms_mooney_level', 'name': '查看', 'parent_id': 1014},
     {'id': 1016, 'code': 'change_wms_mooney_level', 'name': '修改', 'parent_id': 1014},
 
-    # 下一个 1018 开始
+    {'id': 1018, 'code': 'product_daily_rate', 'name': '综合合格率月度汇总', 'parent_id': None},
+    {'id': 1019, 'code': 'view_product_daily_rate', 'name': '查看', 'parent_id': 1018},
+
+    {'id': 1020, 'code': 'product_monthly_rate', 'name': '综合合格率年度汇总', 'parent_id': None},
+    {'id': 1021, 'code': 'view_product_monthly_rate', 'name': '查看', 'parent_id': 1020},
+
+    # 下一个 1022 开始
 ]
 
 

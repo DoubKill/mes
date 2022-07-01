@@ -1,3 +1,4 @@
+import calendar
 import datetime
 import json
 import re
@@ -25,7 +26,7 @@ from rest_framework.views import APIView
 
 from rest_framework.viewsets import GenericViewSet, ModelViewSet, ReadOnlyModelViewSet
 
-from basics.models import GlobalCodeType
+from basics.models import GlobalCodeType, Equip, GlobalCode
 from basics.serializers import GlobalCodeSerializer
 import uuid
 
@@ -3572,27 +3573,484 @@ class WMSMooneyLevelView(ModelViewSet):
         return Response(serializer.data)
 
 
-class Demo(APIView):
+@method_decorator([api_recorder], name="dispatch")
+class ProductSynthesisRate(APIView):
+    # [{"name": "综合合格率%", "rate": 22.2, "1": "", "2": "", "3": ""},
+    #  {"name": "一次合格率%", "rate": 22.2, "1": "", "2": "", "3": ""},
+    #  {"name": "流变合格率%", "rate": 22.2, "1": "", "2": "", "3": ""}]
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_product_daily_rate'}))
+
+    def get(self, request):
+        date = self.request.query_params.get('date')
+        if not date:
+            raise ValidationError('请选择月份！')
+        year = int(date.split('-')[0])
+        month = int(date.split('-')[1])
+        filter_kwargs = {'production_factory_date__year': year,
+                         'production_factory_date__month': month}
+
+        # 每日检查量
+        mto_data = dict(MaterialTestOrder.objects.filter(
+            **filter_kwargs).values('production_factory_date__day').annotate(qty=Count('id')).values_list('production_factory_date__day', 'qty'))
+        if not mto_data:
+            return Response({})
+        total_mto_qty = sum(mto_data.values())
+
+        # 每日合格量
+        mto_qualified_data = dict(MaterialTestOrder.objects.filter(
+            **filter_kwargs).filter(is_qualified=True).values('production_factory_date__day').annotate(qty=Count('id')).values_list('production_factory_date__day', 'qty'))
+        total_mto_qualified_qty = sum(mto_qualified_data.values())
+
+        # 按照胶料规格分组，每个规格流变检测多少车次
+        lb_product_check_data = dict(MaterialTestOrder.objects.filter(**filter_kwargs).filter(
+            order_results__test_indicator_name='流变'
+        ).values('production_factory_date__day').annotate(cnt=Count('id', distinct=True)).values_list('production_factory_date__day', 'cnt'))
+        total_lb_product_check_qty = sum(lb_product_check_data.values())
+
+        # 按照胶料规格分组，每个规格流变不合格多少车次
+        lb_product_unqualified_data = dict(MaterialTestOrder.objects.filter(**filter_kwargs).filter(
+            order_results__test_indicator_name='流变',
+            order_results__level=2).values('production_factory_date__day').annotate(cnt=Count('id', distinct=True)).values_list('production_factory_date__day', 'cnt'))
+        total_lb_product_unqualified_qty = sum(lb_product_unqualified_data.values())
+
+        # 按照胶料规格分组，每个规格一次检测多少车次
+        yc_product_check_data = dict(MaterialTestOrder.objects.filter(**filter_kwargs).filter(
+            order_results__test_indicator_name__in=('门尼', '比重', '硬度')
+        ).values('production_factory_date__day').annotate(cnt=Count('id', distinct=True)).values_list('production_factory_date__day', 'cnt'))
+        total_yc_product_check_qty = sum(yc_product_check_data.values())
+
+        # 按照胶料规格分组，每个规格一次不合格多少车次
+        yc_product_unqualified_data = dict(MaterialTestOrder.objects.filter(**filter_kwargs).filter(
+            order_results__test_indicator_name__in=('门尼', '比重', '硬度'),
+            order_results__level=2).values('production_factory_date__day').annotate(cnt=Count('id', distinct=True)).values_list(
+            'production_factory_date__day', 'cnt'))
+        total_yc_product_unqualified_qty = sum(yc_product_unqualified_data.values())
+
+        days = calendar.monthrange(year, month)[1]
+
+        data1 = [{"name": "综合合格率%", "rate": round(total_mto_qualified_qty/total_mto_qty*100, 1)},
+                 {"name": "一次合格率%", "rate": "" if not total_yc_product_check_qty else round((1-total_yc_product_unqualified_qty/total_yc_product_check_qty)*100, 1)},
+                 {"name": "流变合格率%", "rate": "" if not total_lb_product_check_qty else round((1-total_lb_product_unqualified_qty/total_lb_product_check_qty)*100, 1)}]
+
+        for i in range(1, days+1):
+            try:
+                zh_rate = round(mto_qualified_data.get(i) / mto_data.get(i) * 100, 1)
+            except Exception:
+                zh_rate = ''
+            try:
+                lb_rate = round((1-lb_product_unqualified_data.get(i) / lb_product_check_data.get(i)) * 100, 1)
+            except Exception:
+                lb_rate = ''
+            try:
+                yc_rate = round((1-yc_product_unqualified_data.get(i) / yc_product_check_data.get(i)) * 100, 1)
+            except Exception:
+                yc_rate = ''
+            data1[0][str(i)] = zh_rate
+            data1[1][str(i)] = yc_rate
+            data1[2][str(i)] = lb_rate
+        return Response({'data': data1})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductSynthesisMonthRate(APIView):
+    # [{"name": "综合合格率%", "rate": 22.2, "1": "", "2": "", "3": ""},
+    #  {"name": "一次合格率%", "rate": 22.2, "1": "", "2": "", "3": ""},
+    #  {"name": "流变合格率%", "rate": 22.2, "1": "", "2": "", "3": ""}]
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_product_daily_rate'}))
 
     def get(self, request):
         year = self.request.query_params.get('year')
-        month = self.request.query_params.get('month')
+        if not year:
+            raise ValidationError('请选择年份！')
+        year = int(year)
+        filter_kwargs = {'production_factory_date__year': year}
+
+        # 每月检查量
+        mto_data = dict(MaterialTestOrder.objects.filter(
+            **filter_kwargs).values('production_factory_date__month').annotate(qty=Count('id')).values_list('production_factory_date__month', 'qty'))
+        if not mto_data:
+            return Response({})
+        total_mto_qty = sum(mto_data.values())
+
+        # 每月合格量
+        mto_qualified_data = dict(MaterialTestOrder.objects.filter(
+            **filter_kwargs).filter(is_qualified=True).values('production_factory_date__month').annotate(qty=Count('id')).values_list('production_factory_date__month', 'qty'))
+        total_mto_qualified_qty = sum(mto_qualified_data.values())
+
+        # 按照胶料规格分组，每个规格流变检测多少车次
+        lb_product_check_data = dict(MaterialTestOrder.objects.filter(**filter_kwargs).filter(
+            order_results__test_indicator_name='流变'
+        ).values('production_factory_date__month').annotate(cnt=Count('id', distinct=True)).values_list('production_factory_date__month', 'cnt'))
+        total_lb_product_check_qty = sum(lb_product_check_data.values())
+
+        # 按照胶料规格分组，每个规格流变不合格多少车次
+        lb_product_unqualified_data = dict(MaterialTestOrder.objects.filter(**filter_kwargs).filter(
+            order_results__test_indicator_name='流变',
+            order_results__level=2).values('production_factory_date__month').annotate(cnt=Count('id', distinct=True)).values_list('production_factory_date__month', 'cnt'))
+        total_lb_product_unqualified_qty = sum(lb_product_unqualified_data.values())
+
+        # 按照胶料规格分组，每个规格一次检测多少车次
+        yc_product_check_data = dict(MaterialTestOrder.objects.filter(**filter_kwargs).filter(
+            order_results__test_indicator_name__in=('门尼', '比重', '硬度')
+        ).values('production_factory_date__month').annotate(cnt=Count('id', distinct=True)).values_list('production_factory_date__month', 'cnt'))
+        total_yc_product_check_qty = sum(yc_product_check_data.values())
+
+        # 按照胶料规格分组，每个规格一次不合格多少车次
+        yc_product_unqualified_data = dict(MaterialTestOrder.objects.filter(**filter_kwargs).filter(
+            order_results__test_indicator_name__in=('门尼', '比重', '硬度'),
+            order_results__level=2).values('production_factory_date__month').annotate(cnt=Count('id', distinct=True)).values_list(
+            'production_factory_date__month', 'cnt'))
+        total_yc_product_unqualified_qty = sum(yc_product_unqualified_data.values())
+
+        data1 = [{"name": "综合合格率%", "rate": round(total_mto_qualified_qty/total_mto_qty*100, 1)},
+                 {"name": "一次合格率%", "rate": "" if not total_yc_product_check_qty else round((1-total_yc_product_unqualified_qty/total_yc_product_check_qty)*100, 1)},
+                 {"name": "流变合格率%", "rate": "" if not total_lb_product_check_qty else round((1-total_lb_product_unqualified_qty/total_lb_product_check_qty)*100, 1)}]
+
+        for i in range(1, 13):
+            try:
+                zh_rate = round(mto_qualified_data.get(i) / mto_data.get(i) * 100, 1)
+            except Exception:
+                zh_rate = ''
+            try:
+                lb_rate = round((1-lb_product_unqualified_data.get(i) / lb_product_check_data.get(i)) * 100, 1)
+            except Exception:
+                lb_rate = ''
+            try:
+                yc_rate = round((1-yc_product_unqualified_data.get(i) / yc_product_check_data.get(i)) * 100, 1)
+            except Exception:
+                yc_rate = ''
+            data1[0][str(i)] = zh_rate
+            data1[1][str(i)] = yc_rate
+            data1[2][str(i)] = lb_rate
+        return Response({'data': data1})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductSynthesisEquipRate(APIView):
+    # [{"name": "Z01", "rate": 22.2, "1": "", "2": "", "3": ""},
+    #  {"name": "Z02", "rate": 22.2, "1": "", "2": "", "3": ""},
+    #  {"name": "Z03", "rate": 22.2, "1": "", "2": "", "3": ""}]
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_product_daily_rate'}))
+
+    def get(self, request):
+        date = self.request.query_params.get('date')
+        if not date:
+            raise ValidationError('请选择月份！')
+        year = int(date.split('-')[0])
+        month = int(date.split('-')[1])
+        days = calendar.monthrange(year, month)[1]
         filter_kwargs = {'production_factory_date__year': year,
                          'production_factory_date__month': month}
-        mto_data = MaterialTestOrder.objects.filter(
-            **filter_kwargs).values('production_factory_date').annotate(qty=Count('id'))
 
-        # 流变总检查车次
-        lb_check_cnt = MaterialTestOrder.objects.filter(**filter_kwargs).filter(
-            order_results__test_indicator_name='流变').distinct().values('id').count()
-        # 流变总检查不合格车次
-        lb_qualified_cnt = MaterialTestOrder.objects.filter(**filter_kwargs).filter(
-            order_results__test_indicator_name='流变', order_results__level=2).values('id').distinct().count()
+        # 机台每日总检查量
+        mto_equip_data = MaterialTestOrder.objects.filter(
+            **filter_kwargs).values('production_factory_date__day', 'production_equip_no').annotate(qty=Count('id'))
+        mto_equip_data_dict = {}
+        for item in mto_equip_data:
+            equip_no = item['production_equip_no']
+            day = item['production_factory_date__day']
+            qty = item['qty']
+            if equip_no in mto_equip_data_dict:
+                mto_equip_data_dict[equip_no][day] = qty
+                mto_equip_data_dict[equip_no]['total'] += qty
+            else:
+                mto_equip_data_dict[equip_no] = {day: qty, 'total': qty}
 
-        # 一次总检查车次
-        yc_check_cnt = MaterialTestOrder.objects.filter(**filter_kwargs).filter(
-            order_results__test_indicator_name__in=('门尼', '比重', '硬度')).values('id').distinct().count()
-        # 一次总检查不合格车次
-        yc_qualified_cnt = MaterialTestOrder.objects.filter(**filter_kwargs).filter(
+        # 机台每日合格量
+        mto_equip_qualified_data = MaterialTestOrder.objects.filter(
+            **filter_kwargs).filter(is_qualified=True).values(
+            'production_factory_date__day', 'production_equip_no').annotate(qty=Count('id'))
+        mto_equip_qualified_data_dict = {}
+        for item in mto_equip_qualified_data:
+            equip_no = item['production_equip_no']
+            day = item['production_factory_date__day']
+            qty = item['qty']
+            if equip_no in mto_equip_qualified_data_dict:
+                mto_equip_qualified_data_dict[equip_no][day] = qty
+                mto_equip_qualified_data_dict[equip_no]['total'] += qty
+            else:
+                mto_equip_qualified_data_dict[equip_no] = {day: qty, 'total': qty}
+
+        data2 = [{"name": equip_no, "rate": "" if not mto_equip_data_dict.get(equip_no) else
+                    round(mto_equip_qualified_data_dict.get(equip_no, {}).get('total', 0) / mto_equip_data_dict.get(equip_no, {}).get('total') * 100, 1)}
+                 for equip_no in Equip.objects.filter(
+                category__equip_type__global_name="密炼设备"
+            ).order_by('equip_no').values_list("equip_no", flat=True)]
+
+        # 机台合格率
+        for i in range(1, days+1):
+            for idx, equip_no in enumerate(list(Equip.objects.filter(
+                     category__equip_type__global_name="密炼设备"
+                 ).order_by('equip_no').values_list("equip_no", flat=True))):
+                q_qty = mto_equip_qualified_data_dict.get(equip_no, {}).get(i, 0)
+                t_qty = mto_equip_data_dict.get(equip_no, {}).get(i, 0)
+                data2[idx][str(i)] = '' if not t_qty else round(q_qty/t_qty*100, 2)
+        return Response({'data': data2})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductSynthesisGroupRate(APIView):
+    # [{"name": "A班", "rate": 22.2, "1": "", "2": "", "3": ""},
+    #  {"name": "B班", "rate": 22.2, "1": "", "2": "", "3": ""},
+    #  {"name": "C班", "rate": 22.2, "1": "", "2": "", "3": ""}]
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_product_daily_rate'}))
+
+    def get(self, request):
+        date = self.request.query_params.get('date')
+        if not date:
+            raise ValidationError('请选择月份！')
+        year = int(date.split('-')[0])
+        month = int(date.split('-')[1])
+        days = calendar.monthrange(year, month)[1]
+        filter_kwargs = {'production_factory_date__year': year,
+                         'production_factory_date__month': month}
+
+        # 班组每日总检查量
+        mto_group_data = MaterialTestOrder.objects.filter(
+            **filter_kwargs).values('production_factory_date__day', 'production_group').annotate(qty=Count('id'))
+        mto_group_data_dict = {}
+        for item in mto_group_data:
+            group = item['production_group']
+            day = item['production_factory_date__day']
+            qty = item['qty']
+            if group in mto_group_data_dict:
+                mto_group_data_dict[group][day] = qty
+                mto_group_data_dict[group]['total'] += qty
+            else:
+                mto_group_data_dict[group] = {day: qty, 'total': qty}
+
+        # 班组每日合格量
+        mto_group_qualified_data = MaterialTestOrder.objects.filter(
+            **filter_kwargs).filter(is_qualified=True).values(
+            'production_factory_date__day', 'production_group').annotate(qty=Count('id'))
+        mto_group_qualified_data_dict = {}
+        for item in mto_group_qualified_data:
+            group = item['production_group']
+            day = item['production_factory_date__day']
+            qty = item['qty']
+            if group in mto_group_qualified_data:
+                mto_group_qualified_data_dict[group][day] = qty
+                mto_group_qualified_data_dict[group]['total'] += qty
+            else:
+                mto_group_qualified_data_dict[group] = {day: qty, 'total': qty}
+        data3 = [{"name": group_name, "rate": "" if not mto_group_data_dict.get(group_name) else
+                    round(mto_group_qualified_data_dict.get(group_name, {}).get('total', 0) / mto_group_data_dict.get(group_name, {}).get('total') * 100, 1)}
+                 for group_name in GlobalCode.objects.filter(
+                     global_type__type_name="班组"
+                 ).order_by('global_name').values_list("global_name", flat=True)]
+
+        # 班组合格率
+        for i in range(1, days+1):
+            for idx, group in enumerate(list(GlobalCode.objects.filter(
+                global_type__type_name="班组"
+            ).order_by('global_name').values_list("global_name", flat=True))):
+                q_qty = mto_group_qualified_data_dict.get(group, {}).get(i, 0)
+                t_qty = mto_group_data_dict.get(group, {}).get(i, 0)
+                data3[idx][str(i)] = '' if not t_qty else round(q_qty / t_qty * 100, 2)
+        return Response({'data': data3})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductSynthesisProductRate(APIView):
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_product_monthly_rate'}))
+
+    def get(self, request):
+        date = self.request.query_params.get('date')
+        if not date:
+            raise ValidationError('请选择月份！')
+        year = int(date.split('-')[0])
+        month = int(date.split('-')[1])
+        days = calendar.monthrange(year, month)[1]
+        filter_kwargs = {'production_factory_date__year': year,
+                         'production_factory_date__month': month}
+
+        pt_dict = {}
+        pt_list = []
+        pt = GlobalCode.objects.filter(global_type__type_name='配方类别').values('global_no', 'global_name')
+        for item in pt:
+            pt_list.append(item['global_no'])
+            for i in item['global_name'].split(','):
+                pt_dict[i] = item['global_no']
+
+        # 规格每日总检查量
+        mto_product_data = MaterialTestOrder.objects.filter(
+            **filter_kwargs).values('production_factory_date__day', 'product_no').annotate(qty=Count('id'))
+        mto_product_dict = {}
+        for item in mto_product_data:
+            product_no = item['product_no'].split('-')[2]
+            day = item['production_factory_date__day']
+            qty = item['qty']
+            re_result = re.match(r'[A-Z]+', product_no)
+            if not re_result:
+                continue
+            pb_type = pt_dict.get(re_result.group(), '未知')
+            if pb_type in mto_product_dict:
+                if day not in mto_product_dict[pb_type]:
+                    mto_product_dict[pb_type][day] = qty
+                else:
+                    mto_product_dict[pb_type][day] += qty
+                mto_product_dict[pb_type]['total'] += qty
+            else:
+                mto_product_dict[pb_type] = {day: qty, 'total': qty}
+
+        # 规格每日合格量
+        mto_product_qualified_data = MaterialTestOrder.objects.filter(
+            **filter_kwargs).filter(is_qualified=True).values(
+            'production_factory_date__day', 'product_no').annotate(qty=Count('id'))
+        mto_product_qualified_data_dict = {}
+        for item in mto_product_qualified_data:
+            product_no = item['product_no'].split('-')[2]
+            day = item['production_factory_date__day']
+            qty = item['qty']
+            re_result = re.match(r'[A-Z]+', product_no)
+            if not re_result:
+                continue
+            pb_type = pt_dict.get(re_result.group(), '未知')
+            if pb_type in mto_product_qualified_data_dict:
+                if day not in mto_product_qualified_data_dict[pb_type]:
+                    mto_product_qualified_data_dict[pb_type][day] = qty
+                else:
+                    mto_product_qualified_data_dict[pb_type][day] += qty
+                mto_product_qualified_data_dict[pb_type]['total'] += qty
+            else:
+                mto_product_qualified_data_dict[pb_type] = {day: qty, 'total': qty}
+
+        # 规格每日流变检测多少车次
+        lb_product_daily_check_data = MaterialTestOrder.objects.filter(**filter_kwargs).filter(
+            order_results__test_indicator_name='流变'
+        ).values('production_factory_date__day', 'product_no').annotate(cnt=Count('id', distinct=True))
+        lb_product_daily_check_dict = {}
+        for item in lb_product_daily_check_data:
+            day = item['production_factory_date__day']
+            product_no = item['product_no'].split('-')[2]
+            qty = item['cnt']
+            re_result = re.match(r'[A-Z]+', product_no)
+            if not re_result:
+                continue
+            pb_type = pt_dict.get(re_result.group(), '未知')
+            if pb_type in lb_product_daily_check_dict:
+                if day not in lb_product_daily_check_dict[pb_type]:
+                    lb_product_daily_check_dict[pb_type][day] = qty
+                else:
+                    lb_product_daily_check_dict[pb_type][day] += qty
+                lb_product_daily_check_dict[pb_type]['total'] += qty
+            else:
+                lb_product_daily_check_dict[pb_type] = {day: qty, 'total': qty}
+
+        # 规格每日流变不合格多少车次
+        lb_product_daily_unqualified_data = MaterialTestOrder.objects.filter(**filter_kwargs).filter(
+            order_results__test_indicator_name='流变',
+            order_results__level=2).values('production_factory_date__day', 'product_no').annotate(cnt=Count('id', distinct=True))
+        lb_product_daily_unqualified_dict = {}
+        for item in lb_product_daily_unqualified_data:
+            day = item['production_factory_date__day']
+            product_no = item['product_no'].split('-')[2]
+            qty = item['cnt']
+            re_result = re.match(r'[A-Z]+', product_no)
+            if not re_result:
+                continue
+            pb_type = pt_dict.get(re_result.group(), '未知')
+            if pb_type in lb_product_daily_unqualified_dict:
+                if day not in lb_product_daily_unqualified_dict[pb_type]:
+                    lb_product_daily_unqualified_dict[pb_type][day] = qty
+                else:
+                    lb_product_daily_unqualified_dict[pb_type][day] += qty
+                lb_product_daily_unqualified_dict[pb_type]['total'] += qty
+            else:
+                lb_product_daily_unqualified_dict[pb_type] = {day: qty, 'total': qty}
+
+        # 规格一次每日检测多少车次
+        yc_product_daily_check_data = MaterialTestOrder.objects.filter(**filter_kwargs).filter(
+            order_results__test_indicator_name__in=('门尼', '比重', '硬度')
+        ).values('production_factory_date__day', 'product_no').annotate(cnt=Count('id', distinct=True))
+        yc_product_daily_check_dict = {}
+        for item in yc_product_daily_check_data:
+            day = item['production_factory_date__day']
+            product_no = item['product_no'].split('-')[2]
+            qty = item['cnt']
+            re_result = re.match(r'[A-Z]+', product_no)
+            if not re_result:
+                continue
+            pb_type = pt_dict.get(re_result.group(), '未知')
+            if pb_type in yc_product_daily_check_dict:
+                if day not in yc_product_daily_check_dict[pb_type]:
+                    yc_product_daily_check_dict[pb_type][day] = qty
+                else:
+                    yc_product_daily_check_dict[pb_type][day] += qty
+                yc_product_daily_check_dict[pb_type]['total'] += qty
+            else:
+                yc_product_daily_check_dict[pb_type] = {day: qty, 'total': qty}
+
+        # 规格一次每日不合格多少车次
+        yc_product_daily_unqualified_data = MaterialTestOrder.objects.filter(**filter_kwargs).filter(
             order_results__test_indicator_name__in=('门尼', '比重', '硬度'),
-            order_results__level=2).values('id').distinct().count()
+            order_results__level=2).values('production_factory_date__day', 'product_no').annotate(cnt=Count('id', distinct=True))
+        yc_product_daily_unqualified_dict = {}
+        for item in yc_product_daily_unqualified_data:
+            day = item['production_factory_date__day']
+            product_no = item['product_no'].split('-')[2]
+            qty = item['cnt']
+            re_result = re.match(r'[A-Z]+', product_no)
+            if not re_result:
+                continue
+            pb_type = pt_dict.get(re_result.group(), '未知')
+            if pb_type in yc_product_daily_unqualified_dict:
+                if day not in yc_product_daily_unqualified_dict[pb_type]:
+                    yc_product_daily_unqualified_dict[pb_type][day] = qty
+                else:
+                    yc_product_daily_unqualified_dict[pb_type][day] += qty
+                yc_product_daily_unqualified_dict[pb_type]['total'] += qty
+            else:
+                yc_product_daily_unqualified_dict[pb_type] = {day: qty, 'total': qty}
+
+        data4 = {}
+        # {'半钢-综合合格率': {'name': '半钢', 'type': '综合合格率', 1:1, 2:2, 3:3},
+        #  '半钢-流变合格率': {'name': '半钢', 'type': '流变合格率', 1:1, 2:2, 3:3},
+        #  '半钢-一次合格率': {'name': '半钢', 'type': '一次合格率', 1:1, 2:2, 3:3},
+        #  '车胎-综合合格率': {'name': '车胎', 'type': '综合合格率', 1: 1, 2: 2, 3: 3},
+        #  '车胎-流变合格率': {'name': '车胎', 'type': '一次合格率', 1: 1, 2: 2, 3: 3},
+        #  '车胎-一次合格率': {'name': '车胎', 'type': '', 1: 1, 2: 2, 3: 3},
+        #  '斜胶胎-综合合格率': {'name': '斜胶胎', 'type'综合合格率: '', 1: 1, 2: 2, 3: 3},
+        #  '斜胶胎-流变合格率': {'name': '斜胶胎', 'type': '一次合格率', 1: 1, 2: 2, 3: 3},
+        #  '斜胶胎-一次合格率': {'name': '斜胶胎', 'type': '', 1: 1, 2: 2, 3: 3},
+        #  }
+
+        # 规格合格率
+        for i in range(1, days+1):
+            for product_type in pt_list:
+                zh_qualified_qty = mto_product_qualified_data_dict.get(product_type, {}).get(i, 0)
+                zh_total_qty = mto_product_dict.get(product_type, {}).get(i)
+                zh_rate = "" if not zh_total_qty else round(zh_qualified_qty/zh_total_qty*100, 1)
+                k = product_type + '-综合合格率'
+                if k not in data4:
+                    q_qty1 = mto_product_qualified_data_dict.get(product_type, {}).get('total', 0)
+                    t_qty1 = mto_product_dict.get(product_type, {}).get('total')
+                    rate1 = "" if not t_qty1 else round(q_qty1/t_qty1*100, 1)
+                    data4[k] = {"name": product_type, "type": "综合合格率%", "rate": rate1, i: zh_rate}
+                else:
+                    data4[k][i] = zh_rate
+
+                lb_unqualified_qty = lb_product_daily_unqualified_dict.get(product_type, {}).get(i, 0)
+                lb_total_qty = lb_product_daily_check_dict.get(product_type, {}).get(i)
+                lb_rate = "" if not lb_total_qty else round((1-lb_unqualified_qty / lb_total_qty) * 100, 1)
+                k = product_type + '-流变合格率'
+                if k not in data4:
+                    q_qty2 = lb_product_daily_unqualified_dict.get(product_type, {}).get('total', 0)
+                    t_qty2 = lb_product_daily_check_dict.get(product_type, {}).get('total')
+                    rate2 = "" if not t_qty2 else round((1-q_qty2 / t_qty2) * 100, 1)
+                    data4[k] = {"name": product_type, "type": "流变合格率%", "rate": rate2, i: lb_rate}
+                else:
+                    data4[k][i] = lb_rate
+
+                yc_unqualified_qty = yc_product_daily_unqualified_dict.get(product_type, {}).get(i, 0)
+                yc_total_qty = yc_product_daily_check_dict.get(product_type, {}).get(i)
+                yc_rate = "" if not yc_total_qty else round((1-yc_unqualified_qty / yc_total_qty) * 100, 1)
+                k = product_type + '-一次合格率'
+                if k not in data4:
+                    q_qty3 = yc_product_daily_unqualified_dict.get(product_type, {}).get('total', 0)
+                    t_qty3 = yc_product_daily_check_dict.get(product_type, {}).get('total')
+                    rate3 = "" if not t_qty3 else round((1-q_qty3 / t_qty3) * 100, 1)
+                    data4[k] = {"name": product_type, "type": "一次合格率%", "rate": rate3, i: yc_rate}
+                else:
+                    data4[k][i] = yc_rate
+        return Response({'data': data4.values()})
