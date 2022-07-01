@@ -3737,6 +3737,8 @@ class AttendanceClockViewSet(ModelViewSet):
         extra_work = ApplyForExtraWork.objects.filter(factory_date=date_now, user=user, group=data['group'],
                                                       classes=data['classes'], section=data['section'],
                                                       handling_result=True).last()
+        if extra_work:
+            standard_begin_time, standard_end_time = extra_work.begin_date, extra_work.end_date
         if status == '上岗':
             begin_date = time_now
             lead_time = datetime.timedelta(minutes=attendance_group_obj.lead_time)
