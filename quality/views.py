@@ -3582,13 +3582,15 @@ class ProductSynthesisRate(APIView):
 
     def get(self, request):
         date = self.request.query_params.get('date')
+        sy_flag = self.request.query_params.get('sy_flag', 'N')
         if not date:
             raise ValidationError('请选择月份！')
         year = int(date.split('-')[0])
         month = int(date.split('-')[1])
         filter_kwargs = {'production_factory_date__year': year,
                          'production_factory_date__month': month}
-
+        if sy_flag == 'N':
+            filter_kwargs['is_experiment'] = False
         # 每日检查量
         mto_data = dict(MaterialTestOrder.objects.filter(
             **filter_kwargs).values('production_factory_date__day').annotate(qty=Count('id')).values_list('production_factory_date__day', 'qty'))
@@ -3660,11 +3662,13 @@ class ProductSynthesisMonthRate(APIView):
 
     def get(self, request):
         year = self.request.query_params.get('year')
+        sy_flag = self.request.query_params.get('sy_flag', 'N')
         if not year:
             raise ValidationError('请选择年份！')
         year = int(year)
         filter_kwargs = {'production_factory_date__year': year}
-
+        if sy_flag == 'N':
+            filter_kwargs['is_experiment'] = False
         # 每月检查量
         mto_data = dict(MaterialTestOrder.objects.filter(
             **filter_kwargs).values('production_factory_date__month').annotate(qty=Count('id')).values_list('production_factory_date__month', 'qty'))
@@ -3734,6 +3738,7 @@ class ProductSynthesisEquipRate(APIView):
 
     def get(self, request):
         date = self.request.query_params.get('date')
+        sy_flag = self.request.query_params.get('sy_flag', 'N')
         if not date:
             raise ValidationError('请选择月份！')
         year = int(date.split('-')[0])
@@ -3741,7 +3746,8 @@ class ProductSynthesisEquipRate(APIView):
         days = calendar.monthrange(year, month)[1]
         filter_kwargs = {'production_factory_date__year': year,
                          'production_factory_date__month': month}
-
+        if sy_flag == 'N':
+            filter_kwargs['is_experiment'] = False
         # 机台每日总检查量
         mto_equip_data = MaterialTestOrder.objects.filter(
             **filter_kwargs).values('production_factory_date__day', 'production_equip_no').annotate(qty=Count('id'))
@@ -3797,6 +3803,7 @@ class ProductSynthesisGroupRate(APIView):
 
     def get(self, request):
         date = self.request.query_params.get('date')
+        sy_flag = self.request.query_params.get('sy_flag', 'N')
         if not date:
             raise ValidationError('请选择月份！')
         year = int(date.split('-')[0])
@@ -3804,7 +3811,8 @@ class ProductSynthesisGroupRate(APIView):
         days = calendar.monthrange(year, month)[1]
         filter_kwargs = {'production_factory_date__year': year,
                          'production_factory_date__month': month}
-
+        if sy_flag == 'N':
+            filter_kwargs['is_experiment'] = False
         # 班组每日总检查量
         mto_group_data = MaterialTestOrder.objects.filter(
             **filter_kwargs).values('production_factory_date__day', 'production_group').annotate(qty=Count('id'))
@@ -3856,6 +3864,7 @@ class ProductSynthesisProductRate(APIView):
 
     def get(self, request):
         date = self.request.query_params.get('date')
+        sy_flag = self.request.query_params.get('sy_flag', 'N')
         if not date:
             raise ValidationError('请选择月份！')
         year = int(date.split('-')[0])
@@ -3863,15 +3872,19 @@ class ProductSynthesisProductRate(APIView):
         days = calendar.monthrange(year, month)[1]
         filter_kwargs = {'production_factory_date__year': year,
                          'production_factory_date__month': month}
-
+        if sy_flag == 'N':
+            filter_kwargs['is_experiment'] = False
         pt_dict = {}
         pt_list = []
-        pt = GlobalCode.objects.filter(global_type__type_name='配方类别').values('global_no', 'global_name')
+        pt = GlobalCode.objects.filter(global_type__type_name='配方类别').order_by('id').values('global_no', 'global_name')
         for item in pt:
-            pt_list.append(item['global_no'])
+            type_name = item['global_no']
+            if type_name == '斜胶胎':
+                type_name = '斜胶胎（不含实心胎）'
+            pt_list.append(type_name)
             for i in item['global_name'].split(','):
-                pt_dict[i] = item['global_no']
-
+                pt_dict[i] = type_name
+        pt_list.insert(1, '斜胶胎（含实心胎）')
         # 规格每日总检查量
         mto_product_data = MaterialTestOrder.objects.filter(
             **filter_kwargs).values('production_factory_date__day', 'product_no').annotate(qty=Count('id'))
@@ -4018,39 +4031,88 @@ class ProductSynthesisProductRate(APIView):
         # 规格合格率
         for i in range(1, days+1):
             for product_type in pt_list:
-                zh_qualified_qty = mto_product_qualified_data_dict.get(product_type, {}).get(i, 0)
-                zh_total_qty = mto_product_dict.get(product_type, {}).get(i)
-                zh_rate = "" if not zh_total_qty else round(zh_qualified_qty/zh_total_qty*100, 1)
-                k = product_type + '-综合合格率'
-                if k not in data4:
-                    q_qty1 = mto_product_qualified_data_dict.get(product_type, {}).get('total', 0)
-                    t_qty1 = mto_product_dict.get(product_type, {}).get('total')
-                    rate1 = "" if not t_qty1 else round(q_qty1/t_qty1*100, 1)
-                    data4[k] = {"name": product_type, "type": "综合合格率%", "rate": rate1, i: zh_rate}
-                else:
-                    data4[k][i] = zh_rate
+                if product_type == '斜胶胎（含实心胎）':
+                    zh_qualified_qty = mto_product_qualified_data_dict.get('斜胶胎（不含实心胎）', {}).get(i, 0) +\
+                                       mto_product_qualified_data_dict.get('实心胎', {}).get(i, 0)
+                    zh_total_qty = mto_product_dict.get('斜胶胎（不含实心胎）', {}).get(i, 0) + \
+                                   mto_product_dict.get('实心胎', {}).get(i, 0)
+                    zh_rate = "" if not zh_total_qty else round(zh_qualified_qty / zh_total_qty * 100, 1)
+                    k = product_type + '-综合合格率'
+                    if k not in data4:
+                        q_qty1 = mto_product_qualified_data_dict.get('斜胶胎（不含实心胎）', {}).get('total', 0) + \
+                                 mto_product_qualified_data_dict.get('实心胎', {}).get('total', 0)
+                        t_qty1 = mto_product_dict.get('斜胶胎（不含实心胎）', {}).get('total', 0) + \
+                                 mto_product_dict.get('实心胎', {}).get('total', 0)
+                        rate1 = "" if not t_qty1 else round(q_qty1 / t_qty1 * 100, 1)
+                        data4[k] = {"name": product_type, "type": "综合合格率%", "rate": rate1, i: zh_rate}
+                    else:
+                        data4[k][i] = zh_rate
 
-                lb_unqualified_qty = lb_product_daily_unqualified_dict.get(product_type, {}).get(i, 0)
-                lb_total_qty = lb_product_daily_check_dict.get(product_type, {}).get(i)
-                lb_rate = "" if not lb_total_qty else round((1-lb_unqualified_qty / lb_total_qty) * 100, 1)
-                k = product_type + '-流变合格率'
-                if k not in data4:
-                    q_qty2 = lb_product_daily_unqualified_dict.get(product_type, {}).get('total', 0)
-                    t_qty2 = lb_product_daily_check_dict.get(product_type, {}).get('total')
-                    rate2 = "" if not t_qty2 else round((1-q_qty2 / t_qty2) * 100, 1)
-                    data4[k] = {"name": product_type, "type": "流变合格率%", "rate": rate2, i: lb_rate}
-                else:
-                    data4[k][i] = lb_rate
+                    lb_unqualified_qty = lb_product_daily_unqualified_dict.get('斜胶胎（不含实心胎）', {}).get(i, 0) +\
+                                         lb_product_daily_unqualified_dict.get('实心胎', {}).get(i, 0)
+                    lb_total_qty = lb_product_daily_check_dict.get('斜胶胎（不含实心胎）', {}).get(i, 0) +\
+                                   lb_product_daily_check_dict.get('实心胎', {}).get(i, 0)
+                    lb_rate = "" if not lb_total_qty else round((1-lb_unqualified_qty / lb_total_qty) * 100, 1)
+                    k = product_type + '-流变合格率'
+                    if k not in data4:
+                        q_qty2 = lb_product_daily_unqualified_dict.get('斜胶胎（不含实心胎）', {}).get('total', 0) +\
+                                 lb_product_daily_unqualified_dict.get('实心胎', {}).get('total', 0)
+                        t_qty2 = lb_product_daily_check_dict.get('斜胶胎（不含实心胎）', {}).get('total', 0) +\
+                                 lb_product_daily_check_dict.get('实心胎', {}).get('total', 0)
+                        rate2 = "" if not t_qty2 else round((1-q_qty2 / t_qty2) * 100, 1)
+                        data4[k] = {"name": product_type, "type": "流变合格率%", "rate": rate2, i: lb_rate}
+                    else:
+                        data4[k][i] = lb_rate
 
-                yc_unqualified_qty = yc_product_daily_unqualified_dict.get(product_type, {}).get(i, 0)
-                yc_total_qty = yc_product_daily_check_dict.get(product_type, {}).get(i)
-                yc_rate = "" if not yc_total_qty else round((1-yc_unqualified_qty / yc_total_qty) * 100, 1)
-                k = product_type + '-一次合格率'
-                if k not in data4:
-                    q_qty3 = yc_product_daily_unqualified_dict.get(product_type, {}).get('total', 0)
-                    t_qty3 = yc_product_daily_check_dict.get(product_type, {}).get('total')
-                    rate3 = "" if not t_qty3 else round((1-q_qty3 / t_qty3) * 100, 1)
-                    data4[k] = {"name": product_type, "type": "一次合格率%", "rate": rate3, i: yc_rate}
+                    yc_unqualified_qty = yc_product_daily_unqualified_dict.get('斜胶胎（不含实心胎）', {}).get(i, 0) +\
+                                         yc_product_daily_unqualified_dict.get('实心胎', {}).get(i, 0)
+                    yc_total_qty = yc_product_daily_check_dict.get('斜胶胎（不含实心胎）', {}).get(i, 0) +\
+                                   yc_product_daily_check_dict.get('实心胎', {}).get(i, 0)
+                    yc_rate = "" if not yc_total_qty else round((1-yc_unqualified_qty / yc_total_qty) * 100, 1)
+                    k = product_type + '-一次合格率'
+                    if k not in data4:
+                        q_qty3 = yc_product_daily_unqualified_dict.get('斜胶胎（不含实心胎）', {}).get('total', 0) +\
+                                 yc_product_daily_unqualified_dict.get('实心胎', {}).get('total', 0)
+                        t_qty3 = yc_product_daily_check_dict.get('斜胶胎（不含实心胎）', {}).get('total', 0) +\
+                                 yc_product_daily_check_dict.get('实心胎', {}).get('total', 0)
+                        rate3 = "" if not t_qty3 else round((1-q_qty3 / t_qty3) * 100, 1)
+                        data4[k] = {"name": product_type, "type": "一次合格率%", "rate": rate3, i: yc_rate}
+                    else:
+                        data4[k][i] = yc_rate
                 else:
-                    data4[k][i] = yc_rate
+                    zh_qualified_qty = mto_product_qualified_data_dict.get(product_type, {}).get(i, 0)
+                    zh_total_qty = mto_product_dict.get(product_type, {}).get(i)
+                    zh_rate = "" if not zh_total_qty else round(zh_qualified_qty/zh_total_qty*100, 1)
+                    k = product_type + '-综合合格率'
+                    if k not in data4:
+                        q_qty1 = mto_product_qualified_data_dict.get(product_type, {}).get('total', 0)
+                        t_qty1 = mto_product_dict.get(product_type, {}).get('total')
+                        rate1 = "" if not t_qty1 else round(q_qty1/t_qty1*100, 1)
+                        data4[k] = {"name": product_type, "type": "综合合格率%", "rate": rate1, i: zh_rate}
+                    else:
+                        data4[k][i] = zh_rate
+
+                    lb_unqualified_qty = lb_product_daily_unqualified_dict.get(product_type, {}).get(i, 0)
+                    lb_total_qty = lb_product_daily_check_dict.get(product_type, {}).get(i)
+                    lb_rate = "" if not lb_total_qty else round((1-lb_unqualified_qty / lb_total_qty) * 100, 1)
+                    k = product_type + '-流变合格率'
+                    if k not in data4:
+                        q_qty2 = lb_product_daily_unqualified_dict.get(product_type, {}).get('total', 0)
+                        t_qty2 = lb_product_daily_check_dict.get(product_type, {}).get('total')
+                        rate2 = "" if not t_qty2 else round((1-q_qty2 / t_qty2) * 100, 1)
+                        data4[k] = {"name": product_type, "type": "流变合格率%", "rate": rate2, i: lb_rate}
+                    else:
+                        data4[k][i] = lb_rate
+
+                    yc_unqualified_qty = yc_product_daily_unqualified_dict.get(product_type, {}).get(i, 0)
+                    yc_total_qty = yc_product_daily_check_dict.get(product_type, {}).get(i)
+                    yc_rate = "" if not yc_total_qty else round((1-yc_unqualified_qty / yc_total_qty) * 100, 1)
+                    k = product_type + '-一次合格率'
+                    if k not in data4:
+                        q_qty3 = yc_product_daily_unqualified_dict.get(product_type, {}).get('total', 0)
+                        t_qty3 = yc_product_daily_check_dict.get(product_type, {}).get('total')
+                        rate3 = "" if not t_qty3 else round((1-q_qty3 / t_qty3) * 100, 1)
+                        data4[k] = {"name": product_type, "type": "一次合格率%", "rate": rate3, i: yc_rate}
+                    else:
+                        data4[k][i] = yc_rate
         return Response({'data': data4.values()})
