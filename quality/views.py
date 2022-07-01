@@ -3784,7 +3784,7 @@ class ProductSynthesisEquipRate(APIView):
                  ).order_by('equip_no').values_list("equip_no", flat=True))):
                 q_qty = mto_equip_qualified_data_dict.get(equip_no, {}).get(i, 0)
                 t_qty = mto_equip_data_dict.get(equip_no, {}).get(i, 0)
-                data2[idx][str(i)] = '' if not t_qty else round(q_qty/t_qty*100, 2)
+                data2[idx][str(i)] = '' if not t_qty else round(q_qty/t_qty*100, 1)
         return Response({'data': data2})
 
 
