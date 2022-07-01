@@ -21,7 +21,7 @@ from mes.conf import COMMON_READ_ONLY_FIELDS, JZ_EQUIP_NO
 from plan.models import ProductClassesPlan, BatchingClassesPlan, BatchingClassesEquipPlan
 from production.models import PalletFeedbacks
 from recipe.models import ERPMESMaterialRelation, ProductBatchingDetail, \
-    ProductBatchingEquip
+    ProductBatchingEquip, ProductBatchingDetailPlan
 from terminal.models import EquipOperationLog, WeightBatchingLog, FeedingLog, WeightTankStatus, \
     WeightPackageLog, FeedingMaterialLog, LoadMaterialLog, MaterialInfo, Bin, Plan, RecipePre, ReportBasic, \
     ReportWeight, LoadTankMaterialLog, PackageExpire, RecipeMaterial, CarbonTankFeedWeightSet, \
@@ -285,14 +285,13 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             if scan_material_type == '胶皮':
                 flag, send_flag = False, False
                 # 查看群控配方是否含有掺料和待处理料
-                pcp = ProductClassesPlan.objects.using('SFJ').filter(plan_classes_uid=plan_classes_uid).first()
-                if not pcp:
-                    raise serializers.ValidationError('群控计划不存在')
-                product_recipe = ProductBatchingDetail.objects.using('SFJ').filter(product_batching_id=pcp.product_batching_id, delete_flag=False, type=1)
-                query_set = product_recipe.filter(Q(Q(material__material_name__icontains='掺料') |
-                                                  Q(material__material_name__icontains='待处理料')))
+                product_recipe = ProductBatchingDetailPlan.objects.using('SFJ').filter(plan_classes_uid=plan_classes_uid)
+                if not product_recipe:
+                    raise serializers.ValidationError(f'未获取到计划的配方详情{plan_classes_uid}')
+                query_set = product_recipe.filter(Q(Q(material_name__icontains='掺料') |
+                                                  Q(material_name__icontains='待处理料')))
                 if query_set:  # 此处由工艺确认: 掺料与待处理料不会同时出现在一个配方中
-                    recipe_material_name = query_set.first().material.material_name
+                    recipe_material_name = query_set.first().material_name
                     # 查询掺料放行
                     s_result = self.material_pass(plan_classes_uid, scan_material, material_type=scan_material_type)
                     if s_result[0]:
@@ -316,9 +315,9 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                 # 待处理料不需要做加硫磺前后判断
                                 if '掺料' in recipe_material_name:
                                     # 加硫磺前后(上面限定了胶皮,这里不会出现小料硫磺xxx-硫磺)
-                                    s_id = product_recipe.filter(Q(material__material_name__icontains='硫磺')).first()
+                                    s_id = product_recipe.filter(Q(material_name__icontains='硫磺')).first()
                                     if s_id:
-                                        if s_id.id < query_set.first().id:
+                                        if s_id.sn < query_set.first().sn:
                                             # 硫磺在前, 只能投加硫料
                                             if add_s:
                                                 other_type, status, scan_material_msg = recipe_material_name, True, f'掺料:{scan_material} 扫码成功'
@@ -335,8 +334,8 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                         else:
                                             other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入加硫料'
                                 else:  # 加硫待处理料、无硫待处理料、前两者都有
-                                    add_s_wait_s = query_set.filter(material__material_name__icontains='加硫待处理料')
-                                    no_s_wait_s = query_set.filter(material__material_name__icontains='无硫待处理料')
+                                    add_s_wait_s = query_set.filter(material_name__icontains='加硫待处理料')
+                                    no_s_wait_s = query_set.filter(material_name__icontains='无硫待处理料')
                                     if add_s_wait_s and not no_s_wait_s:
                                         if add_s:
                                             other_type, status, scan_material_msg = recipe_material_name, True, f'待处理物料:{scan_material}扫码成功'
@@ -574,16 +573,16 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 logger.error('群控服务器错误！')
                 raise serializers.ValidationError(e.args[0])
         if scan_material_msg:
-            # dk_equip = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='导开机控制机台', global_name=classes_plan.equip.equip_no)
-            # if scan_material_type == '胶皮' and dk_equip:
-            #     dk_control = 'Start' if '成功' in scan_material_msg else 'Stop'
-            #     status, text = send_dk(classes_plan.equip.equip_no, dk_control)
-            #     if not status:  # 发送导开机启停信号异常
-            #         logger.error(f'发送导开机信号异常, 计划号: {plan_classes_uid}, 机台: {classes_plan.equip.equip_no}, 错误:{text}')
-            #         raise serializers.ValidationError(f'发送导开机信号异常:{text}')
-            #     else:  # 失败信号发送成功需要终端阻断进程
-            #         if dk_control == 'Stop':
-            #             raise serializers.ValidationError('发送导开机停止信号成功')
+            dk_equip = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='导开机控制机台', global_name=classes_plan.equip.equip_no)
+            if scan_material_type == '胶皮' and dk_equip:
+                dk_control = 'Start' if '成功' in scan_material_msg else 'Stop'
+                status, text = send_dk(classes_plan.equip.equip_no, dk_control)
+                if not status:  # 发送导开机启停信号异常
+                    logger.error(f'发送导开机信号异常, 计划号: {plan_classes_uid}, 机台: {classes_plan.equip.equip_no}, 错误:{text}')
+                    raise serializers.ValidationError(f'发送导开机信号异常:{text}')
+                else:  # 失败信号发送成功需要终端阻断进程
+                    if dk_control == 'Stop':
+                        raise serializers.ValidationError('发送导开机停止信号成功')
             raise serializers.ValidationError(scan_material_msg)
         for i in details:
             msg = i['tank_data'].pop('msg')
@@ -725,12 +724,12 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                'useup_time': datetime.now()})
             instance = LoadTankMaterialLog.objects.create(**tank_data)
         # 胶皮扫码正确发送消息给导开机
-        # dk_equip = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='导开机控制机台', global_name=equip_no)
-        # if scan_material_type == '胶皮' and dk_equip:
-        #     status, text = send_dk(equip_no, 'Start')
-        #     if not status:  # 发送导开机启停信号异常只记录
-        #         logger.error(f'发送导开机信号异常, 计划号: {plan_classes_uid}, 机台: {equip_no}, 错误:{text}')
-        #         raise serializers.ValidationError(f'导开机启动信号发送失败: {text}')
+        dk_equip = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='导开机控制机台', global_name=equip_no)
+        if scan_material_type == '胶皮' and dk_equip:
+            status, text = send_dk(equip_no, 'Start')
+            if not status:  # 发送导开机启停信号异常只记录
+                logger.error(f'发送导开机信号异常, 计划号: {plan_classes_uid}, 机台: {equip_no}, 错误:{text}')
+                raise serializers.ValidationError(f'导开机启动信号发送失败: {text}')
         # 判断补充进料后是否能进上辅机
         fml = FeedingMaterialLog.objects.using('SFJ').filter(plan_classes_uid=plan_classes_uid, trains=int(trains)).last()
         if fml and fml.add_feed_result == 1:

@@ -36,7 +36,7 @@ from mes.settings import DATABASES
 from plan.models import ProductClassesPlan, BatchingClassesPlan, BatchingClassesEquipPlan
 from production.models import PlanStatus, MaterialTankStatus, TrainsFeedbacks, PalletFeedbacks
 from recipe.models import ProductBatchingDetail, ProductBatching, ERPMESMaterialRelation, Material, WeighCntType, \
-    WeighBatchingDetail, ProductBatchingEquip
+    WeighBatchingDetail, ProductBatchingEquip, ProductBatchingDetailPlan
 from terminal.filters import FeedingLogFilter, WeightTankStatusFilter, WeightBatchingLogListFilter, \
     BatchingClassesEquipPlanFilter, CarbonTankSetFilter, \
     FeedingOperationLogFilter, ReplaceMaterialFilter, ReturnRubberFilter
@@ -313,19 +313,18 @@ class BatchProductBatchingVIew(APIView):
         # 存在通用料包则显示一条空数据
         common_scan = OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, other_type='通用料包',
                                                       status=1).last()
-        sfj_details = ProductBatchingDetail.objects.using('SFJ')\
-            .filter(product_batching__stage_product_batch_no=product_no, product_batching__delete_flag=False, type=1,
-                    product_batching__used_type=4, product_batching__equip__equip_no=equip_no, delete_flag=False)
+        # 获取机台配方详情
+        sfj_details = ProductBatchingDetailPlan.objects.using('SFJ').filter(plan_classes_uid=plan_classes_uid)
         if common_scan:
             # 查询上辅机料包重量、误差
-            other_xl = sfj_details.filter(material__material_name__in=['细料', '硫磺']).last()
+            other_xl = sfj_details.filter(material_name__in=['细料', '硫磺']).last()
             if other_xl:  # 防止配方中没有料包但是扫了通用料包条码
                 res.append({
-                    "material__material_name": other_xl.material.material_name, "actual_weight": 1,
+                    "material__material_name": other_xl.material_name, "actual_weight": 1,
                     "standard_error": 1, "msg": "", "scan_finished": True,
                     "detail": [{
                         "bra_code": common_scan.bra_code, "init_weight": Decimal(9999), "used_weight": Decimal(0),
-                        "single_need": Decimal(1), "scan_material": other_xl.material.material_name,
+                        "single_need": Decimal(1), "scan_material": other_xl.material_name,
                         "unit": "包", "msg": "", "id": 0, "scan_material_type": "机配",
                         "adjust_left_weight": Decimal(9999)
                     }]
@@ -333,10 +332,10 @@ class BatchProductBatchingVIew(APIView):
         # 掺料或待处理料数据
         index, other_material_name, need_weight, error = -1, '', 0, 0
         # 群控配方数据
-        other_details = sfj_details.values('material__material_name', 'actual_weight', 'standard_error')
+        other_details = sfj_details.values('material_name', 'actual_weight', 'standard_error')
         for i, v in enumerate(other_details):
-            if '掺料' in v['material__material_name'] or '待处理料' in v['material__material_name']:
-                index, other_material_name, need_weight, error = i, v['material__material_name'], v['actual_weight'], v[
+            if '掺料' in v['material_name'] or '待处理料' in v['material_name']:
+                index, other_material_name, need_weight, error = i, v['material_name'], v['actual_weight'], v[
                     'standard_error']
                 break
         if index != -1:  # 增加掺料或者待处理料的信息
@@ -3318,11 +3317,11 @@ class MaterialDetailsAux(APIView):
             pcp = ProductClassesPlan.objects.using('SFJ').filter(plan_classes_uid=plan_classes_uid).first()
             if not pcp:
                 raise ValidationError('群控计划不存在')
-            product_recipe = ProductBatchingDetail.objects.using('SFJ')\
-                .filter(Q(Q(material__material_name__icontains='掺料') | Q(material__material_name__icontains='待处理料')),
-                        product_batching_id=pcp.product_batching_id, delete_flag=False, type=1)
+            product_recipe = ProductBatchingDetailPlan.objects.using('SFJ') \
+                .filter(Q(Q(material_name__icontains='掺料') | Q(material_name__icontains='待处理料')),
+                        plan_classes_uid=plan_classes_uid)
             if product_recipe:
-                res += [product_recipe.first().material.material_name]
+                res += [product_recipe.first().material_name]
             return Response(res)
         else:
             return Response({'material_name_weight': material_name_weight, 'cnt_type_details': handle_cnt_details})
@@ -3531,7 +3530,7 @@ class FormulaPreparationView(APIView):
         if feed_r:
             weight_details += list(feed_r.annotate(actual_weight=F('batching_detail_equip__actual_weight'),
                                                    standard_error=F('batching_detail_equip__standard_error'),
-                                                   sn=F('batching_detail_equip')) \
+                                                   sn=F('batching_detail_equip'))
                                    .values('sn', 'material__material_name', 'actual_weight', 'standard_error'))
         response_data['results'] = weight_details
         xl = details.filter(material__material_name__in=['细料', '硫磺'])
