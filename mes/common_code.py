@@ -297,7 +297,7 @@ class WebService(object):
         url = cls.url.format(recv_ip, default_url_name)
         headers['SOAPAction'] = headers['SOAPAction'].format(category)
         body = cls.trans_dict_to_xml(data, category)
-        rep = cls.client(method, url, headers=headers, data=body, timeout=5)
+        rep = cls.client(method, url, headers=headers, data=body, timeout=2)
         # print(rep.text)
         if rep.status_code < 300:
             return True, rep.text

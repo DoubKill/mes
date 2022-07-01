@@ -3180,6 +3180,12 @@ class ReplaceMaterialViewSet(ModelViewSet):
             if opera_type == "可投料":
                 if not recipe_material:
                     raise ValidationError('选择配方物料才可投料')
+                # 返回胶只能当作掺料和待处理料使用
+                r = ReplaceMaterial.objects.filter(id=uid).last()
+                if not r:
+                    raise ValidationError('数据行异常,请刷新页面后重试')
+                if r.bra_code.startswith('AAJ1Z20') and '掺料' not in recipe_material and '待处理料' not in recipe_material:
+                    raise ValidationError('返回胶只能当作待处理料或者掺料使用')
                 item['result'] = 1
             else:
                 item['result'] = 0
@@ -3308,6 +3314,15 @@ class MaterialDetailsAux(APIView):
             handle_cnt_details = cnt_type_details
         if from_mes:
             res = [item.get('material__material_name') for item in material_name_weight + handle_cnt_details] + [classes_plan.product_batching.stage_product_batch_no]
+            # 掺料或者待处理料是否存在
+            pcp = ProductClassesPlan.objects.using('SFJ').filter(plan_classes_uid=plan_classes_uid).first()
+            if not pcp:
+                raise ValidationError('群控计划不存在')
+            product_recipe = ProductBatchingDetail.objects.using('SFJ')\
+                .filter(Q(Q(material__material_name__icontains='掺料') | Q(material__material_name__icontains='待处理料')),
+                        product_batching_id=pcp.product_batching_id, delete_flag=False, type=1)
+            if product_recipe:
+                res += [product_recipe.first().material.material_name]
             return Response(res)
         else:
             return Response({'material_name_weight': material_name_weight, 'cnt_type_details': handle_cnt_details})

@@ -130,7 +130,8 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                     material_no = return_rubber.product_no
                     material_name = material_no
                     scan_material = material_no
-                    total_weight = 500
+                    # 原意当作掺料使用, 修改: 当前生产胶皮与卡片一致, 默认重量600公斤(300公斤一车, 默认2车)
+                    total_weight = Decimal(320 * (return_rubber.end_trains - return_rubber.begin_trains)) if material_no in materials else 0
             else:  # 收皮条码
                 pallet_feedback = PalletFeedbacks.objects.filter(lot_no=bra_code).first()
                 if pallet_feedback:
@@ -253,6 +254,12 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 unit = res.get('BZDW')
         if not material_name:
             raise serializers.ValidationError('未找到该条形码信息！')
+        # 适配掺料、待处理料放行
+        if scan_material_type == '胶皮':
+            s_result = self.material_pass(plan_classes_uid, scan_material, material_type=scan_material_type)
+            if s_result[0]:
+                material_no = material_name = s_result[1]
+                # attrs.update({'material_no': material_no, 'material_name': material_name})
         attrs['equip_no'] = classes_plan.equip.equip_no
         attrs['material_name'] = material_name
         attrs['material_no'] = material_no
@@ -262,7 +269,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                               'scan_material': scan_material, 'plan_classes_uid': plan_classes_uid,
                               'scan_material_type': scan_material_type}
         # 判断物料是否在配方中
-        if isinstance(material_name, dict) or material_name not in materials or bra_code.startswith('AAJ1Z20'):
+        if isinstance(material_name, dict) or material_name not in materials or (bra_code.startswith('AAJ1Z20') and total_weight==0):
             flag, send_flag = True, True
             record_data = {'plan_classes_uid': plan_classes_uid, 'bra_code': bra_code,
                            'product_no': classes_plan.product_batching.stage_product_batch_no,
@@ -286,68 +293,75 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                                   Q(material__material_name__icontains='待处理料')))
                 if query_set:  # 此处由工艺确认: 掺料与待处理料不会同时出现在一个配方中
                     recipe_material_name = query_set.first().material.material_name
-                    # 配方尾缀为K的不区分顺序
-                    if classes_plan.product_batching.stage_product_batch_no.endswith('K'):
-                        if '加硫' in recipe_material_name:
-                            if add_s:
-                                other_type, status, scan_material_msg = recipe_material_name, True, f'物料:{scan_material} 扫码成功'
-                            else:
-                                other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入加硫料'
-                        else:
-                            if add_s:
-                                other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入无硫料'
-                            else:
-                                other_type, status, scan_material_msg = recipe_material_name, True, f'物料:{scan_material} 扫码成功'
+                    # 查询掺料放行
+                    s_result = self.material_pass(plan_classes_uid, scan_material, material_type=scan_material_type)
+                    if s_result[0]:
+                        other_type, status, scan_material_msg = recipe_material_name, True, f'物料:{recipe_material_name} 扫码成功'
                     else:
-                        # 炼胶类型判断: 混炼/终炼
-                        if re.findall('FM|RFM|RE', classes_plan.product_batching.stage_product_batch_no):
-                            # 待处理料不需要做加硫磺前后判断
-                            if '掺料' in recipe_material_name:
-                                # 加硫磺前后(上面限定了胶皮,这里不会出现小料硫磺xxx-硫磺)
-                                s_id = product_recipe.filter(Q(material__material_name__icontains='硫磺')).first()
-                                if s_id:
-                                    if s_id.id < query_set.first().id:
-                                        # 硫磺在前, 只能投加硫料
+                        # 配方尾缀为K的不区分顺序
+                        if classes_plan.product_batching.stage_product_batch_no.endswith('K'):
+                            if '加硫' in recipe_material_name:
+                                if add_s:
+                                    other_type, status, scan_material_msg = recipe_material_name, True, f'物料:{scan_material} 扫码成功'
+                                else:
+                                    other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入加硫料'
+                            else:
+                                if add_s:
+                                    other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入无硫料'
+                                else:
+                                    other_type, status, scan_material_msg = recipe_material_name, True, f'物料:{scan_material} 扫码成功'
+                        else:
+                            # 炼胶类型判断: 混炼/终炼
+                            if re.findall('FM|RFM|RE', classes_plan.product_batching.stage_product_batch_no):
+                                # 待处理料不需要做加硫磺前后判断
+                                if '掺料' in recipe_material_name:
+                                    # 加硫磺前后(上面限定了胶皮,这里不会出现小料硫磺xxx-硫磺)
+                                    s_id = product_recipe.filter(Q(material__material_name__icontains='硫磺')).first()
+                                    if s_id:
+                                        if s_id.id < query_set.first().id:
+                                            # 硫磺在前, 只能投加硫料
+                                            if add_s:
+                                                other_type, status, scan_material_msg = recipe_material_name, True, f'掺料:{scan_material} 扫码成功'
+                                            else:
+                                                other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入加硫料'
+                                        else:
+                                            if add_s:
+                                                other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入无硫料'
+                                            else:
+                                                other_type, status, scan_material_msg = recipe_material_name, True, f'掺料:{scan_material} 扫码成功'
+                                    else:  # 有掺料无硫磺
                                         if add_s:
                                             other_type, status, scan_material_msg = recipe_material_name, True, f'掺料:{scan_material} 扫码成功'
                                         else:
                                             other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入加硫料'
-                                    else:
+                                else:  # 加硫待处理料、无硫待处理料、前两者都有
+                                    add_s_wait_s = query_set.filter(material__material_name__icontains='加硫待处理料')
+                                    no_s_wait_s = query_set.filter(material__material_name__icontains='无硫待处理料')
+                                    if add_s_wait_s and not no_s_wait_s:
+                                        if add_s:
+                                            other_type, status, scan_material_msg = recipe_material_name, True, f'待处理物料:{scan_material}扫码成功'
+                                        else:
+                                            other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入加硫料'
+                                    elif no_s_wait_s and not add_s_wait_s:
                                         if add_s:
                                             other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入无硫料'
                                         else:
-                                            other_type, status, scan_material_msg = recipe_material_name, True, f'掺料:{scan_material} 扫码成功'
-                                else:  # 有掺料无硫磺
-                                    if add_s:
-                                        other_type, status, scan_material_msg = recipe_material_name, True, f'掺料:{scan_material} 扫码成功'
-                                    else:
-                                        other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入加硫料'
-                            else:  # 加硫待处理料、无硫待处理料、前两者都有
-                                add_s_wait_s = query_set.filter(material__material_name__icontains='加硫待处理料')
-                                no_s_wait_s = query_set.filter(material__material_name__icontains='无硫待处理料')
-                                if add_s_wait_s and not no_s_wait_s:
-                                    if add_s:
-                                        other_type, status, scan_material_msg = recipe_material_name, True, f'待处理物料:{scan_material}扫码成功'
-                                    else:
-                                        other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入加硫料'
-                                elif no_s_wait_s and not add_s_wait_s:
-                                    if add_s:
-                                        other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入无硫料'
+                                            other_type, status, scan_material_msg = recipe_material_name, True, f'待处理物料:{scan_material}扫码成功'
                                     else:
                                         other_type, status, scan_material_msg = recipe_material_name, True, f'待处理物料:{scan_material}扫码成功'
-                                else:
-                                    other_type, status, scan_material_msg = recipe_material_name, True, f'待处理物料:{scan_material}扫码成功'
-                        else:
-                            # 加硫禁止投料
-                            if add_s:
-                                other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入无硫料'
                             else:
-                                other_type, status, scan_material_msg = recipe_material_name, True, f'物料:{scan_material} 扫码成功'
+                                # 加硫禁止投料
+                                if add_s:
+                                    other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入无硫料'
+                                else:
+                                    other_type, status, scan_material_msg = recipe_material_name, True, f'物料:{scan_material} 扫码成功'
                 else:
                     scan_material_msg = '配方中无掺料, 所投物料不在配方中'
                 if not OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code, status=status, other_type=other_type):
                     record_data.update({'other_type': other_type, 'status': status})
                     OtherMaterialLog.objects.create(**record_data)
+                if '成功' not in scan_material_msg and not ReplaceMaterial.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code, reason_type='物料名不一致'):
+                    ReplaceMaterial.objects.create(**replace_material_data)
             # 胶块/细料
             else:
                 if scan_material_type == '胶块':
@@ -560,16 +574,16 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 logger.error('群控服务器错误！')
                 raise serializers.ValidationError(e.args[0])
         if scan_material_msg:
-            dk_equip = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='导开机控制机台', global_name=classes_plan.equip.equip_no)
-            if scan_material_type == '胶皮' and dk_equip:
-                dk_control = 'Start' if '成功' in scan_material_msg else 'Stop'
-                status, text = send_dk(classes_plan.equip.equip_no, dk_control)
-                if not status:  # 发送导开机启停信号异常
-                    logger.error(f'发送导开机信号异常, 计划号: {plan_classes_uid}, 机台: {classes_plan.equip.equip_no}, 错误:{text}')
-                    raise serializers.ValidationError(f'发送导开机信号异常:{text}')
-                else:  # 失败信号发送成功需要终端阻断进程
-                    if dk_control == 'Stop':
-                        raise serializers.ValidationError('发送导开机停止信号成功')
+            # dk_equip = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='导开机控制机台', global_name=classes_plan.equip.equip_no)
+            # if scan_material_type == '胶皮' and dk_equip:
+            #     dk_control = 'Start' if '成功' in scan_material_msg else 'Stop'
+            #     status, text = send_dk(classes_plan.equip.equip_no, dk_control)
+            #     if not status:  # 发送导开机启停信号异常
+            #         logger.error(f'发送导开机信号异常, 计划号: {plan_classes_uid}, 机台: {classes_plan.equip.equip_no}, 错误:{text}')
+            #         raise serializers.ValidationError(f'发送导开机信号异常:{text}')
+            #     else:  # 失败信号发送成功需要终端阻断进程
+            #         if dk_control == 'Stop':
+            #             raise serializers.ValidationError('发送导开机停止信号成功')
             raise serializers.ValidationError(scan_material_msg)
         for i in details:
             msg = i['tank_data'].pop('msg')
@@ -711,12 +725,12 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                'useup_time': datetime.now()})
             instance = LoadTankMaterialLog.objects.create(**tank_data)
         # 胶皮扫码正确发送消息给导开机
-        dk_equip = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='导开机控制机台', global_name=equip_no)
-        if scan_material_type == '胶皮' and dk_equip:
-            status, text = send_dk(equip_no, 'Start')
-            if not status:  # 发送导开机启停信号异常只记录
-                logger.error(f'发送导开机信号异常, 计划号: {plan_classes_uid}, 机台: {equip_no}, 错误:{text}')
-                raise serializers.ValidationError(f'导开机启动信号发送失败: {text}')
+        # dk_equip = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='导开机控制机台', global_name=equip_no)
+        # if scan_material_type == '胶皮' and dk_equip:
+        #     status, text = send_dk(equip_no, 'Start')
+        #     if not status:  # 发送导开机启停信号异常只记录
+        #         logger.error(f'发送导开机信号异常, 计划号: {plan_classes_uid}, 机台: {equip_no}, 错误:{text}')
+        #         raise serializers.ValidationError(f'导开机启动信号发送失败: {text}')
         # 判断补充进料后是否能进上辅机
         fml = FeedingMaterialLog.objects.using('SFJ').filter(plan_classes_uid=plan_classes_uid, trains=int(trains)).last()
         if fml and fml.add_feed_result == 1:
