@@ -4456,9 +4456,16 @@ class AttendanceResultAuditView(APIView):
         approve = data.pop('approve', None)  # 审批人
         is_user = self.request.user.username
         opera_type = None
+        attendance_data = EmployeeAttendanceRecords.objects.filter(factory_date__in=days_cur_month_dates())
+        if not attendance_data:
+            raise ValidationError('暂无本月考勤数据需要处理')
+        not_overall = attendance_data.exclude(record_status='#141414')  # 非整体提交数据
         if overall:  # #141414 黑色
             opera_type = '整体提交'
-            EmployeeAttendanceRecords.objects.filter(factory_date__in=days_cur_month_dates()).update(record_status='#141414')
+            if not_overall:
+                attendance_data.update(record_status='#141414')
+            else:
+                raise ValidationError('请勿重复提交')
         else:
             if audit:
                 opera_type = '审核'
@@ -4466,10 +4473,14 @@ class AttendanceResultAuditView(APIView):
             if approve:
                 opera_type = '审批'
                 data['approve_user'] = is_user
+            # 未整体提交的考勤数据不能审核、审批[]
+            if not_overall:
+                raise ValidationError(f'存在未确认的考勤数据, 请处理后再{opera_type}')
+            AttendanceResultAudit
             AttendanceResultAudit.objects.create(**data)
             # 审核或审批不通过,当月考勤数据全为红色 #DA1F27 红色
             if not data.get('result'):
-                EmployeeAttendanceRecords.objects.filter(factory_date__in=days_cur_month_dates()).update(record_status='#DA1F27')
+                attendance_data.update(record_status='#DA1F27')
         # 记录履历
         EmployeeAttendanceRecordsLog.objects.create(**{'opera_user': is_user, 'opera_type': opera_type})
         return Response('ok')
