@@ -543,24 +543,32 @@ class ProductBatchingNoNew(APIView):
                 nid, is_manual = i.get('id', 0), i.get('is_manual', False)
                 recipe_info.filter(batching_detail_equip_id=nid).update(**{'is_manual': is_manual})
         else:  # 对搭比例设置
+            flag = True
             mixed_ratio = self.request.data.get('mixed_ratio')
-            feeds, ratios = mixed_ratio['stage'], mixed_ratio['ratio']
             instance = ProductBatching.objects.filter(id=product_batching_id).last()
-            f_s, f_stage = get_mixed(instance)
-            if not f_s:
-                raise ValidationError('对搭设置的段次信息在配方中不存在')
-            f_name, f_weight, s_weight = f_s.material.material_name, round(float(f_s.actual_weight) * (ratios['f_ratio'] / sum(ratios.values())), 3), round(float(f_s.actual_weight) * (ratios['s_ratio'] / sum(ratios.values())), 3)
-            # 查询对搭设置
             mixed = ProductBatchingMixed.objects.filter(product_batching_id=product_batching_id)
-            use_data = {'f_feed': feeds['f_feed'], 's_feed': feeds['s_feed'], 's_weight': s_weight,
-                        'f_feed_name': f_name.replace(f_stage, feeds['f_feed']), 'f_ratio': ratios['f_ratio'],
-                        's_feed_name': f_name.replace(f_stage, feeds['s_feed']), 's_ratio': ratios['s_ratio'],
-                        'f_weight': f_weight, 'origin_material_name': f_name}
-            if not mixed:  # 不存在新增
-                use_data.update({'product_batching': instance})
-                ProductBatchingMixed.objects.create(**use_data)
-            else:  # 存在则更新
-                ProductBatchingMixed.objects.update(**use_data)
+            if not mixed_ratio:
+                if not mixed:
+                    raise ValidationError('配方无对搭设置可修改')
+                else:  # 清理掉对搭设置
+                    mixed.delete()
+                    flag = False
+            if flag:
+                feeds, ratios = mixed_ratio['stage'], mixed_ratio['ratio']
+                f_s, f_stage = get_mixed(instance)
+                if not f_s:
+                    raise ValidationError('对搭设置的段次信息在配方中不存在')
+                f_name, f_weight, s_weight = f_s.material.material_name, round(float(f_s.actual_weight) * (ratios['f_ratio'] / sum(ratios.values())), 3), round(float(f_s.actual_weight) * (ratios['s_ratio'] / sum(ratios.values())), 3)
+                # 查询对搭设置
+                use_data = {'f_feed': feeds['f_feed'], 's_feed': feeds['s_feed'], 's_weight': s_weight,
+                            'f_feed_name': f_name.replace(f_stage, feeds['f_feed']), 'f_ratio': ratios['f_ratio'],
+                            's_feed_name': f_name.replace(f_stage, feeds['s_feed']), 's_ratio': ratios['s_ratio'],
+                            'f_weight': f_weight, 'origin_material_name': f_name}
+                if not mixed:  # 不存在新增
+                    use_data.update({'product_batching': instance})
+                    ProductBatchingMixed.objects.create(**use_data)
+                else:  # 存在则更新
+                    ProductBatchingMixed.objects.update(**use_data)
         return Response('操作成功')
 
 
