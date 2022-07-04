@@ -283,7 +283,7 @@ class OutBoundDeliveryOrderDetail(AbstractEntity):
         (1, '新建'),
         (2, '执行中'),
         (3, '已出库'),
-        (4, '关闭'),
+        (4, '取消'),
         (5, '失败')
     )
     outbound_delivery_order = models.ForeignKey(OutBoundDeliveryOrder, help_text='出库单据', on_delete=models.CASCADE,
