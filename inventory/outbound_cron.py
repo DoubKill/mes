@@ -12,14 +12,12 @@ import django
 import logging
 
 
-from inventory.utils import OUTWORKUploader, OUTWORKUploaderLB
-
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()
 logger = logging.getLogger('sync_log')
-
+from inventory.utils import OUTWORKUploader, OUTWORKUploaderLB
 from inventory.models import OutBoundDeliveryOrderDetail, BzFinalMixingRubberInventory, BzFinalMixingRubberInventoryLB
 
 
@@ -40,7 +38,14 @@ def main():
                       'RFID': order.pallet_no,
                       'STATIONID': order.outbound_delivery_order.station,
                       'SENDDATE': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}]
-            json_data = json.dumps(data1, ensure_ascii=False)
+            req_data = {
+                'msgId': order.outbound_delivery_order.order_no,
+                'OUTTYPE': '快检出库',
+                "msgConut": '1',
+                "SENDUSER": 'MES',
+                "items": data1
+            }
+            json_data = json.dumps(req_data, ensure_ascii=False)
             sender = OUTWORKUploader(end_type="指定出库")
             result = sender.request(order.outbound_delivery_order.order_no, '指定出库', '1', 'MES', json_data)
             logger.info('混炼胶库任务号：{},北自反馈信息：{}'.format(order.order_no, result))
@@ -59,7 +64,14 @@ def main():
                       'STATIONID': order.outbound_delivery_order.station,
                       'SENDDATE': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                       'STOREDEF_ID': 1}]
-            json_data = json.dumps(data2, ensure_ascii=False)
+            req_data = {
+                'msgId': order.outbound_delivery_order.order_no,
+                'OUTTYPE': '快检出库',
+                "msgConut": '1',
+                "SENDUSER": 'MES',
+                "items": data2
+            }
+            json_data = json.dumps(req_data, ensure_ascii=False)
             sender = OUTWORKUploaderLB(end_type="指定出库")
             result = sender.request(order.outbound_delivery_order.order_no, '指定出库', '1', 'MES', json_data)
             logger.info('终炼胶库任务号：{},北自反馈信息：{}'.format(order.order_no, result))
