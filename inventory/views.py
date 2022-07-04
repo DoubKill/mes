@@ -5259,49 +5259,49 @@ class OutBoundDeliveryOrderDetailViewSet(ModelViewSet):
             else:
                 sub_no = '00001'
 
-        detail_ids = []
-        items = []
+        # detail_ids = []
+        # items = []
         for item in data:
             item['sub_no'] = sub_no
             s = self.serializer_class(data=item, context={'request': request})
             s.is_valid(raise_exception=True)
             detail = s.save()
-            detail_ids.append(detail.id)
-            dict1 = {'WORKID': detail.order_no,
-                     'MID': instance.product_no,
-                     'PICI': "1",
-                     'RFID': detail.pallet_no,
-                     'STATIONID': instance.station,
-                     'SENDDATE': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-            if instance.warehouse == '终炼胶库':
-                dict1['STOREDEF_ID'] = 1
-            items.append(dict1)
-        username = self.request.user.username
-        json_data = {
-            'msgId': instance.order_no,
-            'OUTTYPE': '快检出库',
-            "msgConut": str(len(items)),
-            "SENDUSER": self.request.user.username,
-            "items": items
-        }
-        if not DEBUG:
-            json_data = json.dumps(json_data, ensure_ascii=False)
-            if instance.warehouse == '混炼胶库':
-                sender = OUTWORKUploader(end_type="指定出库")
-            else:
-                sender = OUTWORKUploaderLB(end_type="指定出库")
-            result = sender.request(instance.order_no, '指定出库', str(len(items)), username, json_data)
-            if result is not None:
-                try:
-                    items = result['items']
-                    msg = items[0]['msg']
-                except:
-                    msg = result[0]['msg']
-                if "TRUE" in msg:  # 成功
-                    OutBoundDeliveryOrderDetail.objects.filter(id__in=detail_ids).update(status=2)
-                else:  # 失败
-                    OutBoundDeliveryOrderDetail.objects.filter(id__in=detail_ids).update(status=5)
-                    raise ValidationError('出库失败：{}'.format(msg))
+        #     detail_ids.append(detail.id)
+        #     dict1 = {'WORKID': detail.order_no,
+        #              'MID': instance.product_no,
+        #              'PICI': "1",
+        #              'RFID': detail.pallet_no,
+        #              'STATIONID': instance.station,
+        #              'SENDDATE': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+        #     if instance.warehouse == '终炼胶库':
+        #         dict1['STOREDEF_ID'] = 1
+        #     items.append(dict1)
+        # username = self.request.user.username
+        # json_data = {
+        #     'msgId': instance.order_no,
+        #     'OUTTYPE': '快检出库',
+        #     "msgConut": str(len(items)),
+        #     "SENDUSER": self.request.user.username,
+        #     "items": items
+        # }
+        # if not DEBUG:
+        #     json_data = json.dumps(json_data, ensure_ascii=False)
+        #     if instance.warehouse == '混炼胶库':
+        #         sender = OUTWORKUploader(end_type="指定出库")
+        #     else:
+        #         sender = OUTWORKUploaderLB(end_type="指定出库")
+        #     result = sender.request(instance.order_no, '指定出库', str(len(items)), username, json_data)
+        #     if result is not None:
+        #         try:
+        #             items = result['items']
+        #             msg = items[0]['msg']
+        #         except:
+        #             msg = result[0]['msg']
+        #         if "TRUE" in msg:  # 成功
+        #             OutBoundDeliveryOrderDetail.objects.filter(id__in=detail_ids).update(status=2)
+        #         else:  # 失败
+        #             OutBoundDeliveryOrderDetail.objects.filter(id__in=detail_ids).update(status=5)
+        #             raise ValidationError('出库失败：{}'.format(msg))
         return Response('ok')
 
 
@@ -6673,14 +6673,14 @@ class ProductInOutHistoryView(APIView):
                 extra_where_str += "where b.DEALTIME<='{}'".format(out_et)
         if tunnel:
             if extra_where_str:
-                extra_where_str += " and a.CID like '{}%' or b.CID like '{}%'".format(tunnel, tunnel)
+                extra_where_str += " and a.CID like '{}%'".format(tunnel)
             else:
-                extra_where_str += "where a.CID like '{}%' or b.CID like '{}%'".format(tunnel, tunnel)
+                extra_where_str += "where a.CID like '{}%'".format(tunnel)
         if product_no:
             if extra_where_str:
-                extra_where_str += " and a.MATNAME like '%{}%' or b.MID like '%{}%'".format(product_no, product_no)
+                extra_where_str += " and a.MATNAME = '{}'".format(product_no)
             else:
-                extra_where_str += "where a.MATNAME like '%{}%' or b.MID like '%{}%'".format(product_no, product_no)
+                extra_where_str += "where a.MATNAME = '{}'".format(product_no)
         if order_no:
             if extra_where_str:
                 extra_where_str += " and a.BILLID like '%{}%' or b.BILLID like '%{}%'".format(order_no, order_no)
@@ -6688,19 +6688,19 @@ class ProductInOutHistoryView(APIView):
                 extra_where_str += "where a.BILLID like '%{}%' or b.BILLID like '%{}%'".format(order_no, order_no)
         if pallet_no:
             if extra_where_str:
-                extra_where_str += " and a.PALLETID like '%{}%' or b.PALLETID like '%{}%'".format(pallet_no, pallet_no)
+                extra_where_str += " and a.PALLETID like '%{}%'".format(pallet_no)
             else:
-                extra_where_str += "where a.PALLETID like '%{}%' or b.PALLETID like '%{}%'".format(pallet_no, pallet_no)
+                extra_where_str += "where a.PALLETID like '%{}%'".format(pallet_no)
         if lot_no:
             if extra_where_str:
-                extra_where_str += " and a.LotNo like '%{}%' or b.Lot_no like '%{}%'".format(lot_no, lot_no)
+                extra_where_str += " and a.LotNo like '%{}%'".format(lot_no)
             else:
-                extra_where_str += "where a.LotNo like '%{}%' or b.Lot_no like '%{}%'".format(lot_no, lot_no)
+                extra_where_str += "where a.LotNo like '%{}%'".format(lot_no)
         if equip_no:
             if extra_where_str:
-                extra_where_str += " and a.LotNo like '%{}%' or b.Lot_no like '%{}%'".format(equip_no, equip_no)
+                extra_where_str += " and a.LotNo like '%{}%'".format(equip_no)
             else:
-                extra_where_str += "where a.LotNo like '%{}%' or b.Lot_no like '%{}%'".format(equip_no, equip_no)
+                extra_where_str += "where a.LotNo like '%{}%'".format(equip_no)
         if export:
             pagination_str = ""
         sql = """select
@@ -6722,7 +6722,7 @@ class ProductInOutHistoryView(APIView):
        b.CarNum,
        b.Weight
 from v_ASRS_LOG_IN_OPREATE_MESVIEW a
-full outer join v_ASRS_TO_MES_RE_MESVIEW b on a.LotNo=b.Lot_no and a.PALLETID=b.PALLETID and a.MATNAME=b.MID
+left join v_ASRS_TO_MES_RE_MESVIEW b on a.LotNo=b.Lot_no and a.PALLETID=b.PALLETID and a.MATNAME=b.MID
 {} order by a.LTIME desc {}""".format(extra_where_str, pagination_str)
         sc = SqlClient(sql=sql, **database_conf)
         temp = sc.all()
@@ -6730,7 +6730,7 @@ full outer join v_ASRS_TO_MES_RE_MESVIEW b on a.LotNo=b.Lot_no and a.PALLETID=b.
         count_sql = """select 
         count(*)
         from v_ASRS_LOG_IN_OPREATE_MESVIEW a 
-        full outer join v_ASRS_TO_MES_RE_MESVIEW b on a.LotNo=b.Lot_no and a.PALLETID=b.PALLETID and a.MATNAME=b.MID {}
+        left join v_ASRS_TO_MES_RE_MESVIEW b on a.LotNo=b.Lot_no and a.PALLETID=b.PALLETID and a.MATNAME=b.MID {}
         """.format(extra_where_str)
         sc = SqlClient(sql=count_sql, **database_conf)
         temp2 = sc.all()
