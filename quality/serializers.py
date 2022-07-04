@@ -206,9 +206,14 @@ class MaterialTestOrderSerializer(BaseModelSerializer):
             validated_data['lot_no'] = pallet.lot_no
             validated_data['material_test_order_uid'] = uuid.uuid1()
             validated_data['production_group'] = production_group
-            instance, created = MaterialTestOrder.objects.get_or_create(
-                defaults=validated_data, **{'lot_no': validated_data['lot_no'],
-                                            'actual_trains': validated_data['actual_trains']})
+            try:
+                instance, created = MaterialTestOrder.objects.get_or_create(
+                    defaults=validated_data, **{'lot_no': validated_data['lot_no'],
+                                                'actual_trains': validated_data['actual_trains']})
+            except Exception:
+                instance = MaterialTestOrder.objects.filter(lot_no=validated_data['lot_no'],
+                                                            actual_trains=validated_data['actual_trains']).first()
+                created = False
             material_no = validated_data['product_no']
             for item in order_results:
                 if not item.get('value'):
@@ -256,6 +261,7 @@ class MaterialTestOrderSerializer(BaseModelSerializer):
         model = MaterialTestOrder
         exclude = ('material_test_order_uid', 'production_group')
         read_only_fields = COMMON_READ_ONLY_FIELDS
+        validators = []
 
 
 class UnqualifiedDealOrderDetailSerializer(serializers.ModelSerializer):
