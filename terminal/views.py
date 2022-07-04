@@ -678,7 +678,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                             if get_status:
                                 k.package_fufil = get_status.actno
                                 # 更新未打印数量
-                                prints = WeightPackageLog.objects.filter(plan_weight_uid=k.plan_weight_uid).aggregate(prints=Sum('package_count'))['prints']
+                                prints = WeightPackageLog.objects.filter(plan_weight_uid=k.plan_weight_uid, equip_no=equip_no).aggregate(prints=Sum('package_count'))['prints']
                                 prints = 0 if not prints else prints
                                 k.noprint_count = k.package_fufil - prints if k.package_fufil - prints > 0 else 0
                                 k.save()
@@ -712,7 +712,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                             if get_status:
                                 k.package_fufil = get_status.actno
                                 # 更新未打印数量
-                                prints = WeightPackageLog.objects.filter(plan_weight_uid=k.plan_weight_uid).aggregate(prints=Sum('package_count'))['prints']
+                                prints = WeightPackageLog.objects.filter(plan_weight_uid=k.plan_weight_uid, equip_no=equip_no).aggregate(prints=Sum('package_count'))['prints']
                                 prints = 0 if not prints else prints
                                 k.noprint_count = k.package_fufil - prints if k.package_fufil - prints > 0 else 0
                                 k.save()
@@ -733,7 +733,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                     if get_status:
                         k.package_fufil = get_status.actno
                         # 更新未打印数量
-                        prints = WeightPackageLog.objects.filter(plan_weight_uid=k.plan_weight_uid).aggregate(prints=Sum('package_count'))['prints']
+                        prints = WeightPackageLog.objects.filter(plan_weight_uid=k.plan_weight_uid, equip_no=equip_no).aggregate(prints=Sum('package_count'))['prints']
                         prints = 0 if not prints else prints
                         k.noprint_count = k.package_fufil - prints if k.package_fufil - prints > 0 else 0
                         k.save()
@@ -795,7 +795,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                 raise ValidationError(e.args[0])
             if res:
                 # 查询配方中人工配物料
-                recipe_manual = list(WeightPackageLogManualDetails.objects.filter(plan_weight_uid=plan_weight_uid)
+                recipe_manual = list(WeightPackageLogManualDetails.objects.filter(plan_weight_uid=plan_weight_uid, equip_no=batching_equip)
                                      .annotate(material_name=F('handle_material_name'), standard_weight=F('weight'),
                                                material__material_name=F('handle_material_name'), tolerance=F('error'))
                                      .values('material_name', 'tolerance', 'standard_weight', 'material__material_name'))
@@ -875,7 +875,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         return Response({'results': results})
 
     def scan_check(self, plan_weight_uid, product_no, batching_equip, dev_type, machine_package_count, manual, already_scan_info, check_type='manual'):
-        recipe_manual = list(WeightPackageLogManualDetails.objects.filter(plan_weight_uid=plan_weight_uid)
+        recipe_manual = list(WeightPackageLogManualDetails.objects.filter(plan_weight_uid=plan_weight_uid, equip_no=batching_equip)
                              .annotate(material_name=F('handle_material_name'), standard_weight=F('weight'),
                                        material__material_name=F('handle_material_name'), tolerance=F('error'))
                              .values('material_name', 'tolerance', 'standard_weight', 'material__material_name'))

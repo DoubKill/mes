@@ -152,6 +152,7 @@ class WeightPackageLog(AbstractEntity):
 
 class WeightPackageLogManualDetails(models.Model):
     plan_weight_uid = models.CharField(max_length=64, help_text='小料称量计划号')
+    equip_no = models.CharField(max_length=64, help_text='称量机台[不同机台计划号可能相同]', null=True, blank=True)
     material_type = models.CharField(max_length=64, help_text='物料在配方中所属类别: 胶料、炭黑、油料、细料/硫磺')
     handle_material_name = models.CharField(max_length=64, help_text='物料名称')
     weight = models.DecimalField(decimal_places=3, max_digits=8, help_text='机配对应人工配物料重量', default=0)

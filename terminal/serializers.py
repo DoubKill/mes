@@ -1037,7 +1037,7 @@ class WeightPackageLogCreateSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(f"人工料包配置数量不足,应包含物料:{','.join(list(k))}, 当前总配置数:{v['count']}")
             if v['manual_type'] == 'manual_single' and v['count'] < package_count * split_count:
                 raise serializers.ValidationError(f"原材料{','.join(list(k))}包数不足,已有:{v['count']}, 所需总数:{package_count * split_count}")
-        history_print = WeightPackageLog.objects.filter(plan_weight_uid=plan_weight_uid).aggregate(already_print=Sum('package_count'))['already_print']
+        history_print = WeightPackageLog.objects.filter(plan_weight_uid=plan_weight_uid, equip_no=equip_no).aggregate(already_print=Sum('package_count'))['already_print']
         already_print = history_print if history_print else 0
         if package_count > package_fufil - already_print:
             raise serializers.ValidationError('配置总数量不可大于已完成配料车次')
@@ -1107,18 +1107,18 @@ class WeightPackageLogCreateSerializer(serializers.ModelSerializer):
                 db_name.objects.filter(id=i['manual_id']).update(**update_kwargs)
                 MachineManualRelation.objects.create(**create_data)
         if display_manual_info:  # 固定人工配料信息(没有则新建)
-            history_record = WeightPackageLogManualDetails.objects.filter(plan_weight_uid=plan_weight_uid)
+            history_record = WeightPackageLogManualDetails.objects.filter(plan_weight_uid=plan_weight_uid, equip_no=equip_no)
             if not history_record:
                 create_list = []
                 for i in display_manual_info:
                     created_data = {'plan_weight_uid': plan_weight_uid, 'material_type': i['material_type'],
                                     'handle_material_name': i['handle_material_name'], 'weight': i['weight'],
-                                    'error': i['error']}
+                                    'error': i['error'], 'equip_no': equip_no}
                     create_list.append(WeightPackageLogManualDetails(**created_data))
                 WeightPackageLogManualDetails.objects.bulk_create(create_list)
         # 更新未打印数量
         noprint_count = validated_data['package_fufil'] - (already_print + machine_package_count)
-        WeightPackageLog.objects.filter(plan_weight_uid=plan_weight_uid).update(noprint_count=noprint_count)
+        WeightPackageLog.objects.filter(plan_weight_uid=plan_weight_uid, equip_no=equip_no).update(noprint_count=noprint_count)
         return instance
 
     class Meta:
@@ -1226,7 +1226,7 @@ class WeightPackageLogSerializer(BaseModelSerializer):
                                    'manual_weight': total_manual_weight, 'manual_tolerance': tolerance,
                                    'detail_manual': detail_manual, 'detail_machine': total_manual_weight - detail_manual})
         else:  # 不合包显示人工配料信息
-            manual_record = WeightPackageLogManualDetails.objects.filter(plan_weight_uid=res['plan_weight_uid'])
+            manual_record = WeightPackageLogManualDetails.objects.filter(plan_weight_uid=res['plan_weight_uid'], equip_no=instance.equip_no)
             if manual_record:
                 res.update({'display_manual_info': list(manual_record.values('material_type', 'handle_material_name', 'weight', 'error'))})
             else:
@@ -1268,7 +1268,7 @@ class WeightPackageLogSerializer(BaseModelSerializer):
                     'manual_weight': total_manual_weight, 'machine_weight': instance.plan_weight,
                     'print_datetime': instance.last_updated_date.strftime('%Y-%m-%d %H:%M:%S'), 'expire_datetime': expire_datetime})
         # 最新打印数据
-        last_instance = WeightPackageLog.objects.filter(plan_weight_uid=instance.plan_weight_uid).last()
+        last_instance = WeightPackageLog.objects.filter(plan_weight_uid=instance.plan_weight_uid, equip_no=instance.equip_no).last()
         res['order_flag'] = True if last_instance.bra_code == res['bra_code'] and res['noprint_count'] != 0 else False
         # 已使用数量
         used_trains = 0
