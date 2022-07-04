@@ -43,11 +43,11 @@ def main():
             json_data = json.dumps(data1, ensure_ascii=False)
             sender = OUTWORKUploader(end_type="指定出库")
             result = sender.request(order.outbound_delivery_order.order_no, '指定出库', '1', 'MES', json_data)
-            logger.info('出库任务号：{},北自反馈信息：{}'.format(order.order_no, result))
+            logger.info('混炼胶库任务号：{},北自反馈信息：{}'.format(order.order_no, result))
             order.status = 2
             order.save()
     if final_working_cnt < 6:
-        cnt2 = 6 - mixin_working_cnt
+        cnt2 = 6 - final_working_cnt
         final_out_bound_orders = OutBoundDeliveryOrderDetail.objects.filter(
             outbound_delivery_order__warehouse='终炼胶库',
             status=1).order_by('inventory_time')[:cnt2]
@@ -62,7 +62,7 @@ def main():
             json_data = json.dumps(data2, ensure_ascii=False)
             sender = OUTWORKUploaderLB(end_type="指定出库")
             result = sender.request(order.outbound_delivery_order.order_no, '指定出库', '1', 'MES', json_data)
-            logger.info('出库任务号：{},北自反馈信息：{}'.format(order.order_no, result))
+            logger.info('终炼胶库任务号：{},北自反馈信息：{}'.format(order.order_no, result))
             order.status = 2
             order.save()
 
