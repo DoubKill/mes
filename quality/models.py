@@ -192,6 +192,7 @@ class MaterialTestOrder(AbstractEntity):
     class Meta:
         db_table = 'material_test_order'
         verbose_name_plural = verbose_name = '物料检测单'
+        unique_together = ('lot_no', 'actual_trains')
         indexes = [models.Index(fields=['product_no']),
                    models.Index(fields=['lot_no']),
                    models.Index(fields=['production_factory_date']),

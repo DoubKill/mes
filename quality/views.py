@@ -1271,9 +1271,14 @@ class ImportAndExportView(APIView):
                 validated_data['production_equip_no'] = equip_no
                 validated_data['production_factory_date'] = factory_date
                 validated_data['production_group'] = group
-                instance, created = MaterialTestOrder.objects.get_or_create(
-                    defaults=validated_data, **{'lot_no': lot_no,
-                                                'actual_trains': actual_trains})
+                try:
+                    instance, created = MaterialTestOrder.objects.get_or_create(
+                        defaults=validated_data, **{'lot_no': lot_no,
+                                                    'actual_trains': actual_trains})
+                except Exception:
+                    instance = MaterialTestOrder.objects.filter(lot_no=lot_no,
+                                                                actual_trains=actual_trains).first()
+                    created = False
                 for data_point_name, method in data_point_method_map.items():
                     test_method_name = method['test_method__name']
                     test_indicator_name = method['test_method__test_type__test_indicator__name']
@@ -2250,9 +2255,14 @@ class ReportValueView(APIView):
                     'production_group': group,
                     'production_equip_no': equip_no,
                     'production_factory_date': product_date}
-                test_order, created = MaterialTestOrder.objects.get_or_create(
-                    defaults=test_order_data, **{'lot_no': lot_no,
-                                                 'actual_trains': train})
+                try:
+                    test_order, created = MaterialTestOrder.objects.get_or_create(
+                        defaults=test_order_data, **{'lot_no': lot_no,
+                                                     'actual_trains': train})
+                except Exception:
+                    test_order = MaterialTestOrder.objects.filter(lot_no=lot_no,
+                                                                  actual_trains=train).first()
+                    created = False
 
                 # 由MES判断检测结果
                 material_test_method = MaterialTestMethod.objects.filter(
