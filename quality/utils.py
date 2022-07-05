@@ -177,7 +177,6 @@ def gen_pallet_test_result(lot_nos):
         if not pfb_obj:
             continue
         test_orders = MaterialTestOrder.objects.filter(lot_no=lot_no)
-        tested_data_points = []
         passed_order_count = 0
         unqualified_order_count = 0
         pass_suggestion = "放行"
@@ -191,6 +190,12 @@ def gen_pallet_test_result(lot_nos):
                                                      is_judged=True,
                                                      material__material_no=pfb_obj.product_no).exists():
                 test_product_flat = True
+
+        continue_flag = False
+        data_points = set(MaterialDataPointIndicator.objects.filter(
+            material_test_method__material__material_no=pfb_obj.product_no,
+            material_test_method__is_judged=True,
+            delete_flag=False).values_list('data_point__name', flat=True))
 
         for test_order in test_orders:
             test_results = test_order.order_results.filter()
@@ -216,9 +221,14 @@ def gen_pallet_test_result(lot_nos):
                     passed_order_count += 1
                 else:
                     test_order.is_passed = False
-                tested_data_points.extend(list(test_results.values_list('data_point_name', flat=True)))
+                # 判定所有必检测数据点都是否已检测完成
+                common_data_points = data_points & set(test_results.values_list('data_point_name', flat=True))
+                if not len(data_points) == len(common_data_points):
+                    continue_flag = True
             test_order.save()
 
+        if continue_flag:
+            continue
         # 取检测车次
         test_trains_set = set(test_orders.values_list('actual_trains', flat=True))
         # 取托盘反馈生产车次
@@ -234,15 +244,6 @@ def gen_pallet_test_result(lot_nos):
             test_result = '试验'
             deal_suggestion = '试验'
         else:
-            # 判定所有必检测数据点都是否已检测完成
-            data_points = set(MaterialDataPointIndicator.objects.filter(
-                material_test_method__material__material_no=pfb_obj.product_no,
-                material_test_method__is_judged=True,
-                delete_flag=False).values_list('data_point__name', flat=True))
-            tested_data_points = set(tested_data_points)
-            common_data_points = data_points & tested_data_points
-            if not len(data_points) == len(common_data_points):
-                continue
             # 1、不合格车数以及pass章车数相等且大于0，则判定为PASS章
             if 0 < passed_order_count == unqualified_order_count > 0:
                 level = 1
