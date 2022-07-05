@@ -13,6 +13,7 @@ from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, Pla
     OperationLog, UnReachedCapacityCause, ProcessFeedback, AlarmLog, RubberCannotPutinReason, PerformanceJobLadder, \
     ProductInfoDingJi, SetThePrice, SubsidyInfo, AttendanceGroupSetup, EmployeeAttendanceRecords, FillCardApply, \
     ApplyForExtraWork, Equip190EWeight, OuterMaterial, Equip190E, AttendanceClockDetail
+from recipe.models import MaterialAttribute
 from system.models import User
 
 
@@ -158,10 +159,15 @@ class ProductionRecordSerializer(BaseModelSerializer):
     class_group = serializers.SerializerMethodField(read_only=True)
     margin = serializers.CharField(default=None, read_only=True)
 
-    def get_validtime(self, object):
-        end_time = object.end_time if object.end_time else 0
-        validtime = end_time + datetime.timedelta(days=1)
-        return validtime if validtime else ""
+    def get_validtime(self, obj):
+        attr = MaterialAttribute.objects.filter(material__material_no=obj.product_no).first()
+        if attr:
+            if attr.period_of_validity:
+                validtime = obj.end_time + datetime.timedelta(days=attr.period_of_validity)
+                return validtime.strftime("%Y-%m-%d %H:%M:%S")
+            return ""
+        else:
+            return ""
 
     def get_class_group(self, object):
         product = ProductClassesPlan.objects.filter(plan_classes_uid=object.plan_classes_uid).first()
