@@ -51,23 +51,35 @@ def send_bz():
                 # 向北自发送数据
                 res = update_wms_kjjg(ware, items=item)
                 if not res:  # res为空代表成功
-                    mdr_obj.update_store_test_flag = 1
+                    if ware == '混炼':
+                        ts = BzFinalMixingRubberInventory.objects.using('bz').filter(lot_no=mdr_obj.lot_no).first()
+                    else:
+                        ts = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(lot_no=mdr_obj.lot_no).first()
+                    if not ts:
+                        update_store_test_flag = 1
+                    else:
+                        if ts.quality_level == zjzt:
+                            update_store_test_flag = 1
+                            logger.info("条码：{},更新北自立库品质状态成功！".format(mdr_obj.lot_no))
+                        else:
+                            update_store_test_flag = 2
+                            logger.info("条码：{},更新北自立库品质状态失败，原因未知！".format(mdr_obj.lot_no))
+                    mdr_obj.update_store_test_flag = update_store_test_flag
                     mdr_obj.save()
-                    logger.info("向北自发送数据,发送成功")
                 else:
                     mdr_obj.update_store_test_flag = 2
                     # temp_count = mdr_obj.send_count + 1
                     # mdr_obj.send_count = temp_count
                     mdr_obj.save()
-                    logger.error(f"发送失败{res}")
+                    logger.error("条码：{}，更新北自立库品质状态失败，原因：{}".format(mdr_obj.lot_no, res))
             except Exception as e:
-                logger.error(f"调北自接口发生异常：{e}")
+                logger.error(f"请求北自接口发生异常：{e}")
         else:  # 两个库都没有
             mdr_obj.update_store_test_flag = 3
             # temp_count = mdr_obj.send_count + 1
             # mdr_obj.send_count = temp_count
             mdr_obj.save()
-            logger.error(f"没有发送，库存和线边库里都没有lot_no:{mdr_obj.lot_no}")
+            logger.error("条码：{},更新北自立库品质状态失败，库存未找到！".format(mdr_obj.lot_no))
 
 
 if __name__ == '__main__':
