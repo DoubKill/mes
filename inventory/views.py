@@ -3330,6 +3330,40 @@ class WMSMaterialsView(APIView):
 
 
 @method_decorator([api_recorder], name="dispatch")
+class WmsInventoryMaterialAttribute(APIView):
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_material_attr',
+                                                            'add': ["add_material_attr", "change_material_attr"]}))
+
+    def get(self, request):
+        material_name = self.request.query_params.get('material_name')
+        material_no = self.request.query_params.get('material_no')
+        page = self.request.query_params.get('page', 1)
+        page_size = self.request.query_params.get('page_size', 15)
+        filter_kwargs = {}
+        only_storage_flag = self.request.query_params.get('only_storage_flag')  # 仅显示未设定有效期的物料
+        if material_no:
+            filter_kwargs['material_no__icontains'] = material_no
+        if material_name:
+            filter_kwargs['material_name__icontains'] = material_name
+        if only_storage_flag:
+            filter_kwargs['is_validity'] = 1
+        query_set = WmsInventoryMaterial.objects.using('wms').filter(
+            **filter_kwargs).values('id', 'material_no', 'material_name', 'period_of_validity')
+        st = (int(page) - 1) * int(page_size)
+        et = int(page) * int(page_size)
+        count = len(query_set)
+        data = query_set[st:et]
+        return Response({'results': data, "count": count})
+
+    def post(self, request):
+        material_ids = self.request.data.get('materials')
+        period_of_validity = self.request.data.get('period_of_validity')
+        WmsInventoryMaterial.objects.using('wms').filter(id__in=material_ids).update(
+            is_validity=1, period_of_validity=period_of_validity)
+        return Response('ok')
+
+
+@method_decorator([api_recorder], name="dispatch")
 class WMSInventoryView(APIView):
     """原材料库存信息，material_name=原材料名称&material_no=原材料编号&material_group_name=物料组名称&tunnel_name=巷道名称&page=页数&page_size=每页数量"""
     DATABASE_CONF = WMS_CONF
