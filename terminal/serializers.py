@@ -131,7 +131,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                     material_name = material_no
                     scan_material = material_no
                     # 原意当作掺料使用, 修改: 当前生产胶皮与卡片一致, 默认重量600公斤(300公斤一车, 默认2车)
-                    total_weight = Decimal(320 * (return_rubber.end_trains - return_rubber.begin_trains)) if material_no in materials else 0
+                    total_weight = Decimal(320 * (return_rubber.end_trains - return_rubber.begin_trains + 1)) if material_no in materials else 0
             else:  # 收皮条码
                 pallet_feedback = PalletFeedbacks.objects.filter(lot_no=bra_code).first()
                 if pallet_feedback:
@@ -1702,14 +1702,17 @@ class PlanSerializer(serializers.ModelSerializer):
             validated_data['order_by'] = last_group_plan.order_by + 1
         else:
             validated_data['order_by'] = 1
+        # 查询配方的合包状态
+        recipe = RecipePre.objects.using(equip_no).filter(name=validated_data['recipe']).first()
+        validated_data['merge_flag'] = recipe.merge_flag if recipe else False
+        split_count = 1 if not recipe else recipe.split_count
+        validated_data['setno'] = validated_data['setno'] * split_count
         validated_data['planid'] = datetime.now().strftime('%Y%m%d%H%M%S')[2:]
         validated_data['state'] = '等待'
         validated_data['actno'] = 0
         validated_data['oper'] = self.context['request'].user.username
         validated_data['addtime'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        # 查询配方的合包状态
-        recipe = RecipePre.objects.using(equip_no).filter(name=validated_data['recipe']).first()
-        validated_data['merge_flag'] = recipe.merge_flag if recipe else False
+
         try:
             instance = Plan.objects.using(equip_no).create(**validated_data)
             ins = CLSystem(equip_no)
@@ -1784,6 +1787,11 @@ class JZPlanSerializer(serializers.ModelSerializer):
             plan_id = prefix + '0001'
         else:
             plan_id = prefix + ('%04d' % (int(max_plan_id[-4:]) + 1) if max_plan_id > max_local['max_plan_id'] else '%04d' % (int(max_local['max_plan_id'][-4:]) + 1))
+        # 查询配方的合包状态
+        recipe = pre_model.objects.using(equip_no).filter(name=validated_data['recipe']).first()
+        validated_data['merge_flag'] = recipe.merge_flag if recipe else False
+        split_count = 1 if not recipe else recipe.split_count
+        validated_data['setno'] = validated_data['setno'] * split_count
         validated_data['planid'] = plan_id
         validated_data['state'] = '等待'
         validated_data['actno'] = 0
@@ -1792,9 +1800,6 @@ class JZPlanSerializer(serializers.ModelSerializer):
         validated_data['downtime'] = None
         validated_data['oper'] = self.context['request'].user.username
         validated_data['addtime'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        # 查询配方的合包状态
-        recipe = pre_model.objects.using(equip_no).filter(name=validated_data['recipe']).first()
-        validated_data['merge_flag'] = recipe.merge_flag if recipe else False
         try:
             instance = plan_model.objects.using(equip_no).create(**validated_data)
         except ConnectionDoesNotExist:
@@ -1823,7 +1828,10 @@ class PlanUpdateSerializer(serializers.ModelSerializer):
         elif action == 2:
             ins.reload_plan(instance.planid, instance.recipe)
         elif action == 3:
-            setno = validated_data['setno']
+            # 查询配方的合包状态
+            recipe = RecipePre.objects.using(equip_no).filter(name=instance.recipe).first()
+            split_count = 1 if not recipe else recipe.split_count
+            setno = validated_data['setno'] * split_count
             actno = instance.actno if instance.actno else 0
             if not setno:
                 raise serializers.ValidationError('设定车次不可为空!')
@@ -1862,7 +1870,9 @@ class JZPlanUpdateSerializer(serializers.ModelSerializer):
                 elif action == 2:
                     raise serializers.ValidationError('不支持称量计划重传')
                 elif action == 3:
-                    setno = validated_data['setno']
+                    recipe = RecipePre.objects.using(equip_no).filter(name=instance.recipe).first()
+                    split_count = 1 if not recipe else recipe.split_count
+                    setno = validated_data['setno'] * split_count
                     actno = instance.actno if instance.actno else 0
                     if not setno:
                         raise serializers.ValidationError('设定车次不可为空!')
