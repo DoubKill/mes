@@ -163,9 +163,14 @@ def main():
                                                 'production_group':  production_group,
                                                 'production_equip_no':  equip_no,
                                                 'production_factory_date':  factory_date}
-                            test_order, created = MaterialTestOrder.objects.get_or_create(
-                                defaults=test_order_data, **{'lot_no': lot_no,
-                                                             'actual_trains': train})
+                            try:
+                                test_order, created = MaterialTestOrder.objects.get_or_create(
+                                    defaults=test_order_data, **{'lot_no': lot_no,
+                                                                 'actual_trains': train})
+                            except Exception:
+                                test_order = MaterialTestOrder.objects.filter(lot_no=lot_no,
+                                                                              actual_trains=train).first()
+                                created = False
                             if not created:
                                 test_order.order_results.filter(data_point_name=data_point_name).delete()
                             # 创建数据点检测结果
