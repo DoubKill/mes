@@ -5259,49 +5259,56 @@ class OutBoundDeliveryOrderDetailViewSet(ModelViewSet):
             else:
                 sub_no = '00001'
 
-        # detail_ids = []
-        # items = []
+        detail_ids = []
+        items = []
         for item in data:
             item['sub_no'] = sub_no
             s = self.serializer_class(data=item, context={'request': request})
             s.is_valid(raise_exception=True)
             detail = s.save()
-        #     detail_ids.append(detail.id)
-        #     dict1 = {'WORKID': detail.order_no,
-        #              'MID': instance.product_no,
-        #              'PICI': "1",
-        #              'RFID': detail.pallet_no,
-        #              'STATIONID': instance.station,
-        #              'SENDDATE': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-        #     if instance.warehouse == '终炼胶库':
-        #         dict1['STOREDEF_ID'] = 1
-        #     items.append(dict1)
-        # username = self.request.user.username
-        # json_data = {
-        #     'msgId': instance.order_no,
-        #     'OUTTYPE': '快检出库',
-        #     "msgConut": str(len(items)),
-        #     "SENDUSER": self.request.user.username,
-        #     "items": items
-        # }
-        # if not DEBUG:
-        #     json_data = json.dumps(json_data, ensure_ascii=False)
-        #     if instance.warehouse == '混炼胶库':
-        #         sender = OUTWORKUploader(end_type="指定出库")
-        #     else:
-        #         sender = OUTWORKUploaderLB(end_type="指定出库")
-        #     result = sender.request(instance.order_no, '指定出库', str(len(items)), username, json_data)
-        #     if result is not None:
-        #         try:
-        #             items = result['items']
-        #             msg = items[0]['msg']
-        #         except:
-        #             msg = result[0]['msg']
-        #         if "TRUE" in msg:  # 成功
-        #             OutBoundDeliveryOrderDetail.objects.filter(id__in=detail_ids).update(status=2)
-        #         else:  # 失败
-        #             OutBoundDeliveryOrderDetail.objects.filter(id__in=detail_ids).update(status=5)
-        #             raise ValidationError('出库失败：{}'.format(msg))
+            detail_ids.append(detail.id)
+            dict1 = {'WORKID': detail.order_no,
+                     'MID': instance.product_no,
+                     'PICI': "1",
+                     'RFID': detail.pallet_no,
+                     'STATIONID': instance.station,
+                     'SENDDATE': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+            if instance.warehouse == '终炼胶库':
+                dict1['STOREDEF_ID'] = 1
+            items.append(dict1)
+        username = self.request.user.username
+        json_data = {
+            'msgId': instance.order_no,
+            'OUTTYPE': '快检出库',
+            "msgConut": str(len(items)),
+            "SENDUSER": self.request.user.username,
+            "items": items
+        }
+        if not DEBUG:
+            json_data = json.dumps(json_data, ensure_ascii=False)
+            if instance.warehouse == '混炼胶库':
+                sender = OUTWORKUploader(end_type="指定出库")
+            else:
+                sender = OUTWORKUploaderLB(end_type="指定出库")
+            result = sender.request(instance.order_no, '指定出库', str(len(items)), username, json_data)
+            # {'msgId': 'MESZ2022070500045', 'OUTTYPE': '快检出库', 'msgConut': 1, 'SENDUSER': 'MES',
+            #  'items': [{'workId': 'CHDZ2022070500371', 'msg': 'TRUE#CHDZ2022070500371任务下发成功', 'flag': '01'}]}
+            logger.info('出库单据号：{},北自反馈信息：{}'.format(instance.order_no, result))
+            if result is not None:
+                items = result.get('items', [])
+                for item in items:
+                    try:
+                        msg = item['msg']
+                        work_id = item['workId']
+                        if "TRUE" in msg:  # 成功
+                            state = 2
+                        else:
+                            state = 5
+                    except Exception:
+                        continue
+                    OutBoundDeliveryOrderDetail.objects.filter(order_no=work_id).update(status=state)
+            else:
+                OutBoundDeliveryOrderDetail.objects.filter(id__in=detail_ids).update(status=2)
         return Response('ok')
 
 
