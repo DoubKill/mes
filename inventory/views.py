@@ -4343,6 +4343,20 @@ class BzFinalRubberInventory(ListAPIView):
     filter_backends = (DjangoFilterBackend,)
     queryset = BzFinalMixingRubberInventoryLB.objects.all()
 
+    def get_serializer_context(self):
+        """
+        Extra context provided to the serializer class.
+        """
+        product_validity_data = dict(MaterialAttribute.objects.filter(
+            period_of_validity__isnull=False
+        ).values_list('material__material_no', 'period_of_validity'))
+        return {
+            'request': self.request,
+            'format': self.format_kwarg,
+            'view': self,
+            'product_validity_data': product_validity_data,
+        }
+
     def export_xls(self, result):
         response = HttpResponse(content_type='application/vnd.ms-excel')
         filename = '库位明细'
@@ -4403,6 +4417,7 @@ class BzFinalRubberInventory(ListAPIView):
         outbound_order_id = self.request.query_params.get('outbound_order_id')  # 指定托盘和指定生产信息出库时使用
         begin_trains = self.request.query_params.get('begin_trains')  # 开始车次
         end_trains = self.request.query_params.get('end_trains')  # 结束车次
+        yx_state = self.request.query_params.get('yx_state')  # 有效状态
         if store_name:
             if store_name == '终炼胶库':
                 store_name = "炼胶库"
@@ -4470,6 +4485,8 @@ class BzFinalRubberInventory(ListAPIView):
             ret = list(filter(
                 lambda x: max(x['begin_end_trains'][0], b_e_range[0]) <= min(x['begin_end_trains'][1], b_e_range[1]),
                 ret))
+        if yx_state:
+            ret = list(filter(lambda x: x['yx_state']==yx_state, ret))
 
         page = self.paginate_queryset(ret)
         # serializer = self.get_serializer(page, many=True)
