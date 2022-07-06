@@ -4046,6 +4046,20 @@ class BzMixingRubberInventory(ListAPIView):
     permission_classes = (IsAuthenticated,)
     queryset = BzFinalMixingRubberInventory.objects.all()
 
+    def get_serializer_context(self):
+        """
+        Extra context provided to the serializer class.
+        """
+        product_validity_data = dict(MaterialAttribute.objects.filter(
+            period_of_validity__isnull=False
+        ).values_list('material__material_no', 'period_of_validity'))
+        return {
+            'request': self.request,
+            'format': self.format_kwarg,
+            'view': self,
+            'product_validity_data': product_validity_data,
+        }
+
     def export_xls(self, result):
         response = HttpResponse(content_type='application/vnd.ms-excel')
         filename = '库位明细'
@@ -4104,6 +4118,7 @@ class BzMixingRubberInventory(ListAPIView):
         outbound_order_id = self.request.query_params.get('outbound_order_id')  # 指定托盘和指定生产信息出库时使用
         begin_trains = self.request.query_params.get('begin_trains')  # 开始车次
         end_trains = self.request.query_params.get('end_trains')  # 结束车次
+        yx_state = self.request.query_params.get('yx_state')  # 有效状态
         queryset = BzFinalMixingRubberInventory.objects.using('bz').all().order_by('in_storage_time')
         if material_no:
             queryset = queryset.filter(material_no=material_no)
@@ -4170,6 +4185,8 @@ class BzMixingRubberInventory(ListAPIView):
         ret = self.get_serializer(queryset, many=True).data
         if b_e_range:
             ret = list(filter(lambda x: max(x['begin_end_trains'][0], b_e_range[0]) <= min(x['begin_end_trains'][1], b_e_range[1]), ret))
+        if yx_state:
+            ret = list(filter(lambda x: x['yx_state']==yx_state, ret))
 
         page = self.paginate_queryset(ret)
         # serializer = self.get_serializer(page, many=True)
@@ -4879,7 +4896,8 @@ class LIBRARYINVENTORYView(ListAPIView):
         period_of_validity__isnull=False
     ).values_list('material__material_no', 'period_of_validity'))
 
-    def get_result(self, model, db, store_name, warehouse_name, location_status, now_time, **kwargs):
+    def get_result(self, model, db, store_name, warehouse_name, location_status, **kwargs):
+        now_time = datetime.datetime.now()
         # 各胶料封闭货位数据
         fb = model.objects.using(db).filter(**kwargs).filter(location_status='封闭货位').values('material_no').annotate(
             qty=Sum('qty'),
@@ -4905,9 +4923,12 @@ class LIBRARYINVENTORYView(ListAPIView):
             quality_level = i['quality_level'].strip()
             validity_days = self.PRODUCT_VALIDITY_DICT.get(material_no, 0)
             expire_flag = False
+            yj_flag = False
             if validity_days:
                 if (now_time - i['min_inventory_time']).total_seconds() / 60 / 60 / 24 > validity_days:
                     expire_flag = True
+                if validity_days - (now_time - i['min_inventory_time']).total_seconds() / 60 / 60 / 24 <= 3:
+                    yj_flag = True
             dj_flag = False
             if quality_level == '待检品':
                 if (now_time - i['min_inventory_time']).total_seconds() / 60 / 60 / 24 > 3:
@@ -4924,16 +4945,18 @@ class LIBRARYINVENTORYView(ListAPIView):
                     'stage': stage,
                     'all_qty': i['qty'],
                     'total_weight': i['total_weight'],
-                    i['quality_level']: {'qty': i['qty'], 'total_weight': i['total_weight'], 'expire_flag': expire_flag, 'dj_flag': dj_flag},
+                    i['quality_level']: {'qty': i['qty'], 'total_weight': i['total_weight'], 'expire_flag': expire_flag, 'dj_flag': dj_flag, 'yj_flag': yj_flag},
                     'expire_flag': expire_flag,
-                    'dj_flag': dj_flag
+                    'dj_flag': dj_flag,
+                    'yj_flag': yj_flag,
                 }
             else:
                 res[material_no][quality_level] = {
                     'qty': i['qty'],
                     'total_weight': i['total_weight'],
                     'expire_flag': expire_flag,
-                    'dj_flag': dj_flag
+                    'dj_flag': dj_flag,
+                    'yj_flag': yj_flag,
                 }
                 if not res[material_no]['dj_flag']:
                     res[material_no]['dj_flag'] = dj_flag
@@ -5017,7 +5040,6 @@ class LIBRARYINVENTORYView(ListAPIView):
         location_status = params.get('location_status', '')  # 有无封闭货位
         quality_level = params.get('quality_level')
         export = params.get("export", None)
-        now_time = datetime.datetime.now()
 
         try:
             st = (int(page) - 1) * int(page_size)
@@ -5042,22 +5064,22 @@ class LIBRARYINVENTORYView(ListAPIView):
         if warehouse_name == '混炼胶库':
             model = BzFinalMixingRubberInventory
             store_name = '立体库'
-            temp = self.get_result(model, 'bz', store_name, warehouse_name, location_status, now_time, **filter_kwargs)
+            temp = self.get_result(model, 'bz', store_name, warehouse_name, location_status, **filter_kwargs)
 
         elif warehouse_name == '终炼胶库':
             model = BzFinalMixingRubberInventoryLB
             store_name = '炼胶库'
-            temp = self.get_result(model, 'lb', store_name, warehouse_name, location_status, now_time, **filter_kwargs)
+            temp = self.get_result(model, 'lb', store_name, warehouse_name, location_status, **filter_kwargs)
 
         else:
             model1 = BzFinalMixingRubberInventory
             store_name1 = '立体库'
             warehouse_name1 = '混炼胶库'
-            temp1 = self.get_result(model1, 'bz', store_name1, warehouse_name1, location_status, now_time, **filter_kwargs)
+            temp1 = self.get_result(model1, 'bz', store_name1, warehouse_name1, location_status, **filter_kwargs)
             model2 = BzFinalMixingRubberInventoryLB
             store_name2 = '炼胶库'
             warehouse_name2 = '终炼胶库'
-            temp2 = self.get_result(model2, 'lb', store_name2, warehouse_name2, location_status, now_time, **filter_kwargs)
+            temp2 = self.get_result(model2, 'lb', store_name2, warehouse_name2, location_status, **filter_kwargs)
             temp = list(temp1) + list(temp2)
         temp = sorted(temp, key=itemgetter('expire_flag', 'dj_flag', 'material_no'), reverse=True)  # 按多个字段排序
         weight_1 = qty_1 = weight_3 = qty_3 = weight_dj = qty_dj = weight_fb = qty_fb = 0
@@ -6537,8 +6559,11 @@ class ProductExpireListView(APIView):
                 already_inventory_days = (now_time - m['in_storage_time']).total_seconds() / 60 / 60 / 24
                 if period_of_validity - already_inventory_days <= expire_days:
                     expire_flag = False
+                    yj_flag = False
                     if already_inventory_days > period_of_validity:
                         expire_flag = True
+                    if period_of_validity - already_inventory_days <= 3:
+                        yj_flag = True
                     dj_flag = False
                     if quality_level == '待检品':
                         if already_inventory_days > 3:
@@ -6548,6 +6573,8 @@ class ProductExpireListView(APIView):
                             ret[key]['expire_flag'] = expire_flag
                         if not ret[key]['dj_flag']:
                             ret[key]['dj_flag'] = dj_flag
+                        if not ret[key]['yj_flag']:
+                            ret[key]['yj_flag'] = yj_flag
                         ret[key]['qty'] += m['qty']
                         ret[key]['total_weight'] += m['total_weight']
                     else:
@@ -6559,6 +6586,7 @@ class ProductExpireListView(APIView):
                                     'period_of_validity': period_of_validity,
                                     'expire_flag': expire_flag,
                                     'dj_flag': dj_flag,
+                                    'yj_flag': yj_flag,
                                     }
         temp = list(ret.values())
         count = len(temp)
@@ -6683,6 +6711,7 @@ class ProductInOutHistoryView(APIView):
             et = datetime.datetime.strptime(out_et, "%Y-%m-%d %H:%M:%S")
             if (et - st).total_seconds() / 60 / 60 / 24 > 7:
                 raise ValidationError('出库时间范围不得超过一周！')
+        extra_where_str = ""
         if warehouse_name == '混炼胶库':
             database_conf = {'host': DATABASES['bz']['HOST'],
                              'user': DATABASES['bz']['USER'],
@@ -6693,10 +6722,13 @@ class ProductInOutHistoryView(APIView):
                              'user': DATABASES['lb']['USER'],
                              'password': DATABASES['lb']['PASSWORD'],
                              'database': DATABASES['lb']['NAME']}
-        extra_where_str = ""
+            extra_where_str = "where left(a.CID,1) in (1, 2, 3, 4)"
         pagination_str = "OFFSET {} ROWS FETCH FIRST {} ROWS ONLY".format((page-1)*page_size, page_size)
         if in_st:
-            extra_where_str += "where a.LTIME>='{}'".format(in_st)
+            if extra_where_str:
+                extra_where_str += " and a.LTIME>='{}'".format(in_st)
+            else:
+                extra_where_str += "where a.LTIME>='{}'".format(in_st)
         if in_et:
             if extra_where_str:
                 extra_where_str += " and a.LTIME<='{}'".format(in_et)
@@ -6714,9 +6746,9 @@ class ProductInOutHistoryView(APIView):
                 extra_where_str += "where b.DEALTIME<='{}'".format(out_et)
         if tunnel:
             if extra_where_str:
-                extra_where_str += " and a.CID like '{}%'".format(tunnel)
+                extra_where_str += " and left(a.CID,1)='{}'".format(tunnel)
             else:
-                extra_where_str += "where a.CID like '{}%'".format(tunnel)
+                extra_where_str += "where left(a.CID,1)='{}'".format(tunnel)
         if product_no:
             if extra_where_str:
                 extra_where_str += " and a.MATNAME = '{}'".format(product_no)
