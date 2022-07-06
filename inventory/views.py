@@ -4907,13 +4907,10 @@ class InOutBoundSummaryView(APIView):
 
 
 @method_decorator([api_recorder], name="dispatch")
-class LIBRARYINVENTORYView(ListAPIView):
+class LIBRARYINVENTORYView(APIView):
     permission_classes = (IsAuthenticated, )
-    PRODUCT_VALIDITY_DICT = dict(MaterialAttribute.objects.filter(
-        period_of_validity__isnull=False
-    ).values_list('material__material_no', 'period_of_validity'))
 
-    def get_result(self, model, db, store_name, warehouse_name, location_status, **kwargs):
+    def get_result(self, model, db, store_name, warehouse_name, location_status, product_validity_dict, **kwargs):
         now_time = datetime.datetime.now()
         # 各胶料封闭货位数据
         fb = model.objects.using(db).filter(**kwargs).filter(location_status='封闭货位').values('material_no').annotate(
@@ -4938,7 +4935,7 @@ class LIBRARYINVENTORYView(ListAPIView):
         for i in result:
             material_no = i['material_no'].strip()
             quality_level = i['quality_level'].strip()
-            validity_days = self.PRODUCT_VALIDITY_DICT.get(material_no, 0)
+            validity_days = product_validity_dict.get(material_no, 0)
             expire_flag = False
             yj_flag = False
             if validity_days:
@@ -4988,9 +4985,6 @@ class LIBRARYINVENTORYView(ListAPIView):
                 res[material_no]['active_qty'] -= res[material_no]['封闭']['qty']
 
         return list(res.values())
-
-    def get_queryset(self):
-        return
 
     def export_xls(self, result):
         response = HttpResponse(content_type='application/vnd.ms-excel')
@@ -5046,7 +5040,7 @@ class LIBRARYINVENTORYView(ListAPIView):
         response.write(output.getvalue())
         return response
 
-    def list(self, request, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
         params = request.query_params
         page = params.get("page", 1)
         page_size = params.get("page_size", 10)
@@ -5057,6 +5051,9 @@ class LIBRARYINVENTORYView(ListAPIView):
         location_status = params.get('location_status', '')  # 有无封闭货位
         quality_level = params.get('quality_level')
         export = params.get("export", None)
+        product_validity_dict = dict(MaterialAttribute.objects.filter(
+            period_of_validity__isnull=False
+        ).values_list('material__material_no', 'period_of_validity'))
 
         try:
             st = (int(page) - 1) * int(page_size)
@@ -5081,22 +5078,22 @@ class LIBRARYINVENTORYView(ListAPIView):
         if warehouse_name == '混炼胶库':
             model = BzFinalMixingRubberInventory
             store_name = '立体库'
-            temp = self.get_result(model, 'bz', store_name, warehouse_name, location_status, **filter_kwargs)
+            temp = self.get_result(model, 'bz', store_name, warehouse_name, location_status, product_validity_dict, **filter_kwargs)
 
         elif warehouse_name == '终炼胶库':
             model = BzFinalMixingRubberInventoryLB
             store_name = '炼胶库'
-            temp = self.get_result(model, 'lb', store_name, warehouse_name, location_status, **filter_kwargs)
+            temp = self.get_result(model, 'lb', store_name, warehouse_name, location_status, product_validity_dict, **filter_kwargs)
 
         else:
             model1 = BzFinalMixingRubberInventory
             store_name1 = '立体库'
             warehouse_name1 = '混炼胶库'
-            temp1 = self.get_result(model1, 'bz', store_name1, warehouse_name1, location_status, **filter_kwargs)
+            temp1 = self.get_result(model1, 'bz', store_name1, warehouse_name1, location_status, product_validity_dict, **filter_kwargs)
             model2 = BzFinalMixingRubberInventoryLB
             store_name2 = '炼胶库'
             warehouse_name2 = '终炼胶库'
-            temp2 = self.get_result(model2, 'lb', store_name2, warehouse_name2, location_status, **filter_kwargs)
+            temp2 = self.get_result(model2, 'lb', store_name2, warehouse_name2, location_status, product_validity_dict, **filter_kwargs)
             temp = list(temp1) + list(temp2)
         temp = sorted(temp, key=itemgetter('expire_flag', 'dj_flag', 'material_no'), reverse=True)  # 按多个字段排序
         weight_1 = qty_1 = weight_3 = qty_3 = weight_dj = qty_dj = weight_fb = qty_fb = 0
