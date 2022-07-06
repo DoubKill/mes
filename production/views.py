@@ -4402,16 +4402,19 @@ class MaterialExpendSummaryView(APIView):
         except Exception:
             raise ValidationError('日期错误！')
         diff = e_time - s_time
-        if diff.days > 15:
-            raise ValidationError('搜索日期跨度不得超过15天！')
-        queryset = ExpendMaterial.objects.filter(product_time__date__gte=s_time, product_time__date__lte=e_time)
-            # .exclude(Q(material__material_name__in=('细料', '硫磺')) | Q(material__material_type__global_name__in=stages))
+        if diff.days > 30:
+            raise ValidationError('搜索日期跨度不得超过一个月！')
+        plan_uids = list(ProductClassesPlan.objects.filter(
+            work_schedule_plan__plan_schedule__day_time__gte=s_time,
+            work_schedule_plan__plan_schedule__day_time__lte=e_time).values_list(
+            'plan_classes_uid', flat=True))
+        queryset = ExpendMaterial.objects.filter(plan_classes_uid__in=plan_uids)
         if equip_no:
             queryset = queryset.filter(equip_no=equip_no)
         if product_no:
-            queryset = queryset.filter(product_no=product_no)
+            queryset = queryset.filter(product_no__icontains=product_no)
         if material_name:
-            queryset = queryset.filter(material_name=material_name)
+            queryset = queryset.filter(material_name__icontains=material_name)
         data = queryset.values('equip_no', 'product_no', 'material_no', 'material_name', 'product_time__date').annotate(actual_weight=Sum('actual_weight')/100).order_by('product_no', 'equip_no', 'material_name')
         material_type_dict = dict(Material.objects.values_list('material_name', 'material_type__global_name'))
         days = date_range(s_time, e_time)
