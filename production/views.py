@@ -2796,7 +2796,15 @@ class EmployeeAttendanceRecordsView(APIView):
         results_sort = sorted(list(results.values()), key=lambda x: (x['sort'], x['equip']))
         audit_obj = AttendanceResultAudit.objects.filter(date=date, audit_user__isnull=False).last()
         approve_obj = AttendanceResultAudit.objects.filter(date=date, approve_user__isnull=False).last()
-        return Response({'results': results_sort, 'group_list': group_list,
+        # 增加能否导出的标记
+        export_flag = True
+        attendance_data = EmployeeAttendanceRecords.objects.filter(factory_date__in=days_cur_month_dates())
+        if not attendance_data:
+            export_flag = False
+        not_overall = attendance_data.exclude(record_status='#141414')  # 非整体提交数据
+        if not_overall:
+            export_flag = False
+        return Response({'results': results_sort, 'group_list': group_list, 'export_flag': export_flag,
                          'audit_user':  audit_obj.audit_user if audit_obj else None,
                          'approve_user': approve_obj.approve_user if approve_obj else None})
 
