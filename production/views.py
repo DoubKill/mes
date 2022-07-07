@@ -2248,17 +2248,28 @@ class DailyProductionCompletionReport(APIView):
             'name_7': {'name': '日均完成率1', 'weight': None},
             'name_8': {'name': '日均完成率2', 'weight': None},
         }
-        # 当月混炼实际完成吨(MB段次)  CMB HMB 1MB~4MB
-        queryset1 = TrainsFeedbacks.objects.filter(factory_date__year=year,
-                                                   factory_date__month=month,
-                                                   product_no__icontains='MB-')
-        mix_queryset = queryset1.values('factory_date__day').annotate(weight=Sum('actual_weight', output_field=DecimalField()))
-        # 当月终炼实际完成（FM段次）  FM、RFM
-        queryset2 = TrainsFeedbacks.objects.filter(factory_date__year=year,
-                                                   factory_date__month=month,
-                                                   product_no__icontains='FM-')
-        fin_queryset = queryset2.values('factory_date__day').annotate(weight=Sum('actual_weight', output_field=DecimalField()))
+        total_queryset = TrainsFeedbacks.objects.exclude(Q(product_no__icontains='XCJ') |
+                                                         Q(product_no__icontains='洗车胶') |
+                                                         Q(operation_user='Mixer2')
+                                                         ).filter(factory_date__year=year, factory_date__month=month)
+        month_total_dict = dict(total_queryset.values(
+                'factory_date__day'
+            ).annotate(weight=Sum(
+                'actual_weight', output_field=DecimalField())
+            ).values_list('factory_date__day', 'weight'))
+        # 当月混炼实际完成吨  CMB HMB 1MB~4MB
+        queryset1 = total_queryset.filter(Q(product_no__icontains='-CMB-') |
+                                          Q(product_no__icontains='-HMB-') |
+                                          Q(product_no__icontains='-1MB-') |
+                                          Q(product_no__icontains='-2MB-') |
+                                          Q(product_no__icontains='-3MB-') |
+                                          Q(product_no__icontains='-4MB-'))
 
+        mix_queryset = queryset1.values('factory_date__day').annotate(weight=Sum('actual_weight', output_field=DecimalField()))
+        # 当月终炼实际完成（FM段次）  FM
+        queryset2 = total_queryset.filter(product_no__icontains='-FM-')
+        fin_queryset = queryset2.values('factory_date__day').annotate(weight=Sum('actual_weight', output_field=DecimalField()))
+        fm_total_dict = dict(fin_queryset.values_list('factory_date__day', 'weight'))
         # 当月190E所有产量
         queryset_190e = Equip190EWeight.objects.exclude(
             setup__specification__in=('洗车胶', 'XCJ')).filter(
@@ -2266,9 +2277,14 @@ class DailyProductionCompletionReport(APIView):
         total_queryset_190e_dict = dict(queryset_190e.values(
             'factory_date__day').annotate(
                 sum_weight=Sum(F('setup__weight')*F('qty')/1000, output_field=DecimalField())).values_list('factory_date__day', 'sum_weight'))
-        fm_queryset_190e_dict = dict(queryset_190e.filter(setup__state='FM').values(
-            'factory_date__day').annotate(
-                sum_weight=Sum(F('setup__weight')*F('qty')/1000, output_field=DecimalField())).values_list('factory_date__day', 'sum_weight'))
+        # 当月190E终炼产量  FM
+        equip_190e_weight = queryset_190e.filter(setup__state='FM').values('factory_date__day').annotate(
+                sum_weight=Sum(F('setup__weight')*F('qty')/1000, output_field=DecimalField()))
+        # 当月190E混炼产量
+        equip_190e_mixin_weight = queryset_190e.filter(
+            setup__state__in=('1MB', '2MB', '3MB', '4MB', 'CMB', 'HMB')
+        ).values('factory_date__day').annotate(sum_weight=Sum(F('setup__weight') * F('qty') / 1000, output_field=DecimalField()))
+        fm_queryset_190e_dict = dict(equip_190e_weight.values_list('factory_date__day', 'sum_weight'))
 
         data_190e = {
             'dates': [i for i in range(1, days+1)],
@@ -2277,12 +2293,7 @@ class DailyProductionCompletionReport(APIView):
             'total': [total_queryset_190e_dict.get(i, 0) for i in range(1, days+1)],
             'fm': [fm_queryset_190e_dict.get(i, 0) for i in range(1, days+1)]
         }
-        # 当月190E终炼产量  FM、RFM
-        equip_190e_weight = queryset_190e.filter(setup__state__in=('FM', 'RFM')).values('factory_date__day').annotate(
-                sum_weight=Sum(F('setup__weight')*F('qty')/1000, output_field=DecimalField()))
-        # 当月190E混炼产量
-        equip_190e_mixin_weight = queryset_190e.filter(setup__state__icontains='MB').values('factory_date__day').annotate(
-            sum_weight=Sum(F('setup__weight') * F('qty') / 1000, output_field=DecimalField()))
+
         actual_working_day_dict = dict(
             ActualWorkingDay.objects.filter(
                 factory_date__year=year,
@@ -2336,19 +2347,16 @@ class DailyProductionCompletionReport(APIView):
                         results['name_8'][key] = round(results['name_5'][key] / decimal.Decimal(results['name_6'][key]), 2)
             results['name_7']['weight'] = 0 if results['name_6']['weight'] == 0 else round(results['name_4']['weight'] / decimal.Decimal(results['name_6']['weight']), 2)
             results['name_8']['weight'] = 0 if results['name_6']['weight'] == 0 else round(results['name_5']['weight'] / decimal.Decimal(results['name_6']['weight']), 2)
-        month_working_days = len(set([i for i in results['name_1'].keys() if i[0].isdigit()] + [i for i in results['name_2'].keys() if i[0].isdigit()]))
+        month_working_days = float(sum(actual_working_day_dict.values()))
         # 计算平均值
         for item in results.values():
-            try:
-                item['avg'] = round(item['weight'] / month_working_days, 2)
-            except Exception:
-                item['avg'] = ""
+            item['avg'] = "" if not month_working_days else round(float(item['weight']) / month_working_days, 2)
         if self.request.query_params.get('export', None):
             results2 = {}
             equip_query = Equip.objects.filter(category__equip_type__global_name='密炼设备').values('equip_no',
                                                                                                 'category__category_name')
             equip_dic = {item['equip_no']: item['category__category_name'] for item in equip_query}
-            data2 = TrainsFeedbacks.objects.filter(factory_date__year=year, factory_date__month=month).values(
+            data2 = TrainsFeedbacks.objects.exclude(operation_user='Mixer2').filter(factory_date__year=year, factory_date__month=month).values(
                 'factory_date__day', 'product_no', 'equip_no', 'classes').annotate(actual_trains=Count('actual_trains'),
                                                                                    weight=Sum('actual_weight')/100000).order_by('-classes')
             for item in data2:
@@ -2424,12 +2432,6 @@ class DailyProductionCompletionReport(APIView):
         avg_190e = {'jl': 0 if sum(data_190e['jl']) == 0 else round(sum(data_190e['jl']) / len([i for i in data_190e['jl'] if i > 0]), 1),
                     'wl': 0 if sum(data_190e['wl']) == 0 else round(sum(data_190e['wl']) / len([i for i in data_190e['wl'] if i > 0]), 1),
                     'ds': 0 if not cnt else round(sum_ds/cnt, 1)}
-
-        month_total = TrainsFeedbacks.objects.exclude(product_no__icontains='XCJ').filter(
-            factory_date__year=year, factory_date__month=month)
-        fm_total = month_total.filter(product_no__icontains='-FM-')
-        month_total_dict = dict(month_total.values('factory_date__day').annotate(weight=Sum('actual_weight', output_field=DecimalField())/100000).values_list('factory_date__day', 'weight'))
-        fm_total_dict = dict(fm_total.values('factory_date__day').annotate(weight=Sum('actual_weight', output_field=DecimalField())/100000).values_list('factory_date__day', 'weight'))
 
         cnt2 = 0
         sum_ds2 = 0
