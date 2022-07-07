@@ -1445,6 +1445,7 @@ class BatchChargeLogListViewSet(ListAPIView):
         display_name = self.request.query_params.get('display_name')
         bra_code = self.request.query_params.get('bra_code')
         created_username = self.request.query_params.get('created_username')
+        product_no = self.request.query_params.get('product_no')
         if plan_classes_uid:
             queryset = queryset.filter(feed_log__plan_classes_uid__icontains=plan_classes_uid)
         if production_factory_date:
@@ -1466,6 +1467,8 @@ class BatchChargeLogListViewSet(ListAPIView):
             queryset = queryset.filter(feed_log__trains__icontains=trains)
         if created_username:
             queryset = queryset.filter(created_username__icontains=created_username)
+        if product_no:
+            queryset = queryset.filter(feed_log__product_no__icontains=product_no)
         return queryset
 
     def list(self, request, *args, **kwargs):
