@@ -543,24 +543,32 @@ class ProductBatchingNoNew(APIView):
                 nid, is_manual = i.get('id', 0), i.get('is_manual', False)
                 recipe_info.filter(batching_detail_equip_id=nid).update(**{'is_manual': is_manual})
         else:  # 对搭比例设置
+            flag = True
             mixed_ratio = self.request.data.get('mixed_ratio')
-            feeds, ratios = mixed_ratio['stage'], mixed_ratio['ratio']
             instance = ProductBatching.objects.filter(id=product_batching_id).last()
-            f_s, f_stage = get_mixed(instance)
-            if not f_s:
-                raise ValidationError('对搭设置的段次信息在配方中不存在')
-            f_name, f_weight, s_weight = f_s.material.material_name, round(float(f_s.actual_weight) * (ratios['f_ratio'] / sum(ratios.values())), 3), round(float(f_s.actual_weight) * (ratios['s_ratio'] / sum(ratios.values())), 3)
-            # 查询对搭设置
             mixed = ProductBatchingMixed.objects.filter(product_batching_id=product_batching_id)
-            use_data = {'f_feed': feeds['f_feed'], 's_feed': feeds['s_feed'], 's_weight': s_weight,
-                        'f_feed_name': f_name.replace(f_stage, feeds['f_feed']), 'f_ratio': ratios['f_ratio'],
-                        's_feed_name': f_name.replace(f_stage, feeds['s_feed']), 's_ratio': ratios['s_ratio'],
-                        'f_weight': f_weight, 'origin_material_name': f_name}
-            if not mixed:  # 不存在新增
-                use_data.update({'product_batching': instance})
-                ProductBatchingMixed.objects.create(**use_data)
-            else:  # 存在则更新
-                ProductBatchingMixed.objects.update(**use_data)
+            if not mixed_ratio:
+                if not mixed:
+                    raise ValidationError('配方无对搭设置可修改')
+                else:  # 清理掉对搭设置
+                    mixed.delete()
+                    flag = False
+            if flag:
+                feeds, ratios = mixed_ratio['stage'], mixed_ratio['ratio']
+                f_s, f_stage = get_mixed(instance)
+                if not f_s:
+                    raise ValidationError('对搭设置的段次信息在配方中不存在')
+                f_name, f_weight, s_weight = f_s.material.material_name, round(float(f_s.actual_weight) * (ratios['f_ratio'] / sum(ratios.values())), 3), round(float(f_s.actual_weight) * (ratios['s_ratio'] / sum(ratios.values())), 3)
+                # 查询对搭设置
+                use_data = {'f_feed': feeds['f_feed'], 's_feed': feeds['s_feed'], 's_weight': s_weight,
+                            'f_feed_name': f_name.replace(f_stage, feeds['f_feed']), 'f_ratio': ratios['f_ratio'],
+                            's_feed_name': f_name.replace(f_stage, feeds['s_feed']), 's_ratio': ratios['s_ratio'],
+                            'f_weight': f_weight, 'origin_material_name': f_name}
+                if not mixed:  # 不存在新增
+                    use_data.update({'product_batching': instance})
+                    ProductBatchingMixed.objects.create(**use_data)
+                else:  # 存在则更新
+                    ProductBatchingMixed.objects.update(**use_data)
         return Response('操作成功')
 
 
@@ -595,13 +603,13 @@ class RecipeNoticeAPiView(APIView):
                 return Response({'notice_flag': True})
         # 发送配方的返回信息
         receive_msg = ""
-        enable_equip = list(ProductBatchingEquip.objects.filter(product_batching_id=product_batching_id, is_used=True, send_recipe_flag=False)
-                            .values_list('equip_no', flat=True).distinct())
+        enable_equip_info = ProductBatchingEquip.objects.filter(product_batching_id=product_batching_id, is_used=True, send_recipe_flag=False)
+        enable_equip = list(enable_equip_info.values_list('equip_no', flat=True).distinct())
         if not enable_equip:
             raise ValidationError('配方已经发送到相应机台或未找到配方投料设置信息')
         # 过滤掉有等待或者运行中的群控配方
         n_date = datetime.datetime.now().date() - datetime.timedelta(days=1)
-        send_equip = []
+        send_equip, check_msg = [], ''
         for single_equip_no in enable_equip:
             pcp_obj = ProductClassesPlan.objects.using('SFJ').filter(delete_flag=False, created_date__date__gte=n_date,
                                                                      product_batching__stage_product_batch_no=real_product_no,
@@ -609,13 +617,25 @@ class RecipeNoticeAPiView(APIView):
             if pcp_obj:
                 plan_status = PlanStatus.objects.using('SFJ').filter(plan_classes_uid=pcp_obj.plan_classes_uid).last()
                 if plan_status.status in ['运行中', '等待']:
+                    check_msg += f"{single_equip_no}: 配方正在密炼, 无法下发 "
                     receive_msg += f"{single_equip_no}: 配方正在密炼, 无法下发 "
                 else:
                     send_equip.append(single_equip_no)
-            else:
-                send_equip.append(single_equip_no)
+            else:  # 炭黑罐或者油料罐物料不一致时无法发送
+                c_o = enable_equip_info.filter(Q(feeding_mode__startswith='C', type=2) | Q(feeding_mode__startswith='O', type=3), equip_no=single_equip_no)
+                if c_o:
+                    for s_c_o in c_o:
+                        tank = MaterialTankStatus.objects.using('SFJ').filter(equip_no=single_equip_no, use_flag=True, tank_type=s_c_o.type - 1, material_no=s_c_o.handle_material_name).first()
+                        if not tank:
+                            check_msg += f"{single_equip_no}: 物料设定异常:{s_c_o.handle_material_name} "
+                            receive_msg += f"{single_equip_no}: 物料设定异常:{s_c_o.handle_material_name} "
+                            break
+                    else:
+                        send_equip.append(single_equip_no)
+                else:
+                    send_equip.append(single_equip_no)
         if not send_equip:
-            raise ValidationError(f"该配方在所选{'、'.join(enable_equip)}机台密炼, 无法下发")
+            raise ValidationError(check_msg)
         interface = ProductBatchingSyncInterface(instance=product_batching, context={'enable_equip': send_equip})
         try:
             interface.request()

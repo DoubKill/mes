@@ -36,7 +36,7 @@ from mes.settings import DATABASES
 from plan.models import ProductClassesPlan, BatchingClassesPlan, BatchingClassesEquipPlan
 from production.models import PlanStatus, MaterialTankStatus, TrainsFeedbacks, PalletFeedbacks
 from recipe.models import ProductBatchingDetail, ProductBatching, ERPMESMaterialRelation, Material, WeighCntType, \
-    WeighBatchingDetail, ProductBatchingEquip
+    WeighBatchingDetail, ProductBatchingEquip, ProductBatchingDetailPlan
 from terminal.filters import FeedingLogFilter, WeightTankStatusFilter, WeightBatchingLogListFilter, \
     BatchingClassesEquipPlanFilter, CarbonTankSetFilter, \
     FeedingOperationLogFilter, ReplaceMaterialFilter, ReturnRubberFilter
@@ -313,19 +313,18 @@ class BatchProductBatchingVIew(APIView):
         # 存在通用料包则显示一条空数据
         common_scan = OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, other_type='通用料包',
                                                       status=1).last()
-        sfj_details = ProductBatchingDetail.objects.using('SFJ')\
-            .filter(product_batching__stage_product_batch_no=product_no, product_batching__delete_flag=False, type=1,
-                    product_batching__used_type=4, product_batching__equip__equip_no=equip_no, delete_flag=False)
+        # 获取机台配方详情
+        sfj_details = ProductBatchingDetailPlan.objects.using('SFJ').filter(plan_classes_uid=plan_classes_uid)
         if common_scan:
             # 查询上辅机料包重量、误差
-            other_xl = sfj_details.filter(material__material_name__in=['细料', '硫磺']).last()
+            other_xl = sfj_details.filter(material_name__in=['细料', '硫磺']).last()
             if other_xl:  # 防止配方中没有料包但是扫了通用料包条码
                 res.append({
-                    "material__material_name": other_xl.material.material_name, "actual_weight": 1,
+                    "material__material_name": other_xl.material_name, "actual_weight": 1,
                     "standard_error": 1, "msg": "", "scan_finished": True,
                     "detail": [{
                         "bra_code": common_scan.bra_code, "init_weight": Decimal(9999), "used_weight": Decimal(0),
-                        "single_need": Decimal(1), "scan_material": other_xl.material.material_name,
+                        "single_need": Decimal(1), "scan_material": other_xl.material_name,
                         "unit": "包", "msg": "", "id": 0, "scan_material_type": "机配",
                         "adjust_left_weight": Decimal(9999)
                     }]
@@ -333,10 +332,10 @@ class BatchProductBatchingVIew(APIView):
         # 掺料或待处理料数据
         index, other_material_name, need_weight, error = -1, '', 0, 0
         # 群控配方数据
-        other_details = sfj_details.values('material__material_name', 'actual_weight', 'standard_error')
+        other_details = sfj_details.values('material_name', 'actual_weight', 'standard_error')
         for i, v in enumerate(other_details):
-            if '掺料' in v['material__material_name'] or '待处理料' in v['material__material_name']:
-                index, other_material_name, need_weight, error = i, v['material__material_name'], v['actual_weight'], v[
+            if '掺料' in v['material_name'] or '待处理料' in v['material_name']:
+                index, other_material_name, need_weight, error = i, v['material_name'], v['actual_weight'], v[
                     'standard_error']
                 break
         if index != -1:  # 增加掺料或者待处理料的信息
@@ -679,7 +678,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                             if get_status:
                                 k.package_fufil = get_status.actno
                                 # 更新未打印数量
-                                prints = WeightPackageLog.objects.filter(plan_weight_uid=k.plan_weight_uid).aggregate(prints=Sum('package_count'))['prints']
+                                prints = WeightPackageLog.objects.filter(plan_weight_uid=k.plan_weight_uid, equip_no=equip_no).aggregate(prints=Sum('package_count'))['prints']
                                 prints = 0 if not prints else prints
                                 k.noprint_count = k.package_fufil - prints if k.package_fufil - prints > 0 else 0
                                 k.save()
@@ -713,7 +712,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                             if get_status:
                                 k.package_fufil = get_status.actno
                                 # 更新未打印数量
-                                prints = WeightPackageLog.objects.filter(plan_weight_uid=k.plan_weight_uid).aggregate(prints=Sum('package_count'))['prints']
+                                prints = WeightPackageLog.objects.filter(plan_weight_uid=k.plan_weight_uid, equip_no=equip_no).aggregate(prints=Sum('package_count'))['prints']
                                 prints = 0 if not prints else prints
                                 k.noprint_count = k.package_fufil - prints if k.package_fufil - prints > 0 else 0
                                 k.save()
@@ -734,7 +733,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                     if get_status:
                         k.package_fufil = get_status.actno
                         # 更新未打印数量
-                        prints = WeightPackageLog.objects.filter(plan_weight_uid=k.plan_weight_uid).aggregate(prints=Sum('package_count'))['prints']
+                        prints = WeightPackageLog.objects.filter(plan_weight_uid=k.plan_weight_uid, equip_no=equip_no).aggregate(prints=Sum('package_count'))['prints']
                         prints = 0 if not prints else prints
                         k.noprint_count = k.package_fufil - prints if k.package_fufil - prints > 0 else 0
                         k.save()
@@ -796,7 +795,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                 raise ValidationError(e.args[0])
             if res:
                 # 查询配方中人工配物料
-                recipe_manual = list(WeightPackageLogManualDetails.objects.filter(plan_weight_uid=plan_weight_uid)
+                recipe_manual = list(WeightPackageLogManualDetails.objects.filter(plan_weight_uid=plan_weight_uid, equip_no=batching_equip)
                                      .annotate(material_name=F('handle_material_name'), standard_weight=F('weight'),
                                                material__material_name=F('handle_material_name'), tolerance=F('error'))
                                      .values('material_name', 'tolerance', 'standard_weight', 'material__material_name'))
@@ -876,7 +875,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         return Response({'results': results})
 
     def scan_check(self, plan_weight_uid, product_no, batching_equip, dev_type, machine_package_count, manual, already_scan_info, check_type='manual'):
-        recipe_manual = list(WeightPackageLogManualDetails.objects.filter(plan_weight_uid=plan_weight_uid)
+        recipe_manual = list(WeightPackageLogManualDetails.objects.filter(plan_weight_uid=plan_weight_uid, equip_no=batching_equip)
                              .annotate(material_name=F('handle_material_name'), standard_weight=F('weight'),
                                        material__material_name=F('handle_material_name'), tolerance=F('error'))
                              .values('material_name', 'tolerance', 'standard_weight', 'material__material_name'))
@@ -2368,13 +2367,13 @@ class ReportWeightView(ListAPIView):
 
         plan_model, weight_model = [JZPlan, JZReportWeight] if equip_no in JZ_EQUIP_NO else [Plan, ReportWeight]
         if st or et:
-            plan_queryset = plan_model.objects.using(equip_no).all()
+            filter_plan = {}
             if st:
-                plan_queryset = plan_queryset.filter(date_time__gte=st)
+                filter_plan['date_time__gte'] = st
             if et:
-                plan_queryset = plan_queryset.filter(date_time__lte=et)
+                filter_plan['date_time__lte'] = et
             try:
-                plan_ids = plan_queryset.values_list('planid', flat=True)
+                plan_ids = plan_model.objects.using(equip_no).filter(**filter_plan).values_list('planid', flat=True)
             except Exception:
                 raise ValidationError('称量机台{}服务错误！'.format(equip_no))
             filter_kwargs['planid__in'] = list(plan_ids)
@@ -3180,6 +3179,12 @@ class ReplaceMaterialViewSet(ModelViewSet):
             if opera_type == "可投料":
                 if not recipe_material:
                     raise ValidationError('选择配方物料才可投料')
+                # 返回胶只能当作掺料和待处理料使用
+                r = ReplaceMaterial.objects.filter(id=uid).last()
+                if not r:
+                    raise ValidationError('数据行异常,请刷新页面后重试')
+                if r.bra_code.startswith('AAJ1Z20') and '掺料' not in recipe_material and '待处理料' not in recipe_material:
+                    raise ValidationError('返回胶只能当作待处理料或者掺料使用')
                 item['result'] = 1
             else:
                 item['result'] = 0
@@ -3308,6 +3313,15 @@ class MaterialDetailsAux(APIView):
             handle_cnt_details = cnt_type_details
         if from_mes:
             res = [item.get('material__material_name') for item in material_name_weight + handle_cnt_details] + [classes_plan.product_batching.stage_product_batch_no]
+            # 掺料或者待处理料是否存在
+            pcp = ProductClassesPlan.objects.using('SFJ').filter(plan_classes_uid=plan_classes_uid).first()
+            if not pcp:
+                raise ValidationError('群控计划不存在')
+            product_recipe = ProductBatchingDetailPlan.objects.using('SFJ') \
+                .filter(Q(Q(material_name__icontains='掺料') | Q(material_name__icontains='待处理料')),
+                        plan_classes_uid=plan_classes_uid)
+            if product_recipe:
+                res += [product_recipe.first().material_name]
             return Response(res)
         else:
             return Response({'material_name_weight': material_name_weight, 'cnt_type_details': handle_cnt_details})
@@ -3516,7 +3530,7 @@ class FormulaPreparationView(APIView):
         if feed_r:
             weight_details += list(feed_r.annotate(actual_weight=F('batching_detail_equip__actual_weight'),
                                                    standard_error=F('batching_detail_equip__standard_error'),
-                                                   sn=F('batching_detail_equip')) \
+                                                   sn=F('batching_detail_equip'))
                                    .values('sn', 'material__material_name', 'actual_weight', 'standard_error'))
         response_data['results'] = weight_details
         xl = details.filter(material__material_name__in=['细料', '硫磺'])

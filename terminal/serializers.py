@@ -21,7 +21,7 @@ from mes.conf import COMMON_READ_ONLY_FIELDS, JZ_EQUIP_NO
 from plan.models import ProductClassesPlan, BatchingClassesPlan, BatchingClassesEquipPlan
 from production.models import PalletFeedbacks
 from recipe.models import ERPMESMaterialRelation, ProductBatchingDetail, \
-    ProductBatchingEquip
+    ProductBatchingEquip, ProductBatchingDetailPlan
 from terminal.models import EquipOperationLog, WeightBatchingLog, FeedingLog, WeightTankStatus, \
     WeightPackageLog, FeedingMaterialLog, LoadMaterialLog, MaterialInfo, Bin, Plan, RecipePre, ReportBasic, \
     ReportWeight, LoadTankMaterialLog, PackageExpire, RecipeMaterial, CarbonTankFeedWeightSet, \
@@ -130,7 +130,8 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                     material_no = return_rubber.product_no
                     material_name = material_no
                     scan_material = material_no
-                    total_weight = 500
+                    # 原意当作掺料使用, 修改: 当前生产胶皮与卡片一致, 默认重量600公斤(300公斤一车, 默认2车)
+                    total_weight = Decimal(320 * (return_rubber.end_trains - return_rubber.begin_trains + 1)) if material_no in materials else 0
             else:  # 收皮条码
                 pallet_feedback = PalletFeedbacks.objects.filter(lot_no=bra_code).first()
                 if pallet_feedback:
@@ -253,6 +254,12 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 unit = res.get('BZDW')
         if not material_name:
             raise serializers.ValidationError('未找到该条形码信息！')
+        # 适配掺料、待处理料放行
+        if scan_material_type == '胶皮':
+            s_result = self.material_pass(plan_classes_uid, scan_material, material_type=scan_material_type)
+            if s_result[0]:
+                material_no = material_name = s_result[1]
+                # attrs.update({'material_no': material_no, 'material_name': material_name})
         attrs['equip_no'] = classes_plan.equip.equip_no
         attrs['material_name'] = material_name
         attrs['material_no'] = material_no
@@ -262,7 +269,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                               'scan_material': scan_material, 'plan_classes_uid': plan_classes_uid,
                               'scan_material_type': scan_material_type}
         # 判断物料是否在配方中
-        if isinstance(material_name, dict) or material_name not in materials or bra_code.startswith('AAJ1Z20'):
+        if isinstance(material_name, dict) or material_name not in materials or (bra_code.startswith('AAJ1Z20') and total_weight==0):
             flag, send_flag = True, True
             record_data = {'plan_classes_uid': plan_classes_uid, 'bra_code': bra_code,
                            'product_no': classes_plan.product_batching.stage_product_batch_no,
@@ -278,76 +285,82 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             if scan_material_type == '胶皮':
                 flag, send_flag = False, False
                 # 查看群控配方是否含有掺料和待处理料
-                pcp = ProductClassesPlan.objects.using('SFJ').filter(plan_classes_uid=plan_classes_uid).first()
-                if not pcp:
-                    raise serializers.ValidationError('群控计划不存在')
-                product_recipe = ProductBatchingDetail.objects.using('SFJ').filter(product_batching_id=pcp.product_batching_id, delete_flag=False, type=1)
-                query_set = product_recipe.filter(Q(Q(material__material_name__icontains='掺料') |
-                                                  Q(material__material_name__icontains='待处理料')))
+                product_recipe = ProductBatchingDetailPlan.objects.using('SFJ').filter(plan_classes_uid=plan_classes_uid)
+                if not product_recipe:
+                    raise serializers.ValidationError(f'未获取到计划的配方详情{plan_classes_uid}')
+                query_set = product_recipe.filter(Q(Q(material_name__icontains='掺料') |
+                                                  Q(material_name__icontains='待处理料')))
                 if query_set:  # 此处由工艺确认: 掺料与待处理料不会同时出现在一个配方中
-                    recipe_material_name = query_set.first().material.material_name
-                    # 配方尾缀为K的不区分顺序
-                    if classes_plan.product_batching.stage_product_batch_no.endswith('K'):
-                        if '加硫' in recipe_material_name:
-                            if add_s:
-                                other_type, status, scan_material_msg = recipe_material_name, True, f'物料:{scan_material} 扫码成功'
-                            else:
-                                other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入加硫料'
-                        else:
-                            if add_s:
-                                other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入无硫料'
-                            else:
-                                other_type, status, scan_material_msg = recipe_material_name, True, f'物料:{scan_material} 扫码成功'
+                    recipe_material_name = query_set.first().material_name
+                    # 查询掺料放行
+                    s_result = self.material_pass(plan_classes_uid, scan_material, material_type=scan_material_type)
+                    if s_result[0]:
+                        other_type, status, scan_material_msg = recipe_material_name, True, f'物料:{recipe_material_name} 扫码成功'
                     else:
-                        # 炼胶类型判断: 混炼/终炼
-                        if re.findall('FM|RFM|RE', classes_plan.product_batching.stage_product_batch_no):
-                            # 待处理料不需要做加硫磺前后判断
-                            if '掺料' in recipe_material_name:
-                                # 加硫磺前后(上面限定了胶皮,这里不会出现小料硫磺xxx-硫磺)
-                                s_id = product_recipe.filter(Q(material__material_name__icontains='硫磺')).first()
-                                if s_id:
-                                    if s_id.id < query_set.first().id:
-                                        # 硫磺在前, 只能投加硫料
+                        # 配方尾缀为K的不区分顺序
+                        if classes_plan.product_batching.stage_product_batch_no.endswith('K'):
+                            if '加硫' in recipe_material_name:
+                                if add_s:
+                                    other_type, status, scan_material_msg = recipe_material_name, True, f'物料:{scan_material} 扫码成功'
+                                else:
+                                    other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入加硫料'
+                            else:
+                                if add_s:
+                                    other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入无硫料'
+                                else:
+                                    other_type, status, scan_material_msg = recipe_material_name, True, f'物料:{scan_material} 扫码成功'
+                        else:
+                            # 炼胶类型判断: 混炼/终炼
+                            if re.findall('FM|RFM|RE', classes_plan.product_batching.stage_product_batch_no):
+                                # 待处理料不需要做加硫磺前后判断
+                                if '掺料' in recipe_material_name:
+                                    # 加硫磺前后(上面限定了胶皮,这里不会出现小料硫磺xxx-硫磺)
+                                    s_id = product_recipe.filter(Q(material_name__icontains='硫磺')).first()
+                                    if s_id:
+                                        if s_id.sn < query_set.first().sn:
+                                            # 硫磺在前, 只能投加硫料
+                                            if add_s:
+                                                other_type, status, scan_material_msg = recipe_material_name, True, f'掺料:{scan_material} 扫码成功'
+                                            else:
+                                                other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入加硫料'
+                                        else:
+                                            if add_s:
+                                                other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入无硫料'
+                                            else:
+                                                other_type, status, scan_material_msg = recipe_material_name, True, f'掺料:{scan_material} 扫码成功'
+                                    else:  # 有掺料无硫磺
                                         if add_s:
                                             other_type, status, scan_material_msg = recipe_material_name, True, f'掺料:{scan_material} 扫码成功'
                                         else:
                                             other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入加硫料'
-                                    else:
+                                else:  # 加硫待处理料、无硫待处理料、前两者都有
+                                    add_s_wait_s = query_set.filter(material_name__icontains='加硫待处理料')
+                                    no_s_wait_s = query_set.filter(material_name__icontains='无硫待处理料')
+                                    if add_s_wait_s and not no_s_wait_s:
+                                        if add_s:
+                                            other_type, status, scan_material_msg = recipe_material_name, True, f'待处理物料:{scan_material}扫码成功'
+                                        else:
+                                            other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入加硫料'
+                                    elif no_s_wait_s and not add_s_wait_s:
                                         if add_s:
                                             other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入无硫料'
                                         else:
-                                            other_type, status, scan_material_msg = recipe_material_name, True, f'掺料:{scan_material} 扫码成功'
-                                else:  # 有掺料无硫磺
-                                    if add_s:
-                                        other_type, status, scan_material_msg = recipe_material_name, True, f'掺料:{scan_material} 扫码成功'
-                                    else:
-                                        other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入加硫料'
-                            else:  # 加硫待处理料、无硫待处理料、前两者都有
-                                add_s_wait_s = query_set.filter(material__material_name__icontains='加硫待处理料')
-                                no_s_wait_s = query_set.filter(material__material_name__icontains='无硫待处理料')
-                                if add_s_wait_s and not no_s_wait_s:
-                                    if add_s:
-                                        other_type, status, scan_material_msg = recipe_material_name, True, f'待处理物料:{scan_material}扫码成功'
-                                    else:
-                                        other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入加硫料'
-                                elif no_s_wait_s and not add_s_wait_s:
-                                    if add_s:
-                                        other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入无硫料'
+                                            other_type, status, scan_material_msg = recipe_material_name, True, f'待处理物料:{scan_material}扫码成功'
                                     else:
                                         other_type, status, scan_material_msg = recipe_material_name, True, f'待处理物料:{scan_material}扫码成功'
-                                else:
-                                    other_type, status, scan_material_msg = recipe_material_name, True, f'待处理物料:{scan_material}扫码成功'
-                        else:
-                            # 加硫禁止投料
-                            if add_s:
-                                other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入无硫料'
                             else:
-                                other_type, status, scan_material_msg = recipe_material_name, True, f'物料:{scan_material} 扫码成功'
+                                # 加硫禁止投料
+                                if add_s:
+                                    other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入无硫料'
+                                else:
+                                    other_type, status, scan_material_msg = recipe_material_name, True, f'物料:{scan_material} 扫码成功'
                 else:
                     scan_material_msg = '配方中无掺料, 所投物料不在配方中'
                 if not OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code, status=status, other_type=other_type):
                     record_data.update({'other_type': other_type, 'status': status})
                     OtherMaterialLog.objects.create(**record_data)
+                if '成功' not in scan_material_msg and not ReplaceMaterial.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code, reason_type='物料名不一致'):
+                    ReplaceMaterial.objects.create(**replace_material_data)
             # 胶块/细料
             else:
                 if scan_material_type == '胶块':
@@ -1024,7 +1037,7 @@ class WeightPackageLogCreateSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(f"人工料包配置数量不足,应包含物料:{','.join(list(k))}, 当前总配置数:{v['count']}")
             if v['manual_type'] == 'manual_single' and v['count'] < package_count * split_count:
                 raise serializers.ValidationError(f"原材料{','.join(list(k))}包数不足,已有:{v['count']}, 所需总数:{package_count * split_count}")
-        history_print = WeightPackageLog.objects.filter(plan_weight_uid=plan_weight_uid).aggregate(already_print=Sum('package_count'))['already_print']
+        history_print = WeightPackageLog.objects.filter(plan_weight_uid=plan_weight_uid, equip_no=equip_no).aggregate(already_print=Sum('package_count'))['already_print']
         already_print = history_print if history_print else 0
         if package_count > package_fufil - already_print:
             raise serializers.ValidationError('配置总数量不可大于已完成配料车次')
@@ -1094,18 +1107,18 @@ class WeightPackageLogCreateSerializer(serializers.ModelSerializer):
                 db_name.objects.filter(id=i['manual_id']).update(**update_kwargs)
                 MachineManualRelation.objects.create(**create_data)
         if display_manual_info:  # 固定人工配料信息(没有则新建)
-            history_record = WeightPackageLogManualDetails.objects.filter(plan_weight_uid=plan_weight_uid)
+            history_record = WeightPackageLogManualDetails.objects.filter(plan_weight_uid=plan_weight_uid, equip_no=equip_no)
             if not history_record:
                 create_list = []
                 for i in display_manual_info:
                     created_data = {'plan_weight_uid': plan_weight_uid, 'material_type': i['material_type'],
                                     'handle_material_name': i['handle_material_name'], 'weight': i['weight'],
-                                    'error': i['error']}
+                                    'error': i['error'], 'equip_no': equip_no}
                     create_list.append(WeightPackageLogManualDetails(**created_data))
                 WeightPackageLogManualDetails.objects.bulk_create(create_list)
         # 更新未打印数量
         noprint_count = validated_data['package_fufil'] - (already_print + machine_package_count)
-        WeightPackageLog.objects.filter(plan_weight_uid=plan_weight_uid).update(noprint_count=noprint_count)
+        WeightPackageLog.objects.filter(plan_weight_uid=plan_weight_uid, equip_no=equip_no).update(noprint_count=noprint_count)
         return instance
 
     class Meta:
@@ -1213,7 +1226,7 @@ class WeightPackageLogSerializer(BaseModelSerializer):
                                    'manual_weight': total_manual_weight, 'manual_tolerance': tolerance,
                                    'detail_manual': detail_manual, 'detail_machine': total_manual_weight - detail_manual})
         else:  # 不合包显示人工配料信息
-            manual_record = WeightPackageLogManualDetails.objects.filter(plan_weight_uid=res['plan_weight_uid'])
+            manual_record = WeightPackageLogManualDetails.objects.filter(plan_weight_uid=res['plan_weight_uid'], equip_no=instance.equip_no)
             if manual_record:
                 res.update({'display_manual_info': list(manual_record.values('material_type', 'handle_material_name', 'weight', 'error'))})
             else:
@@ -1255,7 +1268,7 @@ class WeightPackageLogSerializer(BaseModelSerializer):
                     'manual_weight': total_manual_weight, 'machine_weight': instance.plan_weight,
                     'print_datetime': instance.last_updated_date.strftime('%Y-%m-%d %H:%M:%S'), 'expire_datetime': expire_datetime})
         # 最新打印数据
-        last_instance = WeightPackageLog.objects.filter(plan_weight_uid=instance.plan_weight_uid).last()
+        last_instance = WeightPackageLog.objects.filter(plan_weight_uid=instance.plan_weight_uid, equip_no=instance.equip_no).last()
         res['order_flag'] = True if last_instance.bra_code == res['bra_code'] and res['noprint_count'] != 0 else False
         # 已使用数量
         used_trains = 0
@@ -1689,14 +1702,17 @@ class PlanSerializer(serializers.ModelSerializer):
             validated_data['order_by'] = last_group_plan.order_by + 1
         else:
             validated_data['order_by'] = 1
+        # 查询配方的合包状态
+        recipe = RecipePre.objects.using(equip_no).filter(name=validated_data['recipe']).first()
+        validated_data['merge_flag'] = recipe.merge_flag if recipe else False
+        split_count = 1 if not recipe else recipe.split_count
+        validated_data['setno'] = validated_data['setno'] * split_count
         validated_data['planid'] = datetime.now().strftime('%Y%m%d%H%M%S')[2:]
         validated_data['state'] = '等待'
         validated_data['actno'] = 0
         validated_data['oper'] = self.context['request'].user.username
         validated_data['addtime'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        # 查询配方的合包状态
-        recipe = RecipePre.objects.using(equip_no).filter(name=validated_data['recipe']).first()
-        validated_data['merge_flag'] = recipe.merge_flag if recipe else False
+
         try:
             instance = Plan.objects.using(equip_no).create(**validated_data)
             ins = CLSystem(equip_no)
@@ -1771,6 +1787,11 @@ class JZPlanSerializer(serializers.ModelSerializer):
             plan_id = prefix + '0001'
         else:
             plan_id = prefix + ('%04d' % (int(max_plan_id[-4:]) + 1) if max_plan_id > max_local['max_plan_id'] else '%04d' % (int(max_local['max_plan_id'][-4:]) + 1))
+        # 查询配方的合包状态
+        recipe = pre_model.objects.using(equip_no).filter(name=validated_data['recipe']).first()
+        validated_data['merge_flag'] = recipe.merge_flag if recipe else False
+        split_count = 1 if not recipe else recipe.split_count
+        validated_data['setno'] = validated_data['setno'] * split_count
         validated_data['planid'] = plan_id
         validated_data['state'] = '等待'
         validated_data['actno'] = 0
@@ -1779,9 +1800,6 @@ class JZPlanSerializer(serializers.ModelSerializer):
         validated_data['downtime'] = None
         validated_data['oper'] = self.context['request'].user.username
         validated_data['addtime'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        # 查询配方的合包状态
-        recipe = pre_model.objects.using(equip_no).filter(name=validated_data['recipe']).first()
-        validated_data['merge_flag'] = recipe.merge_flag if recipe else False
         try:
             instance = plan_model.objects.using(equip_no).create(**validated_data)
         except ConnectionDoesNotExist:
@@ -1810,7 +1828,10 @@ class PlanUpdateSerializer(serializers.ModelSerializer):
         elif action == 2:
             ins.reload_plan(instance.planid, instance.recipe)
         elif action == 3:
-            setno = validated_data['setno']
+            # 查询配方的合包状态
+            recipe = RecipePre.objects.using(equip_no).filter(name=instance.recipe).first()
+            split_count = 1 if not recipe else recipe.split_count
+            setno = validated_data['setno'] * split_count
             actno = instance.actno if instance.actno else 0
             if not setno:
                 raise serializers.ValidationError('设定车次不可为空!')
@@ -1849,7 +1870,9 @@ class JZPlanUpdateSerializer(serializers.ModelSerializer):
                 elif action == 2:
                     raise serializers.ValidationError('不支持称量计划重传')
                 elif action == 3:
-                    setno = validated_data['setno']
+                    recipe = RecipePre.objects.using(equip_no).filter(name=instance.recipe).first()
+                    split_count = 1 if not recipe else recipe.split_count
+                    setno = validated_data['setno'] * split_count
                     actno = instance.actno if instance.actno else 0
                     if not setno:
                         raise serializers.ValidationError('设定车次不可为空!')

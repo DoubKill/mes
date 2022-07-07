@@ -44,13 +44,15 @@ from equipment.task import property_template, property_import
 from equipment.utils import gen_template_response, get_staff_status, get_ding_uids, DinDinAPI, get_maintenance_status, \
     get_children_section
 from mes.common_code import OMin, OMax, OSum, CommonDeleteMixin
+from mes.conf import JZ_EQUIP_NO
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
 from mes.permissions import PermissionClass
 from plan.models import ProductClassesPlan
 from production.models import TrainsFeedbacks
 from quality.utils import get_cur_sheet, get_sheet_data
-from terminal.models import ToleranceDistinguish, ToleranceProject, ToleranceHandle, ToleranceRule, Plan, ReportBasic
+from terminal.models import ToleranceDistinguish, ToleranceProject, ToleranceHandle, ToleranceRule, Plan, ReportBasic, \
+    JZPlan
 from system.models import Section, User
 
 
@@ -2554,6 +2556,13 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipWarehouseOrderDetailFilter
 
+    def get_queryset(self):
+        order_id = self.request.query_params.get('order_id')
+        if order_id and order_id.startswith('RK'):
+            return self.queryset.exclude(status=3)
+        else:
+            return self.queryset
+
     @atomic
     def create(self, request, *args, **kwargs):
         data = self.request.data
@@ -4858,7 +4867,8 @@ class EquipIndexView(APIView):
             else:
                 actual_trains = plan_trains = halt_time = 0
                 try:
-                    plan_actual_data = Plan.objects.using(equip_no).filter(
+                    plan_model = JZPlan if equip_no in JZ_EQUIP_NO else Plan
+                    plan_actual_data = plan_model.objects.using(equip_no).filter(
                         date_time=factory_date).aggregate(plan_trains=Sum('setno'),
                                                           actual_trains=Sum('actno'))
                     # 称量实际车次
@@ -4866,7 +4876,7 @@ class EquipIndexView(APIView):
                     # 称量计划车次
                     plan_trains = plan_actual_data['plan_trains'] if plan_actual_data['plan_trains'] else 0
                     # 计算所有计划开始结束时间累加
-                    plan_list = Plan.objects.using(equip_no).filter(
+                    plan_list = plan_model.objects.using(equip_no).filter(
                         date_time=factory_date,
                         actno__gt=0).values('starttime', 'stoptime', 'actno', 'state', 'recipe', 'setno')
                     time_consume = 0

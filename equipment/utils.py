@@ -81,7 +81,6 @@ class DinDinAPI(object):
         ret = requests.post(url, params={'access_token': self.access_token}, data={"mobile": phone_num}, timeout=5)
         data = json.loads(ret.text)
         if not data.get('errcode') == 0:
-            logger.error(data.get('errmsg'))
             return ''
         else:
             return data.get('result').get('userid')
@@ -106,7 +105,6 @@ class DinDinAPI(object):
         ret = requests.post(url, params={'access_token': self.access_token}, json=data, timeout=5)
         data = json.loads(ret.text)
         if not data.get('errcode') == 0:
-            logger.error(data.get('errmsg'))
             return []
         else:
             return data.get('recordresult')
