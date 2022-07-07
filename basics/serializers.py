@@ -257,6 +257,7 @@ class PlanScheduleSerializer(BaseModelSerializer):
     work_schedule_plan = WorkSchedulePlanSerializer(many=True,
                                                     help_text="""{"classes":班次id, "rest_flag":0, "group":班组id""")
     work_schedule_name = serializers.CharField(source='work_schedule.schedule_name', read_only=True)
+    work_schedule_type = serializers.CharField(source='work_schedule.work_procedure.global_name', read_only=True)
 
     class Meta:
         model = PlanSchedule

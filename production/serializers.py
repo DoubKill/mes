@@ -13,6 +13,7 @@ from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, Pla
     OperationLog, UnReachedCapacityCause, ProcessFeedback, AlarmLog, RubberCannotPutinReason, PerformanceJobLadder, \
     ProductInfoDingJi, SetThePrice, SubsidyInfo, AttendanceGroupSetup, EmployeeAttendanceRecords, FillCardApply, \
     ApplyForExtraWork, Equip190EWeight, OuterMaterial, Equip190E, AttendanceClockDetail
+from recipe.models import MaterialAttribute
 from system.models import User
 
 
@@ -158,10 +159,15 @@ class ProductionRecordSerializer(BaseModelSerializer):
     class_group = serializers.SerializerMethodField(read_only=True)
     margin = serializers.CharField(default=None, read_only=True)
 
-    def get_validtime(self, object):
-        end_time = object.end_time if object.end_time else 0
-        validtime = end_time + datetime.timedelta(days=1)
-        return validtime if validtime else ""
+    def get_validtime(self, obj):
+        attr = MaterialAttribute.objects.filter(material__material_no=obj.product_no).first()
+        if attr:
+            if attr.period_of_validity:
+                validtime = obj.end_time + datetime.timedelta(days=attr.period_of_validity)
+                return validtime.strftime("%Y-%m-%d %H:%M:%S")
+            return ""
+        else:
+            return ""
 
     def get_class_group(self, object):
         product = ProductClassesPlan.objects.filter(plan_classes_uid=object.plan_classes_uid).first()
@@ -453,6 +459,7 @@ class SubsidyInfoSerializer(serializers.ModelSerializer):
 
 class AttendanceGroupSetupSerializer(serializers.ModelSerializer):
     attendance_users = serializers.SerializerMethodField()
+    work_schedule_name = serializers.ReadOnlyField(source='work_schedule.schedule_name', help_text='倒班名称')
 
     class Meta:
         model = AttendanceGroupSetup
@@ -485,9 +492,20 @@ class EmployeeAttendanceRecordsSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def validate(self, attrs):
-
         attrs['user'] = User.objects.filter(username=attrs.pop('username')).first()
         return attrs
+
+    def create(self, validated_data):
+        # 已经确认过或者整体提交不能添加考勤数据 绿色[#51A651] 黑色[#141414]
+        r_exist = EmployeeAttendanceRecords.objects.filter(factory_date=validated_data['factory_date'],
+                                                           group=validated_data['group'],
+                                                           equip=validated_data['equip'],
+                                                           section=validated_data['section'],
+                                                           user__username=validated_data['user'].username,
+                                                           record_status__in=['#51A651', '#141414'])
+        if r_exist:
+            raise serializers.ValidationError('添加失败: 该考勤数据已锁定!')
+        return super().create(validated_data)
 
 
 class FillCardApplySerializer(serializers.ModelSerializer):
