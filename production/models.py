@@ -1,6 +1,6 @@
 from django.db import models
 
-from basics.models import AbstractEntity, GlobalCode, Location
+from basics.models import AbstractEntity, GlobalCode, Location, WorkSchedule
 from system.models import User
 
 
@@ -396,10 +396,23 @@ class EmployeeAttendanceRecords(models.Model):
     equip = models.CharField(help_text='机台', max_length=12, null=True, blank=True)
     status = models.CharField(max_length=12, help_text='上岗/调岗/加班', null=True, blank=True)
     is_use = models.CharField(max_length=12, help_text='确认/添加/废弃', null=True, blank=True)
+    record_status = models.CharField(max_length=12, help_text='考勤记录颜色: 蓝色[#1010FF]-未确认,绿色[#51A651]-已确认,红色[#DA1F27]-驳回,黑色[#141414]-整体提交', default='#1010FF')
 
     class Meta:
         db_table = 'employee_attendance_records'
         verbose_name_plural = verbose_name = '员工出勤记录表'
+
+
+class EmployeeAttendanceRecordsLog(models.Model):
+    opera_time = models.DateTimeField(help_text='操作时间', auto_now_add=True)
+    opera_user = models.CharField(help_text='操作员', max_length=16)
+    opera_type = models.CharField(help_text='操作类别: 审批、审核、驳回、确认、废弃、整体提交', max_length=8)
+    record_date = models.DateField(help_text='操作数据的日期', null=True, blank=True)
+    delete_id = models.IntegerField(help_text='废弃的考勤数据id', null=True, blank=True)
+
+    class Meta:
+        db_table = 'employee_attendance_records_log'
+        verbose_name_plural = verbose_name = '审批驳回操作履历'
 
 
 class FillCardApply(models.Model):
@@ -521,14 +534,12 @@ class IndependentPostTemplate(models.Model):
 
 class AttendanceGroupSetup(models.Model):
     attendance_group = models.CharField(max_length=64, help_text='考勤组名称')
-    # attendance_users = models.CharField(max_length=64, help_text='参加考勤人员')
-    users = models.ManyToManyField(to=User, related_name='attendance_group')
-    attendance_st = models.TimeField(help_text='考勤开始时间')
-    attendance_et = models.TimeField(help_text='考勤结束时间')
-    principal = models.CharField(max_length=64, help_text='考勤负责人')
+    users = models.ManyToManyField(to=User, related_name='attendance_group', help_text='考勤组人员')
+    principal = models.CharField(max_length=1024, help_text='考勤负责人')
     range_time = models.IntegerField(help_text='上班多久后可打下班卡', null=True, blank=True)
     lead_time = models.IntegerField(help_text='提前几分钟可打工卡', null=True, blank=True)
     type = models.CharField(help_text='类别', max_length=64, null=True, blank=True)
+    work_schedule = models.ForeignKey(WorkSchedule, help_text='倒班规则', on_delete=models.CASCADE, null=True, blank=True)
 
     class Meta:
         db_table = 'attendance_group_setup'
