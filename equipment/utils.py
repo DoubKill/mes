@@ -9,7 +9,7 @@ from io import BytesIO
 import requests
 from django.db.models import Q, F
 from django.http import HttpResponse
-from openpyxl import load_workbook
+from openpyxl import load_workbook, cell
 from rest_framework.exceptions import ValidationError
 
 from equipment.models import EquipApplyOrder, EquipMaintenanceAreaSetting, EquipInspectionOrder
@@ -31,7 +31,8 @@ def gen_template_response(export_fields_dict, data, file_name):
     data_row = 2
     for i in data:
         for col_num, data_key in enumerate(export_fields):
-            sheet.cell(data_row, col_num + 1).value = i[data_key]
+            set_value = cell.cell.ILLEGAL_CHARACTERS_RE.sub(r'', i[data_key]) if isinstance(i[data_key], str) else i[data_key]
+            sheet.cell(data_row, col_num + 1).value = set_value
         data_row += 1
 
     wb.remove_sheet(ws)
