@@ -2765,7 +2765,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
             item['lower_stock'] = item['equip_spare__lower_stock']
             item['unit'] = item['equip_spare__unit']
         if self.request.query_params.get('export'):
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         st = (int(page) - 1) * int(page_size)
         et = int(page) * int(page_size)
         count = len(data)
