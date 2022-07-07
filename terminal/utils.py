@@ -867,14 +867,13 @@ def get_manual_materials(product_no, dev_type, batching_equip, equip_no=None):
     return manual_material
 
 
-def get_current_factory_date():
-    # 获取当前时间的工厂日期，开始、结束时间
-    now = datetime.now()
-    current_work_schedule_plan = WorkSchedulePlan.objects.filter(
-        start_time__lte=now,
-        end_time__gte=now,
-        plan_schedule__work_schedule__work_procedure__global_name='密炼'
-    ).first()
+def get_current_factory_date(select_date, group):
+    now, filter_kwargs = datetime.now(), {}
+    if select_date and group:  # 获取特定日期的班次
+        filter_kwargs = {'plan_schedule__day_time': select_date, 'group__global_name': group, 'plan_schedule__work_schedule__work_procedure__global_name': '密炼'}
+    else:
+        filter_kwargs = {'start_time__lte': now, 'end_time__gte': now, 'plan_schedule__work_schedule__work_procedure__global_name': '密炼'}
+    current_work_schedule_plan = WorkSchedulePlan.objects.filter(**filter_kwargs).first()
     res = {'factory_date': current_work_schedule_plan.plan_schedule.day_time, 'classes': current_work_schedule_plan.classes.global_name} if current_work_schedule_plan else {'factory_date': datetime.now().date()}
     return res
 

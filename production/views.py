@@ -31,8 +31,8 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet, ViewSet
 from basics.models import GlobalCode, WorkSchedulePlan
 from equipment.models import EquipMaintenanceOrder
-from mes.common_code import OSum, date_range
-from mes.conf import EQUIP_LIST
+from mes.common_code import OSum, date_range, days_cur_month_dates
+from mes.conf import EQUIP_LIST, JZ_EQUIP_NO
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
 from mes.permissions import PermissionClass
@@ -48,7 +48,7 @@ from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, Pla
     RubberCannotPutinReason, MachineTargetYieldSettings, EmployeeAttendanceRecords, PerformanceJobLadder, \
     PerformanceUnitPrice, ProductInfoDingJi, SetThePrice, SubsidyInfo, IndependentPostTemplate, AttendanceGroupSetup, \
     FillCardApply, ApplyForExtraWork, EquipMaxValueCache, Equip190EWeight, OuterMaterial, Equip190E, \
-    AttendanceClockDetail, AttendanceResultAudit, ManualInputTrains, ActualWorkingDay
+    AttendanceClockDetail, AttendanceResultAudit, ManualInputTrains, ActualWorkingDay, EmployeeAttendanceRecordsLog
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, \
@@ -63,12 +63,13 @@ from rest_framework.generics import ListAPIView, GenericAPIView, ListCreateAPIVi
     get_object_or_404
 from datetime import timedelta
 
+from production.utils import get_standard_time
 from quality.models import MaterialTestOrder, MaterialDealResult, MaterialTestResult, MaterialDataPointIndicator
 from quality.utils import get_cur_sheet, get_sheet_data
 from system.models import User, Section
 from recipe.models import Material
 from system.models import User
-from terminal.models import Plan
+from terminal.models import Plan, JZPlan
 from equipment.utils import DinDinAPI
 
 
@@ -2685,9 +2686,8 @@ class SummaryOfWeighingOutput(APIView):
             raise ValidationError('请先去添加细料/硫磺单价')
         for equip_no in equip_list:
             dic = {'equip_no': equip_no, 'hj': 0}
-            data = Plan.objects.using(equip_no).filter(actno__gt=1, state='完成',
-                                                       date_time__istartswith=factory_date
-                                                       ).values('date_time', 'grouptime').annotate(count=Sum('actno'))
+            plan_model = JZPlan if equip_no in JZ_EQUIP_NO else Plan
+            data = plan_model.objects.using(equip_no).filter(actno__gt=1, state='完成', date_time__istartswith=factory_date).values('date_time', 'grouptime').annotate(count=Sum('actno'))
             for item in data:
                 date = item['date_time']
                 day = int(date.split('-')[2])    # 2  早班
@@ -2753,7 +2753,9 @@ class EmployeeAttendanceRecordsView(APIView):
         else:
             this_month_end = datetime.datetime(year, month + 1, 1) - timedelta(days=1)
         group = WorkSchedulePlan.objects.filter(start_time__date__gte=this_month_start,
-                                                start_time__date__lte=this_month_end).values('group__global_name', 'start_time__date').order_by('start_time')
+                                                start_time__date__lte=this_month_end,
+                                                plan_schedule__work_schedule__work_procedure__global_name='密炼')\
+            .values('group__global_name', 'start_time__date').order_by('start_time')
         group_list = []
         for key, group in groupby(list(group), key=lambda x: x['start_time__date']):
             group_list.append([item['group__global_name'] for item in group])
@@ -2764,17 +2766,29 @@ class EmployeeAttendanceRecordsView(APIView):
             Q(factory_date__year=year, factory_date__month=month, user__username__icontains=name) &
             ~Q(is_use='废弃')
             ).values(
-            'equip', 'section', 'group', 'factory_date__day', 'user__username', 'actual_time')
+            'equip', 'section', 'group', 'factory_date__day', 'user__username', 'actual_time', 'record_status')
         for item in data:
             equip = item['equip']
             section = item['section']
             if not results.get(f'{equip}_{section}'):
                 results[f'{equip}_{section}'] = {'equip': equip, 'section': section}
             value = item['user__username'] if item['actual_time'] == 12 else '%s(%.2f)' % (item['user__username'], item['actual_time'])
-            if results[f'{equip}_{section}'].get(f"{item['factory_date__day']}{item['group']}"):
-                results[f'{equip}_{section}'][f"{item['factory_date__day']}{item['group']}"].append(value)
+            detail = {'name': value, 'color': item['record_status']}
+            data = results[f'{equip}_{section}'].get(f"{item['factory_date__day']}{item['group']}")
+            if data:
+                # 同一天同班组同一人同岗位同机台时间累加
+                for i in data:
+                    split_name = re.split('[(|)]', i['name'])
+                    if split_name == 1:  # 工作12小时没有时间显示
+                        break
+                    if split_name[0] == item['user__username']:
+                        total_time = item['actual_time'] + float(split_name[1])
+                        i.update(name='%s(%.2f)' % (item['user__username'], total_time))
+                        break
+                else:
+                    data.append(detail)
             else:
-                results[f'{equip}_{section}'][f"{item['factory_date__day']}{item['group']}"] = [value]
+                results[f'{equip}_{section}'][f"{item['factory_date__day']}{item['group']}"] = [detail]
         res = list(results.values())
         for item in res:
             item['equip'] = '' if not item.get('equip') else item['equip']
@@ -3144,17 +3158,17 @@ class PerformanceSummaryView(APIView):
                     user_dic[key]['actual_time'] += item[5]
                 else:
                     user_dic[key] = {'name': item[0], 'section': item[1], 'day': item[2], 'group': item[3], 'equip': equip, 'actual_time': item[5], 'classes': item[6]}
-        group = WorkSchedulePlan.objects.filter(start_time__year=year,
-                                                start_time__month=month).values_list('group__global_name', 'classes__global_name', 'start_time__day').order_by('start_time')
+        group = WorkSchedulePlan.objects.filter(start_time__year=year, start_time__month=month,
+                                                plan_schedule__work_schedule__work_procedure__global_name='密炼')\
+            .values_list('group__global_name', 'classes__global_name', 'start_time__day').order_by('start_time')
         group_list = []
         for key, g in groupby(list(group), key=lambda x: x[2]):
             group_list.append([item[0] for item in g])
 
         # 密炼的产量
         queryset = TrainsFeedbacks.objects.filter(Q(~Q(equip_no='Z04')) | Q(equip_no='Z04', operation_user='Mixer1'))
-        product_qty = list(queryset.filter(**kwargs2
-                                                     ).values('classes', 'equip_no', 'factory_date__day', 'product_no').\
-            annotate(actual_trains=Count('id')).values('actual_trains', 'classes', 'equip_no', 'factory_date__day', 'product_no'))
+        product_qty = list(queryset.filter(**kwargs2).values('classes', 'equip_no', 'factory_date__day', 'product_no')
+                           .annotate(actual_trains=Count('id')).values('actual_trains', 'classes', 'equip_no', 'factory_date__day', 'product_no'))
         # 人工录入产量
         add_qty = list(ManualInputTrains.objects.filter(**kwargs2).values('actual_trains', 'classes', 'equip_no', 'factory_date__day', 'product_no'))
         product_qty = product_qty + add_qty
@@ -3179,8 +3193,10 @@ class PerformanceSummaryView(APIView):
                                 state = 'RFM'
                             elif item['product_no'].split('-')[0] == 'WL':
                                 state = 'RMB'
-                            else: continue
-                    except: continue
+                            else:
+                                continue
+                    except:
+                        continue
                     if not price_dic.get(f"{equip_type}_{state}"):
                         PerformanceUnitPrice.objects.create(state=state, equip_type=equip_type, dj=1.2, pt=1.1)
                         price_dic[f"{equip_type}_{state}"] = {'pt': 1.2, 'dj': 1.1}
@@ -3407,16 +3423,13 @@ class PerformanceSummaryView(APIView):
         if ccjl:  # 超产奖励详情
             return Response({'results': ccjl_dic.get(name_d, None)})
         for item in list(results.values()):
-            # 其他奖惩
-            price1 = SubsidyInfo.objects.filter(type=1, name=item['name'], date__year=year,
-                                                date__month=month).aggregate(price=Sum('price'))['price']
-            # 生产补贴
-            price2 = SubsidyInfo.objects.filter(type=2, name=item['name'], date__year=year,
-                                                date__month=month).aggregate(price=Sum('price'))['price']
-            item['其他奖惩'] = price1
-            item['生产补贴'] = price2
-            item['all'] += price1 if price1 else 0
-            item['all'] += price2 if price2 else 0
+            # 其他奖惩+生产补贴
+            additional = SubsidyInfo.objects.filter(name=item['name'], type__in=[1, 2], date__year=year,
+                                                    date__month=month).aggregate(others=Sum('price', filter=Q(type=1)),
+                                                                                 prods=Sum('price', filter=Q(type=2)))
+            item['其他奖惩'] = additional['others'] if additional['others'] else 0
+            item['生产补贴'] = additional['prods'] if additional['prods'] else 0
+            item['all'] += (item['其他奖惩'] + item['生产补贴'])
             # 乘员工类别系数
             if independent.get(item['name']):
                 work_type = independent[item['name']].get('work_type')
@@ -3535,7 +3548,7 @@ class AttendanceGroupSetupViewSet(ModelViewSet):
         name = self.request.user.username
         state = False
         for obj in AttendanceGroupSetup.objects.all():
-            if obj.principal == name:
+            if name in obj.principal:
                 state = True
                 break
             if name in obj.users.all().values_list('username', flat=True):
@@ -3582,7 +3595,7 @@ class AttendanceClockViewSet(ModelViewSet):
         # 获取登陆用户所在考勤组
         attendance_group_obj = None
         for obj in AttendanceGroupSetup.objects.all():
-            if obj.principal == username:
+            if username in obj.principal:
                 attendance_group_obj = obj
                 break
             if username in obj.users.all().values_list('username', flat=True):
@@ -3617,8 +3630,9 @@ class AttendanceClockViewSet(ModelViewSet):
         else:
             date_now = str(now.date())
         # 获取班次班组
-        queryset = WorkSchedulePlan.objects.filter(plan_schedule__day_time=date_now).values('group__global_name',
-                                                                                     'classes__global_name')
+        queryset = WorkSchedulePlan.objects.filter(plan_schedule__day_time=date_now,
+                                                   plan_schedule__work_schedule__work_procedure__global_name='密炼')\
+            .values('group__global_name', 'classes__global_name')
         group_list = [{'group': item['group__global_name'], 'classes': item['classes__global_name']} for item in queryset]
         return attendance_group_obj, list(section_list), list(equip_list), date_now, group_list
 
@@ -3627,6 +3641,7 @@ class AttendanceClockViewSet(ModelViewSet):
         id_card_num = self.request.user.id_card_num
         apply = self.request.query_params.get('apply', None)
         time_now = datetime.datetime.now()
+        date_now = None
         try:
             attendance_group_obj, section_list, equip_list, date_now, group_list = self.get_user_group(self.request.user)
         except Exception as e:
@@ -3660,9 +3675,12 @@ class AttendanceClockViewSet(ModelViewSet):
             results['equips'] = equips
 
             if str(last_obj.factory_date) == date_now:
-                date_now = datetime.datetime.strptime(date_now, '%Y-%m-%d')
-                if attendance_group_obj.attendance_et.hour > 12:  # 白班
-                    if time_now < date_now + datetime.timedelta(days=1, hours=2):  # 直到明天凌晨两点，显示当前的打卡记录
+                begin_time, end_time = get_standard_time(username, date_now)
+                if not begin_time:
+                    raise ValidationError('未找到排班信息')
+                p_date_now = datetime.datetime.strptime(date_now, '%Y-%m-%d')
+                if end_time.hour > 12:  # 白班
+                    if time_now < p_date_now + datetime.timedelta(days=1, hours=2):  # 直到明天凌晨两点，显示当前的打卡记录
                         results['state'] = 3  # 进行中的
                         results['ids'] = ids
                         results['begin_date'] = datetime.datetime.strftime(last_obj.begin_date, '%H:%M:%S') if last_obj.begin_date else None
@@ -3675,7 +3693,7 @@ class AttendanceClockViewSet(ModelViewSet):
                     else:
                         flat = True
                 else:  # 夜班
-                    if time_now < date_now + datetime.timedelta(days=1, hours=14):
+                    if time_now < p_date_now + datetime.timedelta(days=1, hours=14):
                         results['state'] = 3
                         results['ids'] = ids
                         results['begin_date'] = datetime.datetime.strftime(last_obj.begin_date, '%H:%M:%S') if last_obj.begin_date else None
@@ -3714,8 +3732,15 @@ class AttendanceClockViewSet(ModelViewSet):
             'ids': [],
         }
         # 标准上下班时间
-        standard_begin_time = datetime.datetime.strptime(f"{date_now} {str(attendance_group_obj.attendance_st)}", '%Y-%m-%d %H:%M:%S')
-        standard_end_time = datetime.datetime.strptime(f"{date_now} {str(attendance_group_obj.attendance_et)}", '%Y-%m-%d %H:%M:%S')
+        standard_begin_time, standard_end_time = get_standard_time(user.username, date_now, group=data['group'], classes=data['classes'])
+        if not standard_begin_time:
+            raise ValidationError('未找到排班信息')
+        # 需要和加班申请做交集
+        extra_work = ApplyForExtraWork.objects.filter(factory_date=date_now, user=user, group=data['group'],
+                                                      classes=data['classes'], section=data['section'],
+                                                      handling_result=True).last()
+        if extra_work:
+            standard_begin_time, standard_end_time = extra_work.begin_date, extra_work.end_date
         if status == '上岗':
             begin_date = time_now
             lead_time = datetime.timedelta(minutes=attendance_group_obj.lead_time)
@@ -3724,10 +3749,10 @@ class AttendanceClockViewSet(ModelViewSet):
             # 本次上岗打卡操作自动补上上次离岗打卡
             last_date = datetime.datetime.strptime(date_now, '%Y-%m-%d') - datetime.timedelta(days=1)
             last_date = datetime.datetime.strftime(last_date, '%Y-%m-%d')
-            if attendance_group_obj.attendance_et.hour > 12:  # 白班
-                end_date = f"{str(last_date)} {str(attendance_group_obj.attendance_et)}"
+            if standard_end_time.hour > 12:  # 白班
+                end_date = f"{str(last_date)} {str(standard_end_time)[11:]}"
             else:
-                end_date = f"{str(date_now)} {str(attendance_group_obj.attendance_et)}"
+                end_date = f"{str(date_now)} {str(standard_end_time)[11:]}"
             EmployeeAttendanceRecords.objects.filter(
                 user=user,
                 end_date__isnull=True,
@@ -3749,11 +3774,14 @@ class AttendanceClockViewSet(ModelViewSet):
                 raise ValidationError(f'上班{attendance_group_obj.range_time}分钟内不能打下班卡')
             # 下班半小时后不能再打卡
             if time_now > standard_end_time + datetime.timedelta(minutes=30):
-                raise ValidationError('下班超过半小时不可在打卡')
+                raise ValidationError('下班超过半小时不可再打卡')
             end_date = time_now
             # 计算实际工时(打卡时间)
             actual_begin_time = begin_date if standard_end_time > begin_date > standard_begin_time else standard_begin_time
             actual_end_time = end_date if standard_end_time > end_date > standard_begin_time else standard_end_time
+            if extra_work:
+                actual_begin_time = actual_begin_time if actual_begin_time < extra_work.begin_date else extra_work.begin_date
+                actual_end_time = actual_end_time if actual_end_time < extra_work.end_date else extra_work.end_date
             work_time = round((actual_end_time - actual_begin_time).seconds / 3600, 2)
             EmployeeAttendanceRecords.objects.filter(id__in=ids).update(
                 end_date=end_date, work_time=work_time, actual_time=work_time
@@ -3806,17 +3834,21 @@ class AttendanceClockViewSet(ModelViewSet):
         principal = attendance_group_obj.principal  # 考勤负责人
         # 离岗时间
         equip_list = data.pop('equip_list')
-        if attendance_group_obj.attendance_et.hour > 12:  # 白班
-            attendance_et = datetime.datetime.strptime(f"{date_now} {str(attendance_group_obj.attendance_et)}", '%Y-%m-%d %H:%M:%S')
+        # 标准上下班时间
+        standard_begin_time, standard_end_time = get_standard_time(user.username, now.date(), group=data['group'], classes=data['classes'])
+        if not standard_begin_time:
+            raise ValidationError('未找到排班信息')
+        if standard_end_time.hour > 12:  # 白班
+            attendance_et = datetime.datetime.strptime(f"{date_now} {str(standard_end_time)[11:]}", '%Y-%m-%d %H:%M:%S')
             factory_date = date_now
         else:  # 夜班
-            hours = datetime.datetime.strptime(now_time, '%H:%M:%S')
-            if attendance_group_obj.attendance_et < hours < attendance_group_obj.attendance_st:
+            hours = now_time.time()
+            if standard_end_time.time() < hours < standard_begin_time.time():
                 factory_date = now_time - datetime.timedelta(days=1)
             else:
                 factory_date = date_now
             factory_date1 = str(datetime.datetime.strptime(factory_date, '%Y-%m-%d') + datetime.timedelta(days=1))
-            attendance_et = datetime.datetime.strptime(f"{factory_date1} {str(attendance_group_obj.attendance_et)}", '%Y-%m-%d %H:%M:%S')
+            attendance_et = datetime.datetime.strptime(f"{factory_date1} {str(standard_end_time)[11:]}", '%Y-%m-%d %H:%M:%S')
         if now_time > attendance_et + datetime.timedelta(hours=int(card_time)):
             raise ValidationError(f'不可提交超过{card_time}小时的申请')
 
@@ -3857,7 +3889,7 @@ class AttendanceClockViewSet(ModelViewSet):
             **data
         )
         # 钉钉提醒
-        principal_obj = User.objects.filter(username=principal).first()
+        principal_obj = User.objects.filter(username__in=principal.split(','))
         if not principal_obj:
             raise ValidationError('考勤负责人不存在')
         serializer_data = FillCardApplySerializer(apply).data
@@ -3873,7 +3905,8 @@ class AttendanceClockViewSet(ModelViewSet):
                 {"key": "补卡理由:", "value": apply.desc},
             ],
         }
-        self.send_message(principal_obj, content)
+        for principal in principal_obj:
+            self.send_message(principal, content)
         return Response('消息发送给审批人')
 
     @action(methods=['post'], detail=False, permission_classes=[], url_path='overtime', url_name='overtime')
@@ -3893,7 +3926,7 @@ class AttendanceClockViewSet(ModelViewSet):
             **data
         )
         # 钉钉提醒
-        principal_obj = User.objects.filter(username=principal).first()
+        principal_obj = User.objects.filter(username__in=principal.split(','))
         if not principal_obj:
             raise ValidationError('考勤负责人不存在')
         serializer_data = ApplyForExtraWorkSerializer(apply).data
@@ -3910,7 +3943,8 @@ class AttendanceClockViewSet(ModelViewSet):
                 {"key": "加班理由:", "value": apply.desc},
             ],
         }
-        self.send_message(principal_obj, content)
+        for principal in principal_obj:
+            self.send_message(principal, content)
         return Response('消息发送给审批人')
 
     @action(methods=['get'], detail=False, permission_classes=[], url_path='default_value', url_name='default_value')
@@ -3966,7 +4000,7 @@ class ReissueCardView(APIView):
             et = int(page) * int(page_size)
         except:
             raise ValidationError("page/page_size异常，请修正后重试")
-        group_setup = AttendanceGroupSetup.objects.filter(principal=self.request.user.username).first()
+        group_setup = AttendanceGroupSetup.objects.filter(principal__icontains=self.request.user.username).first()
         if self.request.query_params.get('apply'):  # 查看自己的补卡申请
             user_list = [self.request.user.username]
             if group_setup:
@@ -3977,7 +4011,7 @@ class ReissueCardView(APIView):
         else:  # 审批补卡申请
             principal = group_setup.principal
             attendance_users_list = list(group_setup.users.all().values_list('username', flat=True))
-            attendance_users_list.append(principal)
+            attendance_users_list.extend(principal.split(','))
             # 列表中找出和name想象的
             if name:
                 attendance_users_list = [user for user in attendance_users_list if name in user]
@@ -4101,7 +4135,7 @@ class OverTimeView(APIView):
             et = int(page) * int(page_size)
         except:
             raise ValidationError("page/page_size异常，请修正后重试")
-        group_setup = AttendanceGroupSetup.objects.filter(principal=self.request.user.username).first()
+        group_setup = AttendanceGroupSetup.objects.filter(principal__icontains=self.request.user.username).first()
         if self.request.query_params.get('apply'):  # 查看自己的加班申请
             user_list = [self.request.user.username]
             if group_setup:
@@ -4194,7 +4228,7 @@ class AttendanceRecordSearch(APIView):
                 ~Q(is_use='废弃') & Q(user=self.request.user, factory_date=f"{date}-{day}")).order_by('begin_date')
             group_setup = None
             for obj in AttendanceGroupSetup.objects.all():
-                if obj.principal == username:
+                if username in obj.principal:
                     group_setup = obj
                     break
                 if username in obj.users.all().values_list('username', flat=True):
@@ -4202,9 +4236,13 @@ class AttendanceRecordSearch(APIView):
                     break
             if not group_setup:
                 raise ValidationError(f'{username}不在考勤组')
+            # 标准上下班时间
+            standard_begin_time, standard_end_time = get_standard_time(username, f"{date}-{day if len(day) > 1 else ('0' + day)}")
+            if not standard_begin_time:
+                raise ValidationError('未找到排班信息')
             results = {
-                'attendance_st': group_setup.attendance_st,
-                'attendance_et': group_setup.attendance_et
+                'attendance_st': str(standard_begin_time),
+                'attendance_et': str(standard_end_time)
             }
             if record:
                 begin_date = record.first().begin_date
@@ -4255,7 +4293,7 @@ class AttendanceRecordSearch(APIView):
                 results['work_times'] += item['actual_time']
                 attendance_group_obj = None
                 for obj in AttendanceGroupSetup.objects.all():
-                    if obj.principal == username:
+                    if username in obj.principal:
                         attendance_group_obj = obj
                         break
                     if username in obj.users.all().values_list('username', flat=True):
@@ -4268,12 +4306,16 @@ class AttendanceRecordSearch(APIView):
                 begin_date = record.first().begin_date
                 end_date = record.last().end_date
                 if begin_date and end_date:  # 导入的没有上岗和离岗时间
+                    # 标准上下班时间
+                    standard_begin_time, standard_end_time = get_standard_time(username, record.first().factory_date)
+                    if not standard_begin_time:
+                        raise ValidationError('未找到排班信息')
                     if begin_date > datetime.datetime.strptime(
-                            f"{str(item['factory_date'])} {str(attendance_group_obj.attendance_st)}",
+                            f"{str(item['factory_date'])} {str(standard_end_time)[11:]}",
                             '%Y-%m-%d %H:%M:%S'):
                         results['cd'] += 1
                     if end_date and end_date < datetime.datetime.strptime(
-                            f"{str(item['factory_date'])} {str(attendance_group_obj.attendance_et)}",
+                            f"{str(item['factory_date'])} {str(standard_end_time)[11:]}",
                             '%Y-%m-%d %H:%M:%S'):
                         results['zt'] += 1
         if detail:
@@ -4309,12 +4351,13 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
         queryset = self.get_queryset().filter(factory_date__year=year,
                                               factory_date__month=month, user__username=name)
         data = self.get_serializer(queryset, many=True).data
+        principal, id_card_num = None, None
         if data:
             user = User.objects.filter(username=name).first()
             id_card_num = user.id_card_num
             principal_obj = None
             for obj in AttendanceGroupSetup.objects.all():
-                if obj.principal == user.username:
+                if user.username in obj.principal:
                     principal_obj = obj
                     break
                 if user.username in obj.users.all().values_list('username', flat=True):
@@ -4322,21 +4365,57 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
                     break
             if not principal_obj:
                 raise ValidationError(f'{user.username}不在考勤组')
-            principal = principal_obj.principal if principal_obj else None
-        return Response({'results': data, 'principal': principal if data else None,
-                     'id_card_num': id_card_num if data else None})
+            if principal_obj:
+                principal = principal_obj.principal
+        return Response({'results': data, 'principal': principal, 'id_card_num': id_card_num})
 
+    @atomic
     def create(self, request, *args, **kwargs):
         report_list = self.request.data.get('report_list', [])
         confirm_list = self.request.data.get('confirm_list', [])
-        if report_list:
+        reject_list = self.request.data.get('reject_list', [])
+        opera_user = self.request.user.username
+        factory_date, opera_type = None, None
+        if report_list:  # 添加考勤数据
             serializer = self.get_serializer(data=report_list, many=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
-        elif confirm_list:
-            for item in confirm_list:
-                EmployeeAttendanceRecords.objects.filter(pk=item['id']).update(actual_time=item.get('actual_time', 0))
+        elif confirm_list:  # 确认某一天的考勤数据
+            opera_type = '确认'
+            for item in confirm_list:  # #51A651绿色
+                is_use, factory_date = item.get('is_use'), item.get('factory_date')
+                EmployeeAttendanceRecords.objects.filter(pk=item['id']).update(actual_time=item.get('actual_time', 0),
+                                                                               is_use=is_use, record_status='#51A651')
+        elif reject_list:  # 审批驳回某一天的数据 #DA1F27 红色
+            opera_type = '单天驳回'
+            for item in reject_list:
+                is_use, factory_date = item.get('is_use'), item.get('factory_date')
+                EmployeeAttendanceRecords.objects.filter(pk=item['id']).update(is_use=is_use, record_status='#DA1F27')
+        else:
+            raise ValidationError('不支持的操作')
+        # 记录操作履历
+        if factory_date and opera_type:
+            EmployeeAttendanceRecordsLog.objects.create(**{'opera_user': opera_user, 'opera_type': opera_type,
+                                                           'record_date': factory_date})
         return Response('ok')
+
+    @atomic
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        if getattr(instance, '_prefetched_objects_cache', None):
+            # If 'prefetch_related' has been applied to a queryset, we need to
+            # forcibly invalidate the prefetch cache on the instance.
+            instance._prefetched_objects_cache = {}
+        # 废弃操作履历
+        EmployeeAttendanceRecordsLog.objects.create(**{'opera_user': self.request.user.username, 'delete_id': instance.id,
+                                                       'opera_type': '废弃', 'record_date': instance.factory_date})
+
+        return Response(serializer.data)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -4371,16 +4450,41 @@ class AttendanceResultAuditView(APIView):
                 'result_desc': last.result_desc} if last else {}
         return Response({"results": data})
 
+    @atomic
     def post(self, request):
         data = self.request.data
-        audit = data.pop('audit', None)
-        approve = data.pop('approve', None)
-        is_user = self.request.user
-        if audit:
-            data['audit_user'] = is_user.username
-        if approve:
-            data['approve_user'] = is_user.username
-        AttendanceResultAudit.objects.create(**data)
+        overall = data.pop('overall', None)  # 整体提交
+        audit = data.pop('audit', None)  # 审核人
+        approve = data.pop('approve', None)  # 审批人
+        is_user = self.request.user.username
+        opera_type = None
+        attendance_data = EmployeeAttendanceRecords.objects.filter(factory_date__in=days_cur_month_dates())
+        if not attendance_data:
+            raise ValidationError('暂无本月考勤数据需要处理')
+        not_overall = attendance_data.exclude(record_status='#141414')  # 非整体提交数据
+        if overall:  # #141414 黑色
+            opera_type = '整体提交'
+            if not_overall:
+                attendance_data.update(record_status='#141414')
+            else:
+                raise ValidationError('请勿重复提交')
+        else:
+            if audit:
+                opera_type = '审核'
+                data['audit_user'] = is_user
+            if approve:
+                opera_type = '审批'
+                data['approve_user'] = is_user
+            # 未整体提交的考勤数据不能审核、审批[]
+            if not_overall:
+                raise ValidationError(f'存在未确认的考勤数据, 请处理后再{opera_type}')
+            AttendanceResultAudit
+            AttendanceResultAudit.objects.create(**data)
+            # 审核或审批不通过,当月考勤数据全为红色 #DA1F27 红色
+            if not data.get('result'):
+                attendance_data.update(record_status='#DA1F27')
+        # 记录履历
+        EmployeeAttendanceRecordsLog.objects.create(**{'opera_user': is_user, 'opera_type': opera_type})
         return Response('ok')
 
 
