@@ -6532,7 +6532,10 @@ class ProductExpireListView(APIView):
     permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_product_expire_query'}))
 
     def get(self, request):
-        expire_days = int(self.request.query_params.get('expire_days', 30))
+        expire_days = self.request.query_params.get('expire_days')
+        if not expire_days:
+            expire_days = 0
+        expire_days = int(expire_days)
         warehouse_name = self.request.query_params.get('warehouse_name')
         stage = self.request.query_params.get('stage')
         quality_level = self.request.query_params.get('quality_level')
@@ -6628,7 +6631,10 @@ class ProductExpireDetailView(APIView):
     FILE_NAME = '库位明细'
 
     def get(self, request):
-        expire_days = self.request.query_params.get('expire_days', 30)
+        expire_days = self.request.query_params.get('expire_days')
+        if not expire_days:
+            expire_days = 0
+        expire_days = int(expire_days)
         warehouse_name = self.request.query_params.get('warehouse_name')
         material_no = self.request.query_params.get('material_no')
         quality_status = self.request.query_params.get('quality_status')
@@ -6663,8 +6669,7 @@ class ProductExpireDetailView(APIView):
             in_storage_time = m['in_storage_time']
             if period_of_validity:
                 if (period_of_validity * 24 * 60 * 60 - (
-                        now_time - m['in_storage_time']).total_seconds()) <= int(
-                        expire_days) * 24 * 60 * 60:
+                        now_time - m['in_storage_time']).total_seconds()) <= expire_days * 24 * 60 * 60:
                     expire_date = in_storage_time + datetime.timedelta(days=period_of_validity)
                     m['expire_time'] = expire_date.strftime("%Y-%m-%d %H:%M:%S")
                     m['in_storage_time'] = in_storage_time.strftime("%Y-%m-%d %H:%M:%S")
