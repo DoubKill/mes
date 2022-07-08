@@ -5095,7 +5095,7 @@ class LIBRARYINVENTORYView(APIView):
             warehouse_name2 = '终炼胶库'
             temp2 = self.get_result(model2, 'lb', store_name2, warehouse_name2, location_status, product_validity_dict, **filter_kwargs)
             temp = list(temp1) + list(temp2)
-        temp = sorted(temp, key=itemgetter('expire_flag', 'dj_flag', 'material_no'), reverse=True)  # 按多个字段排序
+        temp = sorted(temp, key=itemgetter('expire_flag', 'yj_flag', 'dj_flag', 'material_no'), reverse=True)  # 按多个字段排序
         weight_1 = qty_1 = weight_3 = qty_3 = weight_dj = qty_dj = weight_fb = qty_fb = 0
 
         for i in temp:
