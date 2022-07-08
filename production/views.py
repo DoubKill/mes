@@ -3318,11 +3318,14 @@ class PerformanceSummaryView(APIView):
                 elif section in ['三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库']:
                     hj['ccjl'] += round(sum(ccjl_dic.values()) * 0.2 * coefficient, 2) if ccjl_dic.values() else 0
                 else:
-                    if post_standard == 1:  # 最大值
-                        hj['ccjl'] += round(max(ccjl_dic.values()), 2) if ccjl_dic.values() else 0
+                    if len(equip_dic.values()) > 1:
+                        if post_standard == 1:  # 最大值
+                            hj['ccjl'] += round(max(ccjl_dic.values()), 2) if ccjl_dic.values() else 0
+                        else:
+                            hj['ccjl'] += round(sum(ccjl_dic.values()) / (len(results_sort) // 3),
+                                               2) if ccjl_dic.values() else 0
                     else:
-                        hj['ccjl'] += round(sum(ccjl_dic.values()) / (len(results_sort) // 3),
-                                           2) if ccjl_dic.values() else 0
+                        hj['ccjl'] = max(ccjl_dic.values()) if ccjl_dic.values() else 0
                 k = equip_price[section].values()
                 if post_standard == 1:
                     hj['price'] += round(max(k) * post_coefficient * coefficient * a, 2) if k else 0
@@ -3379,7 +3382,7 @@ class PerformanceSummaryView(APIView):
                         sum(equip_price.get(key).values()) / len(equip_price.get(key)), 2)
                 price = round(price * coefficient * a * post_coefficient, 2)
             if results.get(name):
-                results[name][f"{day}_{group}"] = results[name].get(f"{day}_{group}", 0) + price
+                results[name][f"{day}_{group}"] = round(results[name].get(f"{day}_{group}", 0) + price, 2)
                 results[name]['hj'] += price
                 results[name]['all'] += price
             else:
@@ -4176,36 +4179,36 @@ class OverTimeView(APIView):
             ],
         }
         self.send_message(user, content)
-        if data.get('handling_result'):  # 申请通过
-            begin_date = obj.begin_date
-            end_date = obj.end_date
-            work_time = round((end_date - begin_date).seconds / 3600, 2)
-            equips = serializer_data.get('equip')
-            for equip in equips.split(','):
-                EmployeeAttendanceRecords.objects.create(
-                    user=obj.user,
-                    section=obj.section,
-                    factory_date=serializer_data.get('factory_date'),
-                    begin_date=serializer_data.get('begin_date'),
-                    end_date=serializer_data.get('end_date'),
-                    work_time=work_time,
-                    actual_time=work_time,
-                    classes=serializer_data.get('classes'),
-                    group=serializer_data.get('group'),
-                    equip=equip,
-                    status='加班'
-                )
-            # 记录考勤打卡详情
-            AttendanceClockDetail.objects.create(
-                name=user.username,
-                equip=obj.equip,
-                group=obj.group,
-                classes=obj.classes,
-                section=obj.section,
-                work_type='加班',
-                date=datetime.date(date_time.year, date_time.month, date_time.day),
-                date_time=date_time
-            )
+        # if data.get('handling_result'):  # 申请通过
+        #     begin_date = obj.begin_date
+        #     end_date = obj.end_date
+        #     work_time = round((end_date - begin_date).seconds / 3600, 2)
+        #     equips = serializer_data.get('equip')
+        #     for equip in equips.split(','):
+        #         EmployeeAttendanceRecords.objects.create(
+        #             user=obj.user,
+        #             section=obj.section,
+        #             factory_date=serializer_data.get('factory_date'),
+        #             begin_date=serializer_data.get('begin_date'),
+        #             end_date=serializer_data.get('end_date'),
+        #             work_time=work_time,
+        #             actual_time=work_time,
+        #             classes=serializer_data.get('classes'),
+        #             group=serializer_data.get('group'),
+        #             equip=equip,
+        #             status='加班'
+        #         )
+        #     # 记录考勤打卡详情
+        #     AttendanceClockDetail.objects.create(
+        #         name=user.username,
+        #         equip=obj.equip,
+        #         group=obj.group,
+        #         classes=obj.classes,
+        #         section=obj.section,
+        #         work_type='加班',
+        #         date=datetime.date(date_time.year, date_time.month, date_time.day),
+        #         date_time=date_time
+        #     )
         return Response({'results': serializer_data})
 
 
