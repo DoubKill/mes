@@ -48,7 +48,8 @@ from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, Pla
     RubberCannotPutinReason, MachineTargetYieldSettings, EmployeeAttendanceRecords, PerformanceJobLadder, \
     PerformanceUnitPrice, ProductInfoDingJi, SetThePrice, SubsidyInfo, IndependentPostTemplate, AttendanceGroupSetup, \
     FillCardApply, ApplyForExtraWork, EquipMaxValueCache, Equip190EWeight, OuterMaterial, Equip190E, \
-    AttendanceClockDetail, AttendanceResultAudit, ManualInputTrains, ActualWorkingDay, EmployeeAttendanceRecordsLog
+    AttendanceClockDetail, AttendanceResultAudit, ManualInputTrains, ActualWorkingDay, EmployeeAttendanceRecordsLog, \
+    RubberFrameRepair
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, \
@@ -4633,4 +4634,31 @@ class ShiftTimeSummaryDetailView(APIView):
         end = query.order_by('end_time').last()
         return Response({'results': {'begin': datetime.datetime.strftime(begin.begin_time, '%Y-%m-%d %H:%M:%S'),
                                      'end': datetime.datetime.strftime(end.end_time, '%Y-%m-%d %H:%M:%S')}})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class RubberFrameRepairView(APIView):
+    """胶架维修记录"""
+
+    def get(self, request):
+        date_time = self.request.query_params.get('date_time')
+        results = {}
+        query_set = RubberFrameRepair.objects.filter(date_time=date_time)
+        if query_set:
+            max_times = query_set.aggregate(max_times=Max('times'))['max_times']
+            instance_list = query_set.filter(times=max_times).order_by('id')
+            for instance in instance_list:
+                content = json.loads(instance.content)
+                results['details'] = [content] if 'details' not in results else (results['details'] + [content])
+            results['date_time'] = date_time
+        return Response({'results': results})
+
+    @atomic
+    def post(self, request):
+        # 获取最新保存次数
+        max_times = RubberFrameRepair.objects.aggregate(max_times=Max('times'))['max_times']
+        times = 1 if not max_times else max_times + 1
+        data_list = [RubberFrameRepair(**{'date_time': detail.get('date_time'), 'content': str(detail), 'times': times}) for detail in details]
+        RubberFrameRepair.objects.bulk_create(data_list)
+        return Response('保存成功')
 
