@@ -4974,6 +4974,10 @@ class LIBRARYINVENTORYView(APIView):
                 }
                 if not res[material_no]['dj_flag']:
                     res[material_no]['dj_flag'] = dj_flag
+                if not res[material_no]['expire_flag']:
+                    res[material_no]['expire_flag'] = expire_flag
+                if not res[material_no]['yj_flag']:
+                    res[material_no]['yj_flag'] = yj_flag
                 res[material_no]['all_qty'] += i['qty']
                 res[material_no]['total_weight'] += i['total_weight']
             res[material_no]['active_qty'] = res[material_no]['all_qty']
