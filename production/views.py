@@ -4650,15 +4650,28 @@ class RubberFrameRepairView(APIView):
             for instance in instance_list:
                 content = json.loads(instance.content)
                 results['details'] = [content] if 'details' not in results else (results['details'] + [content])
-            results['date_time'] = date_time
+        else:  # 返回空格式
+            details = [{'name': '待维修胶架发出量', '总计': None}, {'name': '已维修胶架数量', '总计': None},
+                       {'name': '待维修胶架数量', '总计': None}, {'name': '输送人员', '总计': None},
+                       {'name': '确认人员', '总计': None}]
+            data = days_cur_month_dates(date_time)
+            update_data = {i: None for i in range(1, len(data) + 1)}
+            for detail in details:
+                detail.update(update_data)
+            results['details'] = details
+        results['date_time'] = date_time
         return Response({'results': results})
 
     @atomic
     def post(self, request):
+        date_time = self.request.data.get('date_time')
+        details = self.request.data.get('details')
+        if not all([date_time, details]):
+            raise ValidationError('参数异常')
         # 获取最新保存次数
         max_times = RubberFrameRepair.objects.aggregate(max_times=Max('times'))['max_times']
         times = 1 if not max_times else max_times + 1
-        data_list = [RubberFrameRepair(**{'date_time': detail.get('date_time'), 'content': str(detail), 'times': times}) for detail in details]
+        data_list = [RubberFrameRepair(**{'date_time': date_time, 'content': json.dumps(detail), 'times': times}) for detail in details]
         RubberFrameRepair.objects.bulk_create(data_list)
         return Response('保存成功')
 
