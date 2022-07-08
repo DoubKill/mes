@@ -625,7 +625,7 @@ class RecipeNoticeAPiView(APIView):
                 c_o = enable_equip_info.filter(Q(feeding_mode__startswith='C', type=2) | Q(feeding_mode__startswith='O', type=3), equip_no=single_equip_no)
                 if c_o:
                     for s_c_o in c_o:
-                        tank = MaterialTankStatus.objects.using('SFJ').filter(equip_no=single_equip_no, use_flag=True, tank_type=s_c_o.type - 1, material_no=s_c_o.handle_material_name).first()
+                        tank = MaterialTankStatus.objects.using('SFJ').filter(equip_no=single_equip_no, use_flag=True, tank_type=s_c_o.type - 1, material_name=s_c_o.handle_material_name).first()
                         if not tank:
                             check_msg += f"{single_equip_no}: 物料设定异常:{s_c_o.handle_material_name} "
                             receive_msg += f"{single_equip_no}: 物料设定异常:{s_c_o.handle_material_name} "
