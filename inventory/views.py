@@ -61,7 +61,7 @@ from inventory.serializers import PutPlanManagementSerializer, \
     OutBoundTasksSerializer, WmsInventoryMaterialSerializer, WmsNucleinManagementSerializer, \
     MaterialOutHistoryOtherSerializer, MaterialOutHistorySerializer, WMSExceptHandleSerializer, \
     BzMixingRubberInventorySearchSerializer, BzFinalRubberInventorySearchSerializer, \
-    OutBoundDeliveryOrderUpdateSerializer
+    OutBoundDeliveryOrderUpdateSerializer, ProductInOutHistorySerializer
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
@@ -6606,9 +6606,180 @@ class ProductExpireDetailView(APIView):
         return Response(
             {'results': data, "count": count, 'total_weight': total_weight, 'total_quantity': total_quantity})
 
+#
+# @method_decorator([api_recorder], name="dispatch")
+# class ProductInOutHistoryView(APIView):
+#     permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_in_out_history'}))
+#     EXPORT_FIELDS_DICT = {'胶料名称': 'product_no',
+#                           '机台号': 'equip_no',
+#                           '车次': 'memo',
+#                           '重量(kg)': 'weight',
+#                           '托盘号': 'pallet_no',
+#                           '巷道': 'location',
+#                           '质检条码': 'lot_no',
+#                           '入库单号': 'inbound_order_no',
+#                           '入库发起时间': 'inbound_time',
+#                           '出库单号': 'outbound_order_no',
+#                           '出库发起时间': 'outbound_time',
+#                           '出库发起人': 'outbound_user',
+#                           }
+#     FILE_NAME = '出入库履历'
+#
+#     def get(self, request):
+#         warehouse_name = self.request.query_params.get('warehouse_name')
+#         in_st = self.request.query_params.get('in_st')
+#         in_et = self.request.query_params.get('in_et')
+#         out_st = self.request.query_params.get('out_st')
+#         out_et = self.request.query_params.get('out_et')
+#         tunnel = self.request.query_params.get('tunnel')
+#         product_no = self.request.query_params.get('product_no')
+#         order_no = self.request.query_params.get('order_no')
+#         pallet_no = self.request.query_params.get('pallet_no')
+#         lot_no = self.request.query_params.get('lot_no')
+#         equip_no = self.request.query_params.get('equip_no')
+#         page = int(self.request.query_params.get('page', 1))
+#         page_size = int(self.request.query_params.get('page_size', 10))
+#         export = self.request.query_params.get('export')
+#         if not warehouse_name:
+#             raise ValidationError('请选择库区！')
+#         if export:
+#             if not all([out_st, out_et]):
+#                 raise ValidationError('请选择出库时间范围不超过一周进行导出！')
+#             st = datetime.datetime.strptime(out_st, "%Y-%m-%d %H:%M:%S")
+#             et = datetime.datetime.strptime(out_et, "%Y-%m-%d %H:%M:%S")
+#             if (et - st).total_seconds() / 60 / 60 / 24 > 7:
+#                 raise ValidationError('出库时间范围不得超过一周！')
+#         if warehouse_name == '混炼胶库':
+#             database_conf = {'host': DATABASES['bz']['HOST'],
+#                              'user': DATABASES['bz']['USER'],
+#                              'password': DATABASES['bz']['PASSWORD'],
+#                              'database': DATABASES['bz']['NAME']}
+#         else:
+#             database_conf = {'host': DATABASES['lb']['HOST'],
+#                              'user': DATABASES['lb']['USER'],
+#                              'password': DATABASES['lb']['PASSWORD'],
+#                              'database': DATABASES['lb']['NAME']}
+#         extra_where_str = ""
+#         pagination_str = "OFFSET {} ROWS FETCH FIRST {} ROWS ONLY".format((page-1)*page_size, page_size)
+#         if in_st:
+#             extra_where_str += "where a.LTIME>='{}'".format(in_st)
+#         if in_et:
+#             if extra_where_str:
+#                 extra_where_str += " and a.LTIME<='{}'".format(in_et)
+#             else:
+#                 extra_where_str += "where a.LTIME<='{}'".format(in_et)
+#         if out_st:
+#             if extra_where_str:
+#                 extra_where_str += " and b.DEALTIME>='{}'".format(out_st)
+#             else:
+#                 extra_where_str += "where b.DEALTIME>='{}'".format(out_st)
+#         if out_et:
+#             if extra_where_str:
+#                 extra_where_str += " and b.DEALTIME<='{}'".format(out_et)
+#             else:
+#                 extra_where_str += "where b.DEALTIME<='{}'".format(out_et)
+#         if tunnel:
+#             if extra_where_str:
+#                 extra_where_str += " and a.CID like '{}%'".format(tunnel)
+#             else:
+#                 extra_where_str += "where a.CID like '{}%'".format(tunnel)
+#         if product_no:
+#             if extra_where_str:
+#                 extra_where_str += " and a.MATNAME = '{}'".format(product_no)
+#             else:
+#                 extra_where_str += "where a.MATNAME = '{}'".format(product_no)
+#         if order_no:
+#             if extra_where_str:
+#                 extra_where_str += " and a.BILLID like '%{}%' or b.BILLID like '%{}%'".format(order_no, order_no)
+#             else:
+#                 extra_where_str += "where a.BILLID like '%{}%' or b.BILLID like '%{}%'".format(order_no, order_no)
+#         if pallet_no:
+#             if extra_where_str:
+#                 extra_where_str += " and a.PALLETID like '%{}%'".format(pallet_no)
+#             else:
+#                 extra_where_str += "where a.PALLETID like '%{}%'".format(pallet_no)
+#         if lot_no:
+#             if extra_where_str:
+#                 extra_where_str += " and a.LotNo like '%{}%'".format(lot_no)
+#             else:
+#                 extra_where_str += "where a.LotNo like '%{}%'".format(lot_no)
+#         if equip_no:
+#             if extra_where_str:
+#                 extra_where_str += " and a.LotNo like '%{}%'".format(equip_no)
+#             else:
+#                 extra_where_str += "where a.LotNo like '%{}%'".format(equip_no)
+#         if export:
+#             pagination_str = ""
+#         sql = """select
+#        a.LotNo,
+#        a.BILLID,
+#        a.LTIME,
+#        b.BILLID,
+#        b.OutUser,
+#        b.DEALTIME,
+#        a.CID,
+#        a.PALLETID,
+#        a.MATNAME,
+#        a.NUM,
+#        a.SWEIGHT,
+#        b.Lot_no,
+#        b.CID,
+#        b.PALLETID,
+#        b.MID,
+#        b.CarNum,
+#        b.Weight
+# from v_ASRS_LOG_IN_OPREATE_MESVIEW a
+# left join v_ASRS_TO_MES_RE_MESVIEW b on a.LotNo=b.Lot_no and a.PALLETID=b.PALLETID and a.MATNAME=b.MID
+# {} order by a.LTIME desc {}""".format(extra_where_str, pagination_str)
+#         sc = SqlClient(sql=sql, **database_conf)
+#         temp = sc.all()
+#         result = []
+#         count_sql = """select
+#         count(*)
+#         from v_ASRS_LOG_IN_OPREATE_MESVIEW a
+#         left join v_ASRS_TO_MES_RE_MESVIEW b on a.LotNo=b.Lot_no and a.PALLETID=b.PALLETID and a.MATNAME=b.MID {}
+#         """.format(extra_where_str)
+#         sc = SqlClient(sql=count_sql, **database_conf)
+#         temp2 = sc.all()
+#         count = temp2[0][0]
+#         outbound_order_nos = [i[3] for i in temp]
+#         outbound_order_dict = dict(OutBoundDeliveryOrderDetail.objects.filter(
+#             order_no__in=outbound_order_nos).values_list('order_no', 'created_user__username'))
+#         lot_nos = [i[0] for i in temp]
+#         lot_nos_data = PalletFeedbacks.objects.filter(lot_no__in=lot_nos).values('lot_no', 'begin_trains', 'end_trains')
+#         lot_nos_dict = {i['lot_no']: '{}-{}'.format(i['begin_trains'], i['end_trains']) for i in lot_nos_data}
+#         for item in temp:
+#             try:
+#                 lot_no = item[0].strip() if item[0] else item[11].strip()
+#                 equip = lot_no[4:7]
+#             except Exception:
+#                 equip = ""
+#                 lot_no = ""
+#             result.append(
+#                 {
+#                     'lot_no': lot_no,
+#                     'inbound_order_no': item[1],
+#                     'inbound_time': '' if not item[2] else item[2].strftime('%Y-%m-%d %H:%M:%S'),
+#                     'outbound_order_no': item[3],
+#                     'outbound_user': outbound_order_dict.get(item[3], ''),
+#                     'outbound_time': '' if not item[5] else item[5].strftime('%Y-%m-%d %H:%M:%S'),
+#                     'location': item[6] if item[6] else item[12],
+#                     'pallet_no': item[7] if item[7] else item[13],
+#                     'product_no': item[8] if item[8] else item[14],
+#                     'qty': item[9] if item[9] else item[15],
+#                     'weight': item[10] if item[10] else item[16],
+#                     'equip_no': equip if equip.startswith('Z') else '',
+#                     'memo': lot_nos_dict.get(lot_no, '')
+#                 }
+#             )
+#         sc.close()
+#         if export:
+#             return gen_template_response(self.EXPORT_FIELDS_DICT, result, self.FILE_NAME)
+#         return Response({'result': result, 'count': count})
+
 
 @method_decorator([api_recorder], name="dispatch")
-class ProductInOutHistoryView(APIView):
+class ProductInOutHistoryView(ListAPIView):
     permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_in_out_history'}))
     EXPORT_FIELDS_DICT = {'胶料名称': 'product_no',
                           '机台号': 'equip_no',
@@ -6624,8 +6795,10 @@ class ProductInOutHistoryView(APIView):
                           '出库发起人': 'outbound_user',
                           }
     FILE_NAME = '出入库履历'
+    queryset = InventoryLog.objects.all()
+    serializer_class = ProductInOutHistorySerializer
 
-    def get(self, request):
+    def list(self, request, *args, **kwargs):
         warehouse_name = self.request.query_params.get('warehouse_name')
         in_st = self.request.query_params.get('in_st')
         in_et = self.request.query_params.get('in_et')
@@ -6637,11 +6810,81 @@ class ProductInOutHistoryView(APIView):
         pallet_no = self.request.query_params.get('pallet_no')
         lot_no = self.request.query_params.get('lot_no')
         equip_no = self.request.query_params.get('equip_no')
-        page = int(self.request.query_params.get('page', 1))
-        page_size = int(self.request.query_params.get('page_size', 10))
         export = self.request.query_params.get('export')
         if not warehouse_name:
             raise ValidationError('请选择库区！')
+        if warehouse_name == '混炼胶库':
+            if not in_st and not in_et and not out_st and not out_et:
+                query_set = MixGumInInventoryLog.objects.using('bz').order_by('-start_time')
+                inout_type = 'in'
+            elif all([in_st, in_et, out_st, out_et]):
+                query_set = MixGumInInventoryLog.objects.using('bz').filter(start_time__gte=in_st,
+                                                                            start_time__lte=in_et
+                                                                            ).order_by('-start_time')
+                inout_type = 'in'
+            elif all([in_st, in_et]):
+                query_set = MixGumInInventoryLog.objects.using('bz').filter(start_time__gte=in_st,
+                                                                            start_time__lte=in_et
+                                                                            ).order_by('-start_time')
+                inout_type = 'in'
+            elif all([out_st, out_et]):
+                query_set = MixGumOutInventoryLog.objects.using('bz').filter(start_time__gte=out_st,
+                                                                             start_time__lte=out_et
+                                                                             ).order_by('-start_time')
+                inout_type = 'out'
+            else:
+                raise ValidationError('参数错误')
+        else:
+            if not in_st and not in_et and not out_st and not out_et:
+                query_set = FinalGumInInventoryLog.objects.using('lb').filter(Q(location__startswith=1) |
+                                                                              Q(location__startswith=2) |
+                                                                              Q(location__startswith=3) |
+                                                                              Q(location__startswith=4)
+                                                                              ).order_by('-start_time')
+                inout_type = 'in'
+            elif all([in_st, in_et, out_st, out_et]):
+                query_set = FinalGumInInventoryLog.objects.using('lb').filter(start_time__gte=in_st,
+                                                                              start_time__lte=in_et
+                                                                              ).filter(Q(location__startswith=1) |
+                                                                                       Q(location__startswith=2) |
+                                                                                       Q(location__startswith=3) |
+                                                                                       Q(location__startswith=4)
+                                                                                       ).order_by('-start_time')
+                inout_type = 'in'
+            elif all([in_st, in_et]):
+                query_set = FinalGumInInventoryLog.objects.using('lb').filter(start_time__gte=in_st,
+                                                                              start_time__lte=in_et
+                                                                              ).filter(Q(location__startswith=1) |
+                                                                                       Q(location__startswith=2) |
+                                                                                       Q(location__startswith=3) |
+                                                                                       Q(location__startswith=4)
+                                                                                       ).order_by('-start_time')
+                inout_type = 'in'
+            elif all([out_st, out_et]):
+                query_set = FinalGumOutInventoryLog.objects.using('lb').filter(start_time__gte=out_st,
+                                                                               start_time__lte=out_et
+                                                                               ).filter(Q(location__startswith=1) |
+                                                                                        Q(location__startswith=2) |
+                                                                                        Q(location__startswith=3) |
+                                                                                        Q(location__startswith=4)
+                                                                                        ).order_by('-start_time')
+                inout_type = 'out'
+            else:
+                raise ValidationError('参数错误')
+        filter_dict = {}
+        if tunnel:
+            filter_dict.update(location__startswith=tunnel)
+        if product_no:
+            filter_dict.update(material_no=product_no)
+        if order_no:
+            filter_dict.update(order_no=order_no)
+        if lot_no:
+            filter_dict.update(lot_no=lot_no)
+        if pallet_no:
+            filter_dict.update(pallet_no=pallet_no)
+        if equip_no:
+            filter_dict.update(order_no__endswith=equip_no)
+        queryset = query_set.filter(**filter_dict)
         if export:
             if not all([out_st, out_et]):
                 raise ValidationError('请选择出库时间范围不超过一周进行导出！')
@@ -6649,133 +6892,15 @@ class ProductInOutHistoryView(APIView):
             et = datetime.datetime.strptime(out_et, "%Y-%m-%d %H:%M:%S")
             if (et - st).total_seconds() / 60 / 60 / 24 > 7:
                 raise ValidationError('出库时间范围不得超过一周！')
-        if warehouse_name == '混炼胶库':
-            database_conf = {'host': DATABASES['bz']['HOST'],
-                             'user': DATABASES['bz']['USER'],
-                             'password': DATABASES['bz']['PASSWORD'],
-                             'database': DATABASES['bz']['NAME']}
-        else:
-            database_conf = {'host': DATABASES['lb']['HOST'],
-                             'user': DATABASES['lb']['USER'],
-                             'password': DATABASES['lb']['PASSWORD'],
-                             'database': DATABASES['lb']['NAME']}
-        extra_where_str = ""
-        pagination_str = "OFFSET {} ROWS FETCH FIRST {} ROWS ONLY".format((page-1)*page_size, page_size)
-        if in_st:
-            extra_where_str += "where a.LTIME>='{}'".format(in_st)
-        if in_et:
-            if extra_where_str:
-                extra_where_str += " and a.LTIME<='{}'".format(in_et)
-            else:
-                extra_where_str += "where a.LTIME<='{}'".format(in_et)
-        if out_st:
-            if extra_where_str:
-                extra_where_str += " and b.DEALTIME>='{}'".format(out_st)
-            else:
-                extra_where_str += "where b.DEALTIME>='{}'".format(out_st)
-        if out_et:
-            if extra_where_str:
-                extra_where_str += " and b.DEALTIME<='{}'".format(out_et)
-            else:
-                extra_where_str += "where b.DEALTIME<='{}'".format(out_et)
-        if tunnel:
-            if extra_where_str:
-                extra_where_str += " and a.CID like '{}%'".format(tunnel)
-            else:
-                extra_where_str += "where a.CID like '{}%'".format(tunnel)
-        if product_no:
-            if extra_where_str:
-                extra_where_str += " and a.MATNAME = '{}'".format(product_no)
-            else:
-                extra_where_str += "where a.MATNAME = '{}'".format(product_no)
-        if order_no:
-            if extra_where_str:
-                extra_where_str += " and a.BILLID like '%{}%' or b.BILLID like '%{}%'".format(order_no, order_no)
-            else:
-                extra_where_str += "where a.BILLID like '%{}%' or b.BILLID like '%{}%'".format(order_no, order_no)
-        if pallet_no:
-            if extra_where_str:
-                extra_where_str += " and a.PALLETID like '%{}%'".format(pallet_no)
-            else:
-                extra_where_str += "where a.PALLETID like '%{}%'".format(pallet_no)
-        if lot_no:
-            if extra_where_str:
-                extra_where_str += " and a.LotNo like '%{}%'".format(lot_no)
-            else:
-                extra_where_str += "where a.LotNo like '%{}%'".format(lot_no)
-        if equip_no:
-            if extra_where_str:
-                extra_where_str += " and a.LotNo like '%{}%'".format(equip_no)
-            else:
-                extra_where_str += "where a.LotNo like '%{}%'".format(equip_no)
-        if export:
-            pagination_str = ""
-        sql = """select
-       a.LotNo,
-       a.BILLID,
-       a.LTIME,
-       b.BILLID,
-       b.OutUser,
-       b.DEALTIME,
-       a.CID,
-       a.PALLETID,
-       a.MATNAME,
-       a.NUM,
-       a.SWEIGHT,
-       b.Lot_no,
-       b.CID,
-       b.PALLETID,
-       b.MID,
-       b.CarNum,
-       b.Weight
-from v_ASRS_LOG_IN_OPREATE_MESVIEW a
-left join v_ASRS_TO_MES_RE_MESVIEW b on a.LotNo=b.Lot_no and a.PALLETID=b.PALLETID and a.MATNAME=b.MID
-{} order by a.LTIME desc {}""".format(extra_where_str, pagination_str)
-        sc = SqlClient(sql=sql, **database_conf)
-        temp = sc.all()
-        result = []
-        count_sql = """select 
-        count(*)
-        from v_ASRS_LOG_IN_OPREATE_MESVIEW a 
-        left join v_ASRS_TO_MES_RE_MESVIEW b on a.LotNo=b.Lot_no and a.PALLETID=b.PALLETID and a.MATNAME=b.MID {}
-        """.format(extra_where_str)
-        sc = SqlClient(sql=count_sql, **database_conf)
-        temp2 = sc.all()
-        count = temp2[0][0]
-        outbound_order_nos = [i[3] for i in temp]
-        outbound_order_dict = dict(OutBoundDeliveryOrderDetail.objects.filter(
-            order_no__in=outbound_order_nos).values_list('order_no', 'created_user__username'))
-        lot_nos = [i[0] for i in temp]
-        lot_nos_data = PalletFeedbacks.objects.filter(lot_no__in=lot_nos).values('lot_no', 'begin_trains', 'end_trains')
-        lot_nos_dict = {i['lot_no']: '{}-{}'.format(i['begin_trains'], i['end_trains']) for i in lot_nos_data}
-        for item in temp:
-            try:
-                lot_no = item[0].strip() if item[0] else item[11].strip()
-                equip = lot_no[4:7]
-            except Exception:
-                equip = ""
-                lot_no = ""
-            result.append(
-                {
-                    'lot_no': lot_no,
-                    'inbound_order_no': item[1],
-                    'inbound_time': '' if not item[2] else item[2].strftime('%Y-%m-%d %H:%M:%S'),
-                    'outbound_order_no': item[3],
-                    'outbound_user': outbound_order_dict.get(item[3], ''),
-                    'outbound_time': '' if not item[5] else item[5].strftime('%Y-%m-%d %H:%M:%S'),
-                    'location': item[6] if item[6] else item[12],
-                    'pallet_no': item[7] if item[7] else item[13],
-                    'product_no': item[8] if item[8] else item[14],
-                    'qty': item[9] if item[9] else item[15],
-                    'weight': item[10] if item[10] else item[16],
-                    'equip_no': equip if equip.startswith('Z') else '',
-                    'memo': lot_nos_dict.get(lot_no, '')
-                }
-            )
-        sc.close()
-        if export:
-            return gen_template_response(self.EXPORT_FIELDS_DICT, result, self.FILE_NAME)
-        return Response({'result': result, 'count': count})
+            data = ProductInOutHistorySerializer(queryset, many=True, context={'ware_house': warehouse_name, "inout_type": inout_type}).data
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = ProductInOutHistorySerializer(page, many=True, context={'ware_house': warehouse_name, "inout_type": inout_type})
+            return self.get_paginated_response(serializer.data)
+
+        serializer = ProductInOutHistorySerializer(queryset, many=True, context={'ware_house': warehouse_name, "inout_type": inout_type})
+        return Response(serializer.data)
 
 
 @method_decorator([api_recorder], name="dispatch")
