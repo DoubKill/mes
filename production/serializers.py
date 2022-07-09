@@ -73,25 +73,20 @@ class TrainsFeedbacksSerializer(BaseModelSerializer):
 
 class PalletFeedbacksSerializer(BaseModelSerializer):
     """托盘产出反馈"""
-    stage = serializers.SerializerMethodField(read_only=True)
 
     def create(self, validated_data):
         instance = PalletFeedbacks.objects.filter(lot_no=validated_data['lot_no']).first()
         if instance:
             return instance
+        begin_trains = validated_data['begin_trains']
+        end_trains = validated_data['end_trains']
+        actual_weight = validated_data['actual_weight']
+        pallet_no = validated_data.get('pallet_no')
+        if begin_trains <= 0 or end_trains <= 0 or actual_weight <= 0:
+            return validated_data
+        if pallet_no == '0':
+            return validated_data
         return super().create(validated_data)
-
-    def get_stage(self, object):
-        plan_classes_uid = object.plan_classes_uid if object.plan_classes_uid else 0
-        productclassesplan = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid).first()
-        if productclassesplan:
-            try:
-                stage = productclassesplan.product_day_plan.product_batching.stage.global_name
-            except:
-                stage = None
-        else:
-            stage = None
-        return stage if stage else ""
 
     class Meta:
         model = PalletFeedbacks
