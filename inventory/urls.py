@@ -146,6 +146,7 @@ urlpatterns = [
     path('wms-tunnels/', WMSTunnelView.as_view()),  # 巷道列表
     path('wms-material-groups/', WMSMaterialGroupNameView.as_view()),  # 物料组列表
     path('wms-materials/', WMSMaterialsView.as_view()),  # 原材料列表
+    path('th-materials-attribute/', WmsInventoryMaterialAttribute.as_view()),  # 原材料物理属性管理
     path('wms-inventory/', WMSInventoryView.as_view()),  # 按物料、批次、航道统计原材料库存
     path('wms-instock/', WmsInStockView.as_view()),  # 根据当前货物外伸位地址获取内伸位数据
     path('wms-release/', WMSRelease.as_view()),  # 原材料库质量放行处理

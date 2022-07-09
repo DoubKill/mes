@@ -3330,6 +3330,40 @@ class WMSMaterialsView(APIView):
 
 
 @method_decorator([api_recorder], name="dispatch")
+class WmsInventoryMaterialAttribute(APIView):
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_material_attr',
+                                                            'add': ["add_material_attr", "change_material_attr"]}))
+
+    def get(self, request):
+        material_name = self.request.query_params.get('material_name')
+        material_no = self.request.query_params.get('material_no')
+        page = self.request.query_params.get('page', 1)
+        page_size = self.request.query_params.get('page_size', 15)
+        filter_kwargs = {}
+        only_storage_flag = self.request.query_params.get('only_storage_flag')  # 仅显示未设定有效期的物料
+        if material_no:
+            filter_kwargs['material_no__icontains'] = material_no
+        if material_name:
+            filter_kwargs['material_name__icontains'] = material_name
+        if only_storage_flag:
+            filter_kwargs['is_validity'] = 1
+        query_set = WmsInventoryMaterial.objects.using('wms').filter(
+            **filter_kwargs).values('id', 'material_no', 'material_name', 'period_of_validity')
+        st = (int(page) - 1) * int(page_size)
+        et = int(page) * int(page_size)
+        count = len(query_set)
+        data = query_set[st:et]
+        return Response({'results': data, "count": count})
+
+    def post(self, request):
+        material_ids = self.request.data.get('materials')
+        period_of_validity = self.request.data.get('period_of_validity')
+        WmsInventoryMaterial.objects.using('wms').filter(id__in=material_ids).update(
+            is_validity=1, period_of_validity=period_of_validity)
+        return Response('ok')
+
+
+@method_decorator([api_recorder], name="dispatch")
 class WMSInventoryView(APIView):
     """原材料库存信息，material_name=原材料名称&material_no=原材料编号&material_group_name=物料组名称&tunnel_name=巷道名称&page=页数&page_size=每页数量"""
     DATABASE_CONF = WMS_CONF
@@ -4012,6 +4046,20 @@ class BzMixingRubberInventory(ListAPIView):
     permission_classes = (IsAuthenticated,)
     queryset = BzFinalMixingRubberInventory.objects.all()
 
+    def get_serializer_context(self):
+        """
+        Extra context provided to the serializer class.
+        """
+        product_validity_data = dict(MaterialAttribute.objects.filter(
+            period_of_validity__isnull=False
+        ).values_list('material__material_no', 'period_of_validity'))
+        return {
+            'request': self.request,
+            'format': self.format_kwarg,
+            'view': self,
+            'product_validity_data': product_validity_data,
+        }
+
     def export_xls(self, result):
         response = HttpResponse(content_type='application/vnd.ms-excel')
         filename = '库位明细'
@@ -4070,6 +4118,7 @@ class BzMixingRubberInventory(ListAPIView):
         outbound_order_id = self.request.query_params.get('outbound_order_id')  # 指定托盘和指定生产信息出库时使用
         begin_trains = self.request.query_params.get('begin_trains')  # 开始车次
         end_trains = self.request.query_params.get('end_trains')  # 结束车次
+        yx_state = self.request.query_params.get('yx_state')  # 有效状态
         queryset = BzFinalMixingRubberInventory.objects.using('bz').all().order_by('in_storage_time')
         if material_no:
             queryset = queryset.filter(material_no=material_no)
@@ -4136,6 +4185,8 @@ class BzMixingRubberInventory(ListAPIView):
         ret = self.get_serializer(queryset, many=True).data
         if b_e_range:
             ret = list(filter(lambda x: max(x['begin_end_trains'][0], b_e_range[0]) <= min(x['begin_end_trains'][1], b_e_range[1]), ret))
+        if yx_state:
+            ret = list(filter(lambda x: x['yx_state']==yx_state, ret))
 
         page = self.paginate_queryset(ret)
         # serializer = self.get_serializer(page, many=True)
@@ -4292,6 +4343,20 @@ class BzFinalRubberInventory(ListAPIView):
     filter_backends = (DjangoFilterBackend,)
     queryset = BzFinalMixingRubberInventoryLB.objects.all()
 
+    def get_serializer_context(self):
+        """
+        Extra context provided to the serializer class.
+        """
+        product_validity_data = dict(MaterialAttribute.objects.filter(
+            period_of_validity__isnull=False
+        ).values_list('material__material_no', 'period_of_validity'))
+        return {
+            'request': self.request,
+            'format': self.format_kwarg,
+            'view': self,
+            'product_validity_data': product_validity_data,
+        }
+
     def export_xls(self, result):
         response = HttpResponse(content_type='application/vnd.ms-excel')
         filename = '库位明细'
@@ -4352,6 +4417,7 @@ class BzFinalRubberInventory(ListAPIView):
         outbound_order_id = self.request.query_params.get('outbound_order_id')  # 指定托盘和指定生产信息出库时使用
         begin_trains = self.request.query_params.get('begin_trains')  # 开始车次
         end_trains = self.request.query_params.get('end_trains')  # 结束车次
+        yx_state = self.request.query_params.get('yx_state')  # 有效状态
         if store_name:
             if store_name == '终炼胶库':
                 store_name = "炼胶库"
@@ -4419,6 +4485,8 @@ class BzFinalRubberInventory(ListAPIView):
             ret = list(filter(
                 lambda x: max(x['begin_end_trains'][0], b_e_range[0]) <= min(x['begin_end_trains'][1], b_e_range[1]),
                 ret))
+        if yx_state:
+            ret = list(filter(lambda x: x['yx_state']==yx_state, ret))
 
         page = self.paginate_queryset(ret)
         # serializer = self.get_serializer(page, many=True)
@@ -4839,13 +4907,11 @@ class InOutBoundSummaryView(APIView):
 
 
 @method_decorator([api_recorder], name="dispatch")
-class LIBRARYINVENTORYView(ListAPIView):
+class LIBRARYINVENTORYView(APIView):
     permission_classes = (IsAuthenticated, )
-    PRODUCT_VALIDITY_DICT = dict(MaterialAttribute.objects.filter(
-        period_of_validity__isnull=False
-    ).values_list('material__material_no', 'period_of_validity'))
 
-    def get_result(self, model, db, store_name, warehouse_name, location_status, now_time, **kwargs):
+    def get_result(self, model, db, store_name, warehouse_name, location_status, product_validity_dict, **kwargs):
+        now_time = datetime.datetime.now()
         # 各胶料封闭货位数据
         fb = model.objects.using(db).filter(**kwargs).filter(location_status='封闭货位').values('material_no').annotate(
             qty=Sum('qty'),
@@ -4869,11 +4935,14 @@ class LIBRARYINVENTORYView(ListAPIView):
         for i in result:
             material_no = i['material_no'].strip()
             quality_level = i['quality_level'].strip()
-            validity_days = self.PRODUCT_VALIDITY_DICT.get(material_no, 0)
+            validity_days = product_validity_dict.get(material_no, 0)
             expire_flag = False
+            yj_flag = False
             if validity_days:
                 if (now_time - i['min_inventory_time']).total_seconds() / 60 / 60 / 24 > validity_days:
                     expire_flag = True
+                if validity_days - (now_time - i['min_inventory_time']).total_seconds() / 60 / 60 / 24 <= 3:
+                    yj_flag = True
             dj_flag = False
             if quality_level == '待检品':
                 if (now_time - i['min_inventory_time']).total_seconds() / 60 / 60 / 24 > 3:
@@ -4890,19 +4959,25 @@ class LIBRARYINVENTORYView(ListAPIView):
                     'stage': stage,
                     'all_qty': i['qty'],
                     'total_weight': i['total_weight'],
-                    i['quality_level']: {'qty': i['qty'], 'total_weight': i['total_weight'], 'expire_flag': expire_flag, 'dj_flag': dj_flag},
+                    i['quality_level']: {'qty': i['qty'], 'total_weight': i['total_weight'], 'expire_flag': expire_flag, 'dj_flag': dj_flag, 'yj_flag': yj_flag},
                     'expire_flag': expire_flag,
-                    'dj_flag': dj_flag
+                    'dj_flag': dj_flag,
+                    'yj_flag': yj_flag,
                 }
             else:
                 res[material_no][quality_level] = {
                     'qty': i['qty'],
                     'total_weight': i['total_weight'],
                     'expire_flag': expire_flag,
-                    'dj_flag': dj_flag
+                    'dj_flag': dj_flag,
+                    'yj_flag': yj_flag,
                 }
                 if not res[material_no]['dj_flag']:
                     res[material_no]['dj_flag'] = dj_flag
+                if not res[material_no]['expire_flag']:
+                    res[material_no]['expire_flag'] = expire_flag
+                if not res[material_no]['yj_flag']:
+                    res[material_no]['yj_flag'] = yj_flag
                 res[material_no]['all_qty'] += i['qty']
                 res[material_no]['total_weight'] += i['total_weight']
             res[material_no]['active_qty'] = res[material_no]['all_qty']
@@ -4914,9 +4989,6 @@ class LIBRARYINVENTORYView(ListAPIView):
                 res[material_no]['active_qty'] -= res[material_no]['封闭']['qty']
 
         return list(res.values())
-
-    def get_queryset(self):
-        return
 
     def export_xls(self, result):
         response = HttpResponse(content_type='application/vnd.ms-excel')
@@ -4972,7 +5044,7 @@ class LIBRARYINVENTORYView(ListAPIView):
         response.write(output.getvalue())
         return response
 
-    def list(self, request, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
         params = request.query_params
         page = params.get("page", 1)
         page_size = params.get("page_size", 10)
@@ -4983,7 +5055,9 @@ class LIBRARYINVENTORYView(ListAPIView):
         location_status = params.get('location_status', '')  # 有无封闭货位
         quality_level = params.get('quality_level')
         export = params.get("export", None)
-        now_time = datetime.datetime.now()
+        product_validity_dict = dict(MaterialAttribute.objects.filter(
+            period_of_validity__isnull=False
+        ).values_list('material__material_no', 'period_of_validity'))
 
         try:
             st = (int(page) - 1) * int(page_size)
@@ -5008,24 +5082,24 @@ class LIBRARYINVENTORYView(ListAPIView):
         if warehouse_name == '混炼胶库':
             model = BzFinalMixingRubberInventory
             store_name = '立体库'
-            temp = self.get_result(model, 'bz', store_name, warehouse_name, location_status, now_time, **filter_kwargs)
+            temp = self.get_result(model, 'bz', store_name, warehouse_name, location_status, product_validity_dict, **filter_kwargs)
 
         elif warehouse_name == '终炼胶库':
             model = BzFinalMixingRubberInventoryLB
             store_name = '炼胶库'
-            temp = self.get_result(model, 'lb', store_name, warehouse_name, location_status, now_time, **filter_kwargs)
+            temp = self.get_result(model, 'lb', store_name, warehouse_name, location_status, product_validity_dict, **filter_kwargs)
 
         else:
             model1 = BzFinalMixingRubberInventory
             store_name1 = '立体库'
             warehouse_name1 = '混炼胶库'
-            temp1 = self.get_result(model1, 'bz', store_name1, warehouse_name1, location_status, now_time, **filter_kwargs)
+            temp1 = self.get_result(model1, 'bz', store_name1, warehouse_name1, location_status, product_validity_dict, **filter_kwargs)
             model2 = BzFinalMixingRubberInventoryLB
             store_name2 = '炼胶库'
             warehouse_name2 = '终炼胶库'
-            temp2 = self.get_result(model2, 'lb', store_name2, warehouse_name2, location_status, now_time, **filter_kwargs)
+            temp2 = self.get_result(model2, 'lb', store_name2, warehouse_name2, location_status, product_validity_dict, **filter_kwargs)
             temp = list(temp1) + list(temp2)
-        temp = sorted(temp, key=itemgetter('expire_flag', 'dj_flag', 'material_no'), reverse=True)  # 按多个字段排序
+        temp = sorted(temp, key=itemgetter('expire_flag', 'yj_flag', 'dj_flag', 'material_no'), reverse=True)  # 按多个字段排序
         weight_1 = qty_1 = weight_3 = qty_3 = weight_dj = qty_dj = weight_fb = qty_fb = 0
 
         for i in temp:
@@ -6462,7 +6536,10 @@ class ProductExpireListView(APIView):
     permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_product_expire_query'}))
 
     def get(self, request):
-        expire_days = int(self.request.query_params.get('expire_days', 30))
+        expire_days = self.request.query_params.get('expire_days')
+        if not expire_days:
+            expire_days = 0
+        expire_days = int(expire_days)
         warehouse_name = self.request.query_params.get('warehouse_name')
         stage = self.request.query_params.get('stage')
         quality_level = self.request.query_params.get('quality_level')
@@ -6503,8 +6580,11 @@ class ProductExpireListView(APIView):
                 already_inventory_days = (now_time - m['in_storage_time']).total_seconds() / 60 / 60 / 24
                 if period_of_validity - already_inventory_days <= expire_days:
                     expire_flag = False
+                    yj_flag = False
                     if already_inventory_days > period_of_validity:
                         expire_flag = True
+                    if period_of_validity - already_inventory_days <= 3:
+                        yj_flag = True
                     dj_flag = False
                     if quality_level == '待检品':
                         if already_inventory_days > 3:
@@ -6514,6 +6594,8 @@ class ProductExpireListView(APIView):
                             ret[key]['expire_flag'] = expire_flag
                         if not ret[key]['dj_flag']:
                             ret[key]['dj_flag'] = dj_flag
+                        if not ret[key]['yj_flag']:
+                            ret[key]['yj_flag'] = yj_flag
                         ret[key]['qty'] += m['qty']
                         ret[key]['total_weight'] += m['total_weight']
                     else:
@@ -6525,6 +6607,7 @@ class ProductExpireListView(APIView):
                                     'period_of_validity': period_of_validity,
                                     'expire_flag': expire_flag,
                                     'dj_flag': dj_flag,
+                                    'yj_flag': yj_flag,
                                     }
         temp = list(ret.values())
         count = len(temp)
@@ -6552,7 +6635,10 @@ class ProductExpireDetailView(APIView):
     FILE_NAME = '库位明细'
 
     def get(self, request):
-        expire_days = self.request.query_params.get('expire_days', 30)
+        expire_days = self.request.query_params.get('expire_days')
+        if not expire_days:
+            expire_days = 0
+        expire_days = int(expire_days)
         warehouse_name = self.request.query_params.get('warehouse_name')
         material_no = self.request.query_params.get('material_no')
         quality_status = self.request.query_params.get('quality_status')
@@ -6587,8 +6673,7 @@ class ProductExpireDetailView(APIView):
             in_storage_time = m['in_storage_time']
             if period_of_validity:
                 if (period_of_validity * 24 * 60 * 60 - (
-                        now_time - m['in_storage_time']).total_seconds()) <= int(
-                        expire_days) * 24 * 60 * 60:
+                        now_time - m['in_storage_time']).total_seconds()) <= expire_days * 24 * 60 * 60:
                     expire_date = in_storage_time + datetime.timedelta(days=period_of_validity)
                     m['expire_time'] = expire_date.strftime("%Y-%m-%d %H:%M:%S")
                     m['in_storage_time'] = in_storage_time.strftime("%Y-%m-%d %H:%M:%S")

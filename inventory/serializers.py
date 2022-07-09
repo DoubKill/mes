@@ -722,6 +722,7 @@ class BzFinalMixingRubberInventorySerializer(serializers.ModelSerializer):
 
 class BzMixingRubberInventorySearchSerializer(BzFinalMixingRubberInventorySerializer):
     deal_suggestion = serializers.SerializerMethodField(read_only=True)
+    yx_state = serializers.SerializerMethodField(read_only=True)
 
     def get_deal_suggestion(self, obj):
         if obj.lot_no:
@@ -733,6 +734,21 @@ class BzMixingRubberInventorySearchSerializer(BzFinalMixingRubberInventorySerial
                     return ""
             return ""
         return ''
+
+    def get_yx_state(self, obj):
+        product_validity_data = self.context['product_validity_data']
+        period_of_validity = product_validity_data.get(obj.material_no)
+        if not period_of_validity:
+            return None
+        now_time = datetime.datetime.now()
+        min_expire_inventory_time = now_time - datetime.timedelta(days=period_of_validity)
+        min_yj_inventory_et_time = min_expire_inventory_time + datetime.timedelta(days=3)
+        if obj.in_storage_time < min_expire_inventory_time:
+            return 'expired'
+        if obj.in_storage_time > min_yj_inventory_et_time:
+            return 'normal'
+        else:
+            return 'warning'
 
 
 class BzFinalMixingRubberLBInventorySerializer(serializers.ModelSerializer):
@@ -823,6 +839,7 @@ class BzFinalMixingRubberLBInventorySerializer(serializers.ModelSerializer):
 
 class BzFinalRubberInventorySearchSerializer(BzFinalMixingRubberLBInventorySerializer):
     deal_suggestion = serializers.SerializerMethodField(read_only=True)
+    yx_state = serializers.SerializerMethodField(read_only=True)
 
     def get_deal_suggestion(self, obj):
         if obj.lot_no:
@@ -835,6 +852,20 @@ class BzFinalRubberInventorySearchSerializer(BzFinalMixingRubberLBInventorySeria
             return ""
         return ''
 
+    def get_yx_state(self, obj):
+        product_validity_data = self.context['product_validity_data']
+        period_of_validity = product_validity_data.get(obj.material_no)
+        if not period_of_validity:
+            return None
+        now_time = datetime.datetime.now()
+        min_expire_inventory_time = now_time - datetime.timedelta(days=period_of_validity)
+        min_yj_inventory_et_time = min_expire_inventory_time + datetime.timedelta(days=3)
+        if obj.in_storage_time < min_expire_inventory_time:
+            return 'expired'
+        if obj.in_storage_time > min_yj_inventory_et_time:
+            return 'normal'
+        else:
+            return 'warning'
 
 class WmsInventoryStockSerializer(serializers.ModelSerializer):
     unit_weight = serializers.SerializerMethodField(read_only=True)
