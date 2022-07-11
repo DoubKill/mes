@@ -4646,10 +4646,8 @@ class RubberFrameRepairView(APIView):
         query_set = RubberFrameRepair.objects.filter(date_time=date_time)
         if query_set:
             max_times = query_set.aggregate(max_times=Max('times'))['max_times']
-            instance_list = query_set.filter(times=max_times).order_by('id')
-            for instance in instance_list:
-                content = json.loads(instance.content)
-                results['details'] = [content] if 'details' not in results else (results['details'] + [content])
+            instance = query_set.filter(times=max_times).last()
+            results['details'] = json.loads(instance.content)
         else:  # 返回空格式
             details = [{'name': '待维修胶架发出量', '总计': None}, {'name': '已维修胶架数量', '总计': None},
                        {'name': '待维修胶架数量', '总计': None}, {'name': '输送人员', '总计': None},
@@ -4671,8 +4669,7 @@ class RubberFrameRepairView(APIView):
         # 获取最新保存次数
         max_times = RubberFrameRepair.objects.filter(date_time=date_time).aggregate(max_times=Max('times'))['max_times']
         times = 1 if not max_times else max_times + 1
-        data_list = [RubberFrameRepair(**{'date_time': date_time, 'content': json.dumps(detail), 'times': times}) for detail in details]
-        RubberFrameRepair.objects.bulk_create(data_list)
+        RubberFrameRepair.objects.create(date_time=date_time, content=json.dumps(details), times=times)
         return Response('保存成功')
 
 
@@ -4686,10 +4683,8 @@ class ToolManageAccountView(APIView):
         query_set = ToolManageAccount.objects.filter(date_time=date_time)
         if query_set:
             max_times = query_set.aggregate(max_times=Max('times'))['max_times']
-            instance_list = query_set.filter(times=max_times).order_by('id')
-            for instance in instance_list:
-                content = json.loads(instance.content)
-                results['details'] = [content] if 'details' not in results else (results['details'] + [content])
+            instance = query_set.filter(times=max_times).last()
+            results['details'] = json.loads(instance.content)
         else:  # 返回空格式
             results['details'] = []
         results['date_time'] = date_time
@@ -4704,6 +4699,5 @@ class ToolManageAccountView(APIView):
         # 获取最新保存次数
         max_times = ToolManageAccount.objects.filter(date_time=date_time).aggregate(max_times=Max('times'))['max_times']
         times = 1 if not max_times else max_times + 1
-        data_list = [ToolManageAccount(**{'date_time': date_time, 'content': json.dumps(detail), 'times': times}) for detail in details]
-        ToolManageAccount.objects.bulk_create(data_list)
+        ToolManageAccount.objects.create(date_time=date_time, content=json.dumps(details), times=times)
         return Response('保存成功')
