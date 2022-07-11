@@ -222,6 +222,8 @@ class WmsInventoryMaterial(models.Model):
     pdm_no = models.CharField(max_length=64, db_column='Pdm')
     erp_material_no = models.CharField(max_length=64, db_column='ZCMaterialCode')
     unit = models.CharField(max_length=64, db_column='StandardUnit')
+    is_validity = models.BooleanField(db_column='IsValidity')
+    period_of_validity = models.IntegerField(db_column='Validity')
 
     class Meta:
         db_table = 't_inventory_material'
