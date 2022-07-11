@@ -27,7 +27,8 @@ from .models import MaterialInventory, BzFinalMixingRubberInventory, WmsInventor
     DeliveryPlanFinal, MixGumOutInventoryLog, MixGumInInventoryLog, MaterialOutPlan, BzFinalMixingRubberInventoryLB, \
     BarcodeQuality, CarbonOutPlan, MixinRubberyOutBoundOrder, FinalRubberyOutBoundOrder, Depot, DepotSite, DepotPallt, \
     SulfurDepotSite, Sulfur, SulfurDepot, OutBoundDeliveryOrder, OutBoundDeliveryOrderDetail, WMSMaterialSafetySettings, \
-    WmsNucleinManagement, WMSExceptHandle, MaterialOutboundOrder, MaterialOutHistoryOther, MaterialOutHistory
+    WmsNucleinManagement, WMSExceptHandle, MaterialOutboundOrder, MaterialOutHistoryOther, MaterialOutHistory, \
+    FinalGumOutInventoryLog, FinalGumInInventoryLog
 
 from inventory.models import DeliveryPlan, DeliveryPlanStatus, InventoryLog, MaterialInventory
 from inventory.utils import OUTWORKUploader, OUTWORKUploaderLB, wms_out
@@ -721,6 +722,7 @@ class BzFinalMixingRubberInventorySerializer(serializers.ModelSerializer):
 
 class BzMixingRubberInventorySearchSerializer(BzFinalMixingRubberInventorySerializer):
     deal_suggestion = serializers.SerializerMethodField(read_only=True)
+    yx_state = serializers.SerializerMethodField(read_only=True)
 
     def get_deal_suggestion(self, obj):
         if obj.lot_no:
@@ -732,6 +734,21 @@ class BzMixingRubberInventorySearchSerializer(BzFinalMixingRubberInventorySerial
                     return ""
             return ""
         return ''
+
+    def get_yx_state(self, obj):
+        product_validity_data = self.context['product_validity_data']
+        period_of_validity = product_validity_data.get(obj.material_no)
+        if not period_of_validity:
+            return None
+        now_time = datetime.datetime.now()
+        min_expire_inventory_time = now_time - datetime.timedelta(days=period_of_validity)
+        min_yj_inventory_et_time = min_expire_inventory_time + datetime.timedelta(days=3)
+        if obj.in_storage_time < min_expire_inventory_time:
+            return 'expired'
+        if obj.in_storage_time > min_yj_inventory_et_time:
+            return 'normal'
+        else:
+            return 'warning'
 
 
 class BzFinalMixingRubberLBInventorySerializer(serializers.ModelSerializer):
@@ -822,6 +839,7 @@ class BzFinalMixingRubberLBInventorySerializer(serializers.ModelSerializer):
 
 class BzFinalRubberInventorySearchSerializer(BzFinalMixingRubberLBInventorySerializer):
     deal_suggestion = serializers.SerializerMethodField(read_only=True)
+    yx_state = serializers.SerializerMethodField(read_only=True)
 
     def get_deal_suggestion(self, obj):
         if obj.lot_no:
@@ -834,6 +852,20 @@ class BzFinalRubberInventorySearchSerializer(BzFinalMixingRubberLBInventorySeria
             return ""
         return ''
 
+    def get_yx_state(self, obj):
+        product_validity_data = self.context['product_validity_data']
+        period_of_validity = product_validity_data.get(obj.material_no)
+        if not period_of_validity:
+            return None
+        now_time = datetime.datetime.now()
+        min_expire_inventory_time = now_time - datetime.timedelta(days=period_of_validity)
+        min_yj_inventory_et_time = min_expire_inventory_time + datetime.timedelta(days=3)
+        if obj.in_storage_time < min_expire_inventory_time:
+            return 'expired'
+        if obj.in_storage_time > min_yj_inventory_et_time:
+            return 'normal'
+        else:
+            return 'warning'
 
 class WmsInventoryStockSerializer(serializers.ModelSerializer):
     unit_weight = serializers.SerializerMethodField(read_only=True)
@@ -2100,3 +2132,96 @@ class MaterialOutHistorySerializer(serializers.ModelSerializer):
     class Meta:
         model = MaterialOutHistory
         fields = '__all__'
+
+
+class ProductInOutHistorySerializer(serializers.ModelSerializer):
+
+    def to_representation(self, instance):
+        ware_house = self.context['ware_house']
+        inout_type = self.context['inout_type']
+        ret = super().to_representation(instance)
+        lot_no = ret['lot_no']
+        memo = ''
+        outbound_user = ''
+        equip_no = ''
+        if lot_no and lot_no != '88888888':
+            equip_no = lot_no[4:7] if lot_no[4:7].startswith('Z') else ""
+            pallet_data = PalletFeedbacks.objects.filter(lot_no=lot_no).first()
+            if pallet_data:
+                memo = '{}-{}'.format(pallet_data.begin_trains, pallet_data.end_trains) if pallet_data.begin_trains != pallet_data.end_trains else pallet_data.begin_trains
+        if ware_house == '混炼胶库':
+            if inout_type == 'in':
+                inbound_order_no = ret['order_no']
+                inbound_time = ret['start_time']
+                out_history = MixGumOutInventoryLog.objects.using('bz').filter(lot_no=lot_no,
+                                                                               pallet_no=ret['pallet_no'],
+                                                                               material_no=ret['material_no'],
+                                                                               location=ret['location']
+                                                                               ).first()
+                if out_history:
+                    outbound_order_no = out_history.order_no
+                    outbound_time = out_history.start_time.strftime('%Y-%m-%d %H:%M:%S')
+                else:
+                    outbound_order_no = ''
+                    outbound_time = ''
+            else:
+                outbound_order_no = ret['order_no']
+                outbound_time = ret['start_time']
+                in_history = MixGumInInventoryLog.objects.using('bz').filter(lot_no=lot_no,
+                                                                             pallet_no=ret['pallet_no'],
+                                                                             material_no=ret['material_no'],
+                                                                             location=ret['location']
+                                                                             ).first()
+                if in_history:
+                    inbound_order_no = in_history.order_no
+                    inbound_time = in_history.start_time.strftime('%Y-%m-%d %H:%M:%S')
+                else:
+                    inbound_order_no = ''
+                    inbound_time = ''
+        else:
+            if inout_type == 'in':
+                inbound_order_no = ret['order_no']
+                inbound_time = ret['start_time']
+                out_history = FinalGumOutInventoryLog.objects.using('lb').filter(lot_no=lot_no,
+                                                                                 pallet_no=ret['pallet_no'],
+                                                                                 material_no=ret['material_no'],
+                                                                                 location=ret['location']
+                                                                                 ).first()
+                if out_history:
+                    outbound_order_no = out_history.order_no
+                    outbound_time = out_history.start_time.strftime('%Y-%m-%d %H:%M:%S')
+                else:
+                    outbound_order_no = ''
+                    outbound_time = ''
+            else:
+                outbound_order_no = ret['order_no']
+                outbound_time = ret['start_time']
+                in_history = FinalGumInInventoryLog.objects.using('lb').filter(lot_no=lot_no,
+                                                                               pallet_no=ret['pallet_no'],
+                                                                               material_no=ret['material_no'],
+                                                                               location=ret['location']
+                                                                               ).first()
+                if in_history:
+                    inbound_order_no = in_history.order_no
+                    inbound_time = in_history.start_time.strftime('%Y-%m-%d %H:%M:%S')
+                else:
+                    inbound_order_no = ''
+                    inbound_time = ''
+        if outbound_order_no:
+            if outbound_order_no.startswith('MES'):
+                out_order = OutBoundDeliveryOrderDetail.objects.filter(order_no=outbound_order_no).first()
+                if out_order:
+                    outbound_user = out_order.created_user.username
+        ret['inbound_time'] = inbound_time
+        ret['inbound_order_no'] = inbound_order_no
+        ret['outbound_order_no'] = outbound_order_no
+        ret['outbound_user'] = outbound_user
+        ret['outbound_time'] = outbound_time
+        ret['product_no'] = ret['material_no']
+        ret['equip_no'] = equip_no
+        ret['memo'] = memo
+        return ret
+
+    class Meta:
+        model = InventoryLog
+        fields = ('lot_no', 'order_no', 'pallet_no', 'location', 'qty', 'weight', 'material_no', 'start_time')

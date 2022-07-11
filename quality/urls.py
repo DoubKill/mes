@@ -22,7 +22,8 @@ from quality.views import TestIndicatorViewSet, TestTypeViewSet, DataPointViewSe
     MaterialSingleTypeExamineResultView, ExamineResultCurveView, ShowQualifiedRange, WMSMaterialSearchView, \
     ReportValueView, TestDataView, CheckEquip, UnqualifiedPalletFeedBackListView, DataPointListView, \
     ProductTestStaticsView, ClassTestStaticsView, UnqialifiedEquipView, LabelPrintLogView, \
-    MaterialDataPointIndicatorHistoryView
+    MaterialDataPointIndicatorHistoryView, ProductSynthesisRate, ProductSynthesisEquipRate, ProductSynthesisGroupRate, \
+    ProductSynthesisProductRate, ProductSynthesisMonthRate
 
 router = DefaultRouter()
 
@@ -150,5 +151,11 @@ urlpatterns = [
     path('unqialified-equip/', UnqialifiedEquipView.as_view()),  # 机台别 不合格率统计
 
     path('label-print-logs/', LabelPrintLogView.as_view()),
-    path('mat-data-point-indicators-history/', MaterialDataPointIndicatorHistoryView.as_view())
+    path('mat-data-point-indicators-history/', MaterialDataPointIndicatorHistoryView.as_view()),
+    path('product-synthesis-rate/', ProductSynthesisRate.as_view()),  # 日合格率
+    path('product-synthesis-month-rate/', ProductSynthesisMonthRate.as_view()),  # 月合格率
+    path('product-synthesis-equip-rate/', ProductSynthesisEquipRate.as_view()),  # 机台日合格率
+    path('product-synthesis-group-rate/', ProductSynthesisGroupRate.as_view()),  # 班组日合格率
+    path('product-synthesis-product-rate/', ProductSynthesisProductRate.as_view()),  # 规格日合格率
+
 ]

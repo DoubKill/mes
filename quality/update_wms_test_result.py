@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 import django
 import requests
 
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
@@ -73,7 +74,8 @@ def main():
                 )
             WmsInventoryStock.objects.using('wms').filter(
                 material_no=material_no,
-                batch_no=batch_no).update(quality_status=quality_status)
+                batch_no=batch_no,
+                quality_status__in=(1, 3, 5)).update(quality_status=quality_status)
 
     ex_time = datetime.now() - timedelta(days=7)
     # 核酸检测锁定（设定不合格）
