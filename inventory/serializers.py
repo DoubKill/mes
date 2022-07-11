@@ -2208,7 +2208,7 @@ class ProductInOutHistorySerializer(serializers.ModelSerializer):
                     inbound_order_no = ''
                     inbound_time = ''
         if outbound_order_no:
-            if outbound_order_no.startswith('MES'):
+            if outbound_order_no.startswith('CHD'):
                 out_order = OutBoundDeliveryOrderDetail.objects.filter(order_no=outbound_order_no).first()
                 if out_order:
                     outbound_user = out_order.created_user.username
