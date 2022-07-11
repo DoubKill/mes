@@ -115,6 +115,7 @@ urlpatterns = [
     path('machine-target-value/', MachineTargetValue.as_view()),
     # 月产量统计汇总报表
     path('monthly-output-statistics-report/', MonthlyOutputStatisticsReport.as_view()),
+    path('monthly-output-statistics-report-detail/', MonthlyOutputStatisticsReportDetail.as_view()),
 
     # 密炼机台产量汇总表
     path('summary-of-mill-output/', SummaryOfMillOutput.as_view()),

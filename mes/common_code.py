@@ -10,7 +10,7 @@ import requests
 import xlwt
 from DBUtils.PooledDB import PooledDB
 from django.contrib.auth.backends import ModelBackend
-from django.db.models import Min, Max, Sum, Q
+from django.db.models import Min, Max, Sum, Q, Aggregate, CharField
 from django.http import HttpResponse
 from rest_framework import status, mixins
 from rest_framework.generics import CreateAPIView
@@ -280,6 +280,14 @@ class OMin(Min):
         return compiler.compile(
             SecondsToInterval(Min(IntervalToSeconds(expression), filter=self.filter))
         )
+
+
+class GroupConcat(Aggregate):
+    function = ''
+    template = "LISTAGG(%(expressions)s, ',') WITHIN GROUP(ORDER BY %(order_by)s)"
+
+    def __init__(self, expression, order_by, **extra):
+        super().__init__(expression, order_by=order_by, output_field=CharField(), **extra)
 
 
 class WebService(object):

@@ -932,7 +932,6 @@ permission_data = [
     {'id': 1018, 'code': 'addall_employee_attendance_records', 'name': '整体提交', 'parent_id': 942},
     {'id': 1019, 'code': 'reject_employee_attendance_records', 'name': '驳回', 'parent_id': 942},
 
-
     {'id': 946, 'code': 'summary_of_mill_output', 'name': '密炼机台产量汇总表', 'parent_id': None},
     {'id': 947, 'code': 'view_summary_of_mill_output', 'name': '查看', 'parent_id': 946},
     {'id': 948, 'code': 'export_summary_of_mill_output', 'name': '导出', 'parent_id': 946},
@@ -1013,15 +1012,21 @@ permission_data = [
     {'id': 1015, 'code': 'view_wms_mooney_level', 'name': '查看', 'parent_id': 1014},
     {'id': 1016, 'code': 'change_wms_mooney_level', 'name': '修改', 'parent_id': 1014},
 
-    {'id': 1020, 'code': 'rubber_frame_repair', 'name': '胶架维修记录', 'parent_id': None},
-    {'id': 1021, 'code': 'view_rubber_frame_repair', 'name': '查看', 'parent_id': 1020},
-    {'id': 1022, 'code': 'add_rubber_frame_repair', 'name': '新增', 'parent_id': 1020},
+    {'id': 1020, 'code': 'product_daily_rate', 'name': '综合合格率月度汇总', 'parent_id': None},
+    {'id': 1021, 'code': 'view_product_daily_rate', 'name': '查看', 'parent_id': 1020},
 
-    {'id': 1023, 'code': 'tool_manage_account', 'name': '工装管理台账', 'parent_id': None},
-    {'id': 1024, 'code': 'view_tool_manage_account', 'name': '查看', 'parent_id': 1023},
-    {'id': 1025, 'code': 'add_tool_manage_account', 'name': '新增', 'parent_id': 1023},
+    {'id': 1022, 'code': 'product_monthly_rate', 'name': '综合合格率年度汇总', 'parent_id': None},
+    {'id': 1023, 'code': 'view_product_monthly_rate', 'name': '查看', 'parent_id': 1022},
 
-    # 下一个 1026 开始
+    {'id': 1024, 'code': 'rubber_frame_repair', 'name': '胶架维修记录', 'parent_id': None},
+    {'id': 1025, 'code': 'view_rubber_frame_repair', 'name': '查看', 'parent_id': 1024},
+    {'id': 1026, 'code': 'add_rubber_frame_repair', 'name': '新增', 'parent_id': 1024},
+
+    {'id': 1027, 'code': 'tool_manage_account', 'name': '工装管理台账', 'parent_id': None},
+    {'id': 1028, 'code': 'view_tool_manage_account', 'name': '查看', 'parent_id': 1027},
+    {'id': 1029, 'code': 'add_tool_manage_account', 'name': '新增', 'parent_id': 1027},
+
+    # 下一个 1030 开始
 ]
 
 

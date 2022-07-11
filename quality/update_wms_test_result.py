@@ -17,10 +17,9 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()
 
 from quality.models import MaterialInspectionRegistration
-from inventory.models import WmsInventoryStock, WmsNucleinManagement, WmsInventoryMaterial
+from inventory.models import WmsInventoryStock, WmsNucleinManagement
 from quality.utils import update_wms_quality_result
 from django.db.models import Min
-from mes.settings import DEBUG
 
 import logging
 logger = logging.getLogger('quality_log')
@@ -90,24 +89,5 @@ def main():
         update_wms_quality_result(data_list)
 
 
-def main2():
-    now_time = datetime.now()
-    for m in WmsInventoryMaterial.objects.using('wms').filter(is_validity=1):
-        period_of_validity = m.period_of_validity
-        min_storage_time = WmsInventoryStock.objects.using('wms').filter(
-            material_no=m.material_no).aggregate(min_time=Min('in_storage_time'))['min_time']
-        if min_storage_time:
-            min_expire_inventory_time = now_time - timedelta(days=period_of_validity)
-            if min_storage_time >= min_expire_inventory_time:
-                continue
-            else:
-                WmsInventoryStock.objects.using('wms').filter(
-                    material_no=m.material_no,
-                    in_storage_time__lt=min_expire_inventory_time
-                ).update(quality_status=4)
-
-
 if __name__ == '__main__':
-    main2()
-    if not DEBUG:
-        main()
+    main()
