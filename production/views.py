@@ -22,7 +22,7 @@ from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 
 from rest_framework import mixins, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, permission_classes
 from rest_framework.exceptions import ValidationError
 from rest_framework.filters import OrderingFilter
 from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated
@@ -4642,6 +4642,8 @@ class ShiftTimeSummaryDetailView(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class RubberFrameRepairView(APIView):
     """胶架维修记录"""
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_rubber_frame_repair',
+                                                            'add': 'add_rubber_frame_repair'}))
 
     def get(self, request):
         date_time = self.request.query_params.get('date_time')
@@ -4679,6 +4681,8 @@ class RubberFrameRepairView(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class ToolManageAccountView(APIView):
     """工装管理台帐"""
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_tool_manage_account',
+                                                            'add': 'add_tool_manage_account'}))
 
     def get(self, request):
         date_time = self.request.query_params.get('date_time')

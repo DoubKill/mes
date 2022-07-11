@@ -1013,7 +1013,15 @@ permission_data = [
     {'id': 1015, 'code': 'view_wms_mooney_level', 'name': '查看', 'parent_id': 1014},
     {'id': 1016, 'code': 'change_wms_mooney_level', 'name': '修改', 'parent_id': 1014},
 
-    # 下一个 1020 开始
+    {'id': 1020, 'code': 'rubber_frame_repair', 'name': '胶架维修记录', 'parent_id': None},
+    {'id': 1021, 'code': 'view_rubber_frame_repair', 'name': '查看', 'parent_id': 1020},
+    {'id': 1022, 'code': 'add_rubber_frame_repair', 'name': '新增', 'parent_id': 1020},
+
+    {'id': 1023, 'code': 'tool_manage_account', 'name': '工装管理台账', 'parent_id': None},
+    {'id': 1024, 'code': 'view_tool_manage_account', 'name': '查看', 'parent_id': 1023},
+    {'id': 1025, 'code': 'add_tool_manage_account', 'name': '新增', 'parent_id': 1023},
+
+    # 下一个 1026 开始
 ]
 
 
