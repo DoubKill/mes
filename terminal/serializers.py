@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 import requests
+import status as status
 from django.db.models import Q, Sum, Max, Min, Count, F
 from django.db.transaction import atomic
 from django.db.utils import ConnectionDoesNotExist
@@ -14,6 +15,7 @@ from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
 from basics.models import WorkSchedulePlan, GlobalCode
+from equipment.models import XLCommonCode
 from inventory.models import MixGumOutInventoryLog, DepotPallt
 from mes import settings
 from mes.base_serializer import BaseModelSerializer
@@ -110,10 +112,14 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 detail_infos[i['material__material_name']] = i['actual_weight']
         materials = detail_infos.keys()
         if bra_code.startswith('TYLB'):  # 2号细料与3号硫磺设备对接前扫通用条码
+            common_code = XLCommonCode.objects.filter(bra_code=bra_code, status=False)
+            if not common_code:
+                raise serializers.ValidationError('未找到条码信息或条码已被使用')
             xl_recipe = [i for i in material_name_weight if i['material__material_name'] in ['硫磺', '细料']]
             if xl_recipe:  # 需要料包
                 OtherMaterialLog.objects.create(**{'plan_classes_uid': plan_classes_uid, 'product_no': classes_plan.product_batching.stage_product_batch_no,
                                                    'material_name': '通用料包', 'bra_code': bra_code, 'status': 1, 'other_type': '通用料包'})
+                common_code.update(status=True, scan_time=now_date)
                 raise serializers.ValidationError('通用料包扫码成功')
             else:
                 common_scan = OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, other_type='通用料包', status=1)

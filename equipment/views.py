@@ -16,7 +16,7 @@ from django.http import HttpResponse
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, permission_classes
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import GenericAPIView
 from rest_framework.mixins import ListModelMixin
@@ -37,7 +37,7 @@ from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipP
     EquipWarehouseRecordFilter, EquipApplyOrderFilter, EquipApplyRepairFilter, EquipWarehouseOrderFilter, \
     EquipPlanFilter, EquipInspectionOrderFilter
 from equipment.models import EquipTargetMTBFMTTRSetting, EquipWarehouseAreaComponent, EquipRepairMaterialReq, \
-    EquipInspectionOrder, EquipRegulationRecord, EquipMaintenanceStandardWork, EquipOrderEntrust
+    EquipInspectionOrder, EquipRegulationRecord, EquipMaintenanceStandardWork, EquipOrderEntrust, XLCommonCode
 from equipment.serializers import *
 from equipment.serializers import EquipRealtimeSerializer
 from equipment.task import property_template, property_import
@@ -5007,3 +5007,24 @@ class EquipIndexView(APIView):
             }
             ret['equip_data'].append(data)
         return Response(ret)
+
+
+@method_decorator([api_recorder], name='dispatch')
+class XLCommonCodeView(APIView):
+    """通用料包条码"""
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        # 获取原因说明
+        apply_desc = list(XLCommonCode.objects.filter(apply_desc__isnull=False).values_list('apply_desc', flat=True).distinct())
+        return Response({'results': apply_desc})
+
+    @atomic
+    def post(self, request):
+        apply_desc = self.request.data.get('apply_desc')
+        prefix = 'TYLB' + datetime.now().strftime('%Y%m%d')
+        m_code = XLCommonCode.objects.filter(bra_code__startswith=prefix).aggregate(m_code=Max('bra_code'))['m_code']
+        bra_code = prefix + ("0001" if not m_code else "%04d" % (int(m_code[-4:]) + 1))
+        instance = XLCommonCode.objects.create(apply_user=self.request.user.username, bra_code=bra_code,
+                                               apply_desc=apply_desc)
+        return Response({'results': bra_code})

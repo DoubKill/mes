@@ -1,6 +1,7 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
+from equipment.models import XLCommonCode
 from equipment.views import *
 
 
@@ -174,6 +175,8 @@ urlpatterns = [
     path('get-spare-order/', GetSpareOrder.as_view()),
     # 委托工单与查询
     path('equip-order-entrust/', EquipOrderEntrustView.as_view()),
+    # 通用料包条码
+    path('xl-common-code/', XLCommonCodeView.as_view()),
 
     path('index/', EquipIndexView.as_view())
 

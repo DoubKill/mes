@@ -24,7 +24,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from basics.models import WorkSchedulePlan, Equip, GlobalCode
-from equipment.models import EquipMachineHaltType
+from equipment.models import EquipMachineHaltType, XLCommonCode
 from equipment.serializers import EquipApplyRepairSerializer
 from equipment.utils import gen_template_response
 from inventory.models import MaterialOutHistory
@@ -133,6 +133,9 @@ class BatchProductionInfoView(APIView):
             plan_status_info = PlanStatus.objects.using("SFJ").filter(plan_classes_uid=plan.plan_classes_uid).order_by('created_date').last()
             plan_status = plan_status_info.status if plan_status_info else plan.status
             if plan_status not in ['运行中', '等待']:
+                if plan_status in ['停止', '完成', '待停止']:  # 更新通用料包完成时间
+                    common_code = OtherMaterialLog.objects.filter(plan_classes_uid=plan.plan_classes_uid, status=1, other_type='通用料包').last()
+                    XLCommonCode.objects.filter(bra_code=common_code.bra_code, status=True, expire_time__isnull=True).update(expire_time=now)
                 continue
             actual_trains = 0
             data = {
