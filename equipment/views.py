@@ -2996,14 +2996,14 @@ class EquipAutoPlanView(APIView):
         get_code = self.request.query_params.get('get_code')
         spare_code = self.request.query_params.get('spare_code')
         order_id = self.request.query_params.get('order_id')
-        default_staff = self.request.query_params.get('default_staff')  # 保养组名单
+        default_staff = self.request.query_params.get('default_staff')  # 保养组名单->变更为设备科
         if default_staff:
-            init_section = Section.objects.filter(name='保养组').last()
+            init_section = Section.objects.filter(name='设备科').last()
             if not init_section:
-                return Response({"success": False, "message": "未找到保养组", "data": []})
+                return Response({"success": False, "message": "未找到设备科", "data": []})
             section_list = get_children_section(init_section, include_self=True)
             res = list(User.objects.filter(section__name__in=section_list, is_active=True).annotate(order_id=F('username')).values('id', 'order_id').distinct())
-            return Response({"success": True, "message": "获取保养组成员信息成功", "data": res})
+            return Response({"success": True, "message": "获取设备科成员信息成功", "data": res})
         if get_code:
             if get_code == "1":
                 order_list = EquipWarehouseOrder.objects.filter(status__in=[1, 2], order_detail__delete_flag=False,
