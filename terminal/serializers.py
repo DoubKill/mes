@@ -7,8 +7,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 import requests
-import status as status
-from django.db.models import Q, Sum, Max, Min, Count, F
+from django.db.models import Q, Sum, Max, Min
 from django.db.transaction import atomic
 from django.db.utils import ConnectionDoesNotExist
 from rest_framework import serializers
@@ -22,8 +21,7 @@ from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS, JZ_EQUIP_NO
 from plan.models import ProductClassesPlan, BatchingClassesPlan, BatchingClassesEquipPlan
 from production.models import PalletFeedbacks
-from recipe.models import ERPMESMaterialRelation, ProductBatchingDetail, \
-    ProductBatchingEquip, ProductBatchingDetailPlan
+from recipe.models import ERPMESMaterialRelation, ProductBatchingEquip, ProductBatchingDetailPlan
 from terminal.models import EquipOperationLog, WeightBatchingLog, FeedingLog, WeightTankStatus, \
     WeightPackageLog, FeedingMaterialLog, LoadMaterialLog, MaterialInfo, Bin, Plan, RecipePre, ReportBasic, \
     ReportWeight, LoadTankMaterialLog, PackageExpire, RecipeMaterial, CarbonTankFeedWeightSet, \
