@@ -1671,6 +1671,21 @@ class PlanSerializer(serializers.ModelSerializer):
         res = super().to_representation(instance)
         if res.get('merge_flag') is None:
             res['merge_flag'] = False
+        # 增加密炼车数列[打印过从履历中取,否则取线上数据]
+        try:
+            equip_no, split_count = self.context['request'].query_params.get('equip_no'), 1
+            if equip_no:
+                s_record = WeightPackageLog.objects.filter(plan_weight_uid=res['planid'], equip_no=equip_no).last()
+                if s_record:
+                    split_count = s_record.split_count
+                else:
+                    recipe = RecipePre.objects.using(equip_no).filter(name=res['recipe']).first()
+                    if recipe:
+                        split_count = recipe.split_count
+        except:
+            pass
+        else:
+            res['mix_trains'] = res['setno'] / split_count
         return res
 
     def create(self, validated_data):
