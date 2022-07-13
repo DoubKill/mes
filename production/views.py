@@ -3743,10 +3743,11 @@ class AttendanceClockViewSet(ModelViewSet):
         username = self.request.user.username
         id_card_num = self.request.user.id_card_num
         apply = self.request.query_params.get('apply', None)
+        select_time = self.request.query_params.get('select_time')
         time_now = datetime.datetime.now()
         date_now = None
         try:
-            attendance_group_obj, section_list, equip_list, date_now, group_list = self.get_user_group(self.request.user)
+            attendance_group_obj, section_list, equip_list, date_now, group_list = self.get_user_group(self.request.user, select_time)
         except Exception as e:
             # 查询审批不返回异常
             if apply:
@@ -3815,9 +3816,10 @@ class AttendanceClockViewSet(ModelViewSet):
                 results['state'] = 2  # 默认显示
                 results['section_list'].remove(last_obj.section)
                 results['section_list'].insert(0, last_obj.section)  # 放到第一位显示
-                group, classes = last_obj.group, last_obj.classes
-                results['group_list'].remove({'group': group, 'classes': classes})
-                results['group_list'].insert(0, {'group': group, 'classes': classes})
+                history_gc = {'group': last_obj.group, 'classes': last_obj.classes}
+                if history_gc in results['group_list']:
+                    results['group_list'].remove(history_gc)
+                    results['group_list'].insert(0, history_gc)
         else:
             results['state'] = 1  # 没有打卡记录
         return Response(results)
@@ -4055,11 +4057,17 @@ class AttendanceClockViewSet(ModelViewSet):
         """获取补卡时默认数据显示"""
         state = self.request.query_params.get('state')
         user = self.request.user
+        select_time = self.request.query_params.get('select_time')
+        try:
+            attendance_group_obj, section_list, equip_list, date_now, group_list = self.get_user_group(self.request.user, select_time)
+        except Exception as e:
+            group_list, equip_list, section_list, principal = [], [], [], ''
+        else:
+            group_list, equip_list, section_list, principal = group_list, equip_list, section_list, attendance_group_obj.principal
         queryset = EmployeeAttendanceRecords.objects.filter(Q(user=user) & ~Q(is_use='废弃'))
-        res = {'classes': None,
-               'group': None,
-               'section': None,
-               'equips': []}
+        res = {'group': group_list,
+               'section': section_list,
+               'equips': equip_list}
         equips = []
         if state == '上岗':
             obj = queryset.filter(status__in=['上岗', '调岗']).last()
@@ -4073,9 +4081,6 @@ class AttendanceClockViewSet(ModelViewSet):
             obj = queryset.filter(status__in=['上岗', '调岗'], end_date__isnull=True).last()
             if obj:
                 equips = queryset.filter(begin_date=obj.begin_date).values_list('equip', flat=True)
-        res['classes'] = obj.classes if obj else None
-        res['group'] = obj.group if obj else None
-        res['section'] = obj.section if obj else None
         res['equips'] = equips
         return Response({'results': res})
 
