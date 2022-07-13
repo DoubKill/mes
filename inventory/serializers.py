@@ -1835,6 +1835,7 @@ class OutBoundDeliveryOrderSerializer(BaseModelSerializer):
     work_qty = serializers.SerializerMethodField(read_only=True)
     finished_qty = serializers.SerializerMethodField(read_only=True)
     period_of_validity = serializers.SerializerMethodField(read_only=True)
+    latest_task_time = serializers.SerializerMethodField(read_only=True)
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
@@ -1855,6 +1856,12 @@ class OutBoundDeliveryOrderSerializer(BaseModelSerializer):
     def get_finished_qty(self, obj):
         finished_qty = obj.outbound_delivery_details.filter(status=3).aggregate(finished_qty=Sum('qty'))['finished_qty']
         return finished_qty if finished_qty else 0
+
+    def get_latest_task_time(self, obj):
+        last_task = obj.outbound_delivery_details.order_by('id').last()
+        if last_task:
+            return last_task.created_date.strftime('%Y-%m-%d %H:%M:%S')
+        return ""
 
     def validate(self, attrs):
         order_type = attrs.get('order_type', 1)
@@ -2144,6 +2151,7 @@ class ProductInOutHistorySerializer(serializers.ModelSerializer):
         memo = ''
         outbound_user = ''
         equip_no = ''
+        order_no = ''
         if lot_no and lot_no != '88888888':
             equip_no = lot_no[4:7] if lot_no[4:7].startswith('Z') else ""
             pallet_data = PalletFeedbacks.objects.filter(lot_no=lot_no).first()
@@ -2212,6 +2220,7 @@ class ProductInOutHistorySerializer(serializers.ModelSerializer):
                 out_order = OutBoundDeliveryOrderDetail.objects.filter(order_no=outbound_order_no).first()
                 if out_order:
                     outbound_user = out_order.created_user.username
+                    order_no = out_order.outbound_delivery_order.order_no
         ret['inbound_time'] = inbound_time
         ret['inbound_order_no'] = inbound_order_no
         ret['outbound_order_no'] = outbound_order_no
@@ -2220,6 +2229,7 @@ class ProductInOutHistorySerializer(serializers.ModelSerializer):
         ret['product_no'] = ret['material_no']
         ret['equip_no'] = equip_no
         ret['memo'] = memo
+        ret['order_no'] = order_no
         return ret
 
     class Meta:
