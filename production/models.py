@@ -589,6 +589,24 @@ class ActualWorkingDay(models.Model):
         verbose_name_plural = verbose_name = '实际生产工作日数'
 
 
+class ActualWorkingDay190E(models.Model):
+    factory_date = models.DateField(help_text='工厂时间')
+    num = models.FloatField(help_text='天数', blank=True, null=True)
+
+    class Meta:
+        db_table = 'actual_working_days_e'
+        verbose_name_plural = verbose_name = '190E实际生产工作日数'
+
+
+class ActualWorkingEquip(models.Model):
+    factory_date = models.DateField(help_text='工厂时间')
+    num = models.FloatField(help_text='机台数量', blank=True, null=True)
+
+    class Meta:
+        db_table = 'actual_working_equips'
+        verbose_name_plural = verbose_name = '实际生产机台数量'
+
+
 class Equip190E(models.Model):
     specification = models.CharField(max_length=12, help_text='规格')
     state = models.CharField(max_length=12, help_text='段次')
