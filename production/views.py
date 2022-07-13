@@ -2498,9 +2498,18 @@ class DailyProductionCompletionReport(APIView):
             elif item['name'] == '实际生产工作日数':
                 item['avg'] = "" if not month_working_days else round(
                     float(item['weight']) / len(actual_working_day_dict), 2)
+            elif item['name'] in ('单机台效率-1（吨/台）', '单机台效率-2（吨/台）', '每日段数'):
+                item['avg'] = item['weight']
             else:
                 item['avg'] = "" if not month_working_days else round(float(item['weight']) / month_working_days, 2)
-
+        try:
+            results['name_11']['avg'] = round(results['name_4']['avg'] / results['name_9']['avg'], 2)
+        except Exception:
+            results['name_11']['avg'] = ''
+        try:
+            results['name_12']['avg'] = round(results['name_5']['avg'] / results['name_9']['avg'], 2)
+        except Exception:
+            results['name_12']['avg'] = ''
         cnt = 0
         sum_ds = 0
         for idx in range(1, days):
