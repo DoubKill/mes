@@ -1535,7 +1535,10 @@ class InOutCommonSerializer(serializers.Serializer):
                        5: '取消',
                        6: '异常',
                        12: '强制完成'}
-        return status_dict.get(obj.task_status, '未知')
+        try:
+            return status_dict.get(obj.task_status, '未知')
+        except Exception:
+            return ""
 
 
 class DepotModelSerializer(serializers.ModelSerializer):
@@ -2208,7 +2211,7 @@ class ProductInOutHistorySerializer(serializers.ModelSerializer):
                     inbound_order_no = ''
                     inbound_time = ''
         if outbound_order_no:
-            if outbound_order_no.startswith('MES'):
+            if outbound_order_no.startswith('CHD'):
                 out_order = OutBoundDeliveryOrderDetail.objects.filter(order_no=outbound_order_no).first()
                 if out_order:
                     outbound_user = out_order.created_user.username
