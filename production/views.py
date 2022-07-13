@@ -2478,7 +2478,7 @@ class DailyProductionCompletionReport(APIView):
                     continue
                 value = round(float(v) / ds, 2)
                 results['name_11'][k] = value
-        results['name_11']['weight'] = 0 if not actual_working_equips else round(float(results['name_7']['weight']) / actual_working_equips, 2)
+        results['name_11']['weight'] = 0 if not actual_working_equips else round(float(results['name_4']['weight']) / actual_working_equips, 2)
         for k, v in results['name_5'].items():
             if k[0].isdigit():
                 ds = actual_working_equip_dict.get(int(k[:-1]))
@@ -2486,7 +2486,7 @@ class DailyProductionCompletionReport(APIView):
                     continue
                 value = round(float(v) / ds, 2)
                 results['name_12'][k] = value
-        results['name_12']['weight'] = 0 if not actual_working_equips else round(float(results['name_8']['weight']) / actual_working_equips, 2)
+        results['name_12']['weight'] = 0 if not actual_working_equips else round(float(results['name_5']['weight']) / actual_working_equips, 2)
 
         # 计算平均值
         for item in results.values():
