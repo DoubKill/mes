@@ -3787,17 +3787,17 @@ class ProductSynthesisEquipRate(APIView):
             else:
                 mto_equip_qualified_data_dict[equip_no] = {day: qty, 'total': qty}
 
+        equip_nos = list(Equip.objects.filter(
+                category__equip_type__global_name="密炼设备"
+            ).order_by('equip_no').values_list("equip_no", flat=True))
+
         data2 = [{"name": equip_no, "rate": "" if not mto_equip_data_dict.get(equip_no) else
                     round(mto_equip_qualified_data_dict.get(equip_no, {}).get('total', 0) / mto_equip_data_dict.get(equip_no, {}).get('total') * 100, 1)}
-                 for equip_no in Equip.objects.filter(
-                category__equip_type__global_name="密炼设备"
-            ).order_by('equip_no').values_list("equip_no", flat=True)]
+                 for equip_no in equip_nos]
 
         # 机台合格率
         for i in range(1, days+1):
-            for idx, equip_no in enumerate(list(Equip.objects.filter(
-                     category__equip_type__global_name="密炼设备"
-                 ).order_by('equip_no').values_list("equip_no", flat=True))):
+            for idx, equip_no in enumerate(equip_nos):
                 q_qty = mto_equip_qualified_data_dict.get(equip_no, {}).get(i, 0)
                 t_qty = mto_equip_data_dict.get(equip_no, {}).get(i, 0)
                 data2[idx][str(i)] = '' if not t_qty else round(q_qty/t_qty*100, 1)
@@ -3827,10 +3827,12 @@ class ProductSynthesisGroupRate(APIView):
         mto_group_data = MaterialTestOrder.objects.filter(
             **filter_kwargs).values('production_factory_date__day', 'production_group').annotate(qty=Count('id'))
         mto_group_data_dict = {}
+        group_names = set()
         for item in mto_group_data:
             group = item['production_group']
             day = item['production_factory_date__day']
             qty = item['qty']
+            group_names.add(group)
             if group in mto_group_data_dict:
                 mto_group_data_dict[group][day] = qty
                 mto_group_data_dict[group]['total'] += qty
@@ -3846,22 +3848,20 @@ class ProductSynthesisGroupRate(APIView):
             group = item['production_group']
             day = item['production_factory_date__day']
             qty = item['qty']
-            if group in mto_group_qualified_data:
+            if group in mto_group_qualified_data_dict:
                 mto_group_qualified_data_dict[group][day] = qty
                 mto_group_qualified_data_dict[group]['total'] += qty
             else:
                 mto_group_qualified_data_dict[group] = {day: qty, 'total': qty}
+
+        group_names = sorted(list(group_names))
         data3 = [{"name": group_name, "rate": "" if not mto_group_data_dict.get(group_name) else
                     round(mto_group_qualified_data_dict.get(group_name, {}).get('total', 0) / mto_group_data_dict.get(group_name, {}).get('total') * 100, 1)}
-                 for group_name in GlobalCode.objects.filter(
-                     global_type__type_name="班组"
-                 ).order_by('global_name').values_list("global_name", flat=True)]
+                 for group_name in group_names]
 
         # 班组合格率
         for i in range(1, days+1):
-            for idx, group in enumerate(list(GlobalCode.objects.filter(
-                global_type__type_name="班组"
-            ).order_by('global_name').values_list("global_name", flat=True))):
+            for idx, group in enumerate(group_names):
                 q_qty = mto_group_qualified_data_dict.get(group, {}).get(i, 0)
                 t_qty = mto_group_data_dict.get(group, {}).get(i, 0)
                 data3[idx][str(i)] = '' if not t_qty else round(q_qty / t_qty * 100, 1)

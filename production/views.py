@@ -49,7 +49,8 @@ from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, Pla
     RubberCannotPutinReason, MachineTargetYieldSettings, EmployeeAttendanceRecords, PerformanceJobLadder, \
     PerformanceUnitPrice, ProductInfoDingJi, SetThePrice, SubsidyInfo, IndependentPostTemplate, AttendanceGroupSetup, \
     FillCardApply, ApplyForExtraWork, EquipMaxValueCache, Equip190EWeight, OuterMaterial, Equip190E, \
-    AttendanceClockDetail, AttendanceResultAudit, ManualInputTrains, ActualWorkingDay, EmployeeAttendanceRecordsLog
+    AttendanceClockDetail, AttendanceResultAudit, ManualInputTrains, ActualWorkingDay, EmployeeAttendanceRecordsLog, \
+    ActualWorkingEquip, ActualWorkingDay190E
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, \
@@ -150,6 +151,12 @@ class PalletFeedbacksViewSet(mixins.CreateModelMixin,
             if isinstance(value, str):
                 value = value.strip()
             validated_data[key] = value
+            if key in ('begin_trains', 'end_trains', 'actual_weight'):
+                if value <= 0:
+                    return Response('补充成功')
+            if key == 'pallet_no':
+                if value == '0':
+                    return Response('补充成功')
         lot_no = validated_data.pop("lot_no", None)
         validated_data.pop("factory_date", None)
         plan_classes_uid = validated_data.get('plan_classes_uid')
@@ -2336,8 +2343,13 @@ class DailyProductionCompletionReport(APIView):
             'name_4': {'name': '实际完成数-1(吨)', 'weight': 0},  # 190E终炼产量 + FM + 外发无硫料*0.7
             'name_5': {'name': '实际完成数-2(吨)', 'weight': 0},  # 190E终炼产量 + FM + 外发无硫料
             'name_6': {'name': '实际生产工作日数', 'weight': 0},
-            'name_7': {'name': '日均完成率1', 'weight': None},
-            'name_8': {'name': '日均完成率2', 'weight': None},
+            'name_10': {'name': '190E实际生产工作日数', 'weight': 0},
+            'name_7': {'name': '日均完成量-1（吨）', 'weight': 0},
+            'name_8': {'name': '日均完成量-2（吨）', 'weight': 0},
+            'name_9': {'name': '实际生产机台数', 'weight': 0},
+            'name_11': {'name': '单机台效率-1（吨/台）', 'weight': 0},
+            'name_12': {'name': '单机台效率-2（吨/台）', 'weight': 0},
+            'name_13': {'name': '每日段数', 'weight': 0}
         }
         total_queryset = TrainsFeedbacks.objects.exclude(Q(product_no__icontains='XCJ') |
                                                          Q(product_no__icontains='洗车胶') |
@@ -2346,7 +2358,7 @@ class DailyProductionCompletionReport(APIView):
         month_total_dict = dict(total_queryset.values(
                 'factory_date__day'
             ).annotate(weight=Sum(
-                'actual_weight', output_field=DecimalField())
+                'plan_weight', output_field=DecimalField())
             ).values_list('factory_date__day', 'weight'))
         # 当月混炼实际完成吨  CMB HMB 1MB~4MB
         queryset1 = total_queryset.filter(Q(product_no__icontains='-CMB-') |
@@ -2356,10 +2368,10 @@ class DailyProductionCompletionReport(APIView):
                                           Q(product_no__icontains='-3MB-') |
                                           Q(product_no__icontains='-4MB-'))
 
-        mix_queryset = queryset1.values('factory_date__day').annotate(weight=Sum('actual_weight', output_field=DecimalField()))
+        mix_queryset = queryset1.values('factory_date__day').annotate(weight=Sum('plan_weight', output_field=DecimalField()))
         # 当月终炼实际完成（FM段次）  FM
         queryset2 = total_queryset.filter(product_no__icontains='-FM-')
-        fin_queryset = queryset2.values('factory_date__day').annotate(weight=Sum('actual_weight', output_field=DecimalField()))
+        fin_queryset = queryset2.values('factory_date__day').annotate(weight=Sum('plan_weight', output_field=DecimalField()))
         fm_total_dict = dict(fin_queryset.values_list('factory_date__day', 'weight'))
         # 当月190E所有产量
         queryset_190e = Equip190EWeight.objects.exclude(
@@ -2388,7 +2400,18 @@ class DailyProductionCompletionReport(APIView):
         actual_working_day_dict = dict(
             ActualWorkingDay.objects.filter(
                 factory_date__year=year,
-                factory_date__month=month).values_list('factory_date__day', 'num'))
+                factory_date__month=month,
+                num__gt=0).values_list('factory_date__day', 'num'))
+        actual_working_day_190e_dict = dict(
+            ActualWorkingDay190E.objects.filter(
+                factory_date__year=year,
+                factory_date__month=month,
+                num__gt=0).values_list('factory_date__day', 'num'))
+        actual_working_equip_dict = dict(
+            ActualWorkingEquip.objects.filter(
+                factory_date__year=year,
+                factory_date__month=month,
+                num__gt=0).values_list('factory_date__day', 'num'))
         for item in mix_queryset:
             mixin_weight = round(item['weight'] / 100000, 2)
             results['name_1']['weight'] += mixin_weight
@@ -2430,6 +2453,12 @@ class DailyProductionCompletionReport(APIView):
         for k, v in actual_working_day_dict.items():
             results['name_6'][f"{k}日"] = v
             results['name_6']['weight'] += 0 if not v else v
+        for k, v in actual_working_equip_dict.items():
+            results['name_9'][f"{k}日"] = v
+            results['name_9']['weight'] += 0 if not v else v
+        for k, v in actual_working_day_190e_dict.items():
+            results['name_10'][f"{k}日"] = v
+            results['name_10']['weight'] += 0 if not v else v
         if len(results['name_6']) - 2 != 0:
             for key, value in results['name_4'].items():
                 if key[0].isdigit():
@@ -2438,10 +2467,88 @@ class DailyProductionCompletionReport(APIView):
                         results['name_8'][key] = round(results['name_5'][key] / decimal.Decimal(results['name_6'][key]), 2)
             results['name_7']['weight'] = 0 if results['name_6']['weight'] == 0 else round(results['name_4']['weight'] / decimal.Decimal(results['name_6']['weight']), 2)
             results['name_8']['weight'] = 0 if results['name_6']['weight'] == 0 else round(results['name_5']['weight'] / decimal.Decimal(results['name_6']['weight']), 2)
+        month_working_days_190e = float(sum(actual_working_day_190e_dict.values()))
         month_working_days = float(sum(actual_working_day_dict.values()))
+        actual_working_equips = float(sum(actual_working_equip_dict.values()))
+
+        for k, v in results['name_4'].items():
+            if k[0].isdigit():
+                ds = actual_working_equip_dict.get(int(k[:-1]))
+                if not ds:
+                    continue
+                value = round(float(v) / ds, 2)
+                results['name_11'][k] = value
+        results['name_11']['weight'] = 0 if not actual_working_equips else round(float(results['name_4']['weight']) / actual_working_equips, 2)
+        for k, v in results['name_5'].items():
+            if k[0].isdigit():
+                ds = actual_working_equip_dict.get(int(k[:-1]))
+                if not ds:
+                    continue
+                value = round(float(v) / ds, 2)
+                results['name_12'][k] = value
+        results['name_12']['weight'] = 0 if not actual_working_equips else round(float(results['name_5']['weight']) / actual_working_equips, 2)
+
         # 计算平均值
         for item in results.values():
-            item['avg'] = "" if not month_working_days else round(float(item['weight']) / month_working_days, 2)
+            if item['name'] == '190E实际生产工作日数':
+                item['avg'] = "" if not month_working_days_190e else round(float(item['weight']) / len(actual_working_day_190e_dict), 2)
+            elif item['name'] == '实际生产机台数':
+                item['avg'] = "" if not actual_working_equips else round(
+                    float(item['weight']) / len(actual_working_equip_dict), 2)
+            elif item['name'] == '实际生产工作日数':
+                item['avg'] = "" if not month_working_days else round(
+                    float(item['weight']) / len(actual_working_day_dict), 2)
+            elif item['name'] in ('单机台效率-1（吨/台）', '单机台效率-2（吨/台）', '每日段数'):
+                item['avg'] = item['weight']
+            else:
+                item['avg'] = "" if not month_working_days else round(float(item['weight']) / month_working_days, 2)
+        try:
+            results['name_11']['avg'] = round(results['name_4']['avg'] / results['name_9']['avg'], 2)
+        except Exception:
+            results['name_11']['avg'] = ''
+        try:
+            results['name_12']['avg'] = round(results['name_5']['avg'] / results['name_9']['avg'], 2)
+        except Exception:
+            results['name_12']['avg'] = ''
+        cnt = 0
+        sum_ds = 0
+        for idx in range(1, days):
+            fm = data_190e['fm'][idx]
+            total = data_190e['total'][idx]
+            if not total:
+                continue
+            try:
+                ds = total/fm
+            except Exception:
+                ds = 0
+            sum_ds += ds
+            cnt += 1
+        avg_190e = {'jl': 0 if sum(data_190e['jl']) == 0 else round(sum(data_190e['jl']) / len([i for i in data_190e['jl'] if i > 0]), 2),
+                    'wl': 0 if sum(data_190e['wl']) == 0 else round(sum(data_190e['wl']) / len([i for i in data_190e['wl'] if i > 0]), 2),
+                    'ds': 0 if sum(data_190e['fm']) == 0 else round(sum(data_190e['total']) / sum(data_190e['fm']), 2)}
+
+        cnt2 = 0
+        sum_ds2 = 0
+        for t_day in range(1, days+1):
+            t_weight = float(month_total_dict.get(t_day, 0) / 100000) + float(total_queryset_190e_dict.get(t_day, 0))
+            if not t_weight:
+                continue
+            fm_weight = float(fm_total_dict.get(t_day, 0) / 100000) + float(fm_queryset_190e_dict.get(t_day, 0))
+            try:
+                ds2 = t_weight / fm_weight
+            except Exception:
+                ds2 = 0
+            sum_ds2 += ds2
+            cnt2 += 1
+            results['name_13']['{}日'.format(str(t_day))] = round(ds2, 2)
+
+        total_weight = total_queryset.aggregate(w=Sum('plan_weight'))['w']
+        total_fm_weight = queryset2.aggregate(w=Sum('plan_weight'))['w']
+        results['name_13']['weight'] = "" if not total_fm_weight or not total_weight else round(total_weight/total_fm_weight, 2)
+        results['name_13']['avg'] = 0 if not cnt2 else round(sum_ds2/cnt2, 2)
+        avg_results = {'jl': results['name_2']['avg'],
+                       'wl': results['name_1']['avg'],
+                       'ds': results['name_13']['weight']}
         if self.request.query_params.get('export', None):
             results2 = {}
             equip_query = Equip.objects.filter(category__equip_type__global_name='密炼设备').values('equip_no',
@@ -2449,7 +2556,7 @@ class DailyProductionCompletionReport(APIView):
             equip_dic = {item['equip_no']: item['category__category_name'] for item in equip_query}
             data2 = TrainsFeedbacks.objects.exclude(operation_user='Mixer2').filter(factory_date__year=year, factory_date__month=month).values(
                 'factory_date__day', 'product_no', 'equip_no', 'classes').annotate(actual_trains=Count('actual_trains'),
-                                                                                   weight=Sum('actual_weight')/100000).order_by('-classes')
+                                                                                   weight=Sum('plan_weight')/100000).order_by('-classes')
             for item in data2:
                 try:
                     state = item['product_no'].split("-")[1]
@@ -2507,39 +2614,6 @@ class DailyProductionCompletionReport(APIView):
             )
             return self.export(month, days, excel_sheet_1_data, excel_sheet_23_data)
 
-        cnt = 0
-        sum_ds = 0
-        for idx in range(1, days):
-            fm = data_190e['fm'][idx]
-            total = data_190e['total'][idx]
-            if not total:
-                continue
-            try:
-                ds = total/fm
-            except Exception:
-                ds = 0
-            sum_ds += ds
-            cnt += 1
-        avg_190e = {'jl': 0 if sum(data_190e['jl']) == 0 else round(sum(data_190e['jl']) / len([i for i in data_190e['jl'] if i > 0]), 1),
-                    'wl': 0 if sum(data_190e['wl']) == 0 else round(sum(data_190e['wl']) / len([i for i in data_190e['wl'] if i > 0]), 1),
-                    'ds': 0 if not cnt else round(sum_ds/cnt, 1)}
-
-        cnt2 = 0
-        sum_ds2 = 0
-        for t_day in range(1, days+1):
-            t_weight = month_total_dict.get(t_day, 0) + total_queryset_190e_dict.get(t_day, 0)
-            if not t_weight:
-                continue
-            fm_weight = fm_total_dict.get(t_day, 0) + fm_queryset_190e_dict.get(t_day, 0)
-            try:
-                ds2 = t_weight / fm_weight
-            except Exception:
-                ds2 = 0
-            sum_ds2 += ds2
-            cnt2 += 1
-        avg_results = {'jl': results['name_2']['avg'],
-                       'wl': results['name_1']['avg'],
-                       'ds': 0 if not cnt2 else round(sum_ds2/cnt2, 1)}
         return Response({'results': results.values(),
                          'data_190e': data_190e,
                          'avg_190e': avg_190e,
@@ -2554,6 +2628,8 @@ class DailyProductionCompletionReport(APIView):
         date = self.request.data.get('date')
         outer_data = self.request.data.get('outer_data', [])  # 外发无硫料
         working_data = self.request.data.get('working_data', [])  # 实际工作日期
+        working_190e_data = self.request.data.get('working_190e_data', [])  # 实际工作日期
+        equip_data = self.request.data.get('equip_data', [])  # 实际工作日期
         if data:
             serializer = Equip190EWeightSerializer(data=data, many=True)
             serializer.is_valid(raise_exception=True)
@@ -2578,6 +2654,20 @@ class DailyProductionCompletionReport(APIView):
             for item in working_data:
                 try:
                     ActualWorkingDay.objects.update_or_create(
+                        defaults={'num': item['num']},
+                        factory_date=item['factory_date'])
+                except Exception:
+                    pass
+            for item in equip_data:
+                try:
+                    ActualWorkingEquip.objects.update_or_create(
+                        defaults={'num': item['num']},
+                        factory_date=item['factory_date'])
+                except Exception:
+                    pass
+            for item in working_190e_data:
+                try:
+                    ActualWorkingDay190E.objects.update_or_create(
                         defaults={'num': item['num']},
                         factory_date=item['factory_date'])
                 except Exception:
