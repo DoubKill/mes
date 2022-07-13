@@ -1535,7 +1535,10 @@ class InOutCommonSerializer(serializers.Serializer):
                        5: '取消',
                        6: '异常',
                        12: '强制完成'}
-        return status_dict.get(obj.task_status, '未知')
+        try:
+            return status_dict.get(obj.task_status, '未知')
+        except Exception:
+            return ""
 
 
 class DepotModelSerializer(serializers.ModelSerializer):

@@ -2344,8 +2344,8 @@ class DailyProductionCompletionReport(APIView):
             'name_5': {'name': '实际完成数-2(吨)', 'weight': 0},  # 190E终炼产量 + FM + 外发无硫料
             'name_6': {'name': '实际生产工作日数', 'weight': 0},
             'name_10': {'name': '190E实际生产工作日数', 'weight': 0},
-            'name_7': {'name': '日均完成量-1（吨）', 'weight': None},
-            'name_8': {'name': '日均完成量-2（吨）', 'weight': None},
+            'name_7': {'name': '日均完成量-1（吨）', 'weight': 0},
+            'name_8': {'name': '日均完成量-2（吨）', 'weight': 0},
             'name_9': {'name': '实际生产机台数', 'weight': 0},
             'name_11': {'name': '单机台效率-1（吨/台）', 'weight': 0},
             'name_12': {'name': '单机台效率-2（吨/台）', 'weight': 0},
@@ -2478,7 +2478,7 @@ class DailyProductionCompletionReport(APIView):
                     continue
                 value = round(float(v) / ds, 2)
                 results['name_11'][k] = value
-                results['name_11']['weight'] = round(results['name_11']['weight'] + value, 2)
+        results['name_11']['weight'] = 0 if not actual_working_equips else round(float(results['name_7']['weight']) / actual_working_equips, 2)
         for k, v in results['name_5'].items():
             if k[0].isdigit():
                 ds = actual_working_equip_dict.get(int(k[:-1]))
@@ -2486,7 +2486,7 @@ class DailyProductionCompletionReport(APIView):
                     continue
                 value = round(float(v) / ds, 2)
                 results['name_12'][k] = value
-                results['name_12']['weight'] = round(results['name_12']['weight'] + value, 2)
+        results['name_12']['weight'] = 0 if not actual_working_equips else round(float(results['name_8']['weight']) / actual_working_equips, 2)
 
         # 计算平均值
         for item in results.values():
@@ -2514,9 +2514,9 @@ class DailyProductionCompletionReport(APIView):
                 ds = 0
             sum_ds += ds
             cnt += 1
-        avg_190e = {'jl': 0 if sum(data_190e['jl']) == 0 else round(sum(data_190e['jl']) / len([i for i in data_190e['jl'] if i > 0]), 1),
-                    'wl': 0 if sum(data_190e['wl']) == 0 else round(sum(data_190e['wl']) / len([i for i in data_190e['wl'] if i > 0]), 1),
-                    'ds': 0 if not cnt else round(sum_ds/cnt, 1)}
+        avg_190e = {'jl': 0 if sum(data_190e['jl']) == 0 else round(sum(data_190e['jl']) / len([i for i in data_190e['jl'] if i > 0]), 2),
+                    'wl': 0 if sum(data_190e['wl']) == 0 else round(sum(data_190e['wl']) / len([i for i in data_190e['wl'] if i > 0]), 2),
+                    'ds': 0 if sum(data_190e['fm']) == 0 else round(sum(data_190e['total']) / sum(data_190e['fm']), 2)}
 
         cnt2 = 0
         sum_ds2 = 0
@@ -2531,12 +2531,15 @@ class DailyProductionCompletionReport(APIView):
                 ds2 = 0
             sum_ds2 += ds2
             cnt2 += 1
-            results['name_13']['{}日'.format(str(t_day))] = round(ds2, 1)
-            results['name_13']['weight'] += round(results['name_13']['weight'] + ds2, 1)
-        results['name_13']['avg'] = 0 if not cnt2 else round(sum_ds2/cnt2, 1)
+            results['name_13']['{}日'.format(str(t_day))] = round(ds2, 2)
+
+        total_weight = total_queryset.aggregate(w=Sum('plan_weight'))['w']
+        total_fm_weight = queryset2.aggregate(w=Sum('plan_weight'))['w']
+        results['name_13']['weight'] = "" if not total_fm_weight or not total_weight else round(total_weight/total_fm_weight, 2)
+        results['name_13']['avg'] = 0 if not cnt2 else round(sum_ds2/cnt2, 2)
         avg_results = {'jl': results['name_2']['avg'],
                        'wl': results['name_1']['avg'],
-                       'ds': 0 if not cnt2 else round(sum_ds2/cnt2, 1)}
+                       'ds': results['name_13']['weight']}
         if self.request.query_params.get('export', None):
             results2 = {}
             equip_query = Equip.objects.filter(category__equip_type__global_name='密炼设备').values('equip_no',
