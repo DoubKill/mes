@@ -2413,7 +2413,7 @@ class DailyProductionCompletionReport(APIView):
                 factory_date__month=month,
                 num__gt=0).values_list('factory_date__day', 'num'))
         for item in mix_queryset:
-            mixin_weight = round(item['weight'] / 100000, 2)
+            mixin_weight = round(item['weight'] / 1000, 2)
             results['name_1']['weight'] += mixin_weight
             results['name_1'][f"{item['factory_date__day']}日"] = mixin_weight
         for item in equip_190e_mixin_weight:
@@ -2431,7 +2431,7 @@ class DailyProductionCompletionReport(APIView):
             results['name_4']['weight'] += round(weight, 2)
             results['name_5']['weight'] += round(weight, 2)
         for item in fin_queryset:
-            final_weight = round(item['weight'] / 100000, 2)
+            final_weight = round(item['weight'] / 1000, 2)
             results['name_2']['weight'] += final_weight
             results['name_4']['weight'] += final_weight
             results['name_5']['weight'] += final_weight
@@ -2530,10 +2530,10 @@ class DailyProductionCompletionReport(APIView):
         cnt2 = 0
         sum_ds2 = 0
         for t_day in range(1, days+1):
-            t_weight = float(month_total_dict.get(t_day, 0) / 100000) + float(total_queryset_190e_dict.get(t_day, 0))
+            t_weight = float(month_total_dict.get(t_day, 0) / 1000) + float(total_queryset_190e_dict.get(t_day, 0))
             if not t_weight:
                 continue
-            fm_weight = float(fm_total_dict.get(t_day, 0) / 100000) + float(fm_queryset_190e_dict.get(t_day, 0))
+            fm_weight = float(fm_total_dict.get(t_day, 0) / 1000) + float(fm_queryset_190e_dict.get(t_day, 0))
             try:
                 ds2 = t_weight / fm_weight
             except Exception:
@@ -2556,7 +2556,7 @@ class DailyProductionCompletionReport(APIView):
             equip_dic = {item['equip_no']: item['category__category_name'] for item in equip_query}
             data2 = TrainsFeedbacks.objects.exclude(operation_user='Mixer2').filter(factory_date__year=year, factory_date__month=month).values(
                 'factory_date__day', 'product_no', 'equip_no', 'classes').annotate(actual_trains=Count('actual_trains'),
-                                                                                   weight=Sum('plan_weight')/100000).order_by('-classes')
+                                                                                   weight=Sum('plan_weight')/1000).order_by('-classes')
             for item in data2:
                 try:
                     state = item['product_no'].split("-")[1]
