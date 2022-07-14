@@ -2452,13 +2452,13 @@ class DailyProductionCompletionReport(APIView):
 
         for k, v in actual_working_day_dict.items():
             results['name_6'][f"{k}日"] = v
-            results['name_6']['weight'] = round(results['name_6']['weight'] + 0 if not v else v, 2)
+            results['name_6']['weight'] = round(results['name_6']['weight'] + v, 2)
         for k, v in actual_working_equip_dict.items():
             results['name_9'][f"{k}日"] = v
-            results['name_9']['weight'] = round(results['name_9']['weight'] + 0 if not v else v, 2)
+            results['name_9']['weight'] = round(results['name_9']['weight'] + v, 2)
         for k, v in actual_working_day_190e_dict.items():
             results['name_10'][f"{k}日"] = v
-            results['name_10']['weight'] = round(results['name_10']['weight'] + 0 if not v else v, 2)
+            results['name_10']['weight'] = round(results['name_10']['weight'] + v, 2)
         if len(results['name_6']) - 2 != 0:
             for key, value in results['name_4'].items():
                 if key[0].isdigit():
