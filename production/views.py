@@ -152,9 +152,13 @@ class PalletFeedbacksViewSet(mixins.CreateModelMixin,
                 value = value.strip()
             validated_data[key] = value
             if key in ('begin_trains', 'end_trains', 'actual_weight'):
-                if value <= 0:
+                if not value:
+                    return Response('补充成功')
+                if float(value) <= 0:
                     return Response('补充成功')
             if key == 'pallet_no':
+                if not value:
+                    return Response('补充成功')
                 if value == '0':
                     return Response('补充成功')
         lot_no = validated_data.pop("lot_no", None)
