@@ -16,7 +16,7 @@ from django.http import HttpResponse
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, permission_classes
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import GenericAPIView
 from rest_framework.mixins import ListModelMixin
@@ -37,7 +37,7 @@ from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipP
     EquipWarehouseRecordFilter, EquipApplyOrderFilter, EquipApplyRepairFilter, EquipWarehouseOrderFilter, \
     EquipPlanFilter, EquipInspectionOrderFilter
 from equipment.models import EquipTargetMTBFMTTRSetting, EquipWarehouseAreaComponent, EquipRepairMaterialReq, \
-    EquipInspectionOrder, EquipRegulationRecord, EquipMaintenanceStandardWork, EquipOrderEntrust
+    EquipInspectionOrder, EquipRegulationRecord, EquipMaintenanceStandardWork, EquipOrderEntrust, XLCommonCode
 from equipment.serializers import *
 from equipment.serializers import EquipRealtimeSerializer
 from equipment.task import property_template, property_import
@@ -2996,14 +2996,14 @@ class EquipAutoPlanView(APIView):
         get_code = self.request.query_params.get('get_code')
         spare_code = self.request.query_params.get('spare_code')
         order_id = self.request.query_params.get('order_id')
-        default_staff = self.request.query_params.get('default_staff')  # 保养组名单
+        default_staff = self.request.query_params.get('default_staff')  # 保养组名单->变更为设备科
         if default_staff:
-            init_section = Section.objects.filter(name='保养组').last()
+            init_section = Section.objects.filter(name='设备科').last()
             if not init_section:
-                return Response({"success": False, "message": "未找到保养组", "data": []})
+                return Response({"success": False, "message": "未找到设备科", "data": []})
             section_list = get_children_section(init_section, include_self=True)
             res = list(User.objects.filter(section__name__in=section_list, is_active=True).annotate(order_id=F('username')).values('id', 'order_id').distinct())
-            return Response({"success": True, "message": "获取保养组成员信息成功", "data": res})
+            return Response({"success": True, "message": "获取设备科成员信息成功", "data": res})
         if get_code:
             if get_code == "1":
                 order_list = EquipWarehouseOrder.objects.filter(status__in=[1, 2], order_detail__delete_flag=False,
@@ -5007,3 +5007,24 @@ class EquipIndexView(APIView):
             }
             ret['equip_data'].append(data)
         return Response(ret)
+
+
+@method_decorator([api_recorder], name='dispatch')
+class XLCommonCodeView(APIView):
+    """通用料包条码"""
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        # 获取原因说明
+        apply_desc = list(XLCommonCode.objects.filter(apply_desc__isnull=False).values_list('apply_desc', flat=True).distinct())
+        return Response({'results': apply_desc})
+
+    @atomic
+    def post(self, request):
+        apply_desc = self.request.data.get('apply_desc')
+        prefix = 'TYLB' + datetime.now().strftime('%Y%m%d')
+        m_code = XLCommonCode.objects.filter(bra_code__startswith=prefix).aggregate(m_code=Max('bra_code'))['m_code']
+        bra_code = prefix + ("0001" if not m_code else "%04d" % (int(m_code[-4:]) + 1))
+        instance = XLCommonCode.objects.create(apply_user=self.request.user.username, bra_code=bra_code,
+                                               apply_desc=apply_desc)
+        return Response({'results': bra_code})

@@ -1034,3 +1034,17 @@ class EquipResultDetail(AbstractEntity):
     class Meta:
         db_table = 'equip_result_detail'
         verbose_name_plural = verbose_name = '设备维修/巡检标准明细'
+
+
+class XLCommonCode(models.Model):
+    apply_datetime = models.DateTimeField(auto_now_add=True)
+    apply_user = models.CharField(max_length=16, help_text='申请人')
+    bra_code = models.CharField(max_length=16, help_text='通用料包条码')
+    apply_desc = models.CharField(max_length=16, help_text='申请通用条码原因', null=True, blank=True)
+    scan_time = models.DateTimeField(help_text='扫码时间', null=True, blank=True)
+    status = models.BooleanField(help_text='条码是否使用', default=False)
+    expire_time = models.DateTimeField(help_text='失效时间', null=True, blank=True)
+
+    class Meta:
+        db_table = 'xl_common_code'
+        verbose_name_plural = verbose_name = '料包通用条码'
