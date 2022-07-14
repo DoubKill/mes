@@ -383,6 +383,7 @@ class UnqualifiedDealOrderUpdateSerializer(BaseModelSerializer):
                                                        '"suggestion":"意见"}]', required=False, write_only=True,
                                                      many=True)
 
+    @atomic()
     def update(self, instance, validated_data):
         tech_deal_result = validated_data.pop('tech_deal_result', {})
         c_agreed = validated_data.get('c_agreed')
