@@ -256,7 +256,7 @@ class MaterialDealResult(AbstractEntity):
         (3, "库存、线边库都没有"),
         (4, "创建"),
     )
-    lot_no = models.CharField(max_length=64, help_text='托盘追踪号')
+    lot_no = models.CharField(max_length=64, help_text='托盘追踪号', unique=True)
     level = models.IntegerField(help_text='综合等级，1为一等品，其他为三等品')
     deal_opinion = models.ForeignKey("DealSuggestion", help_text='综合处理意见id',
                                      on_delete=models.CASCADE, related_name='deal_opinions', blank=True, null=True)

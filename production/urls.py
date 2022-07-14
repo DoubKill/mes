@@ -153,5 +153,9 @@ urlpatterns = [
     path('shift-time-summary/', ShiftTimeSummaryView.as_view()),
     # 交接班时间汇总明细
     path('shift-time-summary/detail/', ShiftTimeSummaryDetailView.as_view()),
+    # 胶架维修记录
+    path('rubber-frame-repair/', RubberFrameRepairView.as_view()),
+    # 工装管理台帐
+    path('tool-manage-account/', ToolManageAccountView.as_view()),
 
 ]

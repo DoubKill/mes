@@ -24,7 +24,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from basics.models import WorkSchedulePlan, Equip, GlobalCode
-from equipment.models import EquipMachineHaltType
+from equipment.models import EquipMachineHaltType, XLCommonCode
 from equipment.serializers import EquipApplyRepairSerializer
 from equipment.utils import gen_template_response
 from inventory.models import MaterialOutHistory
@@ -133,6 +133,9 @@ class BatchProductionInfoView(APIView):
             plan_status_info = PlanStatus.objects.using("SFJ").filter(plan_classes_uid=plan.plan_classes_uid).order_by('created_date').last()
             plan_status = plan_status_info.status if plan_status_info else plan.status
             if plan_status not in ['运行中', '等待']:
+                if plan_status in ['停止', '完成', '待停止']:  # 更新通用料包完成时间
+                    common_code = OtherMaterialLog.objects.filter(plan_classes_uid=plan.plan_classes_uid, status=1, other_type='通用料包').last()
+                    XLCommonCode.objects.filter(bra_code=common_code.bra_code, status=True, expire_time__isnull=True).update(expire_time=now)
                 continue
             actual_trains = 0
             data = {
@@ -3123,6 +3126,7 @@ class MaterialInfoIssue(APIView):
                             time=datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                         )
                 except Exception as e:
+                    logger.error(e.args[0])
                     raise ValidationError(f'通知称量系统{equip_no}新增物料失败')
         return Response('成功')
 
@@ -3444,7 +3448,7 @@ class XlRecipeNoticeView(APIView):
             # 添加配方数据
             tolerance = get_tolerance(batching_equip=xl_equip, standard_weight=weight, project_name='all', only_num=True)
             n_recipe = pre_model.objects.using(xl_equip).create(**{'name': recipe_name, 'ver': dev_type, 'weight': weight,
-                                                                   'error': tolerance, 'use_not': 0, 'merge_flag': False,
+                                                                   'error': tolerance, 'use_not': 1, 'merge_flag': False,
                                                                    'split_count': split_count, 'time': n_time})
             if jz:
                 jz.notice(table_seq=3, table_id=n_recipe.id, opera_type=1)

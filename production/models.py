@@ -670,3 +670,26 @@ class AttendanceResultAudit(AbstractEntity):
     class Meta:
         db_table = 'attendance_result_audit'
         verbose_name_plural = verbose_name = '考勤打卡审批'
+
+
+class RubberFrameRepair(models.Model):
+    save_date = models.DateTimeField(auto_now_add=True)
+    date_time = models.CharField(max_length=10, help_text='记录时间', null=True, blank=True)
+    times = models.IntegerField(help_text='保存次数', null=True, blank=True)
+    content = models.TextField(help_text='维修胶架内容', null=True, blank=True)
+
+    class Meta:
+        db_table = 'rubber_frame_repair'
+        verbose_name_plural = verbose_name = '胶架维修记录'
+
+
+class ToolManageAccount(models.Model):
+    save_date = models.DateTimeField(auto_now_add=True)
+    date_time = models.CharField(max_length=10, help_text='记录时间', null=True, blank=True)
+    times = models.IntegerField(help_text='保存次数', null=True, blank=True)
+    content = models.TextField(help_text='维修胶架内容', null=True, blank=True)
+
+    class Meta:
+        db_table = 'tool_manage_account'
+        verbose_name_plural = verbose_name = '工装管理台帐'
+

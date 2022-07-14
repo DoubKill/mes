@@ -83,11 +83,11 @@ def batching_post_save(sender, instance=None, created=False, update_fields=None,
                                                                            test_method.test_type.name,
                                                                            test_method.name)
                     if deal_suggestion:
-                        instance.is_passed = True
-                        instance.pass_suggestion = deal_suggestion
-                        instance.save()
+                        MaterialTestResult.objects.filter(id=instance.id).update(is_passed=True,
+                                                                                 pass_suggestion=deal_suggestion)
     except Exception as e:
         logger.error(traceback.format_exc())
+        raise e
 
     #         # 取test_order
     #         material_test_order = instance.material_test_order

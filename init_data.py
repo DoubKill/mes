@@ -1007,6 +1007,7 @@ permission_data = [
     {'id': 1011, 'code': 'handle_d_equip_apply_order', 'name': '考勤打卡', 'parent_id': 1004},
     {'id': 1012, 'code': 'accept_d_equip_apply_order', 'name': '补卡申请', 'parent_id': 1004},
     {'id': 1013, 'code': 'export_d_equip_apply_order', 'name': '加班申请', 'parent_id': 1004},
+    {'id': 1030, 'code': 'code_d_equip_apply_order', 'name': '申请料包通用码', 'parent_id': 1004},
 
     {'id': 1014, 'code': 'wms_mooney_level', 'name': '原材料门尼值等级管理', 'parent_id': None},
     {'id': 1015, 'code': 'view_wms_mooney_level', 'name': '查看', 'parent_id': 1014},
@@ -1018,7 +1019,15 @@ permission_data = [
     {'id': 1022, 'code': 'product_monthly_rate', 'name': '综合合格率年度汇总', 'parent_id': None},
     {'id': 1023, 'code': 'view_product_monthly_rate', 'name': '查看', 'parent_id': 1022},
 
-    # 下一个 1024 开始
+    {'id': 1024, 'code': 'rubber_frame_repair', 'name': '胶架维修记录', 'parent_id': None},
+    {'id': 1025, 'code': 'view_rubber_frame_repair', 'name': '查看', 'parent_id': 1024},
+    {'id': 1026, 'code': 'add_rubber_frame_repair', 'name': '新增', 'parent_id': 1024},
+
+    {'id': 1027, 'code': 'tool_manage_account', 'name': '工装管理台账', 'parent_id': None},
+    {'id': 1028, 'code': 'view_tool_manage_account', 'name': '查看', 'parent_id': 1027},
+    {'id': 1029, 'code': 'add_tool_manage_account', 'name': '新增', 'parent_id': 1027},
+
+    # 下一个 1031 开始
 ]
 
 
