@@ -26,7 +26,7 @@ from rest_framework.views import APIView
 
 from rest_framework.viewsets import GenericViewSet, ModelViewSet, ReadOnlyModelViewSet
 
-from basics.models import GlobalCodeType, Equip, GlobalCode
+from basics.models import GlobalCodeType, Equip, GlobalCode, WorkSchedulePlan
 from basics.serializers import GlobalCodeSerializer
 import uuid
 
@@ -418,15 +418,108 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
+    @atomic()
     def create(self, request, *args, **kwargs):
         data = request.data
         if not isinstance(data, list):
             raise ValidationError('参数错误')
-        for item in data:
-            s = MaterialTestOrderSerializer(data=item, context={'request': request})
-            if not s.is_valid():
-                raise ValidationError(s.errors)
-            s.save()
+        s = MaterialTestOrderSerializer(data=data, many=True)
+        if not s.is_valid():
+            raise ValidationError(s.errors)
+        lot_nos = []
+        factory_date = data[0]['production_factory_date']
+        classes = data[0]['production_class']
+        product_no = data[0]['product_no']
+        equip_no = data[0]['production_equip_no']
+        ws = WorkSchedulePlan.objects.filter(plan_schedule__day_time=factory_date,
+                                             classes__global_name=classes,
+                                             plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
+        if not ws:
+            production_group = '班'
+        else:
+            production_group = ws.group.global_name
+        data_point_method_map = {}
+
+        for validated_data in s.validated_data:
+            order_results = validated_data.pop('order_results', None)
+            if not order_results:
+                continue
+            pallets = PalletFeedbacks.objects.filter(
+                equip_no=equip_no,
+                product_no=product_no,
+                classes=classes,
+                factory_date=factory_date,
+                begin_trains__lte=validated_data['actual_trains'],
+                end_trains__gte=validated_data['actual_trains']
+            )
+            for pallet in pallets:
+                lot_nos.append(pallet.lot_no)
+                validated_data['lot_no'] = pallet.lot_no
+                validated_data['material_test_order_uid'] = uuid.uuid1()
+                validated_data['production_group'] = production_group
+                while 1:
+                    try:
+                        instance, created = MaterialTestOrder.objects.get_or_create(
+                            defaults=validated_data, **{'lot_no': validated_data['lot_no'],
+                                                        'actual_trains': validated_data['actual_trains']})
+                        break
+                    except Exception:
+                        pass
+                for item in order_results:
+                    test_value = item['value']
+                    if not test_value:
+                        continue
+                    data_point_name = item['data_point_name']
+                    item['material_test_order'] = instance
+                    item['test_factory_date'] = datetime.datetime.now()
+                    item['created_user'] = self.request.user
+                    item['test_class'] = classes
+                    item['test_group'] = production_group
+                    method = data_point_method_map.get(data_point_name)
+                    if method:
+                        if method['qualified_range'][0] <= test_value <= method['qualified_range'][1]:
+                            item['mes_result'] = '一等品'
+                            item['level'] = 1
+                        else:
+                            item['mes_result'] = '三等品'
+                            item['level'] = 2
+                        item['is_judged'] = method['is_judged']
+                        item['judged_upper_limit'] = method['qualified_range'][1]
+                        item['judged_lower_limit'] = method['qualified_range'][0]
+                    else:
+                        material_test_method = MaterialTestMethod.objects.filter(
+                            material__material_no=product_no,
+                            test_method__name=item['test_method_name'],
+                            test_method__test_type__test_indicator__name=item['test_indicator_name'],
+                            data_point__name=data_point_name,
+                            data_point__test_type__test_indicator__name=item['test_indicator_name']).first()
+                        if material_test_method:
+                            item['is_judged'] = material_test_method.is_judged
+                            indicator = MaterialDataPointIndicator.objects.filter(
+                                material_test_method=material_test_method,
+                                data_point__name=data_point_name,
+                                data_point__test_type__test_indicator__name=item['test_indicator_name'],
+                                level=1).first()
+                            if indicator:
+                                data_point_method_map[data_point_name] = {
+                                    'qualified_range': [indicator.lower_limit,  indicator.upper_limit],
+                                    'is_judged': material_test_method.is_judged}
+                                if indicator.lower_limit <= item['value'] <= indicator.upper_limit:
+                                    item['mes_result'] = '一等品'
+                                    item['level'] = 1
+                                else:
+                                    item['mes_result'] = '三等品'
+                                    item['level'] = 2
+                                item['judged_upper_limit'] = indicator.upper_limit
+                                item['judged_lower_limit'] = indicator.lower_limit
+                            else:
+                                continue
+                        else:
+                            raise ValidationError('该胶料实验方法不存在！')
+                    if not created:
+                        instance.order_results.filter(data_point_name=item['data_point_name']).delete()
+                    MaterialTestResult.objects.create(**item)
+        gen_pallet_test_result(lot_nos)
         return Response('新建成功')
 
 
@@ -1165,6 +1258,7 @@ class ImportAndExportView(APIView):
         """快检数据导入模板"""
         return export_mto()
 
+    @atomic()
     def post(self, request, *args, **kwargs):
         """快检数据导入"""
         file = request.FILES.get('file')
@@ -1272,14 +1366,14 @@ class ImportAndExportView(APIView):
                 validated_data['production_equip_no'] = equip_no
                 validated_data['production_factory_date'] = factory_date
                 validated_data['production_group'] = group
-                try:
-                    instance, created = MaterialTestOrder.objects.get_or_create(
-                        defaults=validated_data, **{'lot_no': lot_no,
-                                                    'actual_trains': actual_trains})
-                except Exception:
-                    instance = MaterialTestOrder.objects.filter(lot_no=lot_no,
-                                                                actual_trains=actual_trains).first()
-                    created = False
+                while 1:
+                    try:
+                        instance, created = MaterialTestOrder.objects.get_or_create(
+                            defaults=validated_data, **{'lot_no': lot_no,
+                                                        'actual_trains': actual_trains})
+                        break
+                    except Exception:
+                        pass
                 for data_point_name, method in data_point_method_map.items():
                     test_method_name = method['test_method__name']
                     test_indicator_name = method['test_method__test_type__test_indicator__name']
@@ -2256,14 +2350,14 @@ class ReportValueView(APIView):
                     'production_group': group,
                     'production_equip_no': equip_no,
                     'production_factory_date': product_date}
-                try:
-                    test_order, created = MaterialTestOrder.objects.get_or_create(
-                        defaults=test_order_data, **{'lot_no': lot_no,
-                                                     'actual_trains': train})
-                except Exception:
-                    test_order = MaterialTestOrder.objects.filter(lot_no=lot_no,
-                                                                  actual_trains=train).first()
-                    created = False
+                while 1:
+                    try:
+                        test_order, created = MaterialTestOrder.objects.get_or_create(
+                            defaults=test_order_data, **{'lot_no': lot_no,
+                                                         'actual_trains': train})
+                        break
+                    except Exception:
+                        pass
 
                 # 由MES判断检测结果
                 material_test_method = MaterialTestMethod.objects.filter(

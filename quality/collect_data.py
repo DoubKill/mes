@@ -10,7 +10,7 @@ import uuid
 from decimal import Decimal
 
 import django
-from django.db.models import Max
+from django.db.transaction import atomic
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
@@ -38,6 +38,7 @@ def get_rids(server, user, password, database, machine_no, rid, test_time):
     return [i[0] for i in data]
 
 
+@atomic()
 def main():
     lot_nos = []
     for config in ZCKJConfig.objects.filter(use_flag=True):
@@ -163,14 +164,14 @@ def main():
                                                 'production_group':  production_group,
                                                 'production_equip_no':  equip_no,
                                                 'production_factory_date':  factory_date}
-                            try:
-                                test_order, created = MaterialTestOrder.objects.get_or_create(
-                                    defaults=test_order_data, **{'lot_no': lot_no,
-                                                                 'actual_trains': train})
-                            except Exception:
-                                test_order = MaterialTestOrder.objects.filter(lot_no=lot_no,
-                                                                              actual_trains=train).first()
-                                created = False
+                            while True:
+                                try:
+                                    test_order, created = MaterialTestOrder.objects.get_or_create(
+                                        defaults=test_order_data, **{'lot_no': lot_no,
+                                                                     'actual_trains': train})
+                                    break
+                                except Exception:
+                                    pass
                             if not created:
                                 test_order.order_results.filter(data_point_name=data_point_name).delete()
                             # 创建数据点检测结果

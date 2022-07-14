@@ -183,79 +183,79 @@ class MaterialTestOrderSerializer(BaseModelSerializer):
     order_results = MaterialTestResultSerializer(many=True, required=True)
     actual_trains = serializers.IntegerField(min_value=0)
 
-    def create(self, validated_data):
-        lot_nos = []
-        order_results = validated_data.pop('order_results', None)
-        ws = WorkSchedulePlan.objects.filter(plan_schedule__day_time=validated_data['production_factory_date'],
-                                             classes__global_name=validated_data['production_class'],
-                                             plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
-        if not ws:
-            production_group = '班'
-        else:
-            production_group = ws.group.global_name
-        pallets = PalletFeedbacks.objects.filter(
-            equip_no=validated_data['production_equip_no'],
-            product_no=validated_data['product_no'],
-            classes=validated_data['production_class'],
-            factory_date=validated_data['production_factory_date'],
-            begin_trains__lte=validated_data['actual_trains'],
-            end_trains__gte=validated_data['actual_trains']
-        )
-        for pallet in pallets:
-            lot_nos.append(pallet.lot_no)
-            validated_data['lot_no'] = pallet.lot_no
-            validated_data['material_test_order_uid'] = uuid.uuid1()
-            validated_data['production_group'] = production_group
-            try:
-                instance, created = MaterialTestOrder.objects.get_or_create(
-                    defaults=validated_data, **{'lot_no': validated_data['lot_no'],
-                                                'actual_trains': validated_data['actual_trains']})
-            except Exception:
-                instance = MaterialTestOrder.objects.filter(lot_no=validated_data['lot_no'],
-                                                            actual_trains=validated_data['actual_trains']).first()
-                created = False
-            material_no = validated_data['product_no']
-            for item in order_results:
-                if not item.get('value'):
-                    continue
-                item['material_test_order'] = instance
-                item['test_factory_date'] = datetime.now()
-                material_test_method = MaterialTestMethod.objects.filter(
-                    material__material_no=material_no,
-                    test_method__name=item['test_method_name'],
-                    test_method__test_type__test_indicator__name=item['test_indicator_name'],
-                    data_point__name=item['data_point_name'],
-                    data_point__test_type__test_indicator__name=item['test_indicator_name']).first()
-                if material_test_method:
-                    item['is_judged'] = material_test_method.is_judged
-                    indicator = MaterialDataPointIndicator.objects.filter(
-                        material_test_method=material_test_method,
-                        data_point__name=item['data_point_name'],
-                        data_point__test_type__test_indicator__name=item['test_indicator_name'],
-                        level=1).first()
-                    if indicator:
-                        if indicator.lower_limit <= item['value'] <= indicator.upper_limit:
-                            item['mes_result'] = '一等品'
-                            item['level'] = 1
-                        else:
-                            item['mes_result'] = '三等品'
-                            item['level'] = 2
-                        item['judged_upper_limit'] = indicator.upper_limit
-                        item['judged_lower_limit'] = indicator.lower_limit
-                    else:
-                        continue
-                        # item['mes_result'] = '三等品'
-                        # item['level'] = 2
-                else:
-                    raise serializers.ValidationError('该胶料实验方法不存在！')
-                item['created_user'] = self.context['request'].user  # 加一个create_user
-                item['test_class'] = validated_data['production_class']  # 暂时先这么写吧
-                item['test_group'] = production_group  # 暂时先这么写吧
-                if not created:
-                    instance.order_results.filter(data_point_name=item['data_point_name']).delete()
-                MaterialTestResult.objects.create(**item)
-        gen_pallet_test_result(lot_nos)
-        return validated_data
+    # def create(self, validated_data):
+    #     lot_nos = []
+    #     order_results = validated_data.pop('order_results', None)
+    #     ws = WorkSchedulePlan.objects.filter(plan_schedule__day_time=validated_data['production_factory_date'],
+    #                                          classes__global_name=validated_data['production_class'],
+    #                                          plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
+    #     if not ws:
+    #         production_group = '班'
+    #     else:
+    #         production_group = ws.group.global_name
+    #     pallets = PalletFeedbacks.objects.filter(
+    #         equip_no=validated_data['production_equip_no'],
+    #         product_no=validated_data['product_no'],
+    #         classes=validated_data['production_class'],
+    #         factory_date=validated_data['production_factory_date'],
+    #         begin_trains__lte=validated_data['actual_trains'],
+    #         end_trains__gte=validated_data['actual_trains']
+    #     )
+    #     for pallet in pallets:
+    #         lot_nos.append(pallet.lot_no)
+    #         validated_data['lot_no'] = pallet.lot_no
+    #         validated_data['material_test_order_uid'] = uuid.uuid1()
+    #         validated_data['production_group'] = production_group
+    #         try:
+    #             instance, created = MaterialTestOrder.objects.get_or_create(
+    #                 defaults=validated_data, **{'lot_no': validated_data['lot_no'],
+    #                                             'actual_trains': validated_data['actual_trains']})
+    #         except Exception:
+    #             instance = MaterialTestOrder.objects.filter(lot_no=validated_data['lot_no'],
+    #                                                         actual_trains=validated_data['actual_trains']).first()
+    #             created = False
+    #         material_no = validated_data['product_no']
+    #         for item in order_results:
+    #             if not item.get('value'):
+    #                 continue
+    #             item['material_test_order'] = instance
+    #             item['test_factory_date'] = datetime.now()
+    #             material_test_method = MaterialTestMethod.objects.filter(
+    #                 material__material_no=material_no,
+    #                 test_method__name=item['test_method_name'],
+    #                 test_method__test_type__test_indicator__name=item['test_indicator_name'],
+    #                 data_point__name=item['data_point_name'],
+    #                 data_point__test_type__test_indicator__name=item['test_indicator_name']).first()
+    #             if material_test_method:
+    #                 item['is_judged'] = material_test_method.is_judged
+    #                 indicator = MaterialDataPointIndicator.objects.filter(
+    #                     material_test_method=material_test_method,
+    #                     data_point__name=item['data_point_name'],
+    #                     data_point__test_type__test_indicator__name=item['test_indicator_name'],
+    #                     level=1).first()
+    #                 if indicator:
+    #                     if indicator.lower_limit <= item['value'] <= indicator.upper_limit:
+    #                         item['mes_result'] = '一等品'
+    #                         item['level'] = 1
+    #                     else:
+    #                         item['mes_result'] = '三等品'
+    #                         item['level'] = 2
+    #                     item['judged_upper_limit'] = indicator.upper_limit
+    #                     item['judged_lower_limit'] = indicator.lower_limit
+    #                 else:
+    #                     continue
+    #                     # item['mes_result'] = '三等品'
+    #                     # item['level'] = 2
+    #             else:
+    #                 raise serializers.ValidationError('该胶料实验方法不存在！')
+    #             item['created_user'] = self.context['request'].user  # 加一个create_user
+    #             item['test_class'] = validated_data['production_class']  # 暂时先这么写吧
+    #             item['test_group'] = production_group  # 暂时先这么写吧
+    #             if not created:
+    #                 instance.order_results.filter(data_point_name=item['data_point_name']).delete()
+    #             MaterialTestResult.objects.create(**item)
+    #     gen_pallet_test_result(lot_nos)
+    #     return validated_data
 
     class Meta:
         model = MaterialTestOrder

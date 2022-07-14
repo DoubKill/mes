@@ -227,18 +227,6 @@ def gen_pallet_test_result(lot_nos):
                     continue_flag = True
             test_order.save()
 
-        if continue_flag:
-            continue
-        # 取检测车次
-        test_trains_set = set(test_orders.values_list('actual_trains', flat=True))
-        # 取托盘反馈生产车次
-        actual_trains_set = {i for i in range(pfb_obj.begin_trains, pfb_obj.end_trains + 1)}
-
-        common_trains_set = actual_trains_set & test_trains_set
-        # 判断托盘反馈车次都存在检测数据
-        if not len(actual_trains_set) == len(common_trains_set):
-            continue
-
         if test_product_flat:
             level = 1
             test_result = '试验'
@@ -259,21 +247,44 @@ def gen_pallet_test_result(lot_nos):
                 level = 3
                 test_result = '三等品'
                 deal_suggestion = '不合格'
+        mdr = MaterialDealResult.objects.filter(lot_no=lot_no).first()
+        if mdr:
+            mdr.level = level
+            mdr.test_result = test_result
+            mdr.level = level
+            mdr.deal_result = '一等品' if level == 1 else '三等品'
+            mdr.deal_suggestion = deal_suggestion
+            mdr.update_store_test_flag = 4
+            mdr.deal_suggestion = deal_suggestion
+            mdr.deal_suggestion = deal_suggestion
+            mdr.save()
+        else:
+            if continue_flag:
+                continue
+            # 取检测车次
+            test_trains_set = set(test_orders.values_list('actual_trains', flat=True))
+            # 取托盘反馈生产车次
+            actual_trains_set = {i for i in range(pfb_obj.begin_trains, pfb_obj.end_trains + 1)}
 
-        deal_result_dict = {
-            'level': level,
-            'test_result': test_result,
-            'reason': 'reason',
-            'status': '待处理',
-            'deal_result': '一等品' if level == 1 else '三等品',
-            'production_factory_date': pfb_obj.end_time,
-            'deal_suggestion': deal_suggestion,
-            'product_no': pfb_obj.product_no,
-            'classes': pfb_obj.classes,
-            'equip_no': pfb_obj.equip_no,
-            'factory_date': pfb_obj.factory_date,
-            'begin_trains': pfb_obj.begin_trains,
-            'end_trains': pfb_obj.end_trains,
-            'update_store_test_flag': 4
-        }
-        MaterialDealResult.objects.update_or_create(defaults=deal_result_dict, **{'lot_no': lot_no})
+            common_trains_set = actual_trains_set & test_trains_set
+            # 判断托盘反馈车次都存在检测数据
+            if not len(actual_trains_set) == len(common_trains_set):
+                continue
+
+            deal_result_dict = {
+                'level': level,
+                'test_result': test_result,
+                'reason': 'reason',
+                'status': '待处理',
+                'deal_result': '一等品' if level == 1 else '三等品',
+                'production_factory_date': pfb_obj.end_time,
+                'deal_suggestion': deal_suggestion,
+                'product_no': pfb_obj.product_no,
+                'classes': pfb_obj.classes,
+                'equip_no': pfb_obj.equip_no,
+                'factory_date': pfb_obj.factory_date,
+                'begin_trains': pfb_obj.begin_trains,
+                'end_trains': pfb_obj.end_trains,
+                'update_store_test_flag': 4
+            }
+            MaterialDealResult.objects.update_or_create(defaults=deal_result_dict, **{'lot_no': lot_no})
