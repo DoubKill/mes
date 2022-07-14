@@ -1296,9 +1296,15 @@ class ImportAndExportView(APIView):
         # 机台
         equip_no = production_data[4].strip()
         # 班组
-        group = production_data[5].strip()
+        group = production_data[5].strip() + '班'
+
         if not group:
             raise ValidationError('请输入班组！')
+        ws = WorkSchedulePlan.objects.filter(plan_schedule__day_time=factory_date,
+                                             classes__global_name=classes,
+                                             plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
+        if ws:
+            group = ws.group.global_name
         # 取数据点
         reverse_dict = {value: key for key, value in by_dict.items()}
         data_points = [reverse_dict.get(i) for i in range(7, 20) if production_data[i]]
