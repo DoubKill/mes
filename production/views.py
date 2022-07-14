@@ -23,7 +23,7 @@ from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 
 from rest_framework import mixins, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, permission_classes
 from rest_framework.exceptions import ValidationError
 from rest_framework.filters import OrderingFilter
 from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated
@@ -50,7 +50,7 @@ from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, Pla
     PerformanceUnitPrice, ProductInfoDingJi, SetThePrice, SubsidyInfo, IndependentPostTemplate, AttendanceGroupSetup, \
     FillCardApply, ApplyForExtraWork, EquipMaxValueCache, Equip190EWeight, OuterMaterial, Equip190E, \
     AttendanceClockDetail, AttendanceResultAudit, ManualInputTrains, ActualWorkingDay, EmployeeAttendanceRecordsLog, \
-    ActualWorkingEquip, ActualWorkingDay190E
+    RubberFrameRepair, ToolManageAccount, ActualWorkingEquip, ActualWorkingDay190E
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, \
@@ -2977,7 +2977,15 @@ class EmployeeAttendanceRecordsView(APIView):
         results_sort = sorted(list(results.values()), key=lambda x: (x['sort'], x['equip']))
         audit_obj = AttendanceResultAudit.objects.filter(date=date, audit_user__isnull=False).last()
         approve_obj = AttendanceResultAudit.objects.filter(date=date, approve_user__isnull=False).last()
-        return Response({'results': results_sort, 'group_list': group_list,
+        # 增加能否导出的标记
+        export_flag = True
+        attendance_data = EmployeeAttendanceRecords.objects.filter(factory_date__in=days_cur_month_dates())
+        if not attendance_data:
+            export_flag = False
+        not_overall = attendance_data.exclude(record_status='#141414')  # 非整体提交数据
+        if not_overall:
+            export_flag = False
+        return Response({'results': results_sort, 'group_list': group_list, 'export_flag': export_flag,
                          'audit_user':  audit_obj.audit_user if audit_obj else None,
                          'approve_user': approve_obj.approve_user if approve_obj else None})
 
@@ -3824,10 +3832,11 @@ class AttendanceClockViewSet(ModelViewSet):
         username = self.request.user.username
         id_card_num = self.request.user.id_card_num
         apply = self.request.query_params.get('apply', None)
+        select_time = self.request.query_params.get('select_time')
         time_now = datetime.datetime.now()
         date_now = None
         try:
-            attendance_group_obj, section_list, equip_list, date_now, group_list = self.get_user_group(self.request.user)
+            attendance_group_obj, section_list, equip_list, date_now, group_list = self.get_user_group(self.request.user, select_time)
         except Exception as e:
             # 查询审批不返回异常
             if apply:
@@ -3896,9 +3905,10 @@ class AttendanceClockViewSet(ModelViewSet):
                 results['state'] = 2  # 默认显示
                 results['section_list'].remove(last_obj.section)
                 results['section_list'].insert(0, last_obj.section)  # 放到第一位显示
-                group, classes = last_obj.group, last_obj.classes
-                results['group_list'].remove({'group': group, 'classes': classes})
-                results['group_list'].insert(0, {'group': group, 'classes': classes})
+                history_gc = {'group': last_obj.group, 'classes': last_obj.classes}
+                if history_gc in results['group_list']:
+                    results['group_list'].remove(history_gc)
+                    results['group_list'].insert(0, history_gc)
         else:
             results['state'] = 1  # 没有打卡记录
         return Response(results)
@@ -4136,11 +4146,17 @@ class AttendanceClockViewSet(ModelViewSet):
         """获取补卡时默认数据显示"""
         state = self.request.query_params.get('state')
         user = self.request.user
+        select_time = self.request.query_params.get('select_time')
+        try:
+            attendance_group_obj, section_list, equip_list, date_now, group_list = self.get_user_group(self.request.user, select_time)
+        except Exception as e:
+            group_list, equip_list, section_list, principal = [], [], [], ''
+        else:
+            group_list, equip_list, section_list, principal = group_list, equip_list, section_list, attendance_group_obj.principal
         queryset = EmployeeAttendanceRecords.objects.filter(Q(user=user) & ~Q(is_use='废弃'))
-        res = {'classes': None,
-               'group': None,
-               'section': None,
-               'equips': []}
+        res = {'group': group_list,
+               'section': section_list,
+               'equips': equip_list}
         equips = []
         if state == '上岗':
             obj = queryset.filter(status__in=['上岗', '调岗']).last()
@@ -4154,9 +4170,6 @@ class AttendanceClockViewSet(ModelViewSet):
             obj = queryset.filter(status__in=['上岗', '调岗'], end_date__isnull=True).last()
             if obj:
                 equips = queryset.filter(begin_date=obj.begin_date).values_list('equip', flat=True)
-        res['classes'] = obj.classes if obj else None
-        res['group'] = obj.group if obj else None
-        res['section'] = obj.section if obj else None
         res['equips'] = equips
         return Response({'results': res})
 
@@ -4810,3 +4823,73 @@ class ShiftTimeSummaryDetailView(APIView):
         return Response({'results': {'begin': datetime.datetime.strftime(begin.begin_time, '%Y-%m-%d %H:%M:%S'),
                                      'end': datetime.datetime.strftime(end.end_time, '%Y-%m-%d %H:%M:%S')}})
 
+
+@method_decorator([api_recorder], name="dispatch")
+class RubberFrameRepairView(APIView):
+    """胶架维修记录"""
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_rubber_frame_repair',
+                                                            'add': 'add_rubber_frame_repair'}))
+
+    def get(self, request):
+        date_time = self.request.query_params.get('date_time')
+        results = {}
+        query_set = RubberFrameRepair.objects.filter(date_time=date_time)
+        if query_set:
+            max_times = query_set.aggregate(max_times=Max('times'))['max_times']
+            instance = query_set.filter(times=max_times).last()
+            results['details'] = json.loads(instance.content)
+        else:  # 返回空格式
+            details = [{'name': '待维修胶架发出量', '总计': None}, {'name': '已维修胶架数量', '总计': None},
+                       {'name': '待维修胶架数量', '总计': None}, {'name': '输送人员', '总计': None},
+                       {'name': '确认人员', '总计': None}]
+            data = days_cur_month_dates(date_time)
+            update_data = {i: None for i in range(1, len(data) + 1)}
+            for detail in details:
+                detail.update(update_data)
+            results['details'] = details
+        results['date_time'] = date_time
+        return Response({'results': results})
+
+    @atomic
+    def post(self, request):
+        date_time = self.request.data.get('date_time')
+        details = self.request.data.get('details')
+        if not all([date_time, details]):
+            raise ValidationError('参数异常')
+        # 获取最新保存次数
+        max_times = RubberFrameRepair.objects.filter(date_time=date_time).aggregate(max_times=Max('times'))['max_times']
+        times = 1 if not max_times else max_times + 1
+        RubberFrameRepair.objects.create(date_time=date_time, content=json.dumps(details), times=times)
+        return Response('保存成功')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ToolManageAccountView(APIView):
+    """工装管理台帐"""
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_tool_manage_account',
+                                                            'add': 'add_tool_manage_account'}))
+
+    def get(self, request):
+        date_time = self.request.query_params.get('date_time')
+        results = {}
+        query_set = ToolManageAccount.objects.filter(date_time=date_time)
+        if query_set:
+            max_times = query_set.aggregate(max_times=Max('times'))['max_times']
+            instance = query_set.filter(times=max_times).last()
+            results['details'] = json.loads(instance.content)
+        else:  # 返回空格式
+            results['details'] = []
+        results['date_time'] = date_time
+        return Response({'results': results})
+
+    @atomic
+    def post(self, request):
+        date_time = self.request.data.get('date_time')
+        details = self.request.data.get('details')
+        if not all([date_time, details]):
+            raise ValidationError('参数异常')
+        # 获取最新保存次数
+        max_times = ToolManageAccount.objects.filter(date_time=date_time).aggregate(max_times=Max('times'))['max_times']
+        times = 1 if not max_times else max_times + 1
+        ToolManageAccount.objects.create(date_time=date_time, content=json.dumps(details), times=times)
+        return Response('保存成功')
