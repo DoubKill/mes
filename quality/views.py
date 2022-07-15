@@ -75,7 +75,7 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestPlanDetailSerializer, MaterialTestOrderExportSerializer, MaterialInspectionRegistrationSerializer, \
     MaterialDataPointIndicatorHistorySerializer, WMSMooneyLevelSerializer, ERPMESMaterialRelationSerializer
 
-from django.db.models import Prefetch
+from django.db.models import Prefetch, F
 from django.db.models import Q
 from quality.utils import get_cur_sheet, get_sheet_data, export_mto, gen_pallet_test_result
 from recipe.models import Material, ProductBatching, ERPMESMaterialRelation, ZCMaterial
@@ -1212,40 +1212,30 @@ class TestDataPointCurveView(APIView):
         product_no = self.request.query_params.get('product_no')
         if not all([st, et, product_no]):
             raise ValidationError('参数缺失')
-        try:
-            days = date_range(datetime.datetime.strptime(st, '%Y-%m-%d'),
-                              datetime.datetime.strptime(et, '%Y-%m-%d'))
-        except Exception:
-            raise ValidationError('参数错误')
-        ret = MaterialTestResult.objects.filter(material_test_order__production_factory_date__gte=st,
-                                                material_test_order__production_factory_date__lte=et,
-                                                material_test_order__product_no=product_no
-                                                ).values('material_test_order__production_factory_date',
-                                                         'data_point_name').annotate(value=GroupConcat('value', order_by='value'))
-
-        data_point_names = [item['data_point_name'] for item in ret]
-        y_axis = {
-            data_point_name: {
-                'name': data_point_name,
-                'type': 'line',
-                'data': [[]] * len(days)}
-            for data_point_name in data_point_names
-        }
-        for item in ret:
-            factory_date = item['material_test_order__production_factory_date'].strftime("%Y-%m-%d")
-            data_point_name = item['data_point_name']
-            value = item['value'].split(',')
-            y_axis[data_point_name]['data'][days.index(factory_date)] = value
-        indicators = {}
-        for data_point_name in data_point_names:
-            indicator = MaterialDataPointIndicator.objects.filter(
-                data_point__name=data_point_name,
-                material_test_method__material__material_name=product_no,
-                level=1).first()
-            if indicator:
-                indicators[data_point_name] = [indicator.lower_limit, indicator.upper_limit]
+        # try:
+        #     days = date_range(datetime.datetime.strptime(st, '%Y-%m-%d'),
+        #                       datetime.datetime.strptime(et, '%Y-%m-%d'))
+        # except Exception:
+        #     raise ValidationError('参数错误')
+        query_set = MaterialTestResult.objects.filter(material_test_order__production_factory_date__gte=st,
+                                                      material_test_order__production_factory_date__lte=et,
+                                                      material_test_order__product_no=product_no)
+        indicators = MaterialDataPointIndicator.objects.filter(
+            material_test_method__material__material_no=product_no,
+            level=1).values('data_point__name', 'upper_limit', 'lower_limit')
+        data_point_names = []
+        ret = []
+        indicators_dict = {}
+        for i in indicators:
+            data_point_name = i['data_point__name']
+            indicators_dict[data_point_name] = {'upper_limit': i['upper_limit'], 'lower_limit': i['lower_limit']}
+            data_point_names.append(data_point_name)
+            test_data = query_set.filter(
+                data_point_name=data_point_name
+            ).values(date=F('material_test_order__production_factory_date'), v=F('value')).order_by('date')
+            ret.append({'name': data_point_name, 'data': test_data})
         return Response(
-            {'x_axis': days, 'y_axis': y_axis.values(), 'indicators': indicators}
+            {'indicators': indicators_dict, 'data': ret}
         )
 
 
