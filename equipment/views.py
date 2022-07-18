@@ -2556,12 +2556,12 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipWarehouseOrderDetailFilter
 
-    def get_queryset(self):
-        order_id = self.request.query_params.get('order_id')
-        if order_id and order_id.startswith('RK'):
-            return self.queryset.exclude(status=3)
-        else:
-            return self.queryset
+    # def get_queryset(self):
+    #     order_id = self.request.query_params.get('order_id')
+    #     if order_id and order_id.startswith('RK'):
+    #         return self.queryset.exclude(status=3)
+    #     else:
+    #         return self.queryset
 
     @atomic
     def create(self, request, *args, **kwargs):
@@ -2580,14 +2580,15 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
         enter_time = datetime.strptime(enter_time, '%Y-%m-%d %H:%M:%S') if enter_time else datetime.now()
         outer_time = datetime.strptime(outer_time, '%Y-%m-%d %H:%M:%S') if outer_time else datetime.now()
         if status == 1:
-            if instance.plan_in_quantity <= instance.in_quantity:
-                return Response({"success": False, "message": '该单据已入库完成', "data": None})
-            if instance.in_quantity + in_quantity > instance.plan_in_quantity:
-                return Response({"success": False, "message": '入库数量大于单据剩余未入库数量', "data": None})
-            if instance.in_quantity + in_quantity == instance.plan_in_quantity:
-                instance.status = 3  # 已完成
-            elif instance.in_quantity + in_quantity < instance.plan_in_quantity:
-                instance.status = 2  # 入库中
+            # if instance.plan_in_quantity <= instance.in_quantity:
+            #     return Response({"success": False, "message": '该单据已入库完成', "data": None})
+            # if instance.in_quantity + in_quantity > instance.plan_in_quantity:
+            #     return Response({"success": False, "message": '入库数量大于单据剩余未入库数量', "data": None})
+            # if instance.in_quantity + in_quantity == instance.plan_in_quantity:
+            #     instance.status = 3  # 已完成
+            # elif instance.in_quantity + in_quantity < instance.plan_in_quantity:
+            #     instance.status = 2  # 入库中
+            instance.status = 2
             instance.in_quantity += data['in_quantity']
             instance.enter_time = enter_time
             instance.save()
@@ -3108,7 +3109,7 @@ class EquipAutoPlanView(APIView):
             }
             return Response({"success": True, "message": None, "data": data})
         else:  # 备件移库/盘库
-            data = EquipWarehouseInventory.objects.filter(equip_spare__spare_code=spare_code, quantity__gt=0)\
+            data = EquipWarehouseInventory.objects.filter(equip_spare__spare_code=spare_code)\
                 .values('equip_spare', 'equip_warehouse_location').annotate(
                 quantity=Sum('quantity')).values(
                 'equip_warehouse_area__id',
