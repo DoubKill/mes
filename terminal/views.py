@@ -130,7 +130,7 @@ class BatchProductionInfoView(APIView):
             classes_plans = classes_plans.filter(work_schedule_plan__classes__global_name=classes)
         for plan in classes_plans:
             # 任务状态
-            plan_status_info = PlanStatus.objects.using("SFJ").filter(plan_classes_uid=plan.plan_classes_uid).order_by('created_date').last()
+            plan_status_info = PlanStatus.objects.using("SFJ").filter(plan_classes_uid=plan.plan_classes_uid, delete_flag=False).order_by('created_date').last()
             plan_status = plan_status_info.status if plan_status_info else plan.status
             if plan_status not in ['运行中', '等待']:
                 if plan_status in ['停止', '完成', '待停止']:  # 更新通用料包完成时间
@@ -3191,8 +3191,6 @@ class ReplaceMaterialViewSet(ModelViewSet):
                 r = ReplaceMaterial.objects.filter(id=uid).last()
                 if not r:
                     raise ValidationError('数据行异常,请刷新页面后重试')
-                if r.bra_code.startswith('AAJ1Z20') and '掺料' not in recipe_material and '待处理料' not in recipe_material:
-                    raise ValidationError('返回胶只能当作待处理料或者掺料使用')
                 item['result'] = 1
             else:
                 item['result'] = 0

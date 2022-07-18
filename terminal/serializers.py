@@ -134,8 +134,8 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                     material_no = return_rubber.product_no
                     material_name = material_no
                     scan_material = material_no
-                    # 原意当作掺料使用, 修改: 当前生产胶皮与卡片一致, 默认重量600公斤(300公斤一车, 默认2车)
-                    total_weight = Decimal(320 * (return_rubber.end_trains - return_rubber.begin_trains + 1)) if material_no in materials else 0
+                    # 原意当作掺料使用, 修改: 默认重量640公斤(320公斤一车, 默认2车)
+                    total_weight = Decimal(320 * (return_rubber.end_trains - return_rubber.begin_trains + 1))
             else:  # 收皮条码
                 pallet_feedback = PalletFeedbacks.objects.filter(lot_no=bra_code).first()
                 if pallet_feedback:
@@ -263,7 +263,6 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             s_result = self.material_pass(plan_classes_uid, scan_material, material_type=scan_material_type)
             if s_result[0]:
                 material_no = material_name = s_result[1]
-                # attrs.update({'material_no': material_no, 'material_name': material_name})
         attrs['equip_no'] = classes_plan.equip.equip_no
         attrs['material_name'] = material_name
         attrs['material_no'] = material_no
@@ -273,7 +272,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                               'scan_material': scan_material, 'plan_classes_uid': plan_classes_uid,
                               'scan_material_type': scan_material_type}
         # 判断物料是否在配方中
-        if isinstance(material_name, dict) or material_name not in materials or (bra_code.startswith('AAJ1Z20') and total_weight==0):
+        if isinstance(material_name, dict) or material_name not in materials:
             flag, send_flag = True, True
             record_data = {'plan_classes_uid': plan_classes_uid, 'bra_code': bra_code,
                            'product_no': classes_plan.product_batching.stage_product_batch_no,
