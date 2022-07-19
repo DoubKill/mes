@@ -79,7 +79,7 @@ from django.db.models import Prefetch, F
 from django.db.models import Q
 from quality.utils import get_cur_sheet, get_sheet_data, export_mto, gen_pallet_test_result
 from recipe.models import Material, ProductBatching, ERPMESMaterialRelation, ZCMaterial
-from django.db.models import Max, Sum, Avg, Count
+from django.db.models import Max, Sum, Avg, Count, Min
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -401,8 +401,12 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
                 raise ValidationError('请选择导出的时间范围！')
             diff = datetime.datetime.strptime(et, '%Y-%m-%d') - \
                    datetime.datetime.strptime(st, '%Y-%m-%d')
-            if diff.days > 7:
-                raise ValidationError('导出数据的日期跨度不得超过一个周！')
+            if self.request.query_params.get('product_no'):
+                if diff.days > 30:
+                    raise ValidationError('导出数据的日期跨度不得超过一个月！')
+            else:
+                if diff.days > 6:
+                    raise ValidationError('导出数据的日期跨度不得超过一个周！')
             queryset = self.filter_queryset(queryset=MaterialTestOrder.objects.filter(
                         delete_flag=False).prefetch_related(
                         Prefetch('order_results',
@@ -4216,3 +4220,24 @@ class ProductSynthesisProductRate(APIView):
                     else:
                         data4[k][i] = yc_rate
         return Response({'data': data4.values()})
+
+
+class ProductTestValueHistoryView(APIView):
+
+    def get(self, request):
+        factory_date = self.request.query_params.get('factory_date')
+        classes = self.request.query_params.get('classes')
+        product_no = self.request.query_params.get('product_no')
+        equip_no = self.request.query_params.get('equip_no')
+        data_point = self.request.query_params.get('data_point')
+        test_order_ids = list(MaterialTestOrder.objects.filter(
+            product_no=product_no,
+            production_class=classes,
+            production_equip_no=equip_no,
+            production_factory_date=factory_date).values_list('id', flat=True))
+        test_result = MaterialTestResult.objects.filter(
+            material_test_order_id__in=test_order_ids,
+            data_point_name=data_point
+        ).aggregate(min_trains=Min('material_test_order__actual_trains'),
+                    max_trains=Max('material_test_order__actual_trains'))
+        return Response(test_result)
