@@ -117,7 +117,10 @@ def days_cur_month_dates(date_time=None):
     date_now = datetime.now() if not date_time else datetime.strptime(date_time, '%Y-%m')
     m = date_now.month
     y = date_now.year
-    days = (date(y, m + 1, 1) - date(y, m, 1)).days
+    if m != 12:
+        days = (date(y, m + 1, 1) - date(y, m, 1)).days
+    else:
+        days = (date(y + 1, 1, 1) - date(y, m, 1)).days
     d1 = date(y, m, 1)
     d2 = date(y, m, days)
     delta = d2 - d1
