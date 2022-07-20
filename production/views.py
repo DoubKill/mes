@@ -2490,9 +2490,7 @@ class DailyProductionCompletionReport(APIView):
             results['name_4'][f"{item['factory_date__day']}日"] = results['name_4'].get(f"{item['factory_date__day']}日", 0) + weight
             results['name_5'][f"{item['factory_date__day']}日"] = results['name_5'].get(f"{item['factory_date__day']}日", 0) + weight
             data_190e['jl'][item['factory_date__day']-1] = weight
-            if item['factory_date__day'] == now_day and exclude_today_flat:
-                pass
-            else:
+            if not(item['factory_date__day'] == now_day and exclude_today_flat):
                 results['name_2']['weight'] += weight
                 results['name_4']['weight'] += weight
                 results['name_5']['weight'] += weight
