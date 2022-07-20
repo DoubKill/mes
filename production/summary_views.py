@@ -501,7 +501,7 @@ class IndexOverview(APIView):
             factory_date=factory_date
         ).exclude(operation_user='Mixer2'
                   ).aggregate(total_trains=Count('id'),
-                              total_weight=Sum('plan_weight')/100000)
+                              total_weight=Sum('plan_weight')/1000)
 
         # 日入库量
         try:
