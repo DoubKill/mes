@@ -827,7 +827,10 @@ def get_tolerance(batching_equip, standard_weight, material_name=None, project_n
                                             small_num__lt=standard_weight, big_num__gte=standard_weight).first()
     # 人工单配配方或通用(所有量程)
     else:
-        rule = ToleranceRule.objects.filter(distinguish__re_str__icontains=material_name, use_flag=True).first()
+        if not material_name:
+            rule = None
+        else:
+            rule = ToleranceRule.objects.filter(distinguish__re_str__icontains=material_name, use_flag=True).first()
     tolerance = f"{rule.handle.keyword_name}{rule.standard_error}{rule.unit}" if rule else ""
     if tolerance:
         if rule.unit == '%':

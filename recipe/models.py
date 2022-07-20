@@ -100,7 +100,8 @@ class ProductBatching(AbstractEntity):
     )
     BATCHING_TYPE_CHOICE = (
         (1, '机台'),
-        (2, '机型')
+        (2, '机型'),
+        (3, '外发特殊配方')
     )
     factory = models.ForeignKey(GlobalCode, help_text='工厂', verbose_name='工厂',
                                 on_delete=models.CASCADE, related_name='f_batching', blank=True, null=True)
