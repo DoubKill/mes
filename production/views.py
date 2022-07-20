@@ -3424,7 +3424,7 @@ class PerformanceSummaryView(APIView):
         # 取每个机台设定的目标值
         settings_value = MachineTargetYieldSettings.objects.filter(target_month=date).last()
         if not settings_value:
-            settings_value = MachineTargetYieldSettings.objects.last()
+            raise ValidationError('请先完成当月的机台目标值设定')
         # 计算薪资
         section_info = {}
         for item in PerformanceJobLadder.objects.filter(type='密炼').values('name', 'coefficient', 'post_standard', 'post_coefficient', 'type'):
@@ -4857,12 +4857,13 @@ class RubberFrameRepairView(APIView):
     def post(self, request):
         date_time = self.request.data.get('date_time')
         details = self.request.data.get('details')
+        save_user = self.request.user.username
         if not all([date_time, details]):
             raise ValidationError('参数异常')
         # 获取最新保存次数
         max_times = RubberFrameRepair.objects.filter(date_time=date_time).aggregate(max_times=Max('times'))['max_times']
         times = 1 if not max_times else max_times + 1
-        RubberFrameRepair.objects.create(date_time=date_time, content=json.dumps(details), times=times)
+        RubberFrameRepair.objects.create(date_time=date_time, content=json.dumps(details), times=times, save_user=save_user)
         return Response('保存成功')
 
 
@@ -4889,10 +4890,11 @@ class ToolManageAccountView(APIView):
     def post(self, request):
         date_time = self.request.data.get('date_time')
         details = self.request.data.get('details')
+        save_user = self.request.user.username
         if not all([date_time, details]):
             raise ValidationError('参数异常')
         # 获取最新保存次数
         max_times = ToolManageAccount.objects.filter(date_time=date_time).aggregate(max_times=Max('times'))['max_times']
         times = 1 if not max_times else max_times + 1
-        ToolManageAccount.objects.create(date_time=date_time, content=json.dumps(details), times=times)
+        ToolManageAccount.objects.create(date_time=date_time, content=json.dumps(details), times=times, save_user=save_user)
         return Response('保存成功')

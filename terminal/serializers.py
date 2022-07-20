@@ -1010,13 +1010,14 @@ class WeightPackageLogCreateSerializer(serializers.ModelSerializer):
         print_begin_trains = attrs['print_begin_trains']
         package_count = attrs['package_count']
         product_no = attrs['product_no']
-        dev_type = attrs['dev_type']
         equip_no = attrs['equip_no']
         batch_classes = attrs['batch_classes']
         package_fufil = attrs['package_fufil']
         merge_flag = attrs.get('merge_flag', False)
         batch_time = attrs['batch_time']
         manual_infos = attrs.get('manual_infos')
+        if attrs['dev_type'] == 'ZWF':
+            attrs['dev_type'] = ''
         # 需要合包但没有扫入人工配料
         if merge_flag and not manual_infos:
             raise serializers.ValidationError('称量计划设置了合包, 请扫码加入人工配料')
@@ -1336,6 +1337,8 @@ class WeightPackageManualSerializer(BaseModelSerializer):
         package_count = validated_data.get('package_count')
         product_no = validated_data.get('product_no')
         manual_details = validated_data.pop('manual_details', [])
+        if validated_data['dev_type'] == 'ZWF':
+            validated_data['dev_type'] = ''
         # 班次, 班组
         batch_class = '早班' if '08:00:00' <= str(now_date)[-8:] < '20:00:00' else '夜班'
         record = WorkSchedulePlan.objects.filter(plan_schedule__day_time=str(now_date.date()),
@@ -1377,6 +1380,21 @@ class WeightPackageManualSerializer(BaseModelSerializer):
             WeightPackageManualDetails.objects.create(**create_data)
         return instance
 
+    # def update(self, instance, validated_data):
+    #     if instance.print_flag == 1:
+    #         raise serializers.ValidationError('打印尚未完成, 请稍后重试')
+    #     validated_data.update({'print_flag': True, 'last_updated_date': datetime.now(), 'ip_address': get_real_ip(self.context['request'].META),
+    #                            'last_updated_user': self.context['request'].user, 'print_datetime': datetime.now()})
+    #     return super().update(instance, validated_data)
+
+    class Meta:
+        model = WeightPackageManual
+        fields = '__all__'
+        read_only_fields = ['bra_code', 'single_weight', 'batch_group', 'batch_class']
+
+
+class WeightPackageManualUpdateSerializer(serializers.ModelSerializer):
+
     def update(self, instance, validated_data):
         if instance.print_flag == 1:
             raise serializers.ValidationError('打印尚未完成, 请稍后重试')
@@ -1385,9 +1403,8 @@ class WeightPackageManualSerializer(BaseModelSerializer):
         return super().update(instance, validated_data)
 
     class Meta:
-        model = WeightPackageManual
-        fields = '__all__'
-        read_only_fields = ['bra_code', 'single_weight', 'batch_group', 'batch_class']
+        model = WeightPackageLog
+        fields = ['print_count']
 
 
 class WeightPackageSingleSerializer(BaseModelSerializer):
@@ -1692,22 +1709,30 @@ class PlanSerializer(serializers.ModelSerializer):
         # 称量重量与mes不同无法下发计划
         recipe_obj = RecipePre.objects.using(equip_no).filter(name=validated_data['recipe']).first()
         product_no_dev, dev_type = re.split(r'\(|\（|\[', recipe_obj.name)[0], recipe_obj.ver
+        wf_flag = False if '[' not in validated_data['recipe'] else True
         if 'ONLY' in validated_data['recipe']:
             ml_equip_no = recipe_obj.name.split('-')[-2]
         else:
-            flag, result = get_common_equip(product_no_dev, dev_type)
-            if flag:
-                ml_equip_no = result[0]
+            if not wf_flag:
+                flag, result = get_common_equip(product_no_dev, dev_type)
+                if flag:
+                    ml_equip_no = result[0]
+                else:
+                    raise serializers.ValidationError(result)
             else:
-                raise serializers.ValidationError(result)
+                ml_equip_no = 'ZWF'
         recipe_materials = list(RecipeMaterial.objects.using(equip_no).filter(recipe_name=recipe_obj.name).values_list('name', flat=True))
         if not recipe_materials:
             raise serializers.ValidationError(f'{equip_no}未找到配方{recipe_obj.name}明细物料信息, 无法新增计划')
+        if ml_equip_no == 'ZWF':
+            filter_kwargs = {'product_batching__stage_product_batch_no': validated_data['recipe']}
+        else:
+            filter_kwargs = {'product_batching__stage_product_batch_no': product_no_dev,
+                             'product_batching__dev_type__category_name': dev_type}
         mes_recipe = ProductBatchingEquip.objects.filter(is_used=True, equip_no=ml_equip_no, type=4,
                                                          feeding_mode__startswith=equip_no[0],
                                                          handle_material_name__in=recipe_materials,
-                                                         product_batching__stage_product_batch_no=product_no_dev,
-                                                         product_batching__dev_type__category_name=dev_type)
+                                                         **filter_kwargs)
         mes_machine_weight = mes_recipe.aggregate(weight=Sum('cnt_type_detail_equip__standard_weight'))['weight']
         if not mes_machine_weight:
             raise serializers.ValidationError('获取mes设置重量失败, 无法比较重量')
@@ -1730,7 +1755,6 @@ class PlanSerializer(serializers.ModelSerializer):
         validated_data['actno'] = 0
         validated_data['oper'] = self.context['request'].user.username
         validated_data['addtime'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
         try:
             instance = Plan.objects.using(equip_no).create(**validated_data)
             ins = CLSystem(equip_no)
@@ -1762,22 +1786,30 @@ class JZPlanSerializer(serializers.ModelSerializer):
         # 称量重量与mes不同无法下发计划
         recipe_obj = pre_model.objects.using(equip_no).filter(name=validated_data['recipe']).first()
         product_no_dev, dev_type = re.split(r'\(|\（|\[', recipe_obj.name)[0], recipe_obj.ver
+        wf_flag = False if '[' not in validated_data['recipe'] else True
         if 'ONLY' in validated_data['recipe']:
             ml_equip_no = recipe_obj.name.split('-')[-2]
         else:
-            flag, result = get_common_equip(product_no_dev, dev_type)
-            if flag:
-                ml_equip_no = result[0]
+            if not wf_flag:
+                flag, result = get_common_equip(product_no_dev, dev_type)
+                if flag:
+                    ml_equip_no = result[0]
+                else:
+                    raise serializers.ValidationError(result)
             else:
-                raise serializers.ValidationError(result)
+                ml_equip_no = 'ZWF'
         recipe_materials = list(material_model.objects.using(equip_no).filter(recipe_name=recipe_obj.name).values_list('name', flat=True))
         if not recipe_materials:
             raise serializers.ValidationError(f'{equip_no}未找到配方{recipe_obj.name}明细物料信息, 无法新增计划')
+        if ml_equip_no == 'ZWF':
+            filter_kwargs = {'product_batching__stage_product_batch_no': validated_data['recipe']}
+        else:
+            filter_kwargs = {'product_batching__stage_product_batch_no': product_no_dev,
+                             'product_batching__dev_type__category_name': dev_type}
         mes_recipe = ProductBatchingEquip.objects.filter(is_used=True, equip_no=ml_equip_no, type=4,
                                                          feeding_mode__startswith=equip_no[0],
                                                          handle_material_name__in=recipe_materials,
-                                                         product_batching__stage_product_batch_no=product_no_dev,
-                                                         product_batching__dev_type__category_name=dev_type)
+                                                         **filter_kwargs)
         mes_machine_weight = mes_recipe.aggregate(weight=Sum('cnt_type_detail_equip__standard_weight'))['weight']
         if not mes_machine_weight:
             raise serializers.ValidationError('获取mes设置重量失败, 无法比较重量')
