@@ -2403,8 +2403,6 @@ class DailyProductionCompletionReport(APIView):
         total_manual_input_trains = ManualInputTrains.objects.exclude(
             Q(product_no__icontains='XCJ') |
             Q(product_no__icontains='洗车胶') |
-            Q(product_no__icontains='-RFM-') |
-            Q(product_no__icontains='-RMB-') |
             Q(product_no__icontains='-WUMING-')
         ).filter(factory_date__year=year, factory_date__month=month)
         total_manual_input_trains_dict = dict(total_manual_input_trains.values(
