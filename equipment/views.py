@@ -36,10 +36,10 @@ from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipP
     EquipBomFilter, EquipJobItemStandardFilter, EquipMaintenanceStandardFilter, EquipRepairStandardFilter, \
     EquipWarehouseInventoryFilter, EquipWarehouseStatisticalFilter, EquipWarehouseOrderDetailFilter, \
     EquipWarehouseRecordFilter, EquipApplyOrderFilter, EquipApplyRepairFilter, EquipWarehouseOrderFilter, \
-    EquipPlanFilter, EquipInspectionOrderFilter, CheckPointStandardFilter
+    EquipPlanFilter, EquipInspectionOrderFilter, CheckPointStandardFilter, CheckTemperatureStandardFilter
 from equipment.models import EquipTargetMTBFMTTRSetting, EquipWarehouseAreaComponent, EquipRepairMaterialReq, \
     EquipInspectionOrder, EquipRegulationRecord, EquipMaintenanceStandardWork, EquipOrderEntrust, XLCommonCode, \
-    CheckPointStandard
+    CheckPointStandard, CheckTemperatureStandard
 from equipment.serializers import *
 from equipment.serializers import EquipRealtimeSerializer
 from equipment.task import property_template, property_import
@@ -5064,16 +5064,16 @@ class CheckPointStandardViewSet(ModelViewSet):
         return Response('删除成功')
 
     @atomic
-    @action(methods=['post'], detail=False, url_path='execl-handle', url_name='execl_handle')
-    def execl_handle(self, request):
-        execl_flag = self.request.data.get('execl_flag')
-        if execl_flag == 'export':  # 导出
+    @action(methods=['post'], detail=False, url_path='excel-handle', url_name='excel_handle')
+    def excel_handle(self, request):
+        excel_flag = self.request.data.get('excel_flag')
+        if excel_flag == 'export':  # 导出
             export_ids = self.request.data.get('export_ids')
             if not export_ids:
                 raise ValidationError('请选择需要导出的标准')
             records = self.get_queryset().filter(id__in=export_ids).order_by('id')
             if not records:
-                raise ValidationError('为找到所选便准, 请刷新页面后重试')
+                raise ValidationError('未找到所选便准, 请刷新页面后重试')
             data = self.get_serializer(records, many=True).data
             return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
         else:  # 导入
@@ -5089,6 +5089,8 @@ class CheckPointStandardViewSet(ModelViewSet):
                 for item in data:
                     if self.get_queryset().filter(point_standard_code=item[0]):  # 存在的编码过滤掉
                         continue
+                    if not all([item[1], item[2], item[3], item[4]]):
+                        raise ValidationError('点检标准名称、文档编号、通用机台、岗位为必填')
                     if self.get_queryset().filter(equip_no=item[3], station=item[4]):
                         raise ValidationError('导入标准存在冲突[通用机台+岗位需要不相同]')
                     contents, styles = item[5].split('；')[:-1], item[6].split('；')[:-1]
@@ -5096,19 +5098,21 @@ class CheckPointStandardViewSet(ModelViewSet):
                         raise ValidationError('同一标准中点检内容不可存在重复项')
                     if len(contents) != len(styles):
                         raise ValidationError('点检内容与点检方法条目数不相同')
-                    equip_no = ','.join(sorted(re.split('[,|，]', item[3])))
+                    equip_no = ','.join(sorted([i.strip() for i in re.split(',', item[3])]))
                     check_details = [{'check_content': contents[i].split('、')[-1], 'check_style': styles[i].split('、')[-1]} for i in range(len(contents))]
                     create_data.append({
                         'point_standard_name': item[1], 'doc_code': item[2], 'equip_no': equip_no, 'station': item[4],
                         'check_details': check_details
                     })
+                if not create_data:
+                    raise ValidationError('规则校验完后无可导入数据')
                 serializer = self.get_serializer(data=create_data, many=True)
                 if not serializer.is_valid(raise_exception=False):
                     raise ValidationError(f'导入数据异常: {serializer.error_messages}')
                 serializer.save()
             except Exception as e:
                 raise ValidationError(e.args[0])
-        return Response(f"{'导出' if execl_flag == 'export' else '导入'}成功")
+        return Response(f"{'导出' if excel_flag == 'export' else '导入'}成功")
 
 
 # @method_decorator([api_recorder], name='dispatch')
@@ -5135,4 +5139,70 @@ class CheckPointStandardViewSet(ModelViewSet):
 #         "创建人": "created_username",
 #         "创建时间": "created_date",
 #     }
+
+
+@method_decorator([api_recorder], name='dispatch')
+class CheckTemperatureStandardViewSet(ModelViewSet):
+    queryset = CheckTemperatureStandard.objects.filter(delete_flag=False).order_by('sn')
+    serializer_class = CheckTemperatureStandardSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = CheckTemperatureStandardFilter
+    FILE_NAME = '除尘袋滤器温度标准'
+    EXPORT_FIELDS_DICT = {
+        "序号(新增不填)": "sn",
+        "具体位置": "location",
+        "名称": "station_name"
+    }
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.delete_flag = True
+        instance.delete_user = self.request.user
+        instance.delete_date = datetime.now()
+        instance.save()
+        return Response('删除成功')
+
+    @atomic
+    @action(methods=['post'], detail=False, url_path='excel-handle', url_name='excel_handle')
+    def excel_handle(self, request):
+        excel_flag = self.request.data.get('excel_flag')
+        if excel_flag == 'export':  # 导出
+            export_ids = self.request.data.get('export_ids')
+            if not export_ids:
+                raise ValidationError('请选择需要导出的标准')
+            records = self.get_queryset().filter(id__in=export_ids).order_by('sn')
+            if not records:
+                raise ValidationError('未找到所选便准, 请刷新页面后重试')
+            data = self.get_serializer(records, many=True).data
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+        else:  # 导入
+            excel_file = request.FILES.get('file', None)
+            if not excel_file:
+                raise ValidationError('文件不可为空！')
+            cur_sheet = get_cur_sheet(excel_file)
+            if cur_sheet.ncols != len(self.EXPORT_FIELDS_DICT):
+                raise ValidationError('导入文件数据错误！')
+            data = get_sheet_data(cur_sheet)
+            create_data = []
+            try:
+                for item in data:
+                    if not item[0] or not isinstance(item, float):
+                        item[0] = 0
+                    if self.get_queryset().filter(sn=item[0]):  # 存在的序号过滤掉
+                        continue
+                    if not all([item[1], item[2]]):
+                        raise ValidationError('具体位置、名称为必填')
+                    if self.get_queryset().filter(location=item[1], station_name=item[2]):
+                        raise ValidationError('导入标准存在冲突[具体位置+名称需要不相同]')
+                    create_data.append({'location': item[1], 'station_name': item[2]})
+                if not create_data:
+                    raise ValidationError('规则校验完后无可导入数据')
+                serializer = self.get_serializer(data=create_data, many=True)
+                if not serializer.is_valid(raise_exception=False):
+                    raise ValidationError(f'导入数据异常: {serializer.error_messages}')
+                serializer.save()
+            except Exception as e:
+                raise ValidationError(e.args[0])
+        return Response(f"{'导出' if excel_flag == 'export' else '导入'}成功")
 

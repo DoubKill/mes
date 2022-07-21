@@ -138,6 +138,9 @@ router.register('check-point-standard', CheckPointStandardViewSet)
 # 岗位安全装置点检表
 # router.register('check-point-table', CheckPointTableViewSet)
 
+# 除尘袋滤器温度标准
+router.register('check-temperature-standard', CheckTemperatureStandardViewSet)
+
 
 urlpatterns = [
     path('', include(router.urls)),

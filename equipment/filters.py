@@ -6,7 +6,7 @@ from equipment.models import EquipDownType, EquipDownReason, EquipPart, EquipMai
     EquipCurrentStatus, EquipFaultSignal, EquipMachineHaltType, EquipMachineHaltReason, EquipOrderAssignRule, EquipBom, \
     EquipJobItemStandard, EquipMaintenanceStandard, EquipRepairStandard, EquipWarehouseInventory, EquipWarehouseRecord, \
     EquipWarehouseOrderDetail, EquipApplyRepair, EquipApplyOrder, EquipWarehouseOrder, EquipPlan, EquipInspectionOrder, \
-    CheckPointStandard
+    CheckPointStandard, CheckTemperatureStandard
 
 
 class EquipDownTypeFilter(django_filters.rest_framework.FilterSet):
@@ -462,3 +462,12 @@ class CheckPointStandardFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = CheckPointStandard
         fields = ('point_standard_name', 'equip_no', 'station')
+
+
+class CheckTemperatureStandardFilter(django_filters.rest_framework.FilterSet):
+    location = django_filters.CharFilter(field_name='location', help_text='具体位置', lookup_expr='icontains')
+    station_name = django_filters.CharFilter(field_name='station_name', help_text='检查点名称', lookup_expr='icontains')
+
+    class Meta:
+        model = CheckTemperatureStandard
+        fields = ('location', 'station_name')

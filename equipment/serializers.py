@@ -18,7 +18,7 @@ from equipment.models import EquipDownType, EquipDownReason, EquipCurrentStatus,
     EquipWarehouseLocation, EquipWarehouseArea, EquipWarehouseOrderDetail, EquipWarehouseOrder, EquipWarehouseInventory, \
     EquipWarehouseRecord, EquipApplyRepair, EquipPlan, EquipApplyOrder, EquipResultDetail, UploadImage, \
     EquipRepairMaterialReq, EquipInspectionOrder, EquipWarehouseAreaComponent, EquipRegulationRecord, \
-    EquipMaintenanceStandardWork, CheckPointStandard, CheckPointStandardDetail
+    EquipMaintenanceStandardWork, CheckPointStandard, CheckPointStandardDetail, CheckTemperatureStandard
 
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
@@ -1748,4 +1748,22 @@ class CheckPointStandardSerializer(BaseModelSerializer):
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
         validators = [UniqueTogetherValidator(queryset=CheckPointStandard.objects.filter(delete_flag=False),
-                                              fields=('equip_no', 'station'), message='已存在集机台+岗位点检标准')]
+                                              fields=('equip_no', 'station'), message='已存在机台+岗位点检标准')]
+
+
+class CheckTemperatureStandardSerializer(BaseModelSerializer):
+
+    @atomic
+    def create(self, validated_data):
+        # 生成序号
+        max_code = CheckTemperatureStandard.objects.aggregate(max_code=Max('sn'))['max_code']
+        sn = 1 if not max_code else (max_code + 1)
+        validated_data['sn'] = sn
+        return super().create(validated_data)
+
+    class Meta:
+        model = CheckTemperatureStandard
+        fields = '__all__'
+        read_only_fields = ('sn', )
+        validators = [UniqueTogetherValidator(queryset=CheckTemperatureStandard.objects.filter(delete_flag=False),
+                                              fields=('location', 'station_name'), message='已存在具体位置+名称')]

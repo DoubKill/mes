@@ -1073,16 +1073,27 @@ class CheckPointStandardDetail(AbstractEntity):
         verbose_name_plural = verbose_name = '岗位安全装置点检标准详情'
 
 
-# class CheckPointTable(AbstractEntity):
-#     check_point_standard = models.ForeignKey(CheckPointStandard, help_text='点检标准', on_delete=models.CASCADE,
-#                                              related_name='check_tables')
-#     point_standard_code = models.CharField(max_length=64, help_text='点检表编号', null=True, blank=True)
-#     point_standard_name = models.CharField(max_length=64, help_text='点检表名称')
-#     doc_code = models.CharField(max_length=64, help_text='文档编号')
-#     equip_no = models.CharField(max_length=64, help_text='适用机台')
-#     station = models.CharField(max_length=64, help_text='岗位')
-#
-#     class Meta:
-#         db_table = 'check_point_table'
-#         verbose_name_plural = verbose_name = '岗位安全装置点检表'
+class CheckPointTable(AbstractEntity):
+    check_point_standard = models.ForeignKey(CheckPointStandard, help_text='点检标准', on_delete=models.CASCADE,
+                                             related_name='check_tables')
+    point_standard_code = models.CharField(max_length=64, help_text='点检表编号', null=True, blank=True)
+    point_standard_name = models.CharField(max_length=64, help_text='点检表名称')
+    doc_code = models.CharField(max_length=64, help_text='文档编号')
+    equip_no = models.CharField(max_length=64, help_text='适用机台')
+    station = models.CharField(max_length=64, help_text='岗位')
+
+    class Meta:
+        db_table = 'check_point_table'
+        verbose_name_plural = verbose_name = '岗位安全装置点检表'
+
+
+class CheckTemperatureStandard(AbstractEntity):
+    sn = models.PositiveIntegerField(help_text='序号')
+    location = models.CharField(max_length=64, help_text='具体位置')
+    station_name = models.CharField(max_length=64, help_text='检查点名称')
+
+    class Meta:
+        db_table = 'check_temperature_standard'
+        verbose_name_plural = verbose_name = '除尘袋滤器温度标准'
+
 
