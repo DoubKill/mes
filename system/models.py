@@ -146,67 +146,6 @@ class SystemConfig(AbstractEntity):
         verbose_name_plural = verbose_name = '系统配置表'
 
 
-class AsyncUpdateContent(AbstractEntity):
-    """异步更新表"""
-    content = models.CharField(max_length=64, help_text='内容', verbose_name='内容')
-    recv_flag = models.BooleanField(default=False, help_text='已经接受标志', verbose_name='已经接受标志')
-    src_table_name = models.CharField(max_length=64, help_text='表名', verbose_name='表名')
-    dst_address = models.CharField(max_length=64, help_text='目标地址', verbose_name='目标地址')
-    method = models.CharField(max_length=64, help_text='http方法', verbose_name='http方法')
-
-    def __str__(self):
-        return f"{self.src_table_name}"
-
-    class Meta:
-        db_table = 'async_update_content'
-        verbose_name_plural = verbose_name = '异步更新表'
-
-
-class AsyncUpdateContentHistory(AbstractEntity):
-    """异步更新历史表"""
-    content = models.CharField(max_length=64, help_text='内容', verbose_name='内容')
-    recv_flag = models.BooleanField(default=False, help_text='已经接受标志', verbose_name='已经接受标志')
-    src_table_name = models.CharField(max_length=64, help_text='表名', verbose_name='表名')
-    dst_address = models.CharField(max_length=64, help_text='目标地址', verbose_name='目标地址')
-    method = models.CharField(max_length=64, help_text='http方法', verbose_name='http方法')
-
-    def __str__(self):
-        return f"{self.src_table_name}|history"
-
-    class Meta:
-        db_table = 'async_update_content_history'
-        verbose_name_plural = verbose_name = '异步更新历史表'
-
-
-class ErrorCode(AbstractEntity):
-    """错误编码表"""
-    name = models.CharField(max_length=64, help_text='错误名称', verbose_name='错误名称')
-    description = models.CharField(max_length=256, help_text='描述', verbose_name='描述')
-    error_type = models.ForeignKey("ErrorType", help_text='错误类型', verbose_name='错误类型',
-                                   on_delete=models.CASCADE, related_name="error_code_set")
-
-    def __str__(self):
-        return f"{self.name}"
-
-    class Meta:
-        db_table = 'error_code'
-        verbose_name_plural = verbose_name = '错误编码'
-
-
-class ErrorType(AbstractEntity):
-    """错误类型表"""
-    name = models.CharField(max_length=64, help_text='错误名称', verbose_name='错误名称')
-    description = models.CharField(max_length=256, help_text='描述', verbose_name='描述')
-    category = models.CharField(max_length=64, help_text='错误名称', verbose_name='错误名称')
-
-    def __str__(self):
-        return f"{self.name}"
-
-    class Meta:
-        db_table = 'error_type'
-        verbose_name_plural = verbose_name = '错误类型'
-
-
 class DataSynchronization(models.Model):
     """记录已经同步过去的数据"""
     TYPE_CHOICE = (
