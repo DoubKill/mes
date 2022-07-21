@@ -499,8 +499,9 @@ class IndexOverview(APIView):
         # 日总产量
         actual_data = TrainsFeedbacks.objects.filter(
             factory_date=factory_date
-        ).aggregate(total_trains=Count('id'),
-                    total_weight=Sum('actual_weight')/100000)
+        ).exclude(operation_user='Mixer2'
+                  ).aggregate(total_trains=Count('id'),
+                              total_weight=Sum('plan_weight')/1000)
 
         # 日入库量
         try:
@@ -595,77 +596,64 @@ class IndexProductionAnalyze(APIView):
             date_range = get_weekdays(7)
         else:  # 月
             date_range = get_weekdays(datetime.datetime.now().day)
-        if settings.DATABASES['default']['ENGINE'] == 'django.db.backends.oracle':
-            actual_extra_where_str = " where to_char(tf.factory_date, 'yyyy-mm-dd')>='{}' and to_char(tf.factory_date, 'yyyy-mm-dd')<='{}'".format(date_range[0], date_range[-1])
-            plan_extra_where_str = " and to_char(ps.day_time, 'yyyy-mm-dd')>='{}' and to_char(ps.day_time, 'yyyy-mm-dd')<='{}'".format(date_range[0], date_range[-1])
-        else:
-            actual_extra_where_str = " where tf.factory_date>='{}' and tf.factory_date<='{}'".format(date_range[0], date_range[-1])
-            plan_extra_where_str = " and ps.day_time>='{}' and ps.day_time<='{}'".format(date_range[0], date_range[-1])
-        cursor = connection.cursor()
+        plan_data = ProductClassesPlan.objects.filter(
+            work_schedule_plan__plan_schedule__day_time__gte=date_range[0],
+            work_schedule_plan__plan_schedule__day_time__lte=date_range[-1],
+            delete_flag=False
+        ).values('work_schedule_plan__plan_schedule__day_time',
+                 'product_batching__stage_product_batch_no'
+                 ).annotate(total_trains=Sum('plan_trains'))
 
-        plan_sql = """
-                    select
-                   day_time,
-                   stage_name,
-                   sum(plan_trains) as total_plan_trains
-            from(
-                select
-                       ps.day_time,
-                       (CASE
-                        WHEN gc.global_name in ('FM','RE','RFM') THEN '加硫'
-                        ELSE '无硫' END) as stage_name,
-                       sum(pcp.plan_trains) as plan_trains
-                from
-                    product_classes_plan pcp
-                    inner join work_schedule_plan wsp on pcp.work_schedule_plan_id = wsp.id
-                    inner join plan_schedule ps on wsp.plan_schedule_id = ps.id
-                    inner join equip e on pcp.equip_id = e.id
-                    inner join product_batching pb on pcp.product_batching_id = pb.id
-                    left join global_code gc on pb.stage_id = gc.id
-                where pcp.delete_flag=0 {}
-                group by ps.day_time, gc.global_name) tmp
-            group by day_time, stage_name order by day_time;""".format(plan_extra_where_str)
-        cursor.execute(plan_sql)
-        plan_data = cursor.fetchall()
-
-        actual_sql = """
-                    select
-                   factory_date,
-                   stage_name,
-                   sum(actual_trains) as total_acctual_trains
-            from(
-                select
-                       tf.factory_date,
-                       (CASE
-                        WHEN gc.GLOBAL_NAME in ('FM','RE','RFM') THEN '加硫'
-                        ELSE '无硫' END) as stage_name,
-                       count(tf.id) as actual_trains
-                from
-                    trains_feedbacks tf
-                inner join product_classes_plan pcp on tf.plan_classes_uid=pcp.plan_classes_uid
-                inner join product_batching pb on pb.ID=pcp.product_batching_id
-                left join global_code gc on gc.ID=pb.stage_id
-                {}
-                group by tf.factory_date, gc.global_name order by tf.factory_date) tmp
-            group by factory_date, stage_name order by factory_date;""".format(actual_extra_where_str)
-
-        cursor.execute(actual_sql)
-        actual_data = cursor.fetchall()
+        # 日总产量
+        actual_data = TrainsFeedbacks.objects.filter(
+            factory_date__gte=date_range[0],
+            factory_date__lte=date_range[-1]
+        ).exclude(operation_user='Mixer2'
+                  ).values('factory_date',
+                           'product_no'
+                           ).annotate(total_trains=Count('id'))
 
         plan_data_dict = {}
         for item in plan_data:
-            plan_date = item[0].strftime("%Y-%m-%d")
+            plan_date = item['work_schedule_plan__plan_schedule__day_time'].strftime("%Y-%m-%d")
+            product_no = item['product_batching__stage_product_batch_no']
+            trains = item['total_trains']
+            try:
+                stage = product_no.split('-')[1]
+                if stage in ('FM', 'RFM', 'RE'):
+                    flag = '加硫'
+                else:
+                    flag = '无硫'
+            except Exception:
+                flag = '无硫'
             if plan_date in plan_data_dict:
-                plan_data_dict[plan_date][item[1]] = int(item[2])
+                if flag in plan_data_dict[plan_date]:
+                    plan_data_dict[plan_date][flag] += trains
+                else:
+                    plan_data_dict[plan_date][flag] = trains
             else:
-                plan_data_dict[plan_date] = {item[1]: int(item[2])}
+                plan_data_dict[plan_date] = {flag: trains}
+
         actual_data_dict = {}
         for item in actual_data:
-            actual_date = item[0].strftime("%Y-%m-%d")
+            actual_date = item['factory_date'].strftime("%Y-%m-%d")
+            product_no = item['product_no']
+            trains = item['total_trains']
+            try:
+                stage = product_no.split('-')[1]
+                if stage in ('FM', 'RFM', 'RE'):
+                    flag = '加硫'
+                else:
+                    flag = '无硫'
+            except Exception:
+                flag = '无硫'
             if actual_date in actual_data_dict:
-                actual_data_dict[actual_date][item[1]] = int(item[2])
+                if flag in actual_data_dict[actual_date]:
+                    actual_data_dict[actual_date][flag] += trains
+                else:
+                    actual_data_dict[actual_date][flag] = trains
             else:
-                actual_data_dict[actual_date] = {item[1]: int(item[2])}
+                actual_data_dict[actual_date] = {flag: trains}
 
         # 日合格率
         test_date_qualify_group = MaterialTestOrder.objects.filter(
@@ -775,7 +763,7 @@ class IndexEquipProductionAnalyze(IndexOverview):
         plan_data = ProductClassesPlan.objects.filter(**plan_query_params).filter(delete_flag=False).values(
             'equip__equip_no').annotate(plan_trains=Sum('plan_trains'))
         actual_data = TrainsFeedbacks.objects.filter(
-            **actual_query_params).values('equip_no').annotate(actual_trains=Count('id'))
+            **actual_query_params).exclude(operation_user='Mixer2').values('equip_no').annotate(actual_trains=Count('id'))
 
         plan_data_dict = {item['equip__equip_no']: item for item in plan_data}
         actual_data_dict = {item['equip_no']: item for item in actual_data}

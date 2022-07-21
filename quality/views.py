@@ -75,11 +75,11 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestPlanDetailSerializer, MaterialTestOrderExportSerializer, MaterialInspectionRegistrationSerializer, \
     MaterialDataPointIndicatorHistorySerializer, WMSMooneyLevelSerializer, ERPMESMaterialRelationSerializer
 
-from django.db.models import Prefetch
+from django.db.models import Prefetch, F
 from django.db.models import Q
 from quality.utils import get_cur_sheet, get_sheet_data, export_mto, gen_pallet_test_result
 from recipe.models import Material, ProductBatching, ERPMESMaterialRelation, ZCMaterial
-from django.db.models import Max, Sum, Avg, Count
+from django.db.models import Max, Sum, Avg, Count, Min
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -401,8 +401,12 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
                 raise ValidationError('请选择导出的时间范围！')
             diff = datetime.datetime.strptime(et, '%Y-%m-%d') - \
                    datetime.datetime.strptime(st, '%Y-%m-%d')
-            if diff.days > 7:
-                raise ValidationError('导出数据的日期跨度不得超过一个周！')
+            if self.request.query_params.get('product_no'):
+                if diff.days > 30:
+                    raise ValidationError('导出数据的日期跨度不得超过一个月！')
+            else:
+                if diff.days > 6:
+                    raise ValidationError('导出数据的日期跨度不得超过一个周！')
             queryset = self.filter_queryset(queryset=MaterialTestOrder.objects.filter(
                         delete_flag=False).prefetch_related(
                         Prefetch('order_results',
@@ -1212,40 +1216,30 @@ class TestDataPointCurveView(APIView):
         product_no = self.request.query_params.get('product_no')
         if not all([st, et, product_no]):
             raise ValidationError('参数缺失')
-        try:
-            days = date_range(datetime.datetime.strptime(st, '%Y-%m-%d'),
-                              datetime.datetime.strptime(et, '%Y-%m-%d'))
-        except Exception:
-            raise ValidationError('参数错误')
-        ret = MaterialTestResult.objects.filter(material_test_order__production_factory_date__gte=st,
-                                                material_test_order__production_factory_date__lte=et,
-                                                material_test_order__product_no=product_no
-                                                ).values('material_test_order__production_factory_date',
-                                                         'data_point_name').annotate(value=GroupConcat('value', order_by='value'))
-
-        data_point_names = [item['data_point_name'] for item in ret]
-        y_axis = {
-            data_point_name: {
-                'name': data_point_name,
-                'type': 'line',
-                'data': [[]] * len(days)}
-            for data_point_name in data_point_names
-        }
-        for item in ret:
-            factory_date = item['material_test_order__production_factory_date'].strftime("%Y-%m-%d")
-            data_point_name = item['data_point_name']
-            value = item['value'].split(',')
-            y_axis[data_point_name]['data'][days.index(factory_date)] = value
-        indicators = {}
-        for data_point_name in data_point_names:
-            indicator = MaterialDataPointIndicator.objects.filter(
-                data_point__name=data_point_name,
-                material_test_method__material__material_name=product_no,
-                level=1).first()
-            if indicator:
-                indicators[data_point_name] = [indicator.lower_limit, indicator.upper_limit]
+        # try:
+        #     days = date_range(datetime.datetime.strptime(st, '%Y-%m-%d'),
+        #                       datetime.datetime.strptime(et, '%Y-%m-%d'))
+        # except Exception:
+        #     raise ValidationError('参数错误')
+        query_set = MaterialTestResult.objects.filter(material_test_order__production_factory_date__gte=st,
+                                                      material_test_order__production_factory_date__lte=et,
+                                                      material_test_order__product_no=product_no)
+        indicators = MaterialDataPointIndicator.objects.filter(
+            material_test_method__material__material_no=product_no,
+            level=1).values('data_point__name', 'upper_limit', 'lower_limit')
+        data_point_names = []
+        ret = []
+        indicators_dict = {}
+        for i in indicators:
+            data_point_name = i['data_point__name']
+            indicators_dict[data_point_name] = {'upper_limit': i['upper_limit'], 'lower_limit': i['lower_limit']}
+            data_point_names.append(data_point_name)
+            test_data = query_set.filter(
+                data_point_name=data_point_name
+            ).values(date=F('material_test_order__production_factory_date'), v=F('value')).order_by('date')
+            ret.append({'name': data_point_name, 'data': test_data})
         return Response(
-            {'x_axis': days, 'y_axis': y_axis.values(), 'indicators': indicators}
+            {'indicators': indicators_dict, 'data': ret}
         )
 
 
@@ -1296,9 +1290,15 @@ class ImportAndExportView(APIView):
         # 机台
         equip_no = production_data[4].strip()
         # 班组
-        group = production_data[5].strip()
+        group = production_data[5].strip() + '班'
+
         if not group:
             raise ValidationError('请输入班组！')
+        ws = WorkSchedulePlan.objects.filter(plan_schedule__day_time=factory_date,
+                                             classes__global_name=classes,
+                                             plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
+        if ws:
+            group = ws.group.global_name
         # 取数据点
         reverse_dict = {value: key for key, value in by_dict.items()}
         data_points = [reverse_dict.get(i) for i in range(7, 20) if production_data[i]]
@@ -4220,3 +4220,24 @@ class ProductSynthesisProductRate(APIView):
                     else:
                         data4[k][i] = yc_rate
         return Response({'data': data4.values()})
+
+
+class ProductTestValueHistoryView(APIView):
+
+    def get(self, request):
+        factory_date = self.request.query_params.get('factory_date')
+        classes = self.request.query_params.get('classes')
+        product_no = self.request.query_params.get('product_no')
+        equip_no = self.request.query_params.get('equip_no')
+        data_point = self.request.query_params.get('data_point')
+        test_order_ids = list(MaterialTestOrder.objects.filter(
+            product_no=product_no,
+            production_class=classes,
+            production_equip_no=equip_no,
+            production_factory_date=factory_date).values_list('id', flat=True))
+        test_result = MaterialTestResult.objects.filter(
+            material_test_order_id__in=test_order_ids,
+            data_point_name=data_point
+        ).aggregate(min_trains=Min('material_test_order__actual_trains'),
+                    max_trains=Max('material_test_order__actual_trains'))
+        return Response(test_result)

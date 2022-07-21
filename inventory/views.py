@@ -5054,6 +5054,7 @@ class LIBRARYINVENTORYView(APIView):
         location = params.get('location', '')  # 巷道
         location_status = params.get('location_status', '')  # 有无封闭货位
         quality_level = params.get('quality_level')
+        equip_no = params.get('equip_no')
         export = params.get("export", None)
         product_validity_dict = dict(MaterialAttribute.objects.filter(
             period_of_validity__isnull=False
@@ -5079,6 +5080,8 @@ class LIBRARYINVENTORYView(APIView):
             filter_kwargs['location__startswith'] = location
         if quality_level:
             filter_kwargs['quality_level'] = quality_level
+        if equip_no:
+            filter_kwargs['lot_no__icontains'] = equip_no
         if warehouse_name == '混炼胶库':
             model = BzFinalMixingRubberInventory
             store_name = '立体库'
@@ -5157,6 +5160,37 @@ class OutBoundDeliveryOrderViewSet(ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filter_class = OutBoundDeliveryOrderFilter
     permission_classes = (IsAuthenticated, )
+
+    def list(self, request, *args, **kwargs):
+        task_no = self.request.query_params.get('task_no')
+        lot_no = self.request.query_params.get('lot_no')
+        pallet_no = self.request.query_params.get('pallet_no')
+        queryset = self.filter_queryset(self.get_queryset())
+        if task_no:
+            order_ids = OutBoundDeliveryOrderDetail.objects.filter(
+                order_no=task_no).values_list('outbound_delivery_order_id', flat=True)
+            if not order_ids:
+                return Response({})
+            queryset = queryset.filter(id__in=order_ids)
+        if pallet_no:
+            order_ids = OutBoundDeliveryOrderDetail.objects.filter(
+                pallet_no=pallet_no).values_list('outbound_delivery_order_id', flat=True)
+            if not order_ids:
+                return Response({})
+            queryset = queryset.filter(id__in=order_ids)
+        if lot_no:
+            order_ids = OutBoundDeliveryOrderDetail.objects.filter(
+                lot_no=lot_no).values_list('outbound_delivery_order_id', flat=True)
+            if not order_ids:
+                return Response({})
+            queryset = queryset.filter(id__in=order_ids)
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     def get_serializer_class(self):
         if self.action in ('update', 'partial_update'):
@@ -6891,6 +6925,7 @@ class ProductInOutHistoryView(ListAPIView):
         out_et = self.request.query_params.get('out_et')
         tunnel = self.request.query_params.get('tunnel')
         product_no = self.request.query_params.get('product_no')
+        task_no = self.request.query_params.get('task_no')
         order_no = self.request.query_params.get('order_no')
         pallet_no = self.request.query_params.get('pallet_no')
         lot_no = self.request.query_params.get('lot_no')
@@ -6899,28 +6934,32 @@ class ProductInOutHistoryView(ListAPIView):
         if not warehouse_name:
             raise ValidationError('请选择库区！')
         if warehouse_name == '混炼胶库':
-            if not in_st and not in_et and not out_st and not out_et:
+            if task_no or order_no:
+                query_set = MixGumOutInventoryLog.objects.using('bz').order_by('-start_time')
+                inout_type = 'out'
+            elif not in_st and not in_et and not out_st and not out_et:
                 query_set = MixGumInInventoryLog.objects.using('bz').order_by('-start_time')
                 inout_type = 'in'
             elif all([in_st, in_et, out_st, out_et]):
-                query_set = MixGumInInventoryLog.objects.using('bz').filter(start_time__gte=in_st,
-                                                                            start_time__lte=in_et
-                                                                            ).order_by('-start_time')
+                query_set = MixGumInInventoryLog.objects.using('bz').order_by('-start_time')
                 inout_type = 'in'
             elif all([in_st, in_et]):
-                query_set = MixGumInInventoryLog.objects.using('bz').filter(start_time__gte=in_st,
-                                                                            start_time__lte=in_et
-                                                                            ).order_by('-start_time')
+                query_set = MixGumInInventoryLog.objects.using('bz').order_by('-start_time')
                 inout_type = 'in'
             elif all([out_st, out_et]):
-                query_set = MixGumOutInventoryLog.objects.using('bz').filter(start_time__gte=out_st,
-                                                                             start_time__lte=out_et
-                                                                             ).order_by('-start_time')
+                query_set = MixGumOutInventoryLog.objects.using('bz').order_by('-start_time')
                 inout_type = 'out'
             else:
                 raise ValidationError('参数错误')
         else:
-            if not in_st and not in_et and not out_st and not out_et:
+            if task_no or order_no:
+                query_set = FinalGumOutInventoryLog.objects.using('lb').filter(Q(location__startswith=1) |
+                                                                               Q(location__startswith=2) |
+                                                                               Q(location__startswith=3) |
+                                                                               Q(location__startswith=4)
+                                                                               ).order_by('-start_time')
+                inout_type = 'out'
+            elif not in_st and not in_et and not out_st and not out_et:
                 query_set = FinalGumInInventoryLog.objects.using('lb').filter(Q(location__startswith=1) |
                                                                               Q(location__startswith=2) |
                                                                               Q(location__startswith=3) |
@@ -6928,31 +6967,25 @@ class ProductInOutHistoryView(ListAPIView):
                                                                               ).order_by('-start_time')
                 inout_type = 'in'
             elif all([in_st, in_et, out_st, out_et]):
-                query_set = FinalGumInInventoryLog.objects.using('lb').filter(start_time__gte=in_st,
-                                                                              start_time__lte=in_et
-                                                                              ).filter(Q(location__startswith=1) |
-                                                                                       Q(location__startswith=2) |
-                                                                                       Q(location__startswith=3) |
-                                                                                       Q(location__startswith=4)
-                                                                                       ).order_by('-start_time')
+                query_set = FinalGumInInventoryLog.objects.using('lb').filter(Q(location__startswith=1) |
+                                                                              Q(location__startswith=2) |
+                                                                              Q(location__startswith=3) |
+                                                                              Q(location__startswith=4)
+                                                                              ).order_by('-start_time')
                 inout_type = 'in'
             elif all([in_st, in_et]):
-                query_set = FinalGumInInventoryLog.objects.using('lb').filter(start_time__gte=in_st,
-                                                                              start_time__lte=in_et
-                                                                              ).filter(Q(location__startswith=1) |
-                                                                                       Q(location__startswith=2) |
-                                                                                       Q(location__startswith=3) |
-                                                                                       Q(location__startswith=4)
-                                                                                       ).order_by('-start_time')
+                query_set = FinalGumInInventoryLog.objects.using('lb').filter(Q(location__startswith=1) |
+                                                                              Q(location__startswith=2) |
+                                                                              Q(location__startswith=3) |
+                                                                              Q(location__startswith=4)
+                                                                              ).order_by('-start_time')
                 inout_type = 'in'
             elif all([out_st, out_et]):
-                query_set = FinalGumOutInventoryLog.objects.using('lb').filter(start_time__gte=out_st,
-                                                                               start_time__lte=out_et
-                                                                               ).filter(Q(location__startswith=1) |
-                                                                                        Q(location__startswith=2) |
-                                                                                        Q(location__startswith=3) |
-                                                                                        Q(location__startswith=4)
-                                                                                        ).order_by('-start_time')
+                query_set = FinalGumOutInventoryLog.objects.using('lb').filter(Q(location__startswith=1) |
+                                                                               Q(location__startswith=2) |
+                                                                               Q(location__startswith=3) |
+                                                                               Q(location__startswith=4)
+                                                                               ).order_by('-start_time')
                 inout_type = 'out'
             else:
                 raise ValidationError('参数错误')
@@ -6961,8 +6994,22 @@ class ProductInOutHistoryView(ListAPIView):
             filter_dict.update(location__startswith=tunnel)
         if product_no:
             filter_dict.update(material_no=product_no)
+        if task_no:
+            filter_dict.update(order_no=task_no)
+        if in_st and in_et:
+            filter_dict.update(start_time__gte=in_st)
+            filter_dict.update(start_time__lte=in_et)
+        elif out_st and out_et:
+            filter_dict.update(start_time__gte=out_st)
+            filter_dict.update(start_time__lte=out_et)
         if order_no:
-            filter_dict.update(order_no=order_no)
+            order = OutBoundDeliveryOrder.objects.filter(order_no=order_no).first()
+            if not order:
+                return Response({})
+            task_nos = list(order.outbound_delivery_details.values_list('order_no', flat=True))
+            if not task_nos:
+                return Response({})
+            filter_dict.update(order_no__in=task_nos)
         if lot_no:
             filter_dict.update(lot_no=lot_no)
         if pallet_no:
