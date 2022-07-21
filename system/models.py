@@ -132,20 +132,6 @@ class ChildSystemInfo(AbstractEntity):
         verbose_name_plural = verbose_name = '子系统信息'
 
 
-class SystemConfig(AbstractEntity):
-    category = models.CharField(max_length=64, help_text='种类', verbose_name='种类')
-    config_name = models.CharField(max_length=64, help_text='配置名称', verbose_name='配置名称')
-    config_value = models.CharField(max_length=64, help_text='配置值', verbose_name='配置值')
-    description = models.CharField(max_length=64, help_text='描述', verbose_name='描述', default="")
-
-    def __str__(self):
-        return f"{self.category}|{self.config_name}|{self.config_value}"
-
-    class Meta:
-        db_table = 'system_config'
-        verbose_name_plural = verbose_name = '系统配置表'
-
-
 class DataSynchronization(models.Model):
     """记录已经同步过去的数据"""
     TYPE_CHOICE = (
