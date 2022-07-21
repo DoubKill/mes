@@ -2834,6 +2834,15 @@ class DailyProductionCompletionReport(APIView):
             Equip190EWeight.objects.filter(factory_date=factory_date, classes=classes).delete()
 
         if date:
+            date_split = date.split('-')
+            OuterMaterial.objects.filter(factory_date__year=date_split[0],
+                                         factory_date__month=date_split[1]).delete()
+            ActualWorkingDay.objects.filter(factory_date__year=date_split[0],
+                                            factory_date__month=date_split[1]).delete()
+            ActualWorkingEquip.objects.filter(factory_date__year=date_split[0],
+                                              factory_date__month=date_split[1]).delete()
+            ActualWorkingDay190E.objects.filter(factory_date__year=date_split[0],
+                                                factory_date__month=date_split[1]).delete()
             for item in outer_data:
                 try:
                     OuterMaterial.objects.update_or_create(
