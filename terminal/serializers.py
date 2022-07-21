@@ -662,6 +662,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                         attrs['tank_data'].update({'msg': f'扫码过快: {n_scan_material_type}{limit_minutes}分钟不超过{limit_nums}次'})
                         attrs['status'] = 2
                 if check_flag:
+                    attrs['status'] = 1
                     last_same_material = add_materials.first()
                     # 包->重量(换算累加)  重量->包(换算累加)  包->包(直接累加)  重量->重量(直接累加)
                     if n_scan_material_type in ['胶块', '胶皮']:
@@ -699,13 +700,14 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                                        'single_need': single_material_weight,
                                                        'pre_material_id': last_same_material.id})
                     else:
-                        weight = total_weight + last_same_material.real_weight
-                        attrs['tank_data'].update({'actual_weight': last_same_material.actual_weight,
-                                                   'adjust_left_weight': weight, 'real_weight': weight,
-                                                   'init_weight': total_weight + last_same_material.init_weight,
-                                                   'single_need': single_material_weight,
-                                                   'pre_material_id': last_same_material.id})
-                    attrs['status'] = 1
+                        # weight = total_weight + last_same_material.real_weight
+                        # attrs['tank_data'].update({'actual_weight': last_same_material.actual_weight,
+                        #                            'adjust_left_weight': weight, 'real_weight': weight,
+                        #                            'init_weight': total_weight + last_same_material.init_weight,
+                        #                            'single_need': single_material_weight,
+                        #                            'pre_material_id': last_same_material.id})
+                        attrs['tank_data'].update({'msg': '料包未使用完, 不能扫码'})
+                        attrs['status'] = 2
         return attrs
 
     def create(self, validated_data):
