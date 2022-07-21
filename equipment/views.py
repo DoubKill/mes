@@ -4,6 +4,8 @@ import datetime as dt
 import re
 import time
 import calendar
+import decimal
+
 import requests
 import xlrd
 import xlwt
@@ -5152,7 +5154,8 @@ class CheckTemperatureStandardViewSet(ModelViewSet):
     EXPORT_FIELDS_DICT = {
         "序号(新增不填)": "sn",
         "具体位置": "location",
-        "名称": "station_name"
+        "名称": "station_name",
+        "温度上限": "temperature_limit"
     }
 
     def destroy(self, request, *args, **kwargs):
@@ -5191,17 +5194,22 @@ class CheckTemperatureStandardViewSet(ModelViewSet):
                         item[0] = 0
                     if self.get_queryset().filter(sn=item[0]):  # 存在的序号过滤掉
                         continue
-                    if not all([item[1], item[2]]):
-                        raise ValidationError('具体位置、名称为必填')
+                    if not all([item[1], item[2], item[3]]):
+                        raise ValidationError('具体位置、名称、温度为必填')
+                    temperature = round(decimal.Decimal(item[3]), 2)
+                    if temperature < 0:
+                        raise ValidationError('温度上限需大于0')
                     if self.get_queryset().filter(location=item[1], station_name=item[2]):
                         raise ValidationError('导入标准存在冲突[具体位置+名称需要不相同]')
-                    create_data.append({'location': item[1], 'station_name': item[2]})
+                    create_data.append({'location': item[1], 'station_name': item[2], 'temperature_limit': temperature})
                 if not create_data:
                     raise ValidationError('规则校验完后无可导入数据')
                 serializer = self.get_serializer(data=create_data, many=True)
                 if not serializer.is_valid(raise_exception=False):
                     raise ValidationError(f'导入数据异常: {serializer.error_messages}')
                 serializer.save()
+            except decimal.InvalidOperation as e:
+                raise ValidationError('温度上限设置异常')
             except Exception as e:
                 raise ValidationError(e.args[0])
         return Response(f"{'导出' if excel_flag == 'export' else '导入'}成功")

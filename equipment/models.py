@@ -1091,6 +1091,7 @@ class CheckTemperatureStandard(AbstractEntity):
     sn = models.PositiveIntegerField(help_text='序号')
     location = models.CharField(max_length=64, help_text='具体位置')
     station_name = models.CharField(max_length=64, help_text='检查点名称')
+    temperature_limit = models.DecimalField(max_digits=4, decimal_places=2, help_text='温度上限')
 
     class Meta:
         db_table = 'check_temperature_standard'
