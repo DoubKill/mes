@@ -1707,7 +1707,9 @@ class PlanSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         equip_no = validated_data.pop('equip_no')
         # 称量重量与mes不同无法下发计划
-        recipe_obj = RecipePre.objects.using(equip_no).filter(name=validated_data['recipe']).first()
+        recipe_obj = RecipePre.objects.using(equip_no).filter(name=validated_data['recipe'], use_not=0).first()
+        if not recipe_obj:
+            raise serializers.ValidationError('请检查配方状态后重新下计划')
         product_no_dev, dev_type = re.split(r'\(|\（|\[', recipe_obj.name)[0], recipe_obj.ver
         wf_flag = False if '[' not in validated_data['recipe'] else True
         if 'ONLY' in validated_data['recipe']:
@@ -1746,10 +1748,8 @@ class PlanSerializer(serializers.ModelSerializer):
         else:
             validated_data['order_by'] = 1
         # 查询配方的合包状态
-        recipe = RecipePre.objects.using(equip_no).filter(name=validated_data['recipe']).first()
-        validated_data['merge_flag'] = recipe.merge_flag if recipe else False
-        split_count = 1 if not recipe else recipe.split_count
-        validated_data['setno'] = validated_data['setno'] * split_count
+        validated_data['merge_flag'] = recipe_obj.merge_flag
+        validated_data['setno'] = validated_data['setno'] * recipe_obj.split_count
         validated_data['planid'] = datetime.now().strftime('%Y%m%d%H%M%S')[2:]
         validated_data['state'] = '等待'
         validated_data['actno'] = 0
@@ -1784,7 +1784,9 @@ class JZPlanSerializer(serializers.ModelSerializer):
         equip_no = validated_data.pop('equip_no')
         plan_model, pre_model, material_model = JZPlan, JZRecipePre, JZRecipeMaterial
         # 称量重量与mes不同无法下发计划
-        recipe_obj = pre_model.objects.using(equip_no).filter(name=validated_data['recipe']).first()
+        recipe_obj = pre_model.objects.using(equip_no).filter(name=validated_data['recipe'], use_not=0).first()
+        if not recipe_obj:
+            raise serializers.ValidationError('请检查配方状态后重新下计划')
         product_no_dev, dev_type = re.split(r'\(|\（|\[', recipe_obj.name)[0], recipe_obj.ver
         wf_flag = False if '[' not in validated_data['recipe'] else True
         if 'ONLY' in validated_data['recipe']:
@@ -1838,10 +1840,8 @@ class JZPlanSerializer(serializers.ModelSerializer):
         else:
             plan_id = prefix + ('%04d' % (int(max_plan_id[-4:]) + 1) if max_plan_id > max_local['max_plan_id'] else '%04d' % (int(max_local['max_plan_id'][-4:]) + 1))
         # 查询配方的合包状态
-        recipe = pre_model.objects.using(equip_no).filter(name=validated_data['recipe']).first()
-        validated_data['merge_flag'] = recipe.merge_flag if recipe else False
-        split_count = 1 if not recipe else recipe.split_count
-        validated_data['setno'] = validated_data['setno'] * split_count
+        validated_data['merge_flag'] = recipe_obj.merge_flag
+        validated_data['setno'] = validated_data['setno'] * recipe_obj.split_count
         validated_data['planid'] = plan_id
         validated_data['state'] = '等待'
         validated_data['actno'] = 0
