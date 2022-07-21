@@ -1027,7 +1027,20 @@ permission_data = [
     {'id': 1028, 'code': 'view_tool_manage_account', 'name': '查看', 'parent_id': 1027},
     {'id': 1029, 'code': 'add_tool_manage_account', 'name': '新增', 'parent_id': 1027},
 
-    # 下一个 1031 开始
+    {'id': 1031, 'code': 'wfproductbatching', 'name': '外供料包的配方', 'parent_id': None},
+    {'id': 1032, 'code': 'view_wfproductbatching', 'name': '查看', 'parent_id': 1031},
+    {'id': 1033, 'code': 'add_wfproductbatching', 'name': '增加', 'parent_id': 1031},
+    {'id': 1034, 'code': 'change_wfproductbatching', 'name': '修改', 'parent_id': 1031},
+    {'id': 1035, 'code': 'edit_wfproductbatching', 'name': '编辑', 'parent_id': 1031},
+    {'id': 1036, 'code': 'submit_wfproductbatching', 'name': '提交', 'parent_id': 1031},
+    {'id': 1037, 'code': 'check_wfproductbatching', 'name': '校对', 'parent_id': 1031},
+    {'id': 1038, 'code': 'use_wfproductbatching', 'name': '启用', 'parent_id': 1031},
+    {'id': 1039, 'code': 'refuse_wfproductbatching', 'name': '驳回', 'parent_id': 1031},
+    {'id': 1040, 'code': 'abandon_wfproductbatching', 'name': '弃用', 'parent_id': 1031},
+    {'id': 1041, 'code': 'stop_wfproductbatching', 'name': '停用', 'parent_id': 1031},
+    {'id': 1042, 'code': 'sendXl_wfproductbatching', 'name': '发送称量配方', 'parent_id': 1031},
+
+    # 下一个 1043 开始
 ]
 
 
