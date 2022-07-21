@@ -23,7 +23,7 @@ from quality.views import TestIndicatorViewSet, TestTypeViewSet, DataPointViewSe
     ReportValueView, TestDataView, CheckEquip, UnqualifiedPalletFeedBackListView, DataPointListView, \
     ProductTestStaticsView, ClassTestStaticsView, UnqialifiedEquipView, LabelPrintLogView, \
     MaterialDataPointIndicatorHistoryView, ProductSynthesisRate, ProductSynthesisEquipRate, ProductSynthesisGroupRate, \
-    ProductSynthesisProductRate, ProductSynthesisMonthRate
+    ProductSynthesisProductRate, ProductSynthesisMonthRate, ProductTestValueHistoryView
 
 router = DefaultRouter()
 
@@ -157,5 +157,7 @@ urlpatterns = [
     path('product-synthesis-equip-rate/', ProductSynthesisEquipRate.as_view()),  # 机台日合格率
     path('product-synthesis-group-rate/', ProductSynthesisGroupRate.as_view()),  # 班组日合格率
     path('product-synthesis-product-rate/', ProductSynthesisProductRate.as_view()),  # 规格日合格率
+
+    path('product-test-value-history/', ProductTestValueHistoryView.as_view()),  # 规格胶料检测历史车次
 
 ]

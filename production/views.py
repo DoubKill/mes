@@ -3608,8 +3608,7 @@ class PerformanceSummaryView(APIView):
         # 取机台历史最大值
         max_value = self.get_equip_max_value()
         # 取每个机台设定的目标值
-        settings_value = MachineTargetYieldSettings.objects.filter(input_datetime__year=year,
-                                                                   input_datetime__month=month).last()
+        settings_value = MachineTargetYieldSettings.objects.filter(target_month=date).last()
         if not settings_value:
             settings_value = MachineTargetYieldSettings.objects.last()
         # 计算薪资
@@ -3704,7 +3703,7 @@ class PerformanceSummaryView(APIView):
                             hj['ccjl'] += round(sum(ccjl_dic.values()) / (len(results_sort) // 3),
                                                2) if ccjl_dic.values() else 0
                     else:
-                        hj['ccjl'] = max(ccjl_dic.values()) if ccjl_dic.values() else 0
+                        hj['ccjl'] = round(max(ccjl_dic.values()), 2) if ccjl_dic.values() else 0
                 k = equip_price[section].values()
                 if post_standard == 1:
                     hj['price'] += round(max(k) * post_coefficient * coefficient * a, 2) if k else 0
@@ -3790,11 +3789,11 @@ class PerformanceSummaryView(APIView):
             else:
                 if len(equip_qty[key].values()) > 1:
                     if post_standard == 1:
-                        p = max(p_dic.values()) if p_dic.values() else 0
+                        p = round(max(p_dic.values()), 2) if p_dic.values() else 0
                     else:
                         p = round(sum(p_dic.values()) / len(equip_qty[key].values()), 2) if p_dic.values() else 0
                 else:
-                    p = max(p_dic.values()) if p_dic.values() else 0
+                    p = round(max(p_dic.values()), 2) if p_dic.values() else 0
             results[name]['超产奖励'] += p
             results[name]['all'] = round(results[name]['all'] + p, 2)
             if p > 0:
