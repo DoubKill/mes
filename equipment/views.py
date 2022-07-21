@@ -1,6 +1,7 @@
 import copy
 import datetime
 import datetime as dt
+import re
 import time
 import calendar
 import requests
@@ -35,9 +36,10 @@ from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipP
     EquipBomFilter, EquipJobItemStandardFilter, EquipMaintenanceStandardFilter, EquipRepairStandardFilter, \
     EquipWarehouseInventoryFilter, EquipWarehouseStatisticalFilter, EquipWarehouseOrderDetailFilter, \
     EquipWarehouseRecordFilter, EquipApplyOrderFilter, EquipApplyRepairFilter, EquipWarehouseOrderFilter, \
-    EquipPlanFilter, EquipInspectionOrderFilter
+    EquipPlanFilter, EquipInspectionOrderFilter, CheckPointStandardFilter
 from equipment.models import EquipTargetMTBFMTTRSetting, EquipWarehouseAreaComponent, EquipRepairMaterialReq, \
-    EquipInspectionOrder, EquipRegulationRecord, EquipMaintenanceStandardWork, EquipOrderEntrust, XLCommonCode
+    EquipInspectionOrder, EquipRegulationRecord, EquipMaintenanceStandardWork, EquipOrderEntrust, XLCommonCode, \
+    CheckPointStandard
 from equipment.serializers import *
 from equipment.serializers import EquipRealtimeSerializer
 from equipment.task import property_template, property_import
@@ -5028,3 +5030,109 @@ class XLCommonCodeView(APIView):
         instance = XLCommonCode.objects.create(apply_user=self.request.user.username, bra_code=bra_code,
                                                apply_desc=apply_desc)
         return Response({'results': bra_code})
+
+
+@method_decorator([api_recorder], name='dispatch')
+class CheckPointStandardViewSet(ModelViewSet):
+    queryset = CheckPointStandard.objects.filter(delete_flag=False).order_by('-id')
+    serializer_class = CheckPointStandardSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = CheckPointStandardFilter
+    FILE_NAME = '岗位安全装置点检标准'
+    EXPORT_FIELDS_DICT = {
+        "点检表编号(新增不填)": "point_standard_code",
+        "点检表名称": "point_standard_name",
+        "文档编号": "doc_code",
+        "通用机台": "equip_no",
+        "岗位": "station",
+        "点检内容": "check_contents",
+        "点检方法": "check_styles",
+        "录入人(新增不填)": "created_username",
+        "录入时间(新增不填)": "created_date",
+    }
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        link_tables = instance.check_tables.filter(delete_flag=False)
+        if link_tables:
+            raise ValidationError('标准已经关联点检表, 无法删除')
+        instance.delete_flag = True
+        instance.delete_user = self.request.user
+        instance.delete_date = datetime.now()
+        instance.save()
+        return Response('删除成功')
+
+    @atomic
+    @action(methods=['post'], detail=False, url_path='execl-handle', url_name='execl_handle')
+    def execl_handle(self, request):
+        execl_flag = self.request.data.get('execl_flag')
+        if execl_flag == 'export':  # 导出
+            export_ids = self.request.data.get('export_ids')
+            if not export_ids:
+                raise ValidationError('请选择需要导出的标准')
+            records = self.get_queryset().filter(id__in=export_ids).order_by('id')
+            if not records:
+                raise ValidationError('为找到所选便准, 请刷新页面后重试')
+            data = self.get_serializer(records, many=True).data
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+        else:  # 导入
+            excel_file = request.FILES.get('file', None)
+            if not excel_file:
+                raise ValidationError('文件不可为空！')
+            cur_sheet = get_cur_sheet(excel_file)
+            if cur_sheet.ncols != len(self.EXPORT_FIELDS_DICT):
+                raise ValidationError('导入文件数据错误！')
+            data = get_sheet_data(cur_sheet)
+            create_data = []
+            try:
+                for item in data:
+                    if self.get_queryset().filter(point_standard_code=item[0]):  # 存在的编码过滤掉
+                        continue
+                    if self.get_queryset().filter(equip_no=item[3], station=item[4]):
+                        raise ValidationError('导入标准存在冲突[通用机台+岗位需要不相同]')
+                    contents, styles = item[5].split('；')[:-1], item[6].split('；')[:-1]
+                    if len(set(contents)) != len(contents):
+                        raise ValidationError('同一标准中点检内容不可存在重复项')
+                    if len(contents) != len(styles):
+                        raise ValidationError('点检内容与点检方法条目数不相同')
+                    equip_no = ','.join(sorted(re.split('[,|，]', item[3])))
+                    check_details = [{'check_content': contents[i].split('、')[-1], 'check_style': styles[i].split('、')[-1]} for i in range(len(contents))]
+                    create_data.append({
+                        'point_standard_name': item[1], 'doc_code': item[2], 'equip_no': equip_no, 'station': item[4],
+                        'check_details': check_details
+                    })
+                serializer = self.get_serializer(data=create_data, many=True)
+                if not serializer.is_valid(raise_exception=False):
+                    raise ValidationError(f'导入数据异常: {serializer.error_messages}')
+                serializer.save()
+            except Exception as e:
+                raise ValidationError(e.args[0])
+        return Response(f"{'导出' if execl_flag == 'export' else '导入'}成功")
+
+
+# @method_decorator([api_recorder], name='dispatch')
+# class CheckPointTableViewSet(ModelViewSet):
+#     queryset = EquipPlan.objects.filter(delete_flag=False).order_by('-id')
+#     serializer_class = EquipPlanSerializer
+#     permission_classes = (IsAuthenticated,)
+#     filter_backends = (DjangoFilterBackend,)
+#     filter_class = EquipPlanFilter
+#     FILE_NAME = '设别维护维修计划'
+#     EXPORT_FIELDS_DICT = {
+#         "作业类型": "work_type",
+#         "计划编号": "plan_id",
+#         "计划名称": "plan_name",
+#         "类别": "type",
+#         "机台": "equip_name",
+#         "维护标准": "standard",
+#         "设备条件": "equip_condition",
+#         "重要程度": "importance_level",
+#         "来源": "plan_source",
+#         "状态": "status",
+#         "计划维护日期": "planned_maintenance_date",
+#         "下次维护日期": "next_maintenance_date",
+#         "创建人": "created_username",
+#         "创建时间": "created_date",
+#     }
+

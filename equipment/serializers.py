@@ -18,7 +18,7 @@ from equipment.models import EquipDownType, EquipDownReason, EquipCurrentStatus,
     EquipWarehouseLocation, EquipWarehouseArea, EquipWarehouseOrderDetail, EquipWarehouseOrder, EquipWarehouseInventory, \
     EquipWarehouseRecord, EquipApplyRepair, EquipPlan, EquipApplyOrder, EquipResultDetail, UploadImage, \
     EquipRepairMaterialReq, EquipInspectionOrder, EquipWarehouseAreaComponent, EquipRegulationRecord, \
-    EquipMaintenanceStandardWork
+    EquipMaintenanceStandardWork, CheckPointStandard, CheckPointStandardDetail
 
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
@@ -1681,3 +1681,71 @@ class EquipPlanSerializer(BaseModelSerializer):
 
         instance = super().create(validated_data)
         return instance
+
+
+class CheckPointStandardDetailSerializer(BaseModelSerializer):
+
+    class Meta:
+        model = CheckPointStandardDetail
+        fields = ('check_content', 'check_style')
+
+
+class CheckPointStandardSerializer(BaseModelSerializer):
+    check_details = CheckPointStandardDetailSerializer(many=True)
+
+    def to_representation(self, instance):
+        res = super().to_representation(instance)
+        check_contents, check_styles = '', ''
+        contents = instance.check_details.filter(delete_flag=False)
+        if contents:
+            for index, content in enumerate(contents):
+                check_contents += f'{index + 1}、{content.check_content}；'
+                check_styles += f'{index + 1}、{content.check_style}；'
+        res.update({'check_contents': check_contents, 'check_styles': check_styles})
+        return res
+
+    @atomic
+    def create(self, validated_data):
+        check_details = validated_data.pop('check_details', None)
+        # 生成点检标准编号
+        max_code = CheckPointStandard.objects.aggregate(max_code=Max('point_standard_code'))['max_code']
+        point_standard_code = 'GWAQDJ' + ('0001' if not max_code else '%04d' % (int(max_code[-4:]) + 1))
+        validated_data['point_standard_code'] = point_standard_code
+        instance = super().create(validated_data)
+        # 增加标准详情
+        if check_details:
+            content = []
+            for detail in check_details:
+                check_content = detail['check_content']
+                detail['check_point_standard'] = instance
+                if check_content not in content:
+                    CheckPointStandardDetail.objects.create(**detail)
+                    content.append(check_content)
+                else:
+                    raise serializers.ValidationError('同一标准中内容不可相同')
+        return instance
+
+    @atomic
+    def update(self, instance, validated_data):
+        check_details = validated_data.pop('check_details')
+        # 删除标准详情并更新
+        instance.check_details.all().delete()
+        # 增加标准详情
+        if check_details:
+            content = []
+            for detail in check_details:
+                check_content = detail['check_content']
+                detail['check_point_standard'] = instance
+                if check_content not in content:
+                    CheckPointStandardDetail.objects.create(**detail)
+                    content.append(check_content)
+                else:
+                    raise serializers.ValidationError('同一标准中内容不可相同')
+        return super().update(instance, validated_data)
+
+    class Meta:
+        model = CheckPointStandard
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+        validators = [UniqueTogetherValidator(queryset=CheckPointStandard.objects.filter(delete_flag=False),
+                                              fields=('equip_no', 'station'), message='已存在集机台+岗位点检标准')]

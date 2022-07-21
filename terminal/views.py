@@ -1913,7 +1913,7 @@ class XLPlanVIewSet(ModelViewSet):
     filter_backends = [DjangoFilterBackend]
 
     def get_serializer_class(self):
-        equip_no = self.request.query_params.get('equip_no') if self.request.query_params.get('equip_no') else self.request.data.get('equip_no')
+        equip_no = None if not self.request else (self.request.query_params.get('equip_no') if self.request.query_params.get('equip_no') else self.request.data.get('equip_no'))
         if self.action in ('list', 'create'):
             return JZPlanSerializer if equip_no in JZ_EQUIP_NO else PlanSerializer
         else:

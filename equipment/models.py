@@ -1048,3 +1048,41 @@ class XLCommonCode(models.Model):
     class Meta:
         db_table = 'xl_common_code'
         verbose_name_plural = verbose_name = '料包通用条码'
+
+
+class CheckPointStandard(AbstractEntity):
+    point_standard_code = models.CharField(max_length=64, help_text='点检表编号', null=True, blank=True)
+    point_standard_name = models.CharField(max_length=64, help_text='点检表名称')
+    doc_code = models.CharField(max_length=64, help_text='文档编号')
+    equip_no = models.CharField(max_length=64, help_text='适用机台')
+    station = models.CharField(max_length=64, help_text='岗位')
+
+    class Meta:
+        db_table = 'check_point_standard'
+        verbose_name_plural = verbose_name = '岗位安全装置点检标准'
+
+
+class CheckPointStandardDetail(AbstractEntity):
+    check_point_standard = models.ForeignKey(CheckPointStandard, help_text='点检标准', on_delete=models.CASCADE,
+                                             related_name='check_details')
+    check_content = models.CharField(max_length=64, help_text='点检内容')
+    check_style = models.CharField(max_length=64, help_text='点检方法')
+
+    class Meta:
+        db_table = 'check_point_standard_detail'
+        verbose_name_plural = verbose_name = '岗位安全装置点检标准详情'
+
+
+# class CheckPointTable(AbstractEntity):
+#     check_point_standard = models.ForeignKey(CheckPointStandard, help_text='点检标准', on_delete=models.CASCADE,
+#                                              related_name='check_tables')
+#     point_standard_code = models.CharField(max_length=64, help_text='点检表编号', null=True, blank=True)
+#     point_standard_name = models.CharField(max_length=64, help_text='点检表名称')
+#     doc_code = models.CharField(max_length=64, help_text='文档编号')
+#     equip_no = models.CharField(max_length=64, help_text='适用机台')
+#     station = models.CharField(max_length=64, help_text='岗位')
+#
+#     class Meta:
+#         db_table = 'check_point_table'
+#         verbose_name_plural = verbose_name = '岗位安全装置点检表'
+

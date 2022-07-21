@@ -5,7 +5,8 @@ from equipment.models import EquipDownType, EquipDownReason, EquipPart, EquipMai
     ERPSpareComponentRelation, EquipSpareErp, EquipFault, EquipFaultType, \
     EquipCurrentStatus, EquipFaultSignal, EquipMachineHaltType, EquipMachineHaltReason, EquipOrderAssignRule, EquipBom, \
     EquipJobItemStandard, EquipMaintenanceStandard, EquipRepairStandard, EquipWarehouseInventory, EquipWarehouseRecord, \
-    EquipWarehouseOrderDetail, EquipApplyRepair, EquipApplyOrder, EquipWarehouseOrder, EquipPlan, EquipInspectionOrder
+    EquipWarehouseOrderDetail, EquipApplyRepair, EquipApplyOrder, EquipWarehouseOrder, EquipPlan, EquipInspectionOrder, \
+    CheckPointStandard
 
 
 class EquipDownTypeFilter(django_filters.rest_framework.FilterSet):
@@ -451,3 +452,13 @@ class EquipInspectionOrderFilter(django_filters.rest_framework.FilterSet):
                   'equip_repair_standard', 'equip_condition', 'repair_user', 'importance_level',
                   'assign_user', 'assign_to_user', 'receiving_user', 'type')
 
+
+class CheckPointStandardFilter(django_filters.rest_framework.FilterSet):
+    point_standard_name = django_filters.CharFilter(field_name='point_standard_name', help_text='点检标准名称',
+                                                    lookup_expr='icontains')
+    equip_no = django_filters.CharFilter(field_name='equip_no', help_text='适用机台', lookup_expr='icontains')
+    station = django_filters.CharFilter(field_name='station', help_text='岗位', lookup_expr='icontains')
+
+    class Meta:
+        model = CheckPointStandard
+        fields = ('point_standard_name', 'equip_no', 'station')
