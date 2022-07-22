@@ -471,10 +471,16 @@ class MaterialTestOrderListSerializer(BaseModelSerializer):
     def get_deal_info(self, obj):
         result = MaterialDealResult.objects.filter(lot_no=obj.lot_no).first()
         if result:
+            if result.test_result == 'PASS':
+                deal_suggestion = 'PASS' if not result.deal_user else result.deal_suggestion
+            elif result.test_result == '三等品':
+                deal_suggestion = '' if not result.deal_user else result.deal_suggestion
+            else:
+                deal_suggestion = ""
             return {
                 'test_result': result.test_result,
                 'deal_user': result.deal_user,
-                'deal_suggestion': '' if not result.deal_user else result.deal_suggestion,
+                'deal_suggestion': deal_suggestion,
                 'deal_time': '' if not result.deal_time else datetime.strftime(result.deal_time, '%Y-%m-%d %H:%M:%S')
             }
         return {
