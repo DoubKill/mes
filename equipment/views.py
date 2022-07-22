@@ -3,6 +3,7 @@ import datetime
 import datetime as dt
 import re
 import time
+import logging
 import calendar
 import decimal
 
@@ -38,15 +39,15 @@ from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipP
     EquipBomFilter, EquipJobItemStandardFilter, EquipMaintenanceStandardFilter, EquipRepairStandardFilter, \
     EquipWarehouseInventoryFilter, EquipWarehouseStatisticalFilter, EquipWarehouseOrderDetailFilter, \
     EquipWarehouseRecordFilter, EquipApplyOrderFilter, EquipApplyRepairFilter, EquipWarehouseOrderFilter, \
-    EquipPlanFilter, EquipInspectionOrderFilter, CheckPointStandardFilter, CheckTemperatureStandardFilter
+    EquipPlanFilter, EquipInspectionOrderFilter, CheckPointStandardFilter, CheckTemperatureStandardFilter, \
+    CheckTemperatureTableFilter
 from equipment.models import EquipTargetMTBFMTTRSetting, EquipWarehouseAreaComponent, EquipRepairMaterialReq, \
     EquipInspectionOrder, EquipRegulationRecord, EquipMaintenanceStandardWork, EquipOrderEntrust, XLCommonCode, \
-    CheckPointStandard, CheckTemperatureStandard
+    CheckPointStandard, CheckTemperatureStandard, CheckTemperatureTable
 from equipment.serializers import *
-from equipment.serializers import EquipRealtimeSerializer
 from equipment.task import property_template, property_import
 from equipment.utils import gen_template_response, get_staff_status, get_ding_uids, DinDinAPI, get_maintenance_status, \
-    get_children_section
+    get_children_section, gen_excels_response
 from mes.common_code import OMin, OMax, OSum, CommonDeleteMixin
 from mes.conf import JZ_EQUIP_NO
 from mes.derorators import api_recorder
@@ -58,6 +59,8 @@ from quality.utils import get_cur_sheet, get_sheet_data
 from terminal.models import ToleranceDistinguish, ToleranceProject, ToleranceHandle, ToleranceRule, Plan, ReportBasic, \
     JZPlan
 from system.models import Section, User
+
+logger = logging.getLogger('error_log')
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -5214,3 +5217,54 @@ class CheckTemperatureStandardViewSet(ModelViewSet):
                 raise ValidationError(e.args[0])
         return Response(f"{'导出' if excel_flag == 'export' else '导入'}成功")
 
+
+@method_decorator([api_recorder], name='dispatch')
+class CheckTemperatureTableViewSet(ModelViewSet):
+    queryset = CheckTemperatureTable.objects.filter(delete_flag=False).order_by('id')
+    serializer_class = CheckTemperatureTableSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = CheckTemperatureTableFilter
+    FILE_NAME = '除尘袋滤器温度检查表'
+    EXPORT_FIELDS_DICT = {
+        "序号": "sn",
+        "具体位置": "location",
+        "名称": "station_name",
+        "温度上限": "temperature_limit",
+        "检测温度": "input_value"
+    }
+
+    @atomic
+    @action(methods=['post'], detail=False, url_path='handle-table', url_name='handle_table')
+    def handle_table(self, request):
+        opera_type = self.request.data.pop('opera_type')
+        ids = self.request.data.pop('ids')
+        if not all([opera_type, ids]):
+            raise ValidationError('参数异常')
+        records = self.get_queryset().filter(id__in=ids)
+        key_word = '检查' if opera_type == 1 else ('确认' if opera_type == 2 else '导出')
+        try:
+            if opera_type == 1:  # 编辑温度检查表
+                key_word = '检查'
+                instance = records.last()
+                if not instance:
+                    raise ValidationError('异常: 数据行异常, 请刷新页面后重试')
+                if instance.status == '已确认':
+                    raise ValidationError('异常: 已确认的表不可再操作')
+                serializer = CheckTemperatureTableUpdateSerializer(instance, self.request.data, context={'request': request})
+                serializer.is_valid(raise_exception=True)
+                serializer.save()
+            elif opera_type == 2:  # 确认温度检查表
+                if records.filter(status='已确认'):
+                    raise ValidationError('异常: 存在已经确认过的数据,请重新选择后再确认')
+                records.update(confirm_desc=self.request.data.get('confirm_desc'), status='已确认')
+            elif opera_type == 3:  # 导出
+                key_word = '导出'
+                data = self.get_serializer(records, many=True).data
+                return gen_excels_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
+            else:
+                raise ValidationError('异常: 未知操作类型')
+        except Exception as e:
+            logger.error(f'点检-温度检查表{key_word}操作异常: {e.args[0]}')
+            raise ValidationError(f'{key_word}操作异常' if '异常' not in e.args[0] else e.args[0])
+        return Response(f"温度表{key_word}操作成功")

@@ -18,7 +18,8 @@ from equipment.models import EquipDownType, EquipDownReason, EquipCurrentStatus,
     EquipWarehouseLocation, EquipWarehouseArea, EquipWarehouseOrderDetail, EquipWarehouseOrder, EquipWarehouseInventory, \
     EquipWarehouseRecord, EquipApplyRepair, EquipPlan, EquipApplyOrder, EquipResultDetail, UploadImage, \
     EquipRepairMaterialReq, EquipInspectionOrder, EquipWarehouseAreaComponent, EquipRegulationRecord, \
-    EquipMaintenanceStandardWork, CheckPointStandard, CheckPointStandardDetail, CheckTemperatureStandard
+    EquipMaintenanceStandardWork, CheckPointStandard, CheckPointStandardDetail, CheckTemperatureStandard, \
+    CheckTemperatureTable, CheckTemperatureTableDetail
 
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
@@ -1767,3 +1768,89 @@ class CheckTemperatureStandardSerializer(BaseModelSerializer):
         read_only_fields = ('sn', )
         validators = [UniqueTogetherValidator(queryset=CheckTemperatureStandard.objects.filter(delete_flag=False),
                                               fields=('location', 'station_name'), message='已存在具体位置+名称')]
+
+
+class CheckTemperatureTableDetailSerializer(BaseModelSerializer):
+
+    class Meta:
+        model = CheckTemperatureTableDetail
+        fields = '__all__'
+        read_only_fields = ('check_temperature_table',)
+
+
+class CheckTemperatureTableSerializer(BaseModelSerializer):
+    table_details = CheckTemperatureTableDetailSerializer(many=True, default=[])
+
+    @atomic
+    def create(self, validated_data):
+        table_details = validated_data.pop('table_details', [])
+        instance = super().create(validated_data)
+        if not table_details:
+            raise serializers.ValidationError('请先设定除尘袋滤器温度标准')
+        content, is_exceed_list = [], []
+        for detail in table_details:
+            # 判断是否超标
+            temperature_limit, input_value = detail.get('temperature_limit'), detail.get('input_value')
+            is_exceed = 1
+            if input_value and input_value <= temperature_limit:
+                is_exceed = 0
+            is_exceed_list.append(is_exceed)
+            detail.update({'check_temperature_table': instance, 'is_exceed': is_exceed})
+            content.append(CheckTemperatureTableDetail(**detail))
+        if 1 not in is_exceed_list:
+            instance.is_exceed = False
+            instance.save()
+        CheckTemperatureTableDetail.objects.bulk_create(content)
+        return instance
+
+    class Meta:
+        model = CheckTemperatureTable
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class CheckTemperatureTableUpdateSerializer(BaseModelSerializer):
+    table_details = CheckTemperatureTableDetailSerializer(many=True, default=[])
+
+    @atomic
+    def update(self, instance, validated_data):
+        table_details = validated_data.pop('table_details')
+        is_exceed_list = []
+        if table_details:
+            for detail in table_details:
+                record = CheckTemperatureTableDetail.objects.filter(check_temperature_table=instance, sn=detail['sn'],
+                                                                    location=detail['location'], station_name=detail['station_name']).last()
+                r_temperature_limit, r_input_value = record.temperature_limit, record.input_value
+                # if not r_input_value:
+                #     if not detail['input_value']:
+                #         is_exceed = 1
+                #     else:
+                #         if detail['input_value'] <= r_temperature_limit:
+                #             is_exceed = 0
+                #         else:
+                #             is_exceed = 1
+                # else:
+                #     if not detail['input_value']:
+                #         is_exceed = 1
+                #     else:
+                #         if detail['input_value'] <= r_temperature_limit:
+                #             is_exceed = 0
+                #         else:
+                #             is_exceed = 1
+                # 注释部分规则浓缩
+                is_exceed = 1
+                if detail.get('input_value') and detail.get('input_value') <= r_temperature_limit:
+                    is_exceed = 0
+                is_exceed_list.append(is_exceed)
+                record.input_value = detail.get('input_value')
+                record.is_exceed = is_exceed
+                record.save()
+        table_is_exceed = 0 if is_exceed_list and 1 not in is_exceed_list else 1
+        validated_data.update({'is_exceed': table_is_exceed, 'status': '已检查'})
+        return super().update(instance, validated_data)
+
+    class Meta:
+        model = CheckTemperatureTable
+        fields = ('desc', 'table_details', 'check_image_urls')
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+

@@ -7,6 +7,7 @@ from datetime import datetime
 from io import BytesIO
 
 import requests
+import xlwt
 from django.db.models import Q, F
 from django.http import HttpResponse
 from openpyxl import load_workbook, cell
@@ -39,6 +40,36 @@ def gen_template_response(export_fields_dict, data, file_name, handle_str=False)
 
     wb.remove_sheet(ws)
     output = BytesIO()
+    wb.save(output)
+    # 重新定位到开始
+    output.seek(0)
+    response = HttpResponse(content_type='application/vnd.ms-excel')
+    filename = file_name
+    response['Content-Disposition'] = u'attachment;filename= ' + filename.encode('gbk').decode(
+        'ISO-8859-1') + '.xls'
+    response.write(output.getvalue())
+    return response
+
+
+def gen_excels_response(export_fields_dict, data_list, file_name, handle_str=False):
+    """同样内容的sheet按日期导出一个execl"""
+    export_fields = list(export_fields_dict.values())
+    sheet_heads = list(export_fields_dict.keys())
+    wb = xlwt.Workbook(encoding='utf8')
+    output = BytesIO()
+    for i, s_data in enumerate(data_list):
+        sheet = wb.add_sheet(f"{s_data['select_date']}({i + 1})", cell_overwrite_ok=True)
+        for idx, sheet_head in enumerate(sheet_heads):
+            sheet.write(0, idx, sheet_head)
+
+        data_row = 1
+        for data in s_data.get('table_details'):
+            for col_num, data_key in enumerate(export_fields):
+                set_value = data[data_key]
+                if handle_str and isinstance(set_value, str):
+                    set_value = cell.cell.ILLEGAL_CHARACTERS_RE.sub(r'', set_value)
+                sheet.write(data_row, col_num, set_value)
+            data_row += 1
     wb.save(output)
     # 重新定位到开始
     output.seek(0)

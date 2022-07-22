@@ -6,7 +6,7 @@ from equipment.models import EquipDownType, EquipDownReason, EquipPart, EquipMai
     EquipCurrentStatus, EquipFaultSignal, EquipMachineHaltType, EquipMachineHaltReason, EquipOrderAssignRule, EquipBom, \
     EquipJobItemStandard, EquipMaintenanceStandard, EquipRepairStandard, EquipWarehouseInventory, EquipWarehouseRecord, \
     EquipWarehouseOrderDetail, EquipApplyRepair, EquipApplyOrder, EquipWarehouseOrder, EquipPlan, EquipInspectionOrder, \
-    CheckPointStandard, CheckTemperatureStandard
+    CheckPointStandard, CheckTemperatureStandard, CheckTemperatureTable
 
 
 class EquipDownTypeFilter(django_filters.rest_framework.FilterSet):
@@ -471,3 +471,11 @@ class CheckTemperatureStandardFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = CheckTemperatureStandard
         fields = ('location', 'station_name')
+
+
+class CheckTemperatureTableFilter(django_filters.rest_framework.FilterSet):
+    select_date = django_filters.DateFromToRangeFilter(field_name='select_date', help_text='检查日期', lookup_expr='range')
+
+    class Meta:
+        model = CheckTemperatureTable
+        fields = ('select_date', 'status')
