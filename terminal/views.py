@@ -63,7 +63,8 @@ from terminal.serializers import LoadMaterialLogCreateSerializer, \
     WeightPackageSingleSerializer, WeightPackageLogCUpdateSerializer, WmsAddPrintSerializer, JZBinSerializer, \
     JZPlanSerializer, JZPlanUpdateSerializer, WeightPackageManualUpdateSerializer
 from terminal.utils import TankStatusSync, CarbonDeliverySystem, out_task_carbon, get_tolerance, material_out_barcode, \
-    get_manual_materials, CLSystem, get_common_equip, xl_c_calculate, JZCLSystem, JZTankStatusSync
+    get_manual_materials, CLSystem, get_common_equip, xl_c_calculate, JZCLSystem, JZTankStatusSync, \
+    get_current_factory_date
 
 logger = logging.getLogger('sync_log')
 
@@ -1949,10 +1950,25 @@ class XLPlanVIewSet(ModelViewSet):
         recipe = self.request.query_params.get('recipe')
         state = self.request.query_params.get('state')
         batch_time = self.request.query_params.get('batch_time')
+        get_classes = self.request.query_params.get('get_classes')  # 根据工厂日期查询班次
+        plan_model = JZPlan if equip_no in JZ_EQUIP_NO else Plan
 
         filter_kwargs = {}
         if not equip_no:
             raise ValidationError('参数缺失')
+        if get_classes:
+            res = get_current_factory_date()
+            factory_date, classes = res.get('factory_date'), res.get('classes')
+            p_record = plan_model.objects.using(equip_no).filter(date_time=factory_date).order_by('id').last()
+            if p_record:
+                n_classes = p_record.grouptime
+            else:
+                if classes:
+                    n_classes = classes
+                else:
+                    now_date = datetime.datetime.now().replace(microsecond=0)
+                    n_classes = '早班' if '08:00:00' < str(now_date)[-8:] < '20:00:00' else '夜班'
+            return Response({'results': n_classes})
         if date_time:
             filter_kwargs['date_time'] = date_time
         if grouptime:
@@ -1963,7 +1979,6 @@ class XLPlanVIewSet(ModelViewSet):
             filter_kwargs['actno__gte'] = 1
         if batch_time:
             filter_kwargs['date_time'] = batch_time
-        plan_model = JZPlan if equip_no in JZ_EQUIP_NO else Plan
         queryset = plan_model.objects.using(equip_no).filter(**filter_kwargs).order_by('order_by')
         if not state:
             try:

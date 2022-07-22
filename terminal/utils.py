@@ -771,7 +771,7 @@ class JZCLSystem(object):
                                     </SetRealData>
                                 </soap:Body>
                             </soap:Envelope>"""
-        time.sleep(0.4)  # 增加延时，防止频繁调用导致失败
+        time.sleep(0.5)  # 增加延时，防止频繁调用导致失败
         door_info = requests.post(self.url, data=send_data.encode('utf-8'), timeout=1)
         res = door_info.content.decode('utf-8')
         result_flag = re.findall(r'<ns1:SetRealDataResult>(.*)</ns1:SetRealDataResult>', res)[0]
@@ -804,7 +804,7 @@ class JZCLSystem(object):
                                 </GetRealData>
                             </soap:Body>
                         </soap:Envelope>"""
-        time.sleep(0.1)  # 增加延时，防止频繁调用导致失败
+        time.sleep(0.2)  # 增加延时，防止频繁调用导致失败
         door_info = requests.post(self.url, data=send_data.encode('utf-8'), timeout=1)
         res = door_info.content.decode('utf-8')
         result_flag = re.findall(r'<ns1:GetRealDataResult>(.*)</ns1:GetRealDataResult>', res)[0]
@@ -876,7 +876,7 @@ def get_manual_materials(product_no, dev_type, batching_equip, equip_no=None):
     return manual_material
 
 
-def get_current_factory_date(select_date, group):
+def get_current_factory_date(select_date=None, group=None):
     now, filter_kwargs = datetime.now(), {}
     if select_date and group:  # 获取特定日期的班次
         filter_kwargs = {'plan_schedule__day_time': select_date, 'group__global_name': group, 'plan_schedule__work_schedule__work_procedure__global_name': '密炼'}
