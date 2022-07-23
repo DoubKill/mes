@@ -4248,6 +4248,20 @@ class BzMixingRubberInventorySearch(ListAPIView):
     serializer_class = BzMixingRubberInventorySearchSerializer
     permission_classes = (IsAuthenticated,)
 
+    def get_serializer_context(self):
+        """
+        Extra context provided to the serializer class.
+        """
+        product_validity_data = dict(MaterialAttribute.objects.filter(
+            period_of_validity__isnull=False
+        ).values_list('material__material_no', 'period_of_validity'))
+        return {
+            'request': self.request,
+            'format': self.format_kwarg,
+            'view': self,
+            'product_validity_data': product_validity_data,
+        }
+
     def list(self, request, *args, **kwargs):
         material_no = self.request.query_params.get('material_no')  # 物料编码
         quality_status = self.request.query_params.get('quality_status')  # 品质状态
@@ -4542,6 +4556,20 @@ class BzFinalRubberInventorySearch(ListAPIView):
     queryset = BzFinalMixingRubberInventoryLB.objects.all()
     serializer_class = BzFinalRubberInventorySearchSerializer
     permission_classes = (IsAuthenticated,)
+
+    def get_serializer_context(self):
+        """
+        Extra context provided to the serializer class.
+        """
+        product_validity_data = dict(MaterialAttribute.objects.filter(
+            period_of_validity__isnull=False
+        ).values_list('material__material_no', 'period_of_validity'))
+        return {
+            'request': self.request,
+            'format': self.format_kwarg,
+            'view': self,
+            'product_validity_data': product_validity_data,
+        }
 
     def list(self, request, *args, **kwargs):
         material_no = self.request.query_params.get('material_no')  # 物料编码

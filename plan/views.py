@@ -198,7 +198,7 @@ class MaterialDemandedView(APIView):
             filter_dict['work_schedule_plan__classes__global_name'] = classes
         if product_no:
             filter_dict[
-                'product_classes_plan__product_day_plan__product_batching__stage_product_batch_no__icontains'] = product_no
+                'product_classes_plan__product_batching__stage_product_batch_no__icontains'] = product_no
 
         # 库存请求
         material_inventory_dict = {}

@@ -14,9 +14,7 @@ django.setup()
 
 from basics.models import GlobalCode, GlobalCodeType, WorkSchedule, ClassesDetail, EquipCategoryAttribute, PlanSchedule, \
     Equip, WorkSchedulePlan
-from recipe.models import Material, ProductInfo, ProductBatching, ProductBatchingDetail, WeighCntType, \
-    WeighBatchingDetail
-from system.models import SystemConfig, ChildSystemInfo
+from recipe.models import Material, ProductInfo, ProductBatching, ProductBatchingDetail
 from quality.models import DealSuggestion, TestIndicator, TestType, DataPoint, TestMethod, MaterialTestMethod, \
     MaterialDataPointIndicator
 from inventory.models import DispatchLocation, WarehouseInfo
@@ -1209,14 +1207,6 @@ def add_oil_material():
             continue
 
 
-def add_system_config():
-    SystemConfig.objects.create(category="gz", config_name="system_name", config_value="上辅机群控", )
-    ChildSystemInfo.objects.create(link_address="10.4.10.54", system_type="gz", system_name="MES", status="联网")
-    ChildSystemInfo.objects.create(link_address="10.4.10.55", system_type="gz", system_name="上辅机群控", status="联网")
-    ChildSystemInfo.objects.create(link_address="10.4.10.56", system_type="gz", system_name="上辅机工作站1", status="联网")
-    ChildSystemInfo.objects.create(link_address="10.4.10.100", system_type="gz", system_name="收皮终端", status="联网")
-
-
 def add_suggestions():
     ok_id = GlobalCode.objects.filter(global_name="放行处理").first().id
     no_id = GlobalCode.objects.filter(global_name="不合格处理").first().id
@@ -1355,9 +1345,6 @@ if __name__ == '__main__':
 
     add_product()
     print("product is ok")
-
-    add_system_config()
-    print('system_config iok')
 
     add_dispatch_location()
     print('add dispatch_location ok')
