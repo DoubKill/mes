@@ -23,6 +23,7 @@ from mes.common_code import zdy_jwt_payload_handler
 from mes.conf import WMS_URL, TH_URL
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
+from mes.permissions import PermissionClass
 from plan.models import ProductClassesPlan, MaterialDemanded, ProductDayPlan
 from production.models import PlanStatus, AttendanceGroupSetup
 from quality.utils import get_cur_sheet, get_sheet_data
@@ -655,7 +656,7 @@ class QRLoginView(APIView):
 class UserOperationLogViewSet(ModelViewSet):
     queryset = UserOperationLog.objects.all()
     serializer_class = UserOperationLogSerializer
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_user_operation_log'}))
     filter_backends = (DjangoFilterBackend, )
     filter_class = UserOperationLogFilter
     EXPORT_FIELDS_DICT = {
