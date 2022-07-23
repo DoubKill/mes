@@ -1708,6 +1708,14 @@ class CheckPointStandardSerializer(BaseModelSerializer):
     @atomic
     def create(self, validated_data):
         check_details = validated_data.pop('check_details', None)
+        equip_no, station = validated_data.get('equip_no'), validated_data.get('station')
+        # 同岗位机台不能重叠
+        already_equip_no = CheckPointStandard.objects.filter(station=station)
+        if already_equip_no:
+            for i in already_equip_no:
+                equip_no_list, input_equip_no = set(i.equip_no.split(',')), set(equip_no.split(','))
+                if equip_no_list & input_equip_no:
+                    raise serializers.ValidationError('同岗位机台不可重叠')
         # 生成点检标准编号
         max_code = CheckPointStandard.objects.aggregate(max_code=Max('point_standard_code'))['max_code']
         point_standard_code = 'GWAQDJ' + ('0001' if not max_code else '%04d' % (int(max_code[-4:]) + 1))
