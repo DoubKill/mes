@@ -2359,13 +2359,14 @@ class DailyProductionCompletionReport(APIView):
         # 除去洗车胶的总车次报表数据
         total_queryset = TrainsFeedbacks.objects.exclude(Q(product_no__icontains='XCJ') |
                                                          Q(product_no__icontains='洗车胶') |
-                                                         Q(operation_user='Mixer2')
+                                                         Q(operation_user='Mixer2') |
+                                                         Q(product_no__icontains='WUMING')
                                                          ).filter(factory_date__year=year, factory_date__month=month)
         # 按日期分组，计算每日总生产重量
         month_total_dict = dict(total_queryset.values(
                 'factory_date__day'
             ).annotate(weight=Sum(
-                'plan_weight', output_field=DecimalField())
+                'plan_weight', output_field=DecimalField())/1000
             ).values_list('factory_date__day', 'weight'))
 
         # 当月混炼实际完成吨  CMB HMB 1MB~4MB
@@ -2375,16 +2376,16 @@ class DailyProductionCompletionReport(APIView):
                                           Q(product_no__icontains='-2MB-') |
                                           Q(product_no__icontains='-3MB-') |
                                           Q(product_no__icontains='-4MB-'))
-        mix_queryset = queryset1.values('factory_date__day').annotate(weight=Sum('plan_weight', output_field=DecimalField()))
+        mix_queryset = queryset1.values('factory_date__day').annotate(weight=Sum('plan_weight', output_field=DecimalField())/1000)
 
         # 当月终炼实际完成（FM段次）  FM
         queryset2 = total_queryset.filter(product_no__icontains='-FM-')
-        fin_queryset = queryset2.values('factory_date__day').annotate(weight=Sum('plan_weight', output_field=DecimalField()))
+        fin_queryset = queryset2.values('factory_date__day').annotate(weight=Sum('plan_weight', output_field=DecimalField())/1000)
         fm_total_dict = dict(fin_queryset.values_list('factory_date__day', 'weight'))
 
         # 当月190E除去洗车胶外的所有产量
         queryset_190e = Equip190EWeight.objects.exclude(
-            setup__specification__in=('洗车胶', 'XCJ')).filter(
+            setup__specification__in=('洗车胶', 'XCJ', 'WUMING')).filter(
             factory_date__year=year, factory_date__month=month)
         # 按日期分组，计算190E每日总生产重量
         total_queryset_190e_dict = dict(queryset_190e.values(
@@ -2468,7 +2469,7 @@ class DailyProductionCompletionReport(APIView):
             factory_date__month=month).values('factory_date__day').annotate(weight=Sum('weight', output_field=DecimalField()))
         out_queryset_dict = dict(out_queryset.values_list('factory_date__day', 'weight'))
         for item in mix_queryset:
-            mixin_weight = round(item['weight'] / 1000, 2)
+            mixin_weight = round(item['weight'], 2)
             if not(item['factory_date__day'] == now_day and exclude_today_flat):
                 results['name_1']['weight'] += mixin_weight
             results['name_1'][f"{item['factory_date__day']}日"] = mixin_weight
@@ -2493,7 +2494,7 @@ class DailyProductionCompletionReport(APIView):
                 results['name_4']['weight'] += weight
                 results['name_5']['weight'] += weight
         for item in fin_queryset:
-            final_weight = round(item['weight'] / 1000, 2)
+            final_weight = round(item['weight'], 2)
             if not(item['factory_date__day'] == now_day and exclude_today_flat):
                 results['name_2']['weight'] += final_weight
                 results['name_4']['weight'] += final_weight
@@ -2653,12 +2654,12 @@ class DailyProductionCompletionReport(APIView):
         cnt2 = 0
         sum_ds2 = 0
         for t_day in range(1, days+1):
-            t_weight = float(month_total_dict.get(t_day, 0) / 1000) \
+            t_weight = float(month_total_dict.get(t_day, 0)) \
                        + float(total_queryset_190e_dict.get(t_day, 0)) \
                        + float(total_manual_input_trains_dict.get(t_day, 0))
             if not t_weight:
                 continue
-            fm_weight = float(fm_total_dict.get(t_day, 0) / 1000) \
+            fm_weight = float(fm_total_dict.get(t_day, 0)) \
                         + float(fm_queryset_190e_dict.get(t_day, 0)) \
                         + float(out_queryset_dict.get(t_day, 0)) \
                         + float(total_manual_input_trains_final_dict.get(t_day, 0))
