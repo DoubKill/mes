@@ -5262,6 +5262,22 @@ class CheckTemperatureTableViewSet(ModelViewSet):
         "检测温度": "input_value"
     }
 
+    def list(self, request, *args, **kwargs):
+        all_detail = self.request.query_params.get('all_detail')
+        if all_detail:  # 查询所有温度检查项目
+            res = list(CheckTemperatureStandard.objects.filter(delete_flag=False).order_by('sn')
+                       .values('sn', 'location', 'station_name', 'temperature_limit'))
+            return Response({'results': res})
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
     @atomic
     @action(methods=['post'], detail=False, url_path='handle-table', url_name='handle_table')
     def handle_table(self, request):
