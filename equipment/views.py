@@ -40,10 +40,10 @@ from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipP
     EquipWarehouseInventoryFilter, EquipWarehouseStatisticalFilter, EquipWarehouseOrderDetailFilter, \
     EquipWarehouseRecordFilter, EquipApplyOrderFilter, EquipApplyRepairFilter, EquipWarehouseOrderFilter, \
     EquipPlanFilter, EquipInspectionOrderFilter, CheckPointStandardFilter, CheckTemperatureStandardFilter, \
-    CheckTemperatureTableFilter
+    CheckTemperatureTableFilter, CheckPointTableFilter
 from equipment.models import EquipTargetMTBFMTTRSetting, EquipWarehouseAreaComponent, EquipRepairMaterialReq, \
     EquipInspectionOrder, EquipRegulationRecord, EquipMaintenanceStandardWork, EquipOrderEntrust, XLCommonCode, \
-    CheckPointStandard, CheckTemperatureStandard, CheckTemperatureTable
+    CheckPointStandard, CheckTemperatureStandard, CheckTemperatureTable, CheckPointTable
 from equipment.serializers import *
 from equipment.task import property_template, property_import
 from equipment.utils import gen_template_response, get_staff_status, get_ding_uids, DinDinAPI, get_maintenance_status, \
@@ -5120,30 +5120,58 @@ class CheckPointStandardViewSet(ModelViewSet):
         return Response(f"{'导出' if excel_flag == 'export' else '导入'}成功")
 
 
-# @method_decorator([api_recorder], name='dispatch')
-# class CheckPointTableViewSet(ModelViewSet):
-#     queryset = EquipPlan.objects.filter(delete_flag=False).order_by('-id')
-#     serializer_class = EquipPlanSerializer
-#     permission_classes = (IsAuthenticated,)
-#     filter_backends = (DjangoFilterBackend,)
-#     filter_class = EquipPlanFilter
-#     FILE_NAME = '设别维护维修计划'
-#     EXPORT_FIELDS_DICT = {
-#         "作业类型": "work_type",
-#         "计划编号": "plan_id",
-#         "计划名称": "plan_name",
-#         "类别": "type",
-#         "机台": "equip_name",
-#         "维护标准": "standard",
-#         "设备条件": "equip_condition",
-#         "重要程度": "importance_level",
-#         "来源": "plan_source",
-#         "状态": "status",
-#         "计划维护日期": "planned_maintenance_date",
-#         "下次维护日期": "next_maintenance_date",
-#         "创建人": "created_username",
-#         "创建时间": "created_date",
-#     }
+@method_decorator([api_recorder], name='dispatch')
+class CheckPointTableViewSet(ModelViewSet):
+    queryset = CheckPointTable.objects.filter(delete_flag=False).order_by('-id')
+    serializer_class = CheckPointTableSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = CheckPointTableFilter
+    FILE_NAME = '岗位安全装置点检表'
+    EXPORT_FIELDS_DICT = {
+        "点检内容": "check_content",
+        "检查方式": "check_style",
+        "点检结果": "check_result",
+        "是否修复": "is_repaired",
+        # "备注": "desc"
+    }
+
+    @atomic
+    @action(methods=['post'], detail=False, url_path='handle-table', url_name='handle_table')
+    def handle_table(self, request):
+        opera_type = self.request.data.pop('opera_type')
+        ids = self.request.data.pop('ids')
+        if not all([opera_type, ids]):
+            raise ValidationError('参数异常')
+        records = self.get_queryset().filter(id__in=ids)
+        if not records:
+            raise ValidationError('未找到数据行,刷新后重试')
+        key_word = '检查' if opera_type == 1 else ('确认' if opera_type == 2 else '导出')
+        try:
+            if opera_type == 1:  # 编辑点检检查表
+                instance = records.last()
+                if not instance:
+                    raise ValidationError('异常: 数据行异常, 请刷新页面后重试')
+                if instance.status == '已确认':
+                    raise ValidationError('异常: 已确认的表不可再操作')
+                serializer = CheckPointTableUpdateSerializer(instance, self.request.data, context={'request': request})
+                serializer.is_valid(raise_exception=True)
+                serializer.save()
+            elif opera_type == 2:  # 确认点检检查表
+                if records.filter(status='已确认'):
+                    raise ValidationError('异常: 存在已经确认过的数据,请重新选择后再确认')
+                records.update(confirm_desc=self.request.data.get('confirm_desc'), status='已确认')
+            elif opera_type == 3:  # 导出
+                data = self.get_serializer(records, many=True).data
+                return gen_excels_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME,
+                                           sheet_keyword=['select_date', 'point_standard_name', 'equip_no', 'station'],
+                                           handle_str=True)
+            else:
+                raise ValidationError('异常: 未知操作类型')
+        except Exception as e:
+            logger.error(f'点检-检查表{key_word}操作异常: {e.args[0]}')
+            raise ValidationError(f'{key_word}操作异常' if '异常' not in e.args[0] else e.args[0])
+        return Response(f"点检检查表{key_word}操作成功")
 
 
 @method_decorator([api_recorder], name='dispatch')
@@ -5242,10 +5270,11 @@ class CheckTemperatureTableViewSet(ModelViewSet):
         if not all([opera_type, ids]):
             raise ValidationError('参数异常')
         records = self.get_queryset().filter(id__in=ids)
+        if not records:
+            raise ValidationError('未找到数据行,刷新后重试')
         key_word = '检查' if opera_type == 1 else ('确认' if opera_type == 2 else '导出')
         try:
             if opera_type == 1:  # 编辑温度检查表
-                key_word = '检查'
                 instance = records.last()
                 if not instance:
                     raise ValidationError('异常: 数据行异常, 请刷新页面后重试')
@@ -5259,9 +5288,9 @@ class CheckTemperatureTableViewSet(ModelViewSet):
                     raise ValidationError('异常: 存在已经确认过的数据,请重新选择后再确认')
                 records.update(confirm_desc=self.request.data.get('confirm_desc'), status='已确认')
             elif opera_type == 3:  # 导出
-                key_word = '导出'
                 data = self.get_serializer(records, many=True).data
-                return gen_excels_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
+                return gen_excels_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, sheet_keyword=['select_date'],
+                                           handle_str=True)
             else:
                 raise ValidationError('异常: 未知操作类型')
         except Exception as e:

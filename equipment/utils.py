@@ -8,6 +8,7 @@ from io import BytesIO
 
 import requests
 import xlwt
+from operator import itemgetter
 from django.db.models import Q, F
 from django.http import HttpResponse
 from openpyxl import load_workbook, cell
@@ -51,21 +52,24 @@ def gen_template_response(export_fields_dict, data, file_name, handle_str=False)
     return response
 
 
-def gen_excels_response(export_fields_dict, data_list, file_name, handle_str=False):
+def gen_excels_response(export_fields_dict, data_list, file_name, sheet_keyword, handle_str=False):
     """同样内容的sheet按日期导出一个execl"""
     export_fields = list(export_fields_dict.values())
     sheet_heads = list(export_fields_dict.keys())
     wb = xlwt.Workbook(encoding='utf8')
     output = BytesIO()
     for i, s_data in enumerate(data_list):
-        sheet = wb.add_sheet(f"{s_data['select_date']}({i + 1})", cell_overwrite_ok=True)
+        words = itemgetter(*sheet_keyword)(s_data)
+        prefix = '-'.join(list(words)) if isinstance(words, tuple) else words
+        sheet_name = prefix + f"{(i + 1) if sheet_keyword == 'select_date' else ''}"
+        sheet = wb.add_sheet(sheet_name, cell_overwrite_ok=True)
         for idx, sheet_head in enumerate(sheet_heads):
             sheet.write(0, idx, sheet_head)
 
         data_row = 1
         for data in s_data.get('table_details'):
             for col_num, data_key in enumerate(export_fields):
-                set_value = data[data_key]
+                set_value = "否" if data[data_key] is False else ("是" if data[data_key] is True else data[data_key])
                 if handle_str and isinstance(set_value, str):
                     set_value = cell.cell.ILLEGAL_CHARACTERS_RE.sub(r'', set_value)
                 sheet.write(data_row, col_num, set_value)
