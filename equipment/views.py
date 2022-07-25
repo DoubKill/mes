@@ -5181,6 +5181,14 @@ class CheckPointTableViewSet(ModelViewSet):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.delete_flag = True
+        instance.delete_user = self.request.user
+        instance.delete_date = datetime.now()
+        instance.save()
+        return Response('删除成功')
+
     @atomic
     @action(methods=['post'], detail=False, url_path='handle-table', url_name='handle_table')
     def handle_table(self, request):
@@ -5325,6 +5333,14 @@ class CheckTemperatureTableViewSet(ModelViewSet):
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.delete_flag = True
+        instance.delete_user = self.request.user
+        instance.delete_date = datetime.now()
+        instance.save()
+        return Response('删除成功')
 
     @atomic
     @action(methods=['post'], detail=False, url_path='handle-table', url_name='handle_table')

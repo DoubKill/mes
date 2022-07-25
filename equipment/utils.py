@@ -62,7 +62,7 @@ def gen_excels_response(export_fields_dict, data_list, file_name, sheet_keyword,
     for i, s_data in enumerate(data_list):
         words = itemgetter(*sheet_keyword)(s_data)
         if isinstance(words, tuple):
-            sheet_name = '-'.join(list(words))
+            sheet_name = '-'.join(list(words))[5:]  # 第一部分是时间取年月
         else:
             if words in sheet_name_used:
                 sheet_name = f"{words}({i + 1})"
