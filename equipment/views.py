@@ -5057,6 +5057,22 @@ class CheckPointStandardViewSet(ModelViewSet):
         "录入时间(新增不填)": "created_date",
     }
 
+    def list(self, request, *args, **kwargs):
+        all_station = self.request.query_params.get('all_station')  # 获取所有岗位
+        if all_station:
+            station_list = list(CheckPointStandard.objects.values_list('station', flat=True).distinct())
+            return Response({'results': station_list})
+
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         link_tables = instance.check_tables.filter(delete_flag=False)
@@ -5081,7 +5097,7 @@ class CheckPointStandardViewSet(ModelViewSet):
                 raise ValidationError('未找到所选便准, 请刷新页面后重试')
             data = self.get_serializer(records, many=True).data
             return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
-        else:  # 导入
+        elif excel_flag == 'import': # 导入
             excel_file = request.FILES.get('file', None)
             if not excel_file:
                 raise ValidationError('文件不可为空！')
@@ -5117,6 +5133,8 @@ class CheckPointStandardViewSet(ModelViewSet):
                 serializer.save()
             except Exception as e:
                 raise ValidationError(e.args[0])
+        else:
+            raise ValidationError('未知操作[仅支持导入、导出]')
         return Response(f"{'导出' if excel_flag == 'export' else '导入'}成功")
 
 
@@ -5210,7 +5228,7 @@ class CheckTemperatureStandardViewSet(ModelViewSet):
                 raise ValidationError('未找到所选便准, 请刷新页面后重试')
             data = self.get_serializer(records, many=True).data
             return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
-        else:  # 导入
+        elif excel_flag == 'import':  # 导入
             excel_file = request.FILES.get('file', None)
             if not excel_file:
                 raise ValidationError('文件不可为空！')
@@ -5243,6 +5261,8 @@ class CheckTemperatureStandardViewSet(ModelViewSet):
                 raise ValidationError('温度上限设置异常')
             except Exception as e:
                 raise ValidationError(e.args[0])
+        else:
+            raise ValidationError('未知操作[仅支持导入、导出]')
         return Response(f"{'导出' if excel_flag == 'export' else '导入'}成功")
 
 
