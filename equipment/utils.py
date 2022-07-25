@@ -58,10 +58,17 @@ def gen_excels_response(export_fields_dict, data_list, file_name, sheet_keyword,
     sheet_heads = list(export_fields_dict.keys())
     wb = xlwt.Workbook(encoding='utf8')
     output = BytesIO()
+    sheet_name_used = []
     for i, s_data in enumerate(data_list):
         words = itemgetter(*sheet_keyword)(s_data)
-        prefix = '-'.join(list(words)) if isinstance(words, tuple) else words
-        sheet_name = prefix + f"{(i + 1) if sheet_keyword == 'select_date' else ''}"
+        if isinstance(words, tuple):
+            sheet_name = '-'.join(list(words))
+        else:
+            if words in sheet_name_used:
+                sheet_name = f"{words}({i + 1})"
+            else:
+                sheet_name = f"{words}"
+                sheet_name_used.append(words)
         sheet = wb.add_sheet(sheet_name, cell_overwrite_ok=True)
         for idx, sheet_head in enumerate(sheet_heads):
             sheet.write(0, idx, sheet_head)

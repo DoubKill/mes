@@ -8,6 +8,7 @@ import calendar
 import decimal
 
 import requests
+import station as station
 import xlrd
 import xlwt
 
@@ -5152,6 +5153,33 @@ class CheckPointTableViewSet(ModelViewSet):
         "点检结果": "check_result",
         "是否修复": "is_repaired",
     }
+
+    def list(self, request, *args, **kwargs):
+        params = self.request.query_params
+        all_detail = params.get('all_detail')
+        if all_detail:  # 查询所有温度检查项目
+            equip_no, station, res, check_point_standard, point_standard_code, point_standard_name = \
+                params.get('equip_no'), params.get('station'), [], None, '', ''
+            if all([equip_no, station]):
+                point_standard = CheckPointStandard.objects.filter(delete_flag=False, equip_no__icontains=equip_no,
+                                                                   station=station).last()
+                if point_standard:
+                    res = list(point_standard.check_details.all().values('sn', 'check_content', 'check_style'))
+                    check_point_standard = point_standard.id
+                    point_standard_code = point_standard.point_standard_code
+                    point_standard_name = point_standard.point_standard_name
+            return Response({"check_point_standard": check_point_standard, "point_standard_code": point_standard_code,
+                             "point_standard_name": point_standard_name, "table_details": res})
+
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     @atomic
     @action(methods=['post'], detail=False, url_path='handle-table', url_name='handle_table')

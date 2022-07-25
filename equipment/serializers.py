@@ -1710,23 +1710,24 @@ class CheckPointStandardSerializer(BaseModelSerializer):
         check_details = validated_data.pop('check_details', None)
         equip_no, station = validated_data.get('equip_no'), validated_data.get('station')
         # 同岗位机台不能重叠
-        already_equip_no = CheckPointStandard.objects.filter(station=station)
-        if already_equip_no:
-            for i in already_equip_no:
-                equip_no_list, input_equip_no = set(i.equip_no.split(',')), set(equip_no.split(','))
-                if equip_no_list & input_equip_no:
-                    raise serializers.ValidationError('同岗位机台不可重叠')
+        equip_record = list(CheckPointStandard.objects.filter(station=station, delete_flag=False).values_list('equip_no', flat=True))
+        if equip_record:
+            already_equip_no = set(','.join(equip_record).split(','))
+            if set(equip_no.split(',')) & already_equip_no:
+                raise serializers.ValidationError('同岗位机台不可重叠')
         # 生成点检标准编号
         max_code = CheckPointStandard.objects.aggregate(max_code=Max('point_standard_code'))['max_code']
         point_standard_code = 'GWAQDJ' + ('0001' if not max_code else '%04d' % (int(max_code[-4:]) + 1))
         validated_data['point_standard_code'] = point_standard_code
+        validated_data['equip_no'] = ','.join(sorted(equip_no.split(',')))
         instance = super().create(validated_data)
         # 增加标准详情
         if check_details:
             content = []
-            for detail in check_details:
+            for index, detail in enumerate(check_details):
                 check_content = detail['check_content']
                 detail['check_point_standard'] = instance
+                detail['sn'] = index + 1
                 if check_content not in content:
                     CheckPointStandardDetail.objects.create(**detail)
                     content.append(check_content)
@@ -1737,22 +1738,25 @@ class CheckPointStandardSerializer(BaseModelSerializer):
     @atomic
     def update(self, instance, validated_data):
         check_details = validated_data.pop('check_details')
-        equip_no, station = validated_data.get('equip_no'), validated_data.get('station')
+        equip_no = ','.join(sorted(validated_data.get('equip_no').split(',')))
+        station = validated_data.get('station')
         # 同岗位机台不能重叠
-        already_equip_no = CheckPointStandard.objects.filter(station=station)
-        if already_equip_no:
-            for i in already_equip_no:
-                equip_no_list, input_equip_no = set(i.equip_no.split(',')), set(equip_no.split(','))
-                if equip_no_list & input_equip_no:
+        if instance.equip_no != equip_no or instance.station != station:
+            equip_record = list(CheckPointStandard.objects.filter(~Q(id=instance.id), station=station, delete_flag=False)
+                                .values_list('equip_no', flat=True))
+            if equip_record:
+                already_equip_no = set(','.join(equip_record).split(','))
+                if set(equip_no.split(',')) & already_equip_no:
                     raise serializers.ValidationError('同岗位机台不可重叠')
         # 删除标准详情并更新
         instance.check_details.all().delete()
         # 增加标准详情
         if check_details:
             content = []
-            for detail in check_details:
+            for index, detail in enumerate(check_details):
                 check_content = detail['check_content']
                 detail['check_point_standard'] = instance
+                detail['sn'] = index + 1
                 if check_content not in content:
                     CheckPointStandardDetail.objects.create(**detail)
                     content.append(check_content)
