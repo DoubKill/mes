@@ -1885,7 +1885,8 @@ class CheckPointTableUpdateSerializer(BaseModelSerializer):
                 table_check_result = '点检正常'
             else:
                 table_check_result = '已修复'
-        validated_data.update(check_result=table_check_result, status='已检查')
+        validated_data.update(check_result=table_check_result, status='已检查', point_time=datetime.now(),
+                              point_user=self.context['request'].user.username)
         return super().update(instance, validated_data)
 
     class Meta:
@@ -1954,7 +1955,8 @@ class CheckTemperatureTableUpdateSerializer(BaseModelSerializer):
             record.is_exceed = is_exceed
             record.save()
         table_is_exceed = 0 if is_exceed_list and 1 not in is_exceed_list else 1
-        validated_data.update({'is_exceed': table_is_exceed, 'status': '已检查'})
+        validated_data.update({'is_exceed': table_is_exceed, 'status': '已检查', 'point_time': datetime.now(),
+                               'point_user': self.context['request'].user.username})
         return super().update(instance, validated_data)
 
     class Meta:

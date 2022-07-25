@@ -5151,7 +5151,6 @@ class CheckPointTableViewSet(ModelViewSet):
         "检查方式": "check_style",
         "点检结果": "check_result",
         "是否修复": "is_repaired",
-        # "备注": "desc"
     }
 
     @atomic
@@ -5178,7 +5177,8 @@ class CheckPointTableViewSet(ModelViewSet):
             elif opera_type == 2:  # 确认点检检查表
                 if records.filter(status='已确认'):
                     raise ValidationError('异常: 存在已经确认过的数据,请重新选择后再确认')
-                records.update(confirm_desc=self.request.data.get('confirm_desc'), status='已确认')
+                records.update(confirm_desc=self.request.data.get('confirm_desc'), status='已确认',
+                               confirm_time=datetime.now(), confirm_user=self.request.user.username)
             elif opera_type == 3:  # 导出
                 data = self.get_serializer(records, many=True).data
                 return gen_excels_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME,
@@ -5322,7 +5322,8 @@ class CheckTemperatureTableViewSet(ModelViewSet):
             elif opera_type == 2:  # 确认温度检查表
                 if records.filter(status='已确认'):
                     raise ValidationError('异常: 存在已经确认过的数据,请重新选择后再确认')
-                records.update(confirm_desc=self.request.data.get('confirm_desc'), status='已确认')
+                records.update(confirm_desc=self.request.data.get('confirm_desc'), status='已确认',
+                               confirm_time=datetime.now(), confirm_user=self.request.user.username)
             elif opera_type == 3:  # 导出
                 data = self.get_serializer(records, many=True).data
                 return gen_excels_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, sheet_keyword=['select_date'],

@@ -1085,6 +1085,10 @@ class CheckPointTable(AbstractEntity):
     desc = models.CharField(max_length=512, help_text='新建或者更新输入的异常说明', null=True, blank=True)
     confirm_desc = models.CharField(max_length=256, help_text='异常确认说明', null=True, blank=True)
     check_image_urls = models.TextField(help_text='点检图片', default='')
+    point_time = models.DateTimeField(help_text='最新点检时间', null=True, blank=True)
+    point_user = models.CharField(max_length=64, help_text='点检人', null=True, blank=True)
+    confirm_time = models.DateTimeField(help_text='确认时间', null=True, blank=True)
+    confirm_user = models.CharField(max_length=64, help_text='确认人', null=True, blank=True)
     status = models.CharField(max_length=16, help_text='状态: 新建、已检查、已确认', default='新建')
     check_result = models.CharField(max_length=16, help_text='点检结果: 点检正常、点检异常、已修复', default='点检异常')
 
@@ -1125,6 +1129,10 @@ class CheckTemperatureTable(AbstractEntity):
     desc = models.CharField(max_length=512, help_text='新建或者更新输入的备注', null=True, blank=True)
     confirm_desc = models.CharField(max_length=256, help_text='确认备注', null=True, blank=True)
     check_image_urls = models.TextField(help_text='检查温度图片', default='')
+    point_time = models.DateTimeField(help_text='最新点检时间', null=True, blank=True)
+    point_user = models.CharField(max_length=64, help_text='点检人', null=True, blank=True)
+    confirm_time = models.DateTimeField(help_text='确认时间', null=True, blank=True)
+    confirm_user = models.CharField(max_length=64, help_text='确认人', null=True, blank=True)
 
     class Meta:
         db_table = 'check_temperature_table'
