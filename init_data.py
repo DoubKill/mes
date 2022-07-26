@@ -1008,6 +1008,12 @@ permission_data = [
     {'id': 1012, 'code': 'accept_d_equip_apply_order', 'name': '补卡申请', 'parent_id': 1004},
     {'id': 1013, 'code': 'export_d_equip_apply_order', 'name': '加班申请', 'parent_id': 1004},
     {'id': 1030, 'code': 'code_d_equip_apply_order', 'name': '申请料包通用码', 'parent_id': 1004},
+    {'id': 1072, 'code': 'view_d_check_point_table', 'name': '安全点检查询', 'parent_id': 1004},
+    {'id': 1073, 'code': 'execute_d_check_point_table', 'name': '安全点检实施', 'parent_id': 1004},
+    {'id': 1074, 'code': 'confirm_d_check_point_table', 'name': '安全点检确认', 'parent_id': 1004},
+    {'id': 1075, 'code': 'view_d_check_temperature_table', 'name': '除尘袋滤器查询', 'parent_id': 1004},
+    {'id': 1076, 'code': 'execute_d_check_temperature_table', 'name': '除尘袋滤器确认实施', 'parent_id': 1004},
+    {'id': 1077, 'code': 'confirm_d_check_temperature_table', 'name': '除尘袋滤器确认', 'parent_id': 1004},
 
     {'id': 1014, 'code': 'wms_mooney_level', 'name': '原材料门尼值等级管理', 'parent_id': None},
     {'id': 1015, 'code': 'view_wms_mooney_level', 'name': '查看', 'parent_id': 1014},
@@ -1057,7 +1063,7 @@ permission_data = [
     {'id': 1070, 'code': 'confirm_check_temperature_table', 'name': '批量确认', 'parent_id': 1065},
     {'id': 1071, 'code': 'export_check_temperature_table', 'name': '导出', 'parent_id': 1065},
 
-    # 下一个 1072 开始
+    # 下一个 1078 开始
 ]
 
 
