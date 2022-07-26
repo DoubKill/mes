@@ -654,7 +654,7 @@ class QRLoginView(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class UserOperationLogViewSet(ModelViewSet):
-    queryset = UserOperationLog.objects.all()
+    queryset = UserOperationLog.objects.order_by('-id')
     serializer_class = UserOperationLogSerializer
     permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_user_operation_log'}))
     filter_backends = (DjangoFilterBackend, )
