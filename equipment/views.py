@@ -5097,7 +5097,7 @@ class CheckPointStandardViewSet(ModelViewSet):
                 raise ValidationError('未找到所选便准, 请刷新页面后重试')
             data = self.get_serializer(records, many=True).data
             return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
-        elif excel_flag == 'import': # 导入
+        elif excel_flag == 'import':  # 导入
             excel_file = request.FILES.get('file', None)
             if not excel_file:
                 raise ValidationError('文件不可为空！')
