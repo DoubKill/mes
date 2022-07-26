@@ -471,6 +471,11 @@ class ApplyForExtraWork(models.Model):
 
 
 class PerformanceJobLadder(models.Model):
+    Relation = (
+        (0, '不关联机台'),
+        (1, '关联单机台'),
+        (2, '关联多机台')
+    )
     Status = (
         (1, '最大值'),
         (2, '平均值')
@@ -482,7 +487,7 @@ class PerformanceJobLadder(models.Model):
     post_standard = models.PositiveIntegerField(choices=Status, default=1, help_text='多岗位合并基准', null=True, blank=True)
     post_coefficient = models.IntegerField(help_text='多岗位合并系数', null=True, blank=True)
     delete_flag = models.BooleanField(help_text='是否删除', verbose_name='是否删除', default=False)
-    relation = models.BooleanField(help_text='是否与机台相关联', default=True)
+    relation = models.IntegerField(choices=Relation, help_text='打卡是否和机台关联', default=1)
 
     class Meta:
         db_table = 'performance_job_ladder'

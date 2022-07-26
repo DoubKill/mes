@@ -4198,7 +4198,14 @@ class AttendanceClockViewSet(ModelViewSet):
             obj = queryset.filter(status__in=['上岗', '调岗'], end_date__isnull=True).last()
             if obj:
                 equips = queryset.filter(begin_date=obj.begin_date).values_list('equip', flat=True)
-        res['equips'] = equips
+        # 获取单选和多选机台的岗位
+        s_choice, m_choice = [], []
+        if equips:
+            keyword = equips[0][0]
+            equip_type = '密炼' if keyword == 'Z' else ('细料称量' if keyword == 'F' else '硫磺称量')
+            s_choice = list(PerformanceJobLadder.objects.filter(type=equip_type, relation=1).values_list('name', flat=True).distinct())
+            m_choice = list(PerformanceJobLadder.objects.filter(type=equip_type, relation=2).values_list('name', flat=True).distinct())
+        res.update({'equips': equips, 's_choice': s_choice, 'm_choice': m_choice})
         return Response({'results': res})
 
 
