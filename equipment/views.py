@@ -8,7 +8,6 @@ import calendar
 import decimal
 
 import requests
-import station as station
 import xlrd
 import xlwt
 
