@@ -656,7 +656,7 @@ class QRLoginView(APIView):
 class UserOperationLogViewSet(ModelViewSet):
     queryset = UserOperationLog.objects.order_by('-id')
     serializer_class = UserOperationLogSerializer
-    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_user_operation_log'}))
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_user_operation_log', 'add': "__all__"}))
     filter_backends = (DjangoFilterBackend, )
     filter_class = UserOperationLogFilter
     EXPORT_FIELDS_DICT = {
