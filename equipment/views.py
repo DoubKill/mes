@@ -5303,7 +5303,7 @@ class CheckTemperatureStandardViewSet(ModelViewSet):
 
 @method_decorator([api_recorder], name='dispatch')
 class CheckTemperatureTableViewSet(ModelViewSet):
-    queryset = CheckTemperatureTable.objects.filter(delete_flag=False).order_by('id')
+    queryset = CheckTemperatureTable.objects.filter(delete_flag=False).order_by('-id')
     serializer_class = CheckTemperatureTableSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
