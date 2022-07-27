@@ -3360,7 +3360,7 @@ class MaterialDetailsAux(APIView):
             # 掺料或者待处理料是否存在
             pcp = ProductClassesPlan.objects.using('SFJ').filter(plan_classes_uid=plan_classes_uid).first()
             if not pcp:
-                raise ValidationError('群控计划不存在')
+                return Response(f'群控计划不存在')
             product_recipe = ProductBatchingDetailPlan.objects.using('SFJ') \
                 .filter(Q(Q(material_name__icontains='掺料') | Q(material_name__icontains='待处理料')),
                         plan_classes_uid=plan_classes_uid)

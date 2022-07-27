@@ -239,6 +239,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                         raise serializers.ValidationError(f'该物料已经扫过人工单配{material_name}')
                     # 去除原材料小料(群控扣重时需要去除原材料小料物料[mes返回标准内])
                     wms_xl_material = OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, status=1,
+                                                                      material_name=material_name,
                                                                       other_type='原材料小料')
                     if wms_xl_material:
                         raise serializers.ValidationError('原材料小料条码已经扫过')
