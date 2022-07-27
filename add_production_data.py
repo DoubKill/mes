@@ -56,7 +56,7 @@ def main():
                     equip_no=pcp.equip.equip_no,
                     product_no=pcp.product_batching.stage_product_batch_no,
                     plan_weight=pcp.weight*2,
-                    actual_weight=round(float(pcp.weight)-float(random.uniform(0, 5)), 2)*200,
+                    actual_weight=round(float(pcp.weight)-float(random.uniform(0, 5)), 2)*2,
                     begin_time=begin_time,
                     end_time=end_time,
                     operation_user='admin',
