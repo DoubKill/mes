@@ -116,7 +116,7 @@ class MaterialDemandedSerializer(BaseModelSerializer):
     material_type = serializers.CharField(source='material.material_type', read_only=True, help_text='原材料类别')
     material_no = serializers.CharField(source='material.material_no', read_only=True, help_text='原材料编码')
     product_no = serializers.CharField(
-        source='product_classes_plan.product_day_plan.product_batching.stage_product_batch_no', read_only=True,
+        source='product_classes_plan.product_batching.stage_product_batch_no', read_only=True,
         help_text='胶料编码')
 
     class Meta:
@@ -382,18 +382,12 @@ class ProductClassesPlansySerializer(BaseModelSerializer):
     work_schedule_plan__work_schedule_plan_no = serializers.CharField(write_only=True)
     equip__equip_no = serializers.CharField(write_only=True, required=False)
     product_batching__stage_product_batch_no = serializers.CharField(write_only=True, required=False)
-    # product_day_plan__equip__equip_no = serializers.CharField(write_only=True)
-    # product_day_plan__plan_schedule__plan_schedule_no = serializers.CharField(write_only=True)
-    # product_day_plan__product_batching__stage_product_batch_no = serializers.CharField(write_only=True)
     status = serializers.CharField(write_only=True, required=False)
 
     def validate(self, attrs):
         work_schedule_plan1 = attrs.pop('work_schedule_plan__work_schedule_plan_no', None)
         equip_no = attrs.pop('equip__equip_no', None)
         product_batching_no = attrs.pop('product_batching__stage_product_batch_no', None)
-        attrs.pop('product_day_plan__plan_schedule__plan_schedule_no', None)
-        attrs.pop('product_day_plan__equip__equip_no', None)
-        attrs.pop('product_day_plan__product_batching__stage_product_batch_no', None)
         try:
             equip = Equip.objects.get(equip_no=equip_no)
             work_schedule_plan = WorkSchedulePlan.objects.get(work_schedule_plan_no=work_schedule_plan1)

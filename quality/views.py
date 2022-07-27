@@ -1227,6 +1227,10 @@ class TestDataPointCurveView(APIView):
         indicators = MaterialDataPointIndicator.objects.filter(
             material_test_method__material__material_no=product_no,
             level=1).values('data_point__name', 'upper_limit', 'lower_limit')
+        sorted_rules = {'MH': 7, 'ML': 8, 'TC10': 9, 'TC50': 10, 'TC90': 11,
+                        '比重值': 12, 'ML(1+4)': 13, '硬度值': 14,
+                        'M300': 15, '扯断强度': 16, '伸长率%': 17, '焦烧': 18, '钢拔': 19}
+        indicators = sorted(indicators, key=lambda d: sorted_rules.get(d['data_point__name'], 999))
         data_point_names = []
         ret = []
         indicators_dict = {}
@@ -1237,6 +1241,8 @@ class TestDataPointCurveView(APIView):
             test_data = query_set.filter(
                 data_point_name=data_point_name
             ).values(date=F('material_test_order__production_factory_date'), v=F('value')).order_by('date')
+            if not test_data:
+                continue
             ret.append({'name': data_point_name, 'data': test_data})
         return Response(
             {'indicators': indicators_dict, 'data': ret}

@@ -659,6 +659,7 @@ class ManualInputTrains(models.Model):
     actual_trains = models.IntegerField(help_text='车数', verbose_name='车数')
     created_username = models.CharField(max_length=256, help_text='录入人')
     created_time = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
+    weight = models.FloatField(help_text='单车重量', default=0)
 
     class Meta:
         db_table = 'manual_input_trains'
