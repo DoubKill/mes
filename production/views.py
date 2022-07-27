@@ -3158,7 +3158,7 @@ class EmployeeAttendanceRecordsView(APIView):
                 # 同一天同班组同一人同岗位同机台时间累加
                 for i in data:
                     split_name = re.split('[(|)]', i['name'])
-                    if split_name == 1:  # 工作12小时没有时间显示
+                    if len(split_name) == 1:  # 工作12小时没有时间显示
                         break
                     if split_name[0] == item['user__username']:
                         total_time = item['actual_time'] + float(split_name[1])
