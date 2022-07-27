@@ -23,16 +23,16 @@ from mes.common_code import zdy_jwt_payload_handler
 from mes.conf import WMS_URL, TH_URL
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
+from mes.permissions import PermissionClass
 from plan.models import ProductClassesPlan, MaterialDemanded, ProductDayPlan
 from production.models import PlanStatus, AttendanceGroupSetup
 from quality.utils import get_cur_sheet, get_sheet_data
 from recipe.models import Material
-from system.filters import UserFilter, GroupExtensionFilter, SectionFilter
-from system.models import GroupExtension, User, Section, Permissions, DingDingInfo
+from system.filters import UserFilter, GroupExtensionFilter, SectionFilter, UserOperationLogFilter
+from system.models import GroupExtension, User, Section, Permissions, DingDingInfo, UserOperationLog
 from system.serializers import GroupExtensionSerializer, GroupExtensionUpdateSerializer, UserSerializer, \
     UserUpdateSerializer, SectionSerializer, GroupUserUpdateSerializer, PlanReceiveSerializer, \
-    MaterialReceiveSerializer, UserImportSerializer, UserLoginSerializer
-
+    MaterialReceiveSerializer, UserImportSerializer, UserLoginSerializer, UserOperationLogSerializer
 
 jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
 jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
@@ -650,3 +650,27 @@ class QRLoginView(APIView):
                          "token": token,
                          'wms_url': WMS_URL,
                          'th_url': TH_URL})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class UserOperationLogViewSet(ModelViewSet):
+    queryset = UserOperationLog.objects.order_by('-id')
+    serializer_class = UserOperationLogSerializer
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_user_operation_log', 'add': "__all__"}))
+    filter_backends = (DjangoFilterBackend, )
+    filter_class = UserOperationLogFilter
+    EXPORT_FIELDS_DICT = {
+        '日时': 'date',
+        '界面名称': 'menu_name',
+        '操作内容（按钮名称：操作对象+操作信息)': 'operations',
+        '操作员': 'operator',
+        '操作时间': 'create_time'}
+    FILE_NAME = '操作履历'
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        export = self.request.query_params.get('export')
+        if export:
+            data = self.get_serializer(queryset, many=True).data
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+        return super().list(request, *args, **kwargs)
