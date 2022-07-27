@@ -21,7 +21,7 @@ from production.models import PlanStatus
 def main():
     # ProductDayPlan.objects.all().delete()
     ps = PlanSchedule.objects.filter(day_time=datetime.datetime.now().date()).first()
-    for pb in ProductBatching.objects.filter(used_type=4):
+    for pb in ProductBatching.objects.filter(used_type=4, batching_weight__gt=0):
         equip_ids = list(Equip.objects.filter(category=pb.dev_type).values_list('id', flat=True))
         if equip_ids:
             pdp = ProductDayPlan.objects.create(
@@ -31,10 +31,10 @@ def main():
             for name in ['早班', '夜班']:
                 wsp = WorkSchedulePlan.objects.filter(plan_schedule=ps, classes__global_name=name).first()
                 pcp = ProductClassesPlan.objects.create(
-                    weight=random.randint(200, 500),
+                    weight=pb.batching_weight,
                     product_day_plan=pdp,
                     sn=1,
-                    plan_trains=random.randint(20, 50),
+                    plan_trains=random.randint(20, 150),
                     unit='车',
                     work_schedule_plan=wsp,
                     plan_classes_uid=uuid.uuid1(),
