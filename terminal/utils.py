@@ -771,7 +771,7 @@ class JZCLSystem(object):
                                     </SetRealData>
                                 </soap:Body>
                             </soap:Envelope>"""
-        time.sleep(0.5)  # 增加延时，防止频繁调用导致失败
+        time.sleep(0.2)  # 增加延时，防止频繁调用导致失败
         door_info = requests.post(self.url, data=send_data.encode('utf-8'), timeout=1)
         res = door_info.content.decode('utf-8')
         result_flag = re.findall(r'<ns1:SetRealDataResult>(.*)</ns1:SetRealDataResult>', res)[0]
@@ -804,7 +804,7 @@ class JZCLSystem(object):
                                 </GetRealData>
                             </soap:Body>
                         </soap:Envelope>"""
-        time.sleep(0.2)  # 增加延时，防止频繁调用导致失败
+        time.sleep(0.5)  # 增加延时，防止频繁调用导致失败
         door_info = requests.post(self.url, data=send_data.encode('utf-8'), timeout=1)
         res = door_info.content.decode('utf-8')
         result_flag = re.findall(r'<ns1:GetRealDataResult>(.*)</ns1:GetRealDataResult>', res)[0]
