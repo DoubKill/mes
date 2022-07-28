@@ -480,6 +480,7 @@ class DelUser(APIView):
         instance.is_active = 0
         instance.username = u_name
         instance.save()
+        DingDingInfo.objects.filter(user=instance).delete()
         return Response('ok')
 
 
