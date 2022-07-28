@@ -476,11 +476,9 @@ class DelUser(APIView):
         except Exception:
             raise ValidationError('object does not exits!')
         u_name = instance.username + '(DELETED{})'.format(str(instance.id))
-        u_num = instance.num + '(DELETED{})'.format(str(instance.id))
         instance.delete_flag = True
         instance.is_active = 0
         instance.username = u_name
-        instance.num = u_num
         instance.save()
         return Response('ok')
 
