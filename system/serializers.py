@@ -349,10 +349,9 @@ class UserImportSerializer(BaseModelSerializer):
         return attrs
 
     def create(self, validated_data):
-        username = validated_data['username']
         num = validated_data['num']
         password = validated_data.get('password')
-        user = User.objects.filter(Q(username=username) | Q(num=num)).first()
+        user = User.objects.filter(num=num).first()
         if user:
             user = super().update(instance=user, validated_data=validated_data)
         else:
