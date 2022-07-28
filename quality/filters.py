@@ -34,7 +34,7 @@ class MaterialTestOrderFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = MaterialTestOrder
-        fields = ('st', 'et', 'equip_no', 'product_no', "classes", 'stage', 'is_qualified', 'lot_no')
+        fields = ('st', 'et', 'equip_no', 'product_no', "classes", 'stage', 'lot_no', 'is_recheck', 'production_group')
 
 
 class MaterialDataPointIndicatorFilter(django_filters.rest_framework.FilterSet):

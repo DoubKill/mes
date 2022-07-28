@@ -200,6 +200,7 @@ def gen_pallet_test_result(lot_nos):
         for test_order in test_orders:
             test_results = test_order.order_results.filter()
             if test_product_flat:
+                test_order.is_finished = True
                 if test_results.filter(level=2).exists():
                     test_order.is_qualified = False
                 else:
