@@ -4071,7 +4071,7 @@ class AttendanceClockViewSet(ModelViewSet):
             report = EmployeeAttendanceRecords.objects.filter(begin_date=last_obj.begin_date,
                                                               user_id=last_obj.user_id).values_list('equip', 'id')
             ids, equips = [item[1] for item in report], [item[0] for item in report]
-            results['equips'] = list(set(equips))
+            results['equips'] = sorted(list(set(equips))) if all([s_choice, m_choice]) else []
 
             if str(last_obj.factory_date) == date_now:
                 begin_time, end_time = get_standard_time(username, date_now)
@@ -4376,15 +4376,7 @@ class AttendanceClockViewSet(ModelViewSet):
             obj = queryset.filter(status__in=['上岗', '调岗'], end_date__isnull=True).last()
             if obj:
                 equips = queryset.filter(begin_date=obj.begin_date).values_list('equip', flat=True)
-        res['equips'] = list(set(equips))
-        # 获取单选和多选机台的岗位
-        # s_choice, m_choice = [], []
-        # if equips:
-        #     keyword = equips[0][0]
-        #     equip_type = '密炼' if keyword == 'Z' else ('细料称量' if keyword == 'F' else '硫磺称量')
-        #     s_choice = list(PerformanceJobLadder.objects.filter(type=equip_type, relation=1).values_list('name', flat=True).distinct())
-        #     m_choice = list(PerformanceJobLadder.objects.filter(type=equip_type, relation=2).values_list('name', flat=True).distinct())
-        # res.update({'equips': equips, 's_choice': s_choice, 'm_choice': m_choice})
+        res['equips'] = sorted(list(set(equips)))
         return Response({'results': res})
 
 
@@ -4889,7 +4881,6 @@ class AttendanceResultAuditView(APIView):
             # 未整体提交的考勤数据不能审核、审批[]
             if not_overall:
                 raise ValidationError(f'存在未确认的考勤数据, 请处理后再{opera_type}')
-            AttendanceResultAudit
             AttendanceResultAudit.objects.create(**data)
             # 审核或审批不通过,当月考勤数据全为红色 #DA1F27 红色
             if not data.get('result'):
