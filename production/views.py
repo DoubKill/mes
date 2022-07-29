@@ -4071,7 +4071,7 @@ class AttendanceClockViewSet(ModelViewSet):
             report = EmployeeAttendanceRecords.objects.filter(begin_date=last_obj.begin_date,
                                                               user_id=last_obj.user_id).values_list('equip', 'id')
             ids, equips = [item[1] for item in report], [item[0] for item in report]
-            results['equips'] = sorted(list(set(equips))) if all([s_choice, m_choice]) else []
+            results['equips'] = sorted(list(set(equips))) if last_obj.section in (s_choice + m_choice) else []
 
             if str(last_obj.factory_date) == date_now:
                 begin_time, end_time = get_standard_time(username, date_now)
