@@ -153,3 +153,14 @@ class DataSynchronization(models.Model):
     class Meta:
         db_table = 'data_sync'
         verbose_name_plural = verbose_name = '自动同步数据'
+
+
+class UserOperationLog(models.Model):
+    create_time = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
+    operator = models.CharField(max_length=64, help_text='操作人', verbose_name='操作人')
+    menu_name = models.CharField(max_length=64, help_text='菜单名称', verbose_name='菜单名称')
+    operations = models.CharField(max_length=512, help_text='操作内容', verbose_name='操作内容')
+
+    class Meta:
+        db_table = 'user_operation_log'
+        verbose_name_plural = verbose_name = '用户操作履历'

@@ -5431,7 +5431,10 @@ class OutBoundDeliveryOrderDetailViewSet(ModelViewSet):
             #  'items': [{'workId': 'CHDZ2022070500371', 'msg': 'TRUE#CHDZ2022070500371任务下发成功', 'flag': '01'}]}
             logger.info('出库单据号：{},北自反馈信息：{}'.format(instance.order_no, result))
             if result is not None:
-                items = result.get('items', [])
+                try:
+                    items = result.get('items', [])
+                except Exception:
+                    raise ValidationError('出库失败，北自系统错误！')
                 for item in items:
                     try:
                         msg = item['msg']

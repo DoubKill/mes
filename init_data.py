@@ -1027,7 +1027,11 @@ permission_data = [
     {'id': 1028, 'code': 'view_tool_manage_account', 'name': '查看', 'parent_id': 1027},
     {'id': 1029, 'code': 'add_tool_manage_account', 'name': '新增', 'parent_id': 1027},
 
-    # 下一个 1031 开始
+    {'id': 1031, 'code': 'user_operation_log', 'name': '操作履历查询', 'parent_id': None},
+    {'id': 1032, 'code': 'view_user_operation_log', 'name': '查看', 'parent_id': 1031},
+    {'id': 1033, 'code': 'export_user_operation_log', 'name': '导出', 'parent_id': 1031},
+
+    # 下一个 1034 开始
 ]
 
 

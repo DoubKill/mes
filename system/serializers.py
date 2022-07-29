@@ -22,8 +22,7 @@ from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan, MaterialDemanded, ProductDayPlan
 from production.models import PlanStatus
 from recipe.models import ProductBatching, Material, ProductBatchingDetail
-from system.models import GroupExtension, User, Section
-
+from system.models import GroupExtension, User, Section, UserOperationLog
 
 jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
 jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
@@ -350,10 +349,9 @@ class UserImportSerializer(BaseModelSerializer):
         return attrs
 
     def create(self, validated_data):
-        username = validated_data['username']
         num = validated_data['num']
         password = validated_data.get('password')
-        user = User.objects.filter(Q(username=username) | Q(num=num)).first()
+        user = User.objects.filter(num=num).first()
         if user:
             user = super().update(instance=user, validated_data=validated_data)
         else:
@@ -392,3 +390,15 @@ class UserLoginSerializer(JSONWebTokenSerializer):
                 raise serializers.ValidationError('用户名或密码错误！')
         else:
             raise serializers.ValidationError('请输入用户名和密码')
+
+
+class UserOperationLogSerializer(serializers.ModelSerializer):
+    date = serializers.SerializerMethodField(read_only=True)
+
+    def get_date(self, obj):
+        return obj.create_time.strftime('%Y-%m-%d')
+
+    class Meta:
+        model = UserOperationLog
+        fields = '__all__'
+        read_only_fields = ('create_time', )

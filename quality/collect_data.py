@@ -173,7 +173,13 @@ def main():
                                 except Exception:
                                     pass
                             if not created:
-                                test_order.order_results.filter(data_point_name=data_point_name).delete()
+                                a = test_order.order_results.filter(data_point_name=data_point_name).delete()
+                                # try:
+                                #     if a[0]:
+                                #         test_order.is_recheck = True
+                                #         test_order.save()
+                                # except Exception:
+                                #     pass
                             # 创建数据点检测结果
                             MaterialTestResult.objects.create(
                                 material_test_order=test_order,
