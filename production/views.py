@@ -4894,8 +4894,7 @@ class RubberFrameRepairView(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class RubberFrameRepairSummaryView(APIView):
     """胶架维修记录汇总"""
-    # permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_rubber_frame_repair',
-    #                                                         'add': 'add_rubber_frame_repair'}))
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_rubber_frame_repair_summary'}))
 
     def get(self, request):
         select_date = self.request.query_params.get('select_date')

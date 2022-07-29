@@ -1063,7 +1063,11 @@ permission_data = [
     {'id': 1070, 'code': 'confirm_check_temperature_table', 'name': '批量确认', 'parent_id': 1065},
     {'id': 1071, 'code': 'export_check_temperature_table', 'name': '导出', 'parent_id': 1065},
 
-    # 下一个 1078 开始
+    {'id': 1078, 'code': 'rubber_frame_repair_summary', 'name': '胶架维修记录汇总', 'parent_id': None},
+    {'id': 1079, 'code': 'view_rubber_frame_repair_summary', 'name': '查看', 'parent_id': 1078},
+
+    # 下一个 1080 开始
+
 ]
 
 
