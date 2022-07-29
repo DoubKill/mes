@@ -4071,7 +4071,7 @@ class AttendanceClockViewSet(ModelViewSet):
             report = EmployeeAttendanceRecords.objects.filter(begin_date=last_obj.begin_date,
                                                               user_id=last_obj.user_id).values_list('equip', 'id')
             ids, equips = [item[1] for item in report], [item[0] for item in report]
-            results['equips'] = equips
+            results['equips'] = list(set(equips))
 
             if str(last_obj.factory_date) == date_now:
                 begin_time, end_time = get_standard_time(username, date_now)
@@ -4376,7 +4376,7 @@ class AttendanceClockViewSet(ModelViewSet):
             obj = queryset.filter(status__in=['上岗', '调岗'], end_date__isnull=True).last()
             if obj:
                 equips = queryset.filter(begin_date=obj.begin_date).values_list('equip', flat=True)
-        res['equips'] = equips
+        res['equips'] = list(set(equips))
         # 获取单选和多选机台的岗位
         # s_choice, m_choice = [], []
         # if equips:
