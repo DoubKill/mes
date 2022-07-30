@@ -511,7 +511,7 @@ class WeightBatchingLogViewSet(TerminalCreateAPIView, mixins.ListModelMixin, Gen
                 kwargs = {'signal_a': tank_num} if tank_no.endswith('A') else {'signal_b': tank_num}
                 tank_status_sync.sync(**kwargs)
         except:
-            return response(success=False, message='打开料罐门失败！')
+            return response(success=False, message='解锁料罐门失败！')
         # 开门成功判断次数并记录时间(公共变量(料罐扫码限制)设定)
         tank_info = WeightTankStatus.objects.filter(equip_no=equip_no, tank_no=tank_no).last()
         # 获取扫码限制
@@ -534,7 +534,7 @@ class WeightBatchingLogViewSet(TerminalCreateAPIView, mixins.ListModelMixin, Gen
             tank_info.save()
             # 更新其他料罐状态
             WeightTankStatus.objects.filter(~Q(tank_no=tank_no), equip_no=equip_no).update(close_time=now_time, scan_times=0)
-        return response(success=True, data={"tank_no": tank_no}, message='{}号料罐门已打开'.format(tank_no))
+        return response(success=True, data={"tank_no": tank_no}, message='{}号料罐门已解锁'.format(tank_no))
 
 
 @method_decorator([api_recorder], name="dispatch")
