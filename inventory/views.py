@@ -5452,7 +5452,7 @@ class OutBoundDeliveryOrderDetailViewSet(ModelViewSet):
 
     @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated], url_path='cancel-task',
             url_name='cancel-task')
-    def cancel_task(self, request, pk=None):
+    def cancel_task(self, request):
         warehouse_name = self.request.data.get('warehouse_name')
         task_ids = self.request.data.get('task_ids')
         if warehouse_name == '混炼胶库':
