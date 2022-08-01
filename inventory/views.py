@@ -3346,7 +3346,7 @@ class WmsInventoryMaterialAttribute(APIView):
         if material_name:
             filter_kwargs['material_name__icontains'] = material_name
         if only_storage_flag:
-            filter_kwargs['is_validity'] = 1
+            filter_kwargs['is_validity'] = 0
         query_set = WmsInventoryMaterial.objects.using('wms').filter(
             **filter_kwargs).values('id', 'material_no', 'material_name', 'period_of_validity')
         st = (int(page) - 1) * int(page_size)

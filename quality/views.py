@@ -2215,7 +2215,7 @@ class ReportValueView(APIView):
     """
 
     def post(self, request):
-        # 原材料：{"report_type": 1, "ip": "IP地址", "value": {"l_4: 12"}, "raw_value": "机台检测完整数据"}
+        # 原材料：{"report_type": 1, "ip": "IP地址", "value": {"l_4": 12}, "raw_value": "机台检测完整数据"}
         # 胶料门尼：{"report_type": 2, "ip": "IP地址", "value": {"l_4: 12"}, "raw_value": "机台检测完整数据"}
 
         test_type = self.request.data.get('type')

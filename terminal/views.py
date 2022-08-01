@@ -61,9 +61,10 @@ from terminal.serializers import LoadMaterialLogCreateSerializer, \
     CarbonFeedingPromptCreateSerializer, PowderTankSettingSerializer, OilTankSettingSerializer, \
     ReplaceMaterialSerializer, ReturnRubberSerializer, ToleranceRuleSerializer, WeightPackageManualSerializer, \
     WeightPackageSingleSerializer, WeightPackageLogCUpdateSerializer, WmsAddPrintSerializer, JZBinSerializer, \
-    JZPlanSerializer, JZPlanUpdateSerializer
+    JZPlanSerializer, JZPlanUpdateSerializer, WeightPackageManualUpdateSerializer
 from terminal.utils import TankStatusSync, CarbonDeliverySystem, out_task_carbon, get_tolerance, material_out_barcode, \
-    get_manual_materials, CLSystem, get_common_equip, xl_c_calculate, JZCLSystem, JZTankStatusSync
+    get_manual_materials, CLSystem, get_common_equip, xl_c_calculate, JZCLSystem, JZTankStatusSync, \
+    get_current_factory_date
 
 logger = logging.getLogger('sync_log')
 
@@ -130,7 +131,7 @@ class BatchProductionInfoView(APIView):
             classes_plans = classes_plans.filter(work_schedule_plan__classes__global_name=classes)
         for plan in classes_plans:
             # 任务状态
-            plan_status_info = PlanStatus.objects.using("SFJ").filter(plan_classes_uid=plan.plan_classes_uid).order_by('created_date').last()
+            plan_status_info = PlanStatus.objects.using("SFJ").filter(plan_classes_uid=plan.plan_classes_uid, delete_flag=False).order_by('created_date').last()
             plan_status = plan_status_info.status if plan_status_info else plan.status
             if plan_status not in ['运行中', '等待']:
                 if plan_status in ['停止', '完成', '待停止']:  # 更新通用料包完成时间
@@ -510,7 +511,7 @@ class WeightBatchingLogViewSet(TerminalCreateAPIView, mixins.ListModelMixin, Gen
                 kwargs = {'signal_a': tank_num} if tank_no.endswith('A') else {'signal_b': tank_num}
                 tank_status_sync.sync(**kwargs)
         except:
-            return response(success=False, message='打开料罐门失败！')
+            return response(success=False, message='解锁料罐门失败！')
         # 开门成功判断次数并记录时间(公共变量(料罐扫码限制)设定)
         tank_info = WeightTankStatus.objects.filter(equip_no=equip_no, tank_no=tank_no).last()
         # 获取扫码限制
@@ -533,7 +534,7 @@ class WeightBatchingLogViewSet(TerminalCreateAPIView, mixins.ListModelMixin, Gen
             tank_info.save()
             # 更新其他料罐状态
             WeightTankStatus.objects.filter(~Q(tank_no=tank_no), equip_no=equip_no).update(close_time=now_time, scan_times=0)
-        return response(success=True, data={"tank_no": tank_no}, message='{}号料罐门已打开'.format(tank_no))
+        return response(success=True, data={"tank_no": tank_no}, message='{}号料罐门已解锁'.format(tank_no))
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -883,6 +884,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                              .annotate(material_name=F('handle_material_name'), standard_weight=F('weight'),
                                        material__material_name=F('handle_material_name'), tolerance=F('error'))
                              .values('material_name', 'tolerance', 'standard_weight', 'material__material_name'))
+        dev_type = 'ZWF' if '[' in product_no else dev_type
         if not recipe_manual:
             try:
                 if 'ONLY' in product_no:
@@ -917,10 +919,10 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
 
     def handle_machine_print(self, equip_no, i, now_date):
         pre_model, material_model = [JZRecipePre, JZRecipeMaterial] if equip_no in JZ_EQUIP_NO else [RecipePre, RecipeMaterial]
-        recipe_pre = pre_model.objects.using(equip_no).filter(name=i['product_no'])
-        dev_type = recipe_pre.first().ver.upper().strip() if recipe_pre else ''
-        plan_weight = recipe_pre.first().weight if recipe_pre else 0
-        split_count = 1 if not recipe_pre else recipe_pre.first().split_count
+        recipe_pre = pre_model.objects.using(equip_no).filter(name=i['product_no']).first()
+        dev_type = recipe_pre.ver.upper().strip() if recipe_pre and recipe_pre.ver else ''
+        plan_weight = recipe_pre.weight if recipe_pre else 0
+        split_count = 1 if not recipe_pre else recipe_pre.split_count
         # 配料时间
         actual_batch_time = i['starttime']
         # 计算有效期
@@ -937,18 +939,23 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         product_no_dev = re.split(r'\(|\（|\[', i['product_no'])[0]
         msg, ml_equip_no = '', ''
         type_name = '硫磺' if re.findall('FM|RFM|RE', product_no_dev) else '细料'
+        wf_flag = False if '[' not in i['product_no'] else True
+        stage_product_batch_no = product_no_dev if not wf_flag else i['product_no']
         if 'ONLY' in i['product_no']:
             ml_equip_no = i['product_no'].split('-')[-2]
         else:
-            flag, result = get_common_equip(product_no_dev, dev_type)
-            if flag:
-                ml_equip_no = result[0]
+            if not wf_flag:
+                flag, result = get_common_equip(product_no_dev, dev_type)
+                if flag:
+                    ml_equip_no = result[0]
+                else:
+                    msg = result
             else:
-                msg = result
+                ml_equip_no = 'ZWF'
         if i['merge_flag']:
             # 配方中料包重量
             sfj_recipe = ProductBatching.objects.using('SFJ').filter(delete_flag=False, used_type=4,
-                                                                     stage_product_batch_no=product_no_dev,
+                                                                     stage_product_batch_no=stage_product_batch_no,
                                                                      equip__equip_no=ml_equip_no).last()
             # 获取上辅机配料重量(无法获取则从mes配方中获取)
             if sfj_recipe:
@@ -957,9 +964,13 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                 if xl_info:
                     total_weight = xl_info.actual_weight
             else:
-                prod = ProductBatching.objects.filter(delete_flag=False, used_type=4, batching_type=2,
-                                                      stage_product_batch_no=product_no_dev,
-                                                      dev_type__category_name=dev_type).first()
+                if not wf_flag:
+                    f_w = {'batching_type': 2, 'dev_type__category_name': dev_type}
+                else:
+                    f_w = {'batching_type': 3}
+                prod = ProductBatching.objects.filter(delete_flag=False, used_type=4,
+                                                      stage_product_batch_no=stage_product_batch_no,
+                                                      **f_w).first()
                 if prod:
                     xl_instance = prod.weight_cnt_types.filter(delete_flag=False, name=type_name).first()
                     if xl_instance:
@@ -973,8 +984,9 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
             batch_info = ProductBatchingEquip.objects.filter(
                 ~Q(Q(feeding_mode__startswith='C') | Q(feeding_mode__startswith='P')),
                 ~Q(handle_material_name__in=machine_materials), is_used=True, type=4, equip_no=ml_equip_no,
-                product_batching__stage_product_batch_no=product_no_dev,
-                product_batching__dev_type__category_name=dev_type)
+                product_batching__stage_product_batch_no=stage_product_batch_no)
+            if not wf_flag:
+                batch_info = batch_info.filter(product_batching__dev_type__category_name=dev_type)
             for j in batch_info:
                 batch_info_res.append({
                     'material_type': type_name, 'handle_material_name': j.material.material_name,
@@ -1014,6 +1026,12 @@ class WeightPackageManualViewSet(ModelViewSet):
             return ()
         else:
             return (IsAuthenticated(),)
+
+    def get_serializer_class(self):
+        if self.action == 'update':
+            return WeightPackageManualUpdateSerializer
+        else:
+            return WeightPackageManualSerializer
 
     def get_queryset(self):
         query_set = self.queryset
@@ -1253,12 +1271,16 @@ class GetManualInfo(APIView):
             except Exception as e:
                 raise ValidationError(e.args[0])
         else:
-            product_no_dev = re.split(r'\(|\（|\[', product_no)[0]
-            recipe = ProductBatching.objects.filter(stage_product_batch_no=product_no_dev, dev_type__category_name=dev_type,
-                                                    used_type=4, delete_flag=False, batching_type=2).first()
-            if not recipe:
-                raise ValidationError('未找到mes配方')
-            results = recipe.batching_details.values('material__material_name', 'actual_weight')
+            wf_flag = False if '[' not in data.get('product_no', []) else True
+            if not wf_flag:
+                product_no_dev = re.split(r'\(|\（|\[', product_no)[0]
+                recipe = ProductBatching.objects.filter(stage_product_batch_no=product_no_dev, dev_type__category_name=dev_type,
+                                                        used_type=4, delete_flag=False, batching_type=2).first()
+                if not recipe:
+                    raise ValidationError('未找到mes配方')
+                results = recipe.batching_details.values('material__material_name', 'actual_weight')
+            else:
+                results = []
         return Response({'results': list(results)})
 
 
@@ -1913,7 +1935,9 @@ class XLPlanVIewSet(ModelViewSet):
     filter_backends = [DjangoFilterBackend]
 
     def get_serializer_class(self):
-        equip_no = self.request.query_params.get('equip_no') if self.request.query_params.get('equip_no') else self.request.data.get('equip_no')
+        equip_no = None if not self.request else (
+            self.request.query_params.get('equip_no') if self.request.query_params.get(
+                'equip_no') else self.request.data.get('equip_no'))
         if self.action in ('list', 'create'):
             return JZPlanSerializer if equip_no in JZ_EQUIP_NO else PlanSerializer
         else:
@@ -1926,10 +1950,25 @@ class XLPlanVIewSet(ModelViewSet):
         recipe = self.request.query_params.get('recipe')
         state = self.request.query_params.get('state')
         batch_time = self.request.query_params.get('batch_time')
+        get_classes = self.request.query_params.get('get_classes')  # 根据工厂日期查询班次
+        plan_model = JZPlan if equip_no in JZ_EQUIP_NO else Plan
 
         filter_kwargs = {}
         if not equip_no:
             raise ValidationError('参数缺失')
+        if get_classes:
+            res = get_current_factory_date()
+            factory_date, classes = res.get('factory_date'), res.get('classes')
+            p_record = plan_model.objects.using(equip_no).filter(date_time=factory_date).order_by('id').last()
+            if p_record:
+                n_classes = p_record.grouptime
+            else:
+                if classes:
+                    n_classes = classes
+                else:
+                    now_date = datetime.datetime.now().replace(microsecond=0)
+                    n_classes = '早班' if '08:00:00' < str(now_date)[-8:] < '20:00:00' else '夜班'
+            return Response({'results': n_classes})
         if date_time:
             filter_kwargs['date_time'] = date_time
         if grouptime:
@@ -1940,7 +1979,6 @@ class XLPlanVIewSet(ModelViewSet):
             filter_kwargs['actno__gte'] = 1
         if batch_time:
             filter_kwargs['date_time'] = batch_time
-        plan_model = JZPlan if equip_no in JZ_EQUIP_NO else Plan
         queryset = plan_model.objects.using(equip_no).filter(**filter_kwargs).order_by('order_by')
         if not state:
             try:
@@ -3191,8 +3229,6 @@ class ReplaceMaterialViewSet(ModelViewSet):
                 r = ReplaceMaterial.objects.filter(id=uid).last()
                 if not r:
                     raise ValidationError('数据行异常,请刷新页面后重试')
-                if r.bra_code.startswith('AAJ1Z20') and '掺料' not in recipe_material and '待处理料' not in recipe_material:
-                    raise ValidationError('返回胶只能当作待处理料或者掺料使用')
                 item['result'] = 1
             else:
                 item['result'] = 0
@@ -3324,7 +3360,7 @@ class MaterialDetailsAux(APIView):
             # 掺料或者待处理料是否存在
             pcp = ProductClassesPlan.objects.using('SFJ').filter(plan_classes_uid=plan_classes_uid).first()
             if not pcp:
-                raise ValidationError('群控计划不存在')
+                return Response(f'群控计划不存在')
             product_recipe = ProductBatchingDetailPlan.objects.using('SFJ') \
                 .filter(Q(Q(material_name__icontains='掺料') | Q(material_name__icontains='待处理料')),
                         plan_classes_uid=plan_classes_uid)
@@ -3355,6 +3391,7 @@ class XlRecipeNoticeView(APIView):
             raise ValidationError('该配方不存在')
         if not product_batching.used_type == 4:
             raise ValidationError('只有应用状态的配方才可下发至称量系统')
+        wf_flag = True if product_batching.batching_type == 3 else False
         mes_xl_details = ProductBatchingEquip.objects.filter(product_batching=product_batching, is_used=True, type=4)
         if not mes_xl_details:
             raise ValidationError('配方中无称量系统小料内容, 无法下发')
@@ -3366,16 +3403,17 @@ class XlRecipeNoticeView(APIView):
             raise ValidationError('配方中的小料内容投料方式与机台不相符')
         equip_no_list = mes_xl_details.values_list('equip_no', flat=True).distinct()
         common_equip = []
-        if len(equip_no_list) > 1:
-            flag, res = get_common_equip(product_batching.stage_product_batch_no, product_batching.dev_type)
-            if not flag:
-                raise ValidationError(res)
+        if not wf_flag:
+            if len(equip_no_list) > 1:
+                flag, res = get_common_equip(product_batching.stage_product_batch_no, product_batching.dev_type)
+                if not flag:
+                    raise ValidationError(res)
+                else:
+                    common_equip = res
             else:
-                common_equip = res
-        else:
-            c_p = mes_xl_details.filter(Q(Q(feeding_mode__startswith='C') | Q(feeding_mode__startswith='P')))
-            if not c_p:
-                common_equip = list(equip_no_list)
+                c_p = mes_xl_details.filter(Q(Q(feeding_mode__startswith='C') | Q(feeding_mode__startswith='P')))
+                if not c_p:
+                    common_equip = list(equip_no_list)
         # 查询所有的称量线体罐物料与配方设置物料是否一致
         now_date = datetime.datetime.now().date()
         before_date = now_date - timedelta(days=1)
@@ -3390,7 +3428,7 @@ class XlRecipeNoticeView(APIView):
         same_material_list = list(set(mes_xl_materials) & set(xl_equip_materials))
         # 在使用称量配方不能下发
         # 下发配方数据
-        send_data = {'dev_type': product_batching.dev_type.category_no}
+        send_data = {'dev_type': product_batching.dev_type.category_no if not wf_flag else None}
         detail_msg = ""
         send_equip_list = []
         if len(equip_no_list) == len(common_equip):
@@ -3399,7 +3437,7 @@ class XlRecipeNoticeView(APIView):
             send_equip_list = list(set(equip_no_list) - set(common_equip)) + ([common_equip[0]] if common_equip else [])
         for single_equip_no in send_equip_list:
             send_materials = mes_xl_details.filter(equip_no=single_equip_no, feeding_mode__startswith=keywords, handle_material_name__in=same_material_list)
-            send_recipe_name = f"{product_no.split('_NEW')[0]}({product_batching.dev_type.category_no}" + (")" if single_equip_no in common_equip else f"-{single_equip_no}-ONLY)")
+            send_recipe_name = product_batching.stage_product_batch_no if wf_flag else (f"{product_no.split('_NEW')[0]}({product_batching.dev_type.category_no}" + (")" if single_equip_no in common_equip else f"-{single_equip_no}-ONLY)"))
             processing_xl_plan = plan_model.objects.using(xl_equip).filter(Q(planid__startswith=n_prefix) | Q(planid__startswith=b_prefix), state__in=['运行中', '运行', '等待'], recipe=send_recipe_name)
             # 嘉正称量直接下发的计划需要找其他表数据
             run_plan = JZExecutePlan.objects.using(xl_equip).filter(recipe=send_recipe_name, state__in=[1, 3]) if xl_equip in JZ_EQUIP_NO else None

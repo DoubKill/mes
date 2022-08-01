@@ -5,7 +5,8 @@ from recipe.views import MaterialViewSet, ProductInfoViewSet, \
     ProductBatchingViewSet, MaterialAttributeViewSet, \
     ValidateProductVersionsView, RecipeNoticeAPiView, MaterialSupplierViewSet, \
     WeighCntTypeViewSet, ProductBatchingDetailListView, ERPMaterialViewSet, ZCMaterialListView, GetERPZcMaterialAPiView, \
-    ProductDevBatchingReceive, DevTypeProductBatching, ReplaceRecipeMaterialViewSet, ProductBatchingNoNew
+    ProductDevBatchingReceive, DevTypeProductBatching, ReplaceRecipeMaterialViewSet, ProductBatchingNoNew, \
+    WFProductBatchingViewSet
 
 router = DefaultRouter()
 
@@ -20,6 +21,9 @@ router.register(r'product-infos', ProductInfoViewSet)
 
 # 胶料配料
 router.register(r'product-batching', ProductBatchingViewSet)
+
+# 外发胶料配料
+router.register(r'wf-product-batching', WFProductBatchingViewSet)
 
 router.register(r'materials-supplier', MaterialSupplierViewSet)
 
