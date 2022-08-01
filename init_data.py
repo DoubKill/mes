@@ -1007,6 +1007,7 @@ permission_data = [
     {'id': 1011, 'code': 'handle_d_equip_apply_order', 'name': '考勤打卡', 'parent_id': 1004},
     {'id': 1012, 'code': 'accept_d_equip_apply_order', 'name': '补卡申请', 'parent_id': 1004},
     {'id': 1013, 'code': 'export_d_equip_apply_order', 'name': '加班申请', 'parent_id': 1004},
+    {'id': 1081, 'code': 'approval_d_equip_apply_order', 'name': '审批', 'parent_id': 1004},
     {'id': 1030, 'code': 'code_d_equip_apply_order', 'name': '申请料包通用码', 'parent_id': 1004},
     {'id': 1072, 'code': 'view1_d_equip_apply_order', 'name': '安全点检查询', 'parent_id': 1004},
     {'id': 1073, 'code': 'execute1_d_equip_apply_order', 'name': '安全点检实施', 'parent_id': 1004},
@@ -1084,7 +1085,7 @@ permission_data = [
     {'id': 1078, 'code': 'rubber_frame_repair_summary', 'name': '胶架维修记录汇总', 'parent_id': None},
     {'id': 1079, 'code': 'view_rubber_frame_repair_summary', 'name': '查看', 'parent_id': 1078},
 
-    # 下一个 1081 开始
+    # 下一个 1082 开始
 ]
 
 
