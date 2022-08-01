@@ -1307,3 +1307,14 @@ class WMSOutboundHistory(models.Model):
     class Meta:
         db_table = 'wms_outbond_history'
         verbose_name_plural = verbose_name = 'wms出库记录'
+
+
+class CancelTask(models.Model):
+    order_no = models.CharField(max_length=128, db_column='TASKNUMBER')
+    pallet_no = models.CharField(max_length=128, db_column='PALLETID')
+    flag = models.IntegerField(db_column='FLAG', default=0)
+
+    class Meta:
+        db_table = 'Z_MES_CANCLE_TASK'
+        verbose_name_plural = verbose_name = '胶料库任务取消列表'
+        managed = False
