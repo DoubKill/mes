@@ -183,7 +183,7 @@ class TestIndicatorDataPointListView(ListAPIView):
 
     def list(self, request, *args, **kwargs):
         ret = []
-        test_indicators_names = ['门尼', '比重', '硬度', '流变', '钢拔', '物性']
+        test_indicators_names = ['流变', '比重', '门尼', '硬度', '钢拔', '物性']
         for name in test_indicators_names:
             test_indicator = TestIndicator.objects.filter(name__icontains=name).first()
             if test_indicator:
@@ -279,7 +279,7 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
         else:
             return MaterialTestOrderListSerializer
 
-    def export_xls(self, result):
+    def export_xls(self, result, lot_deal_result_dict):
         if not result:
             return Response('暂无数据！')
         wb = load_workbook('xlsx_template/product_test_result.xlsx')
@@ -299,23 +299,30 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
         ).values('data_point__name', 'upper_limit', 'lower_limit')
         indicators_data_dict = {i['data_point__name']: i for i in indicators_data}
         sheet.cell(2, 1).value = product_no
-        sheet.cell(5, 7).value = indicators_data_dict.get('MH', {}).get('upper_limit')
-        sheet.cell(6, 7).value = indicators_data_dict.get('MH', {}).get('lower_limit')
-        sheet.cell(5, 8).value = indicators_data_dict.get('ML', {}).get('upper_limit')
-        sheet.cell(6, 8).value = indicators_data_dict.get('ML', {}).get('lower_limit')
-        sheet.cell(5, 9).value = indicators_data_dict.get('TC10', {}).get('upper_limit')
-        sheet.cell(6, 9).value = indicators_data_dict.get('TC10', {}).get('lower_limit')
-        sheet.cell(5, 10).value = indicators_data_dict.get('TC50', {}).get('upper_limit')
-        sheet.cell(6, 10).value = indicators_data_dict.get('TC50', {}).get('lower_limit')
-        sheet.cell(5, 11).value = indicators_data_dict.get('TC90', {}).get('upper_limit')
-        sheet.cell(6, 11).value = indicators_data_dict.get('TC90', {}).get('lower_limit')
-        sheet.cell(5, 12).value = indicators_data_dict.get('比重值', {}).get('upper_limit')
-        sheet.cell(6, 12).value = indicators_data_dict.get('比重值', {}).get('lower_limit')
-        sheet.cell(5, 13).value = indicators_data_dict.get('ML(1+4)', {}).get('upper_limit')
-        sheet.cell(6, 13).value = indicators_data_dict.get('ML(1+4)', {}).get('lower_limit')
-        sheet.cell(5, 14).value = indicators_data_dict.get('硬度值', {}).get('upper_limit')
-        sheet.cell(6, 14).value = indicators_data_dict.get('硬度值', {}).get('lower_limit')
+        sheet.cell(5, 10).value = indicators_data_dict.get('MH', {}).get('upper_limit')
+        sheet.cell(6, 10).value = indicators_data_dict.get('MH', {}).get('lower_limit')
+        sheet.cell(5, 11).value = indicators_data_dict.get('ML', {}).get('upper_limit')
+        sheet.cell(6, 11).value = indicators_data_dict.get('ML', {}).get('lower_limit')
+        sheet.cell(5, 12).value = indicators_data_dict.get('TC10', {}).get('upper_limit')
+        sheet.cell(6, 12).value = indicators_data_dict.get('TC10', {}).get('lower_limit')
+        sheet.cell(5, 13).value = indicators_data_dict.get('TC50', {}).get('upper_limit')
+        sheet.cell(6, 13).value = indicators_data_dict.get('TC50', {}).get('lower_limit')
+        sheet.cell(5, 14).value = indicators_data_dict.get('TC90', {}).get('upper_limit')
+        sheet.cell(6, 14).value = indicators_data_dict.get('TC90', {}).get('lower_limit')
+        sheet.cell(5, 15).value = indicators_data_dict.get('比重值', {}).get('upper_limit')
+        sheet.cell(6, 15).value = indicators_data_dict.get('比重值', {}).get('lower_limit')
+        sheet.cell(5, 16).value = indicators_data_dict.get('ML(1+4)', {}).get('upper_limit')
+        sheet.cell(6, 16).value = indicators_data_dict.get('ML(1+4)', {}).get('lower_limit')
+        sheet.cell(5, 17).value = indicators_data_dict.get('硬度值', {}).get('upper_limit')
+        sheet.cell(6, 17).value = indicators_data_dict.get('硬度值', {}).get('lower_limit')
         for i in result:
+            deal_suggestion = ''
+            result_data = lot_deal_result_dict.get(i['lot_no'])
+            if result_data:
+                if result_data['deal_user']:
+                    deal_suggestion = result_data['deal_suggestion']
+                else:
+                    deal_suggestion = 'PASS'
             if i['product_no'] != product_no:
                 product_no = i['product_no']
                 sheet = wb.copy_worksheet(ws)
@@ -328,55 +335,77 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
                 ).values('data_point__name', 'upper_limit', 'lower_limit')
                 indicators_data_dict = {i['data_point__name']: i for i in indicators_data}
                 sheet.cell(2, 1).value = product_no
-                sheet.cell(5, 7).value = indicators_data_dict.get('MH', {}).get('upper_limit')
-                sheet.cell(6, 7).value = indicators_data_dict.get('MH', {}).get('lower_limit')
-                sheet.cell(5, 8).value = indicators_data_dict.get('ML', {}).get('upper_limit')
-                sheet.cell(6, 8).value = indicators_data_dict.get('ML', {}).get('lower_limit')
-                sheet.cell(5, 9).value = indicators_data_dict.get('TC10', {}).get('upper_limit')
-                sheet.cell(6, 9).value = indicators_data_dict.get('TC10', {}).get('lower_limit')
-                sheet.cell(5, 10).value = indicators_data_dict.get('TC50', {}).get('upper_limit')
-                sheet.cell(6, 10).value = indicators_data_dict.get('TC50', {}).get('lower_limit')
-                sheet.cell(5, 11).value = indicators_data_dict.get('TC90', {}).get('upper_limit')
-                sheet.cell(6, 11).value = indicators_data_dict.get('TC90', {}).get('lower_limit')
-                sheet.cell(5, 12).value = indicators_data_dict.get('比重值', {}).get('upper_limit')
-                sheet.cell(6, 12).value = indicators_data_dict.get('比重值', {}).get('lower_limit')
-                sheet.cell(5, 13).value = indicators_data_dict.get('ML(1+4)', {}).get('upper_limit')
-                sheet.cell(6, 13).value = indicators_data_dict.get('ML(1+4)', {}).get('lower_limit')
-                sheet.cell(5, 14).value = indicators_data_dict.get('硬度值', {}).get('upper_limit')
-                sheet.cell(6, 14).value = indicators_data_dict.get('硬度值', {}).get('lower_limit')
+                sheet.cell(5, 10).value = indicators_data_dict.get('MH', {}).get('upper_limit')
+                sheet.cell(6, 10).value = indicators_data_dict.get('MH', {}).get('lower_limit')
+                sheet.cell(5, 11).value = indicators_data_dict.get('ML', {}).get('upper_limit')
+                sheet.cell(6, 11).value = indicators_data_dict.get('ML', {}).get('lower_limit')
+                sheet.cell(5, 12).value = indicators_data_dict.get('TC10', {}).get('upper_limit')
+                sheet.cell(6, 12).value = indicators_data_dict.get('TC10', {}).get('lower_limit')
+                sheet.cell(5, 13).value = indicators_data_dict.get('TC50', {}).get('upper_limit')
+                sheet.cell(6, 13).value = indicators_data_dict.get('TC50', {}).get('lower_limit')
+                sheet.cell(5, 14).value = indicators_data_dict.get('TC90', {}).get('upper_limit')
+                sheet.cell(6, 14).value = indicators_data_dict.get('TC90', {}).get('lower_limit')
+                sheet.cell(5, 15).value = indicators_data_dict.get('比重值', {}).get('upper_limit')
+                sheet.cell(6, 15).value = indicators_data_dict.get('比重值', {}).get('lower_limit')
+                sheet.cell(5, 16).value = indicators_data_dict.get('ML(1+4)', {}).get('upper_limit')
+                sheet.cell(6, 16).value = indicators_data_dict.get('ML(1+4)', {}).get('lower_limit')
+                sheet.cell(5, 17).value = indicators_data_dict.get('硬度值', {}).get('upper_limit')
+                sheet.cell(6, 17).value = indicators_data_dict.get('硬度值', {}).get('lower_limit')
             order_results = i['order_results']
+            mn_machine_name = ''
+            lb_machine_name = ''
+            ret = {}
+            for j in order_results:
+                ret[j['data_point_name']] = j['value']
+                machine_name = j['machine_name']
+                if machine_name:
+                    if j['data_point_name'] == 'ML(1+4)':
+                        mn_machine_name = machine_name
+                    elif j['data_point_name'] in ('MH', 'ML', 'TC10', 'TC50', 'TC90'):
+                        lb_machine_name = machine_name
+
             ret = {i['data_point_name']: i['value'] for i in order_results}
             sheet.cell(data_row, 1).value = i['product_no']
             sheet.cell(data_row, 2).value = i['production_factory_date']
             sheet.cell(data_row, 3).value = i['production_class']
             sheet.cell(data_row, 4).value = i['production_group']
             sheet.cell(data_row, 5).value = i['production_equip_no']
-            sheet.cell(data_row, 6).value = i['actual_trains']
-            sheet.cell(data_row, 7).value = ret.get('MH')
-            sheet.cell(data_row, 8).value = ret.get('ML')
-            sheet.cell(data_row, 9).value = ret.get('TC10')
-            sheet.cell(data_row, 10).value = ret.get('TC50')
-            sheet.cell(data_row, 11).value = ret.get('TC90')
-            sheet.cell(data_row, 12).value = ret.get('比重值')
-            sheet.cell(data_row, 13).value = ret.get('ML(1+4)')
-            sheet.cell(data_row, 14).value = ret.get('硬度值')
-            sheet.cell(data_row, 15).value = 'Y' if i['is_qualified'] else 'N'
+            sheet.cell(data_row, 6).value = mn_machine_name
+            sheet.cell(data_row, 7).value = lb_machine_name
+            sheet.cell(data_row, 8).value = i['actual_trains']
+            sheet.cell(data_row, 9).value = '复检' if i['is_recheck'] else '正常'
+            sheet.cell(data_row, 10).value = ret.get('MH')
+            sheet.cell(data_row, 11).value = ret.get('ML')
+            sheet.cell(data_row, 12).value = ret.get('TC10')
+            sheet.cell(data_row, 13).value = ret.get('TC50')
+            sheet.cell(data_row, 14).value = ret.get('TC90')
+            sheet.cell(data_row, 15).value = ret.get('比重值')
+            sheet.cell(data_row, 16).value = ret.get('ML(1+4)')
+            sheet.cell(data_row, 17).value = ret.get('硬度值')
+            sheet.cell(data_row, 18).value = i['state']
+            sheet.cell(data_row, 19).value = deal_suggestion
+
             # 写入汇总
             sheet0.cell(data_row0, 1).value = i['product_no']
             sheet0.cell(data_row0, 2).value = i['production_factory_date']
             sheet0.cell(data_row0, 3).value = i['production_class']
             sheet0.cell(data_row0, 4).value = i['production_group']
             sheet0.cell(data_row0, 5).value = i['production_equip_no']
-            sheet0.cell(data_row0, 6).value = i['actual_trains']
-            sheet0.cell(data_row0, 7).value = ret.get('MH')
-            sheet0.cell(data_row0, 8).value = ret.get('ML')
-            sheet0.cell(data_row0, 9).value = ret.get('TC10')
-            sheet0.cell(data_row0, 10).value = ret.get('TC50')
-            sheet0.cell(data_row0, 11).value = ret.get('TC90')
-            sheet0.cell(data_row0, 12).value = ret.get('比重值')
-            sheet0.cell(data_row0, 13).value = ret.get('ML(1+4)')
-            sheet0.cell(data_row0, 14).value = ret.get('硬度值')
-            sheet0.cell(data_row0, 15).value = 'Y' if i['is_qualified'] else 'N'
+            sheet0.cell(data_row0, 6).value = mn_machine_name
+            sheet0.cell(data_row0, 7).value = lb_machine_name
+            sheet0.cell(data_row0, 8).value = i['actual_trains']
+            sheet0.cell(data_row0, 9).value = '复检' if i['is_recheck'] else '正常'
+            sheet0.cell(data_row0, 10).value = ret.get('MH')
+            sheet0.cell(data_row0, 11).value = ret.get('ML')
+            sheet0.cell(data_row0, 12).value = ret.get('TC10')
+            sheet0.cell(data_row0, 13).value = ret.get('TC50')
+            sheet0.cell(data_row0, 14).value = ret.get('TC90')
+            sheet0.cell(data_row0, 15).value = ret.get('比重值')
+            sheet0.cell(data_row0, 16).value = ret.get('ML(1+4)')
+            sheet0.cell(data_row0, 17).value = ret.get('硬度值')
+            sheet0.cell(data_row0, 18).value = i['state']
+            sheet0.cell(data_row0, 19).value = deal_suggestion
+
             data_row += 1
             data_row0 += 1
         wb.remove_sheet(ws)
@@ -392,8 +421,16 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
         return response
 
     def list(self, request, *args, **kwargs):
+        state = self.request.query_params.get('state')
         export = self.request.query_params.get('export')
         queryset = self.filter_queryset(self.get_queryset())
+        if state:
+            if state == '检测中':
+                queryset = queryset.filter(is_finished=False)
+            elif state == '合格':
+                queryset = queryset.filter(is_finished=True, is_qualified=True)
+            elif state == '不合格':
+                queryset = queryset.filter(is_finished=True, is_qualified=False)
         if export:
             st = self.request.query_params.get('st')
             et = self.request.query_params.get('et')
@@ -412,12 +449,30 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
                         Prefetch('order_results',
                                  queryset=MaterialTestResult.objects.order_by('id'))
                     ).order_by('product_no', 'production_factory_date', '-production_class', 'production_equip_no', 'actual_trains'))
+            lot_nos = set(queryset.values_list('lot_no', flat=True))
+            deal_results = MaterialDealResult.objects.filter(
+                lot_no__in=lot_nos,
+                test_result='PASS').values('lot_no', 'deal_suggestion', 'deal_user')
+            lot_deal_result_dict = {i['lot_no']: i for i in deal_results}
             data = MaterialTestOrderExportSerializer(queryset, many=True).data
-            return self.export_xls(data)
+            return self.export_xls(data, lot_deal_result_dict)
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+            s_data = serializer.data
+            lot_nos = [i['lot_no'] for i in s_data]
+            result = MaterialDealResult.objects.filter(
+                lot_no__in=lot_nos,
+                test_result='PASS').values('lot_no', 'deal_suggestion', 'deal_user')
+            lot_dict = {i['lot_no']: i for i in result}
+            for item in s_data:
+                result_data = lot_dict.get(item['lot_no'])
+                if result_data:
+                    if result_data['deal_user']:
+                        item['deal_suggestion'] = result_data['deal_suggestion']
+                    else:
+                        item['deal_suggestion'] = 'PASS'
+            return self.get_paginated_response(s_data)
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
@@ -469,6 +524,7 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
                         break
                     except Exception:
                         pass
+                # is_recheck = False
                 for item in order_results:
                     test_value = item['value']
                     if not test_value:
@@ -521,8 +577,16 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
                         else:
                             raise ValidationError('该胶料实验方法不存在！')
                     if not created:
-                        instance.order_results.filter(data_point_name=item['data_point_name']).delete()
+                        a = instance.order_results.filter(data_point_name=item['data_point_name']).delete()
+                        # try:
+                        #     if a[0]:
+                        #         is_recheck = True
+                        # except Exception:
+                        #     pass
                     MaterialTestResult.objects.create(**item)
+                # if is_recheck:
+                #     instance.is_recheck = True
+                #     instance.save()
         gen_pallet_test_result(lot_nos)
         return Response('新建成功')
 
@@ -1227,6 +1291,10 @@ class TestDataPointCurveView(APIView):
         indicators = MaterialDataPointIndicator.objects.filter(
             material_test_method__material__material_no=product_no,
             level=1).values('data_point__name', 'upper_limit', 'lower_limit')
+        sorted_rules = {'MH': 7, 'ML': 8, 'TC10': 9, 'TC50': 10, 'TC90': 11,
+                        '比重值': 12, 'ML(1+4)': 13, '硬度值': 14,
+                        'M300': 15, '扯断强度': 16, '伸长率%': 17, '焦烧': 18, '钢拔': 19}
+        indicators = sorted(indicators, key=lambda d: sorted_rules.get(d['data_point__name'], 999))
         data_point_names = []
         ret = []
         indicators_dict = {}
@@ -1237,6 +1305,8 @@ class TestDataPointCurveView(APIView):
             test_data = query_set.filter(
                 data_point_name=data_point_name
             ).values(date=F('material_test_order__production_factory_date'), v=F('value')).order_by('date')
+            if not test_data:
+                continue
             ret.append({'name': data_point_name, 'data': test_data})
         return Response(
             {'indicators': indicators_dict, 'data': ret}
@@ -1374,6 +1444,7 @@ class ImportAndExportView(APIView):
                         break
                     except Exception:
                         pass
+                # is_recheck = False
                 for data_point_name, method in data_point_method_map.items():
                     test_method_name = method['test_method__name']
                     test_indicator_name = method['test_method__test_type__test_indicator__name']
@@ -1408,8 +1479,16 @@ class ImportAndExportView(APIView):
                     else:
                         continue
                     if not created:
-                        instance.order_results.filter(data_point_name=data_point_name).delete()
+                        a = instance.order_results.filter(data_point_name=data_point_name).delete()
+                        # try:
+                        #     if a[0]:
+                        #         is_recheck = True
+                        # except Exception:
+                        #     pass
                     MaterialTestResult.objects.create(**result_data)
+                # if is_recheck:
+                #     instance.is_recheck = True
+                #     instance.save()
         gen_pallet_test_result(lot_nos)
         return Response('导入成功')
 
@@ -2136,7 +2215,7 @@ class ReportValueView(APIView):
     """
 
     def post(self, request):
-        # 原材料：{"report_type": 1, "ip": "IP地址", "value": {"l_4: 12"}, "raw_value": "机台检测完整数据"}
+        # 原材料：{"report_type": 1, "ip": "IP地址", "value": {"l_4": 12}, "raw_value": "机台检测完整数据"}
         # 胶料门尼：{"report_type": 2, "ip": "IP地址", "value": {"l_4: 12"}, "raw_value": "机台检测完整数据"}
 
         test_type = self.request.data.get('type')
@@ -2366,6 +2445,7 @@ class ReportValueView(APIView):
                 if not material_test_method:
                     continue
 
+                # is_recheck = False
                 for data_point in data_point_list:
                     data_point_name = data_point
                     try:
@@ -2401,7 +2481,12 @@ class ReportValueView(APIView):
                         # level = 2
                         continue
                     if not created:
-                        test_order.order_results.filter(data_point_name=data_point_name).delete()
+                        a = test_order.order_results.filter(data_point_name=data_point_name).delete()
+                        # try:
+                        #     if a[0]:
+                        #         is_recheck = True
+                        # except Exception:
+                        #     pass
                     MaterialTestResult.objects.create(
                         material_test_order=test_order,
                         test_factory_date=datetime.datetime.now(),
@@ -2421,6 +2506,10 @@ class ReportValueView(APIView):
                         judged_upper_limit=indicator.upper_limit,
                         judged_lower_limit=indicator.lower_limit
                     )
+
+                # if is_recheck:
+                #     test_order.is_recheck = True
+                #     test_order.save()
 
         # test_indicator_name = current_test_detail.test_plan.test_indicator_name
         # mto = MaterialTestOrder.objects.filter(lot_no=current_test_detail.lot_no,
@@ -4241,3 +4330,15 @@ class ProductTestValueHistoryView(APIView):
         ).aggregate(min_trains=Min('material_test_order__actual_trains'),
                     max_trains=Max('material_test_order__actual_trains'))
         return Response(test_result)
+
+
+class ProductIndicatorStandard(APIView):
+
+    def get(self, request):
+        product_no = self.request.query_params.get('product_no')
+        indicators_data = MaterialDataPointIndicator.objects.filter(
+            material_test_method__material__material_no=product_no,
+            level=1,
+            delete_flag=False
+        ).values('data_point__name', 'upper_limit', 'lower_limit', 'data_point__unit')
+        return Response(indicators_data)

@@ -3346,7 +3346,7 @@ class WmsInventoryMaterialAttribute(APIView):
         if material_name:
             filter_kwargs['material_name__icontains'] = material_name
         if only_storage_flag:
-            filter_kwargs['is_validity'] = 1
+            filter_kwargs['is_validity'] = 0
         query_set = WmsInventoryMaterial.objects.using('wms').filter(
             **filter_kwargs).values('id', 'material_no', 'material_name', 'period_of_validity')
         st = (int(page) - 1) * int(page_size)
@@ -4248,6 +4248,20 @@ class BzMixingRubberInventorySearch(ListAPIView):
     serializer_class = BzMixingRubberInventorySearchSerializer
     permission_classes = (IsAuthenticated,)
 
+    def get_serializer_context(self):
+        """
+        Extra context provided to the serializer class.
+        """
+        product_validity_data = dict(MaterialAttribute.objects.filter(
+            period_of_validity__isnull=False
+        ).values_list('material__material_no', 'period_of_validity'))
+        return {
+            'request': self.request,
+            'format': self.format_kwarg,
+            'view': self,
+            'product_validity_data': product_validity_data,
+        }
+
     def list(self, request, *args, **kwargs):
         material_no = self.request.query_params.get('material_no')  # 物料编码
         quality_status = self.request.query_params.get('quality_status')  # 品质状态
@@ -4542,6 +4556,20 @@ class BzFinalRubberInventorySearch(ListAPIView):
     queryset = BzFinalMixingRubberInventoryLB.objects.all()
     serializer_class = BzFinalRubberInventorySearchSerializer
     permission_classes = (IsAuthenticated,)
+
+    def get_serializer_context(self):
+        """
+        Extra context provided to the serializer class.
+        """
+        product_validity_data = dict(MaterialAttribute.objects.filter(
+            period_of_validity__isnull=False
+        ).values_list('material__material_no', 'period_of_validity'))
+        return {
+            'request': self.request,
+            'format': self.format_kwarg,
+            'view': self,
+            'product_validity_data': product_validity_data,
+        }
 
     def list(self, request, *args, **kwargs):
         material_no = self.request.query_params.get('material_no')  # 物料编码
@@ -5403,7 +5431,10 @@ class OutBoundDeliveryOrderDetailViewSet(ModelViewSet):
             #  'items': [{'workId': 'CHDZ2022070500371', 'msg': 'TRUE#CHDZ2022070500371任务下发成功', 'flag': '01'}]}
             logger.info('出库单据号：{},北自反馈信息：{}'.format(instance.order_no, result))
             if result is not None:
-                items = result.get('items', [])
+                try:
+                    items = result.get('items', [])
+                except Exception:
+                    raise ValidationError('出库失败，北自系统错误！')
                 for item in items:
                     try:
                         msg = item['msg']

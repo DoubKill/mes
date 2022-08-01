@@ -1,6 +1,6 @@
 import django_filters
 
-from system.models import User, GroupExtension, Section
+from system.models import User, GroupExtension, Section, UserOperationLog
 
 
 class UserFilter(django_filters.rest_framework.FilterSet):
@@ -31,3 +31,14 @@ class SectionFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = Section
         fields = ('name', 'section_id', 'parent_section_id')
+
+
+class UserOperationLogFilter(django_filters.rest_framework.FilterSet):
+    st = django_filters.CharFilter(field_name='create_time', help_text='开始时间', lookup_expr='gte')
+    et = django_filters.CharFilter(field_name='create_time', help_text='结束时间', lookup_expr='lte')
+    operator = django_filters.CharFilter(field_name='operator', help_text='操作人', lookup_expr='icontains')
+    menu_name = django_filters.CharFilter(field_name='menu_name', help_text='界面名称', lookup_expr='icontains')
+
+    class Meta:
+        model = UserOperationLog
+        fields = ('st', 'et', 'operator', 'menu_name')

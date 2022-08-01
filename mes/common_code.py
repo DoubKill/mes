@@ -379,7 +379,7 @@ class UsernameMobileAuthBackend(ModelBackend):
 
     def authenticate(self, request, username=None, password=None, **kwargs):
         """判断用户名、工号和密码是否正确"""
-        query_set = User.objects.filter(Q(username=username) | Q(num=username))
+        query_set = User.objects.filter(Q(username=username) | Q(num=username)).filter(delete_flag=False)
         try:
             if query_set.exists():
                 user = query_set.get()

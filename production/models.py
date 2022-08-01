@@ -471,6 +471,11 @@ class ApplyForExtraWork(models.Model):
 
 
 class PerformanceJobLadder(models.Model):
+    Relation = (
+        (0, '不关联机台'),
+        (1, '关联单机台'),
+        (2, '关联多机台')
+    )
     Status = (
         (1, '最大值'),
         (2, '平均值')
@@ -482,7 +487,7 @@ class PerformanceJobLadder(models.Model):
     post_standard = models.PositiveIntegerField(choices=Status, default=1, help_text='多岗位合并基准', null=True, blank=True)
     post_coefficient = models.IntegerField(help_text='多岗位合并系数', null=True, blank=True)
     delete_flag = models.BooleanField(help_text='是否删除', verbose_name='是否删除', default=False)
-    relation = models.BooleanField(help_text='是否与机台相关联', default=True)
+    relation = models.IntegerField(choices=Relation, help_text='打卡是否和机台关联', default=1)
 
     class Meta:
         db_table = 'performance_job_ladder'
@@ -654,6 +659,7 @@ class ManualInputTrains(models.Model):
     actual_trains = models.IntegerField(help_text='车数', verbose_name='车数')
     created_username = models.CharField(max_length=256, help_text='录入人')
     created_time = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
+    weight = models.FloatField(help_text='单车重量', default=0)
 
     class Meta:
         db_table = 'manual_input_trains'
@@ -677,6 +683,7 @@ class RubberFrameRepair(models.Model):
     date_time = models.CharField(max_length=10, help_text='记录时间', null=True, blank=True)
     times = models.IntegerField(help_text='保存次数', null=True, blank=True)
     content = models.TextField(help_text='维修胶架内容', null=True, blank=True)
+    save_user = models.CharField(max_length=64, help_text='保存人', null=True, blank=True)
 
     class Meta:
         db_table = 'rubber_frame_repair'
@@ -688,6 +695,7 @@ class ToolManageAccount(models.Model):
     date_time = models.CharField(max_length=10, help_text='记录时间', null=True, blank=True)
     times = models.IntegerField(help_text='保存次数', null=True, blank=True)
     content = models.TextField(help_text='维修胶架内容', null=True, blank=True)
+    save_user = models.CharField(max_length=64, help_text='保存人', null=True, blank=True)
 
     class Meta:
         db_table = 'tool_manage_account'

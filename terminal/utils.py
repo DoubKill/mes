@@ -771,7 +771,7 @@ class JZCLSystem(object):
                                     </SetRealData>
                                 </soap:Body>
                             </soap:Envelope>"""
-        time.sleep(0.4)  # 增加延时，防止频繁调用导致失败
+        time.sleep(0.2)  # 增加延时，防止频繁调用导致失败
         door_info = requests.post(self.url, data=send_data.encode('utf-8'), timeout=1)
         res = door_info.content.decode('utf-8')
         result_flag = re.findall(r'<ns1:SetRealDataResult>(.*)</ns1:SetRealDataResult>', res)[0]
@@ -789,6 +789,7 @@ class JZCLSystem(object):
         if rep != 1:
             logger.error(f'通知接口异常: {resp_string}, detail: table_seq[{table_seq}]-table_id[{table_id}]-opera_type[{opera_type}]')
             raise ValueError(f'通知接口异常: {resp_string}, detail: table_seq[{table_seq}]-table_id[{table_id}]-opera_type[{opera_type}]')
+        logger.error(f'通知接口调用成功 detail: table_seq[{table_seq}]-table_id[{table_id}]-opera_type[{opera_type}]')
         return resp_string
 
     def execute_result(self, param):
@@ -803,7 +804,7 @@ class JZCLSystem(object):
                                 </GetRealData>
                             </soap:Body>
                         </soap:Envelope>"""
-        time.sleep(0.1)  # 增加延时，防止频繁调用导致失败
+        time.sleep(0.5)  # 增加延时，防止频繁调用导致失败
         door_info = requests.post(self.url, data=send_data.encode('utf-8'), timeout=1)
         res = door_info.content.decode('utf-8')
         result_flag = re.findall(r'<ns1:GetRealDataResult>(.*)</ns1:GetRealDataResult>', res)[0]
@@ -827,7 +828,10 @@ def get_tolerance(batching_equip, standard_weight, material_name=None, project_n
                                             small_num__lt=standard_weight, big_num__gte=standard_weight).first()
     # 人工单配配方或通用(所有量程)
     else:
-        rule = ToleranceRule.objects.filter(distinguish__re_str__icontains=material_name, use_flag=True).first()
+        if not material_name:
+            rule = None
+        else:
+            rule = ToleranceRule.objects.filter(distinguish__re_str__icontains=material_name, use_flag=True).first()
     tolerance = f"{rule.handle.keyword_name}{rule.standard_error}{rule.unit}" if rule else ""
     if tolerance:
         if rule.unit == '%':
@@ -844,16 +848,21 @@ def get_tolerance(batching_equip, standard_weight, material_name=None, project_n
 
 def get_manual_materials(product_no, dev_type, batching_equip, equip_no=None):
     product_no_dev = re.split(r'\(|\（|\[', product_no)[0]
+    wf_flag = False if dev_type != 'ZWF' else True
     if not equip_no:
-        flag, result = get_common_equip(product_no_dev, dev_type)
-        if flag:
-            equip_no = result[0]
+        if not wf_flag:
+            flag, result = get_common_equip(product_no_dev, dev_type)
+            if flag:
+                equip_no = result[0]
+            else:
+                raise ValueError(result)
         else:
-            raise ValueError(result)
+            equip_no, product_no_dev = 'ZWF', product_no
     mes_recipe = ProductBatchingEquip.objects.filter(is_used=True, equip_no=equip_no, type=4,
                                                      feeding_mode__startswith=batching_equip[0],
-                                                     product_batching__stage_product_batch_no=product_no_dev,
-                                                     product_batching__dev_type__category_name=dev_type)
+                                                     product_batching__stage_product_batch_no=product_no_dev)
+    if not wf_flag:
+        mes_recipe = mes_recipe.filter(product_batching__dev_type__category_name=dev_type)
     # 机配物料
     rep_material_model = JZRecipeMaterial if batching_equip in JZ_EQUIP_NO else RecipeMaterial
     machine_material = list(rep_material_model.objects.using(batching_equip).filter(recipe_name=product_no).values_list('name', flat=True))
@@ -867,7 +876,7 @@ def get_manual_materials(product_no, dev_type, batching_equip, equip_no=None):
     return manual_material
 
 
-def get_current_factory_date(select_date, group):
+def get_current_factory_date(select_date=None, group=None):
     now, filter_kwargs = datetime.now(), {}
     if select_date and group:  # 获取特定日期的班次
         filter_kwargs = {'plan_schedule__day_time': select_date, 'group__global_name': group, 'plan_schedule__work_schedule__work_procedure__global_name': '密炼'}

@@ -26,7 +26,7 @@ class MaterialDemandedFilter(django_filters.rest_framework.FilterSet):
     classes = django_filters.CharFilter(field_name='work_schedule_plan__classes__global_name', help_text='班次')
 
     product_no = django_filters.CharFilter(
-        field_name='product_classes_plan__product_day_plan__product_batching__stage_product_batch_no',
+        field_name='product_classes_plan__product_batching__stage_product_batch_no',
         lookup_expr='icontains', help_text='胶料编码')
 
     class Meta:
@@ -43,7 +43,6 @@ class ProductClassesPlanFilter(django_filters.rest_framework.FilterSet):
                                                help_text='开始时间')
     end_time = django_filters.DateTimeFilter(field_name='work_schedule_plan__start_time', lookup_expr="lte",
                                              help_text='结束时间')
-    # equip_no = django_filters.CharFilter(field_name='product_day_plan__equip__equip_no', help_text='机台编号')
     equip_no = django_filters.CharFilter(field_name='equip__equip_no', help_text='机台编号')
     schedule_name = django_filters.CharFilter(
         field_name='work_schedule_plan__plan_schedule__id', help_text='排班规则')

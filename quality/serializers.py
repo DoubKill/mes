@@ -455,8 +455,8 @@ class MaterialTestResultListSerializer(BaseModelSerializer):
 
     class Meta:
         model = MaterialTestResult
-        fields = ('id', 'test_times', 'value', 'data_point_name', 'test_method_name', 'judged_lower_limit',
-                  'judged_upper_limit', 'test_indicator_name', 'mes_result', 'result', 'machine_name', 'level')
+        fields = ('value', 'data_point_name', 'test_indicator_name', 'machine_name', 'level',
+                  'judged_lower_limit', 'judged_upper_limit')
         extra_kwargs = {
             'value': {'coerce_to_string': False},
             # 'judged_lower_limit': {'coerce_to_string': False},
@@ -466,54 +466,24 @@ class MaterialTestResultListSerializer(BaseModelSerializer):
 
 class MaterialTestOrderListSerializer(BaseModelSerializer):
     order_results = MaterialTestResultListSerializer(many=True)
-    deal_info = serializers.SerializerMethodField(read_only=True)
+    state = serializers.SerializerMethodField(read_only=True)
 
-    def get_deal_info(self, obj):
-        result = MaterialDealResult.objects.filter(lot_no=obj.lot_no).first()
-        if result:
-            return {
-                'test_result': result.test_result,
-                'deal_user': result.deal_user,
-                'deal_suggestion': '' if not result.deal_user else result.deal_suggestion,
-                'deal_time': '' if not result.deal_time else datetime.strftime(result.deal_time, '%Y-%m-%d %H:%M:%S')
-            }
-        return {
-            'test_result': '',
-            'deal_user': '',
-            'deal_suggestion': '',
-            'deal_time': '',
-        }
-
-    def to_representation(self, instance):
-        data = super().to_representation(instance)
-        order_results = data['order_results']
-        ret = {'门尼': {}, '硬度': {}, '比重': {}, '流变': {}, '钢拔': {}, '物性': {}}
-        for item in order_results:
-            indicator = item['test_indicator_name']
-            data_point = item['data_point_name']
-            ret[indicator][data_point] = item
-            # if indicator not in ret:
-            #     ret[indicator] = {}
-            #     ret[indicator][data_point] = item
-            # else:
-            #     if data_point not in ret[indicator]:
-            #         ret[indicator][data_point] = item
-            #     else:
-            #         if ret[indicator][data_point]['id'] < item['id']:
-            #             ret[indicator][data_point] = item
-        data['order_results'] = ret
-        return data
+    def get_state(self, obj):
+        if obj.is_finished:
+            return "合格" if obj.is_qualified else "不合格"
+        return "检测中"
 
     class Meta:
         model = MaterialTestOrder
-        fields = '__all__'
+        fields = ('lot_no', 'product_no', 'production_factory_date', 'production_class', 'production_group',
+                  'production_equip_no', 'actual_trains', 'is_recheck', 'state', 'order_results')
 
 
 class MaterialTestResultExportSerializer(BaseModelSerializer):
 
     class Meta:
         model = MaterialTestResult
-        fields = ('value', 'data_point_name')
+        fields = ('value', 'data_point_name', 'machine_name')
         extra_kwargs = {
                     'value': {'coerce_to_string': False},
                 }
@@ -521,11 +491,17 @@ class MaterialTestResultExportSerializer(BaseModelSerializer):
 
 class MaterialTestOrderExportSerializer(BaseModelSerializer):
     order_results = MaterialTestResultExportSerializer(many=True)
+    state = serializers.SerializerMethodField(read_only=True)
+
+    def get_state(self, obj):
+        if obj.is_finished:
+            return "合格" if obj.is_qualified else "不合格"
+        return "检测中"
 
     class Meta:
         model = MaterialTestOrder
-        fields = ('product_no', 'production_factory_date', 'production_class', 'order_results',
-                  'production_group', 'production_equip_no', 'actual_trains', 'is_qualified')
+        fields = ('lot_no', 'product_no', 'production_factory_date', 'production_class', 'order_results',
+                  'production_group', 'production_equip_no', 'actual_trains', 'state', 'is_recheck')
 
 
 class MaterialTestMethodSerializer(BaseModelSerializer):

@@ -1034,6 +1034,23 @@ permission_data = [
     {'id': 1028, 'code': 'view_tool_manage_account', 'name': '查看', 'parent_id': 1027},
     {'id': 1029, 'code': 'add_tool_manage_account', 'name': '新增', 'parent_id': 1027},
 
+    {'id': 1031, 'code': 'user_operation_log', 'name': '操作履历查询', 'parent_id': None},
+    {'id': 1032, 'code': 'view_user_operation_log', 'name': '查看', 'parent_id': 1031},
+    {'id': 1033, 'code': 'export_user_operation_log', 'name': '导出', 'parent_id': 1031},
+
+    {'id': 1034, 'code': 'wfproductbatching', 'name': '外供料包的配方', 'parent_id': None},
+    {'id': 1035, 'code': 'view_wfproductbatching', 'name': '查看', 'parent_id': 1034},
+    {'id': 1036, 'code': 'add_wfproductbatching', 'name': '增加', 'parent_id': 1034},
+    {'id': 1037, 'code': 'change_wfproductbatching', 'name': '修改', 'parent_id': 1034},
+    {'id': 1038, 'code': 'edit_wfproductbatching', 'name': '编辑', 'parent_id': 1034},
+    {'id': 1039, 'code': 'submit_wfproductbatching', 'name': '提交', 'parent_id': 1034},
+    {'id': 1040, 'code': 'check_wfproductbatching', 'name': '校对', 'parent_id': 1034},
+    {'id': 1041, 'code': 'use_wfproductbatching', 'name': '启用', 'parent_id': 1034},
+    {'id': 1042, 'code': 'refuse_wfproductbatching', 'name': '驳回', 'parent_id': 1034},
+    {'id': 1043, 'code': 'abandon_wfproductbatching', 'name': '弃用', 'parent_id': 1034},
+    {'id': 1044, 'code': 'stop_wfproductbatching', 'name': '停用', 'parent_id': 1034},
+    {'id': 1045, 'code': 'sendXl_wfproductbatching', 'name': '发送称量配方', 'parent_id': 1034},
+
     {'id': 1046, 'code': 'check_point_standard', 'name': '岗位安全装置点检标准', 'parent_id': None},
     {'id': 1047, 'code': 'view_check_point_standard', 'name': '查看', 'parent_id': 1046},
     {'id': 1048, 'code': 'add_check_point_standard', 'name': '新增', 'parent_id': 1046},
@@ -1068,7 +1085,6 @@ permission_data = [
     {'id': 1079, 'code': 'view_rubber_frame_repair_summary', 'name': '查看', 'parent_id': 1078},
 
     # 下一个 1081 开始
-
 ]
 
 

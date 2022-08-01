@@ -363,8 +363,9 @@ class AutoDispatch(object):
 
 if __name__ == '__main__':
     auto_dispatch = AutoDispatch()
-    repair_orders = list(EquipApplyOrder.objects.filter(status='已生成', back_order=False))
-    inspect_order = list(EquipInspectionOrder.objects.filter(status='已生成', back_order=False))
+    limit_range = datetime.datetime.now() - datetime.timedelta(days=5)
+    repair_orders = list(EquipApplyOrder.objects.filter(status='已生成', back_order=False, created_date__gte=limit_range))
+    inspect_order = list(EquipInspectionOrder.objects.filter(status='已生成', back_order=False, created_date__gte=limit_range))
     orders = repair_orders + inspect_order
     if not orders:
         logger.info("系统派单: 没有新生成的工单可派")

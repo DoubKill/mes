@@ -200,6 +200,7 @@ def gen_pallet_test_result(lot_nos):
         for test_order in test_orders:
             test_results = test_order.order_results.filter()
             if test_product_flat:
+                test_order.is_finished = True
                 if test_results.filter(level=2).exists():
                     test_order.is_qualified = False
                 else:
@@ -225,6 +226,8 @@ def gen_pallet_test_result(lot_nos):
                 common_data_points = data_points & set(test_results.values_list('data_point_name', flat=True))
                 if not len(data_points) == len(common_data_points):
                     continue_flag = True
+                else:
+                    test_order.is_finished = True
             test_order.save()
 
         if test_product_flat:

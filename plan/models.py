@@ -11,7 +11,7 @@ from system.models import AbstractEntity
 
 # Create your models here.
 class ProductDayPlan(AbstractEntity):
-    """胶料日计划表"""
+    """胶料日计划表（MES无用）"""
     equip = models.ForeignKey(Equip, on_delete=models.CASCADE, help_text='机台id', verbose_name='机台id',
                               related_name='equip_product_day_plan')
     product_batching = models.ForeignKey(ProductBatching, on_delete=models.CASCADE, help_text='配料id',
