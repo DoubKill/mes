@@ -141,3 +141,12 @@ class AttendanceClockDetailFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = AttendanceClockDetail
         fields = ('name', 'date')
+
+
+class EmployeeAttendanceRecordsLogFilter(django_filters.rest_framework.FilterSet):
+    opera_user = django_filters.CharFilter(field_name='opera_user', help_text='操作人', lookup_expr='icontains')
+    opera_type = django_filters.CharFilter(field_name='opera_type', help_text='操作类型', lookup_expr='icontains')
+
+    class Meta:
+        model = EmployeeAttendanceRecordsLog
+        fields = ('opera_time', 'opera_user', 'opera_type', 'record_date')

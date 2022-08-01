@@ -66,6 +66,8 @@ router.register('attendance-clock-detail', AttendanceClockDetailViewSet)
 router.register('attendance-time-statistics', AttendanceTimeStatisticsViewSet)
 # 190E机台规格信息维护
 router.register('equip-190e', Equip190EViewSet)
+# 考勤操作记录
+router.register('employee-attendance-records-log', EmployeeAttendanceRecordsLogViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),

@@ -12,7 +12,7 @@ from plan.models import ProductClassesPlan
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, QualityControl, \
     OperationLog, UnReachedCapacityCause, ProcessFeedback, AlarmLog, RubberCannotPutinReason, PerformanceJobLadder, \
     ProductInfoDingJi, SetThePrice, SubsidyInfo, AttendanceGroupSetup, EmployeeAttendanceRecords, FillCardApply, \
-    ApplyForExtraWork, Equip190EWeight, OuterMaterial, Equip190E, AttendanceClockDetail
+    ApplyForExtraWork, Equip190EWeight, OuterMaterial, Equip190E, AttendanceClockDetail, EmployeeAttendanceRecordsLog
 from recipe.models import MaterialAttribute
 from system.models import User
 
@@ -480,24 +480,25 @@ class AttendanceGroupSetupSerializer(serializers.ModelSerializer):
 
 
 class EmployeeAttendanceRecordsSerializer(serializers.ModelSerializer):
-    username = serializers.CharField(default=None)
+    username = serializers.CharField(source='user.username', default=None)
 
     class Meta:
         model = EmployeeAttendanceRecords
         fields = '__all__'
 
     def validate(self, attrs):
-        attrs['user'] = User.objects.filter(username=attrs.pop('username')).first()
+        user = attrs.pop('user')
+        attrs['user'] = User.objects.filter(username=user.get('username')).first()
         return attrs
 
     def create(self, validated_data):
-        # 已经确认过或者整体提交不能添加考勤数据 绿色[#51A651] 黑色[#141414]
+        # 已经确认过或者整体提交不能添加考勤数据 黑色[#141414]
         r_exist = EmployeeAttendanceRecords.objects.filter(factory_date=validated_data['factory_date'],
                                                            group=validated_data['group'],
                                                            equip=validated_data['equip'],
                                                            section=validated_data['section'],
-                                                           user__username=validated_data['user'].username,
-                                                           record_status__in=['#51A651', '#141414'])
+                                                           user=validated_data['user'],
+                                                           record_status__in=['#141414'])
         if r_exist:
             raise serializers.ValidationError('添加失败: 该考勤数据已锁定!')
         return super().create(validated_data)
@@ -577,3 +578,11 @@ class AttendanceClockDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = AttendanceClockDetail
         fields = '__all__'
+
+
+class EmployeeAttendanceRecordsLogSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = EmployeeAttendanceRecordsLog
+        fields = '__all__'
+
