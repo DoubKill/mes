@@ -176,6 +176,7 @@ class WeightPackageLogDetails(models.Model):
 
 
 class OtherMaterialLog(models.Model):
+    scan_time = models.DateTimeField(auto_now_add=True)
     plan_classes_uid = models.CharField(max_length=64, help_text='密炼计划号')
     product_no = models.CharField(max_length=64, help_text='胶料名称-配方号')
     material_name = models.CharField(max_length=64, help_text='物料名称', null=True)

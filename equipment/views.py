@@ -2556,12 +2556,12 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipWarehouseOrderDetailFilter
 
-    def get_queryset(self):
-        order_id = self.request.query_params.get('order_id')
-        if order_id and order_id.startswith('RK'):
-            return self.queryset.exclude(status=3)
-        else:
-            return self.queryset
+    # def get_queryset(self):
+    #     order_id = self.request.query_params.get('order_id')
+    #     if order_id and order_id.startswith('RK'):
+    #         return self.queryset.exclude(status=3)
+    #     else:
+    #         return self.queryset
 
     @atomic
     def create(self, request, *args, **kwargs):
@@ -2580,14 +2580,15 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
         enter_time = datetime.strptime(enter_time, '%Y-%m-%d %H:%M:%S') if enter_time else datetime.now()
         outer_time = datetime.strptime(outer_time, '%Y-%m-%d %H:%M:%S') if outer_time else datetime.now()
         if status == 1:
-            if instance.plan_in_quantity <= instance.in_quantity:
-                return Response({"success": False, "message": '该单据已入库完成', "data": None})
-            if instance.in_quantity + in_quantity > instance.plan_in_quantity:
-                return Response({"success": False, "message": '入库数量大于单据剩余未入库数量', "data": None})
-            if instance.in_quantity + in_quantity == instance.plan_in_quantity:
-                instance.status = 3  # 已完成
-            elif instance.in_quantity + in_quantity < instance.plan_in_quantity:
-                instance.status = 2  # 入库中
+            # if instance.plan_in_quantity <= instance.in_quantity:
+            #     return Response({"success": False, "message": '该单据已入库完成', "data": None})
+            # if instance.in_quantity + in_quantity > instance.plan_in_quantity:
+            #     return Response({"success": False, "message": '入库数量大于单据剩余未入库数量', "data": None})
+            # if instance.in_quantity + in_quantity == instance.plan_in_quantity:
+            #     instance.status = 3  # 已完成
+            # elif instance.in_quantity + in_quantity < instance.plan_in_quantity:
+            #     instance.status = 2  # 入库中
+            instance.status = 2
             instance.in_quantity += data['in_quantity']
             instance.enter_time = enter_time
             instance.save()
@@ -2677,7 +2678,9 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
         "备件名称": "spare_name",
         "规格型号": "specification",
         "用途": "technical_params",
+        "单价": "single_price",
         "在库数量": "quantity",
+        "总金额": "total_price",
         "标准单位": "unit",
         "库存下限": "lower_stock",
         "库存上限": "upper_stock",
@@ -2688,6 +2691,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
         page_size = self.request.query_params.get('page_size', 10)
         equip_spare = self.request.query_params.get('equip_spare')
         equip_warehouse_location = self.request.query_params.get('equip_warehouse_location')
+        order_id = self.request.query_params.get('order_id')  # 获取id[编辑的时候过滤掉id内包含的备件]
         if self.request.query_params.get("detail"):
             queryset = EquipWarehouseRecord.objects.filter(equip_spare_id=equip_spare,
                                                           equip_warehouse_location_id=equip_warehouse_location).order_by('id')
@@ -2727,7 +2731,12 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
                 'location_id': first.equip_warehouse_location.id,
             }})
         if self.request.query_params.get('use'):
-            data = self.filter_queryset(self.queryset.filter(quantity__gt=0)).values('equip_spare').annotate(qty=Sum('quantity')).values(
+            if order_id:
+                order_info = EquipWarehouseOrder.objects.filter(id=order_id).last()
+                equip_spare_ids = [] if not order_info else order_info.order_detail.values_list('equip_spare__id', flat=True)
+            else:  # 新建单据过滤掉已经添加的物料
+                equip_spare_ids = set(EquipWarehouseOrderDetail.objects.filter(~Q(status=7), equip_warehouse_order__order_id__startswith='CK').values_list('equip_spare__id', flat=True))
+            data = self.filter_queryset(self.queryset.filter(~Q(equip_spare_id__in=equip_spare_ids), quantity__gt=0)).values('equip_spare').annotate(qty=Sum('quantity')).values(
                                             'equip_spare__equip_component_type__component_type_name',
                                             'equip_spare__spare_code',
                                             'equip_spare__spare_name',
@@ -2747,6 +2756,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
                                                  'equip_warehouse_location__location_name',
                                                  'equip_spare__equip_component_type__component_type_name',
                                                  'equip_spare__spare_code',
+                                                 'equip_spare__cost',
                                                  'equip_spare__spare_name',
                                                  'equip_spare__specification',
                                                  'equip_spare__technical_params',
@@ -2764,6 +2774,9 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
             item['upper_stock'] = item['equip_spare__upper_stock']
             item['lower_stock'] = item['equip_spare__lower_stock']
             item['unit'] = item['equip_spare__unit']
+            if not self.request.query_params.get('use'):
+                item['single_price'] = item['equip_spare__cost']
+                item['total_price'] = item['equip_spare__cost'] * item['quantity']
         if self.request.query_params.get('export'):
             return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         st = (int(page) - 1) * int(page_size)
@@ -3096,7 +3109,7 @@ class EquipAutoPlanView(APIView):
             }
             return Response({"success": True, "message": None, "data": data})
         else:  # 备件移库/盘库
-            data = EquipWarehouseInventory.objects.filter(equip_spare__spare_code=spare_code, quantity__gt=0)\
+            data = EquipWarehouseInventory.objects.filter(equip_spare__spare_code=spare_code)\
                 .values('equip_spare', 'equip_warehouse_location').annotate(
                 quantity=Sum('quantity')).values(
                 'equip_warehouse_area__id',

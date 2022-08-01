@@ -31,7 +31,8 @@ from recipe.serializers import MaterialSerializer, ProductInfoSerializer, \
     ProductBatchingPartialUpdateSerializer, MaterialSupplierSerializer, \
     ProductBatchingDetailMaterialSerializer, WeighCntTypeSerializer, ERPMaterialCreateSerializer, ERPMaterialSerializer, \
     ERPMaterialUpdateSerializer, ZCMaterialSerializer, ProductBatchingDetailRetrieveSerializer, \
-    ReplaceRecipeMaterialSerializer
+    ReplaceRecipeMaterialSerializer, WFProductBatchingCreateSerializer, WFProductBatchingUpdateSerializer, \
+    WFProductBatchingListSerializer, WFProductBatchingRetrieveSerializer
 from recipe.models import Material, ProductInfo, ProductBatching, MaterialAttribute, \
     ProductBatchingDetail, MaterialSupplier, WeighCntType, WeighBatchingDetail, ZCMaterial, ERPMESMaterialRelation, \
     ProductBatchingEquip, ProductBatchingMixed, MultiReplaceMaterial
@@ -355,6 +356,129 @@ class ProductBatchingViewSet(ModelViewSet):
             return ProductBatchingPartialUpdateSerializer
         else:
             return ProductBatchingUpdateSerializer
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.delete_flag = True
+        instance.delete_user = request.user
+        instance.save()
+        instance.batching_details.filter().update(delete_flag=True, delete_user=request.user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class WFProductBatchingViewSet(ModelViewSet):
+    """
+    list:
+        胶料配料标准列表
+    retrieve:
+        胶料配料标准详情
+    create:
+        新建胶料配料标准
+    update:
+        配料
+    partial_update:
+        配料审批
+    """
+    queryset = ProductBatching.objects.filter(delete_flag=False, batching_type=3).select_related(
+        "factory", "site", "dev_type", "stage", "product_info"
+    ).prefetch_related(
+        Prefetch('batching_details', queryset=ProductBatchingDetail.objects.filter(delete_flag=False).order_by('sn')),
+        Prefetch('weight_cnt_types', queryset=WeighCntType.objects.filter(delete_flag=False)),
+        Prefetch('weight_cnt_types__weight_details', queryset=WeighBatchingDetail.objects.filter(
+            delete_flag=False).order_by('id')),
+    ).order_by('stage_product_batch_no', 'dev_type')
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = ProductBatchingFilter
+    EXPORT_FIELDS_DICT = {
+        '序号': 'id',
+        '配方名称': 'stage_product_batch_no'
+    }
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        exclude_used_type = self.request.query_params.get('exclude_used_type')
+        filter_type = self.request.query_params.get('filter_type')  # 1-表示已发送(蓝色) 2-表示未发送
+        recipe_type = self.request.query_params.get('recipe_type')  # 配方类别(车胎胶料、斜交胎胶料...)
+        wms_material_name = self.request.query_params.get('wms_material_name')  # 原材料名称过滤
+        print_type = self.request.query_params.get('print_type')  # 胶皮补打[加硫、无硫]过滤
+        export = self.request.query_params.get('export')  # 导出涉及上述原材料的配方名称
+        if exclude_used_type:
+            queryset = queryset.exclude(used_type=exclude_used_type)
+        if self.request.query_params.get('all'):
+            data = queryset.values('id', 'stage_product_batch_no',
+                                   'batching_weight',
+                                   'production_time_interval',
+                                   'used_type',
+                                   'dev_type',
+                                   'dev_type__category_name')
+            if print_type:
+                data = list(set(data.filter(stage__global_name__in=['FM', 'RFM', 'RE'])
+                                .values_list('stage_product_batch_no', flat=True))) if print_type == '加硫' else \
+                    list(set(data.exclude(stage__global_name__in=['FM', 'RFM', 'RE'])
+                             .values_list('stage_product_batch_no', flat=True)))
+            return Response({'results': data})
+        else:
+            if filter_type:
+                res_id = []
+                recipe_ids = ProductBatchingEquip.objects.filter(is_used=True).values_list('product_batching_id', flat=True).distinct()
+                if filter_type == '1':
+                    if not recipe_ids:
+                        return Response([])
+                    for r_id in recipe_ids:
+                        enable_equip = list(ProductBatchingEquip.objects.filter(product_batching_id=r_id).values_list('equip_no', flat=True).distinct())
+                        send_success_equip = list(ProductBatchingEquip.objects.filter(product_batching_id=r_id, send_recipe_flag=True).values_list('equip_no', flat=True).distinct())
+                        if enable_equip != send_success_equip:
+                            res_id.append(r_id)
+                    queryset = queryset.filter(id__in=res_id)
+                elif filter_type == '2':
+                    queryset = queryset.exclude(id__in=list(recipe_ids))
+            if recipe_type:
+                stage_prefix = re.split(r'[,|，]', recipe_type)
+                filter_str = ''
+                for i in stage_prefix:
+                    filter_str += ('' if not filter_str else '|') + f"Q(product_info__product_name__startswith='{i.strip()}')"
+                queryset = queryset.filter(eval(filter_str))
+                if 'C' in stage_prefix or 'TC' in stage_prefix:  # 车胎类别(C)与半钢类别(CJ)需要区分
+                    queryset = queryset.filter(~Q(product_info__product_name__startswith='CJ'), ~Q(product_info__product_name__startswith='TCJ'))
+                if 'U' in stage_prefix or 'TU' in stage_prefix:  # 车胎类别(UC)与斜胶类别(U)需要区分
+                    queryset = queryset.filter(~Q(product_info__product_name__startswith='UC'), ~Q(product_info__product_name__startswith='TUC'))
+            if wms_material_name:
+                queryset = queryset.filter(Q(batching_details__material__material_name=wms_material_name,
+                                             batching_details__delete_flag=False) |
+                                           Q(weight_cnt_types__delete_flag=False,
+                                             weight_cnt_types__weight_details__material__material_name=wms_material_name)).distinct()
+                if export:
+                    now_date = datetime.datetime.now().strftime('%Y-%m-%d')
+                    file_name = f"原材料({wms_material_name})使用配方列表{now_date}.xls"
+                    data = self.get_serializer(queryset.order_by('id'), many=True).data
+                    return gen_template_response(self.EXPORT_FIELDS_DICT, data, file_name)
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
+
+    def get_permissions(self):
+        if self.request.query_params.get('all'):
+            return ()
+        else:
+            return (IsAuthenticated(),)
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return WFProductBatchingListSerializer
+        elif self.action == 'create':
+            return WFProductBatchingCreateSerializer
+        elif self.action == 'retrieve':
+            return WFProductBatchingRetrieveSerializer
+        elif self.action == 'partial_update':
+            return ProductBatchingPartialUpdateSerializer
+        else:
+            return WFProductBatchingUpdateSerializer
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()

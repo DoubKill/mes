@@ -3618,7 +3618,7 @@ class PerformanceSummaryView(APIView):
         # 取每个机台设定的目标值
         settings_value = MachineTargetYieldSettings.objects.filter(target_month=date).last()
         if not settings_value:
-            settings_value = MachineTargetYieldSettings.objects.last()
+            raise ValidationError('请先完成当月的机台目标值设定')
         # 计算薪资
         section_info = {}
         for item in PerformanceJobLadder.objects.filter(type='密炼').values('name', 'coefficient', 'post_standard', 'post_coefficient', 'type'):
@@ -4043,6 +4043,13 @@ class AttendanceClockViewSet(ModelViewSet):
         else:
             group_list, equip_list, section_list, principal = group_list, equip_list, section_list, attendance_group_obj.principal
         equip_list.sort()
+        # 获取单选和多选机台的岗位
+        s_choice, m_choice = [], []
+        if equip_list:
+            keyword = equip_list[0][0]
+            equip_type = '密炼' if keyword == 'Z' else ('细料称量' if keyword == 'F' else '硫磺称量')
+            s_choice = list(PerformanceJobLadder.objects.filter(type=equip_type, relation=1).values_list('name', flat=True).distinct())
+            m_choice = list(PerformanceJobLadder.objects.filter(type=equip_type, relation=2).values_list('name', flat=True).distinct())
         results = {
             # 'ids': ids,  # 进行中的id，前端打卡传这个过来
             'username': username,
@@ -4050,6 +4057,8 @@ class AttendanceClockViewSet(ModelViewSet):
             'group_list': group_list,
             'equip_list': equip_list,
             'section_list': section_list,
+            's_choice': s_choice,
+            'm_choice': m_choice,
             'principal': principal,  # 前端根据这个判断是否显示审批
         }
         if apply:  # 补卡/加班
@@ -4062,7 +4071,7 @@ class AttendanceClockViewSet(ModelViewSet):
             report = EmployeeAttendanceRecords.objects.filter(begin_date=last_obj.begin_date,
                                                               user_id=last_obj.user_id).values_list('equip', 'id')
             ids, equips = [item[1] for item in report], [item[0] for item in report]
-            results['equips'] = equips
+            results['equips'] = sorted(list(set(equips))) if last_obj.section in (s_choice + m_choice) else []
 
             if str(last_obj.factory_date) == date_now:
                 begin_time, end_time = get_standard_time(username, date_now)
@@ -4367,7 +4376,7 @@ class AttendanceClockViewSet(ModelViewSet):
             obj = queryset.filter(status__in=['上岗', '调岗'], end_date__isnull=True).last()
             if obj:
                 equips = queryset.filter(begin_date=obj.begin_date).values_list('equip', flat=True)
-        res['equips'] = equips
+        res['equips'] = sorted(list(set(equips)))
         return Response({'results': res})
 
 
@@ -4872,7 +4881,6 @@ class AttendanceResultAuditView(APIView):
             # 未整体提交的考勤数据不能审核、审批[]
             if not_overall:
                 raise ValidationError(f'存在未确认的考勤数据, 请处理后再{opera_type}')
-            AttendanceResultAudit
             AttendanceResultAudit.objects.create(**data)
             # 审核或审批不通过,当月考勤数据全为红色 #DA1F27 红色
             if not data.get('result'):
@@ -5051,12 +5059,13 @@ class RubberFrameRepairView(APIView):
     def post(self, request):
         date_time = self.request.data.get('date_time')
         details = self.request.data.get('details')
+        save_user = self.request.user.username
         if not all([date_time, details]):
             raise ValidationError('参数异常')
         # 获取最新保存次数
         max_times = RubberFrameRepair.objects.filter(date_time=date_time).aggregate(max_times=Max('times'))['max_times']
         times = 1 if not max_times else max_times + 1
-        RubberFrameRepair.objects.create(date_time=date_time, content=json.dumps(details), times=times)
+        RubberFrameRepair.objects.create(date_time=date_time, content=json.dumps(details), times=times, save_user=save_user)
         return Response('保存成功')
 
 
@@ -5083,10 +5092,11 @@ class ToolManageAccountView(APIView):
     def post(self, request):
         date_time = self.request.data.get('date_time')
         details = self.request.data.get('details')
+        save_user = self.request.user.username
         if not all([date_time, details]):
             raise ValidationError('参数异常')
         # 获取最新保存次数
         max_times = ToolManageAccount.objects.filter(date_time=date_time).aggregate(max_times=Max('times'))['max_times']
         times = 1 if not max_times else max_times + 1
-        ToolManageAccount.objects.create(date_time=date_time, content=json.dumps(details), times=times)
+        ToolManageAccount.objects.create(date_time=date_time, content=json.dumps(details), times=times, save_user=save_user)
         return Response('保存成功')
