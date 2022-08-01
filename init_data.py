@@ -1014,6 +1014,7 @@ permission_data = [
     {'id': 1075, 'code': 'view2_d_equip_apply_order', 'name': '除尘袋滤器查询', 'parent_id': 1004},
     {'id': 1076, 'code': 'execute2_d_equip_apply_order', 'name': '除尘袋滤器确认实施', 'parent_id': 1004},
     {'id': 1077, 'code': 'confirm2_d_equip_apply_order', 'name': '除尘袋滤器确认', 'parent_id': 1004},
+    {'id': 1080, 'code': 'view3_d_equip_apply_order', 'name': '细料胶块放行处理', 'parent_id': 1004},
 
     {'id': 1014, 'code': 'wms_mooney_level', 'name': '原材料门尼值等级管理', 'parent_id': None},
     {'id': 1015, 'code': 'view_wms_mooney_level', 'name': '查看', 'parent_id': 1014},
@@ -1066,7 +1067,7 @@ permission_data = [
     {'id': 1078, 'code': 'rubber_frame_repair_summary', 'name': '胶架维修记录汇总', 'parent_id': None},
     {'id': 1079, 'code': 'view_rubber_frame_repair_summary', 'name': '查看', 'parent_id': 1078},
 
-    # 下一个 1080 开始
+    # 下一个 1081 开始
 
 ]
 
