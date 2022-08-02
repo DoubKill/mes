@@ -1053,7 +1053,7 @@ class XLCommonCode(models.Model):
 class CheckPointStandard(AbstractEntity):
     point_standard_code = models.CharField(max_length=64, help_text='点检表编号', null=True, blank=True)
     point_standard_name = models.CharField(max_length=64, help_text='点检表名称')
-    doc_code = models.CharField(max_length=64, help_text='文档编号')
+    doc_code = models.CharField(max_length=64, help_text='文档编号', null=True, blank=True)
     equip_no = models.CharField(max_length=64, help_text='适用机台')
     station = models.CharField(max_length=64, help_text='岗位')
 

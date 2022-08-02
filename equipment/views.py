@@ -5123,8 +5123,8 @@ class CheckPointStandardViewSet(ModelViewSet):
                 for item in data:
                     if self.get_queryset().filter(point_standard_code=item[0]):  # 存在的编码过滤掉
                         continue
-                    if not all([item[1], item[2], item[3], item[4]]):
-                        raise ValidationError('点检标准名称、文档编号、通用机台、岗位为必填')
+                    if not all([item[1], item[3], item[4]]):
+                        raise ValidationError('点检标准名称、通用机台、岗位为必填')
                     if self.get_queryset().filter(equip_no=item[3], station=item[4]):
                         raise ValidationError('导入标准存在冲突[通用机台+岗位需要不相同]')
                     contents, styles = item[5].split('；')[:-1], item[6].split('；')[:-1]
