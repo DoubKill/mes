@@ -2782,7 +2782,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
             item['lower_stock'] = item['equip_spare__lower_stock']
             item['unit'] = item['equip_spare__unit']
             if not self.request.query_params.get('use'):
-                item['single_price'] = item['equip_spare__cost']
+                item['single_price'] = round(item['equip_spare__cost'] if item['equip_spare__cost'] else 0, 2)
                 item['total_price'] = item['equip_spare__cost'] * item['quantity']
         if self.request.query_params.get('export'):
             return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
