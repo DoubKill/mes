@@ -1850,8 +1850,8 @@ class CheckPointTableSerializer(BaseModelSerializer):
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
         validators = [UniqueTogetherValidator(queryset=CheckPointTable.objects.filter(delete_flag=False),
-                                              fields=('point_standard_name', 'equip_no', 'station', 'select_date'),
-                                              message='已存在点检表名称+岗位+适用机台')]
+                                              fields=('point_standard_name', 'equip_no', 'station', 'select_date', 'classes'),
+                                              message='已存在点检表名称+岗位+适用机台+日期+班次')]
 
 
 class CheckPointTableUpdateSerializer(BaseModelSerializer):
