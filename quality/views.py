@@ -183,7 +183,7 @@ class TestIndicatorDataPointListView(ListAPIView):
 
     def list(self, request, *args, **kwargs):
         ret = []
-        test_indicators_names = ['流变', '比重', '门尼', '硬度', '钢拔', '物性']
+        test_indicators_names = ['门尼', '比重', '硬度', '流变', '钢拔', '物性']
         for name in test_indicators_names:
             test_indicator = TestIndicator.objects.filter(name__icontains=name).first()
             if test_indicator:
@@ -299,22 +299,22 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
         ).values('data_point__name', 'upper_limit', 'lower_limit')
         indicators_data_dict = {i['data_point__name']: i for i in indicators_data}
         sheet.cell(2, 1).value = product_no
-        sheet.cell(5, 10).value = indicators_data_dict.get('MH', {}).get('upper_limit')
-        sheet.cell(6, 10).value = indicators_data_dict.get('MH', {}).get('lower_limit')
-        sheet.cell(5, 11).value = indicators_data_dict.get('ML', {}).get('upper_limit')
-        sheet.cell(6, 11).value = indicators_data_dict.get('ML', {}).get('lower_limit')
-        sheet.cell(5, 12).value = indicators_data_dict.get('TC10', {}).get('upper_limit')
-        sheet.cell(6, 12).value = indicators_data_dict.get('TC10', {}).get('lower_limit')
-        sheet.cell(5, 13).value = indicators_data_dict.get('TC50', {}).get('upper_limit')
-        sheet.cell(6, 13).value = indicators_data_dict.get('TC50', {}).get('lower_limit')
-        sheet.cell(5, 14).value = indicators_data_dict.get('TC90', {}).get('upper_limit')
-        sheet.cell(6, 14).value = indicators_data_dict.get('TC90', {}).get('lower_limit')
-        sheet.cell(5, 15).value = indicators_data_dict.get('比重值', {}).get('upper_limit')
-        sheet.cell(6, 15).value = indicators_data_dict.get('比重值', {}).get('lower_limit')
-        sheet.cell(5, 16).value = indicators_data_dict.get('ML(1+4)', {}).get('upper_limit')
-        sheet.cell(6, 16).value = indicators_data_dict.get('ML(1+4)', {}).get('lower_limit')
-        sheet.cell(5, 17).value = indicators_data_dict.get('硬度值', {}).get('upper_limit')
-        sheet.cell(6, 17).value = indicators_data_dict.get('硬度值', {}).get('lower_limit')
+        sheet.cell(5, 10).value = indicators_data_dict.get('ML(1+4)', {}).get('upper_limit')
+        sheet.cell(6, 10).value = indicators_data_dict.get('ML(1+4)', {}).get('lower_limit')
+        sheet.cell(5, 11).value = indicators_data_dict.get('比重值', {}).get('upper_limit')
+        sheet.cell(6, 11).value = indicators_data_dict.get('比重值', {}).get('lower_limit')
+        sheet.cell(5, 12).value = indicators_data_dict.get('硬度值', {}).get('upper_limit')
+        sheet.cell(6, 12).value = indicators_data_dict.get('硬度值', {}).get('lower_limit')
+        sheet.cell(5, 13).value = indicators_data_dict.get('MH', {}).get('upper_limit')
+        sheet.cell(6, 13).value = indicators_data_dict.get('MH', {}).get('lower_limit')
+        sheet.cell(5, 14).value = indicators_data_dict.get('ML', {}).get('upper_limit')
+        sheet.cell(6, 14).value = indicators_data_dict.get('ML', {}).get('lower_limit')
+        sheet.cell(5, 15).value = indicators_data_dict.get('TC10', {}).get('upper_limit')
+        sheet.cell(6, 15).value = indicators_data_dict.get('TC10', {}).get('lower_limit')
+        sheet.cell(5, 16).value = indicators_data_dict.get('TC50', {}).get('upper_limit')
+        sheet.cell(6, 16).value = indicators_data_dict.get('TC50', {}).get('lower_limit')
+        sheet.cell(5, 17).value = indicators_data_dict.get('TC90', {}).get('upper_limit')
+        sheet.cell(6, 17).value = indicators_data_dict.get('TC90', {}).get('lower_limit')
         for i in result:
             deal_suggestion = ''
             result_data = lot_deal_result_dict.get(i['lot_no'])
@@ -335,22 +335,22 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
                 ).values('data_point__name', 'upper_limit', 'lower_limit')
                 indicators_data_dict = {i['data_point__name']: i for i in indicators_data}
                 sheet.cell(2, 1).value = product_no
-                sheet.cell(5, 10).value = indicators_data_dict.get('MH', {}).get('upper_limit')
-                sheet.cell(6, 10).value = indicators_data_dict.get('MH', {}).get('lower_limit')
-                sheet.cell(5, 11).value = indicators_data_dict.get('ML', {}).get('upper_limit')
-                sheet.cell(6, 11).value = indicators_data_dict.get('ML', {}).get('lower_limit')
-                sheet.cell(5, 12).value = indicators_data_dict.get('TC10', {}).get('upper_limit')
-                sheet.cell(6, 12).value = indicators_data_dict.get('TC10', {}).get('lower_limit')
-                sheet.cell(5, 13).value = indicators_data_dict.get('TC50', {}).get('upper_limit')
-                sheet.cell(6, 13).value = indicators_data_dict.get('TC50', {}).get('lower_limit')
-                sheet.cell(5, 14).value = indicators_data_dict.get('TC90', {}).get('upper_limit')
-                sheet.cell(6, 14).value = indicators_data_dict.get('TC90', {}).get('lower_limit')
-                sheet.cell(5, 15).value = indicators_data_dict.get('比重值', {}).get('upper_limit')
-                sheet.cell(6, 15).value = indicators_data_dict.get('比重值', {}).get('lower_limit')
-                sheet.cell(5, 16).value = indicators_data_dict.get('ML(1+4)', {}).get('upper_limit')
-                sheet.cell(6, 16).value = indicators_data_dict.get('ML(1+4)', {}).get('lower_limit')
-                sheet.cell(5, 17).value = indicators_data_dict.get('硬度值', {}).get('upper_limit')
-                sheet.cell(6, 17).value = indicators_data_dict.get('硬度值', {}).get('lower_limit')
+                sheet.cell(5, 10).value = indicators_data_dict.get('ML(1+4)', {}).get('upper_limit')
+                sheet.cell(6, 10).value = indicators_data_dict.get('ML(1+4)', {}).get('lower_limit')
+                sheet.cell(5, 11).value = indicators_data_dict.get('比重值', {}).get('upper_limit')
+                sheet.cell(6, 11).value = indicators_data_dict.get('比重值', {}).get('lower_limit')
+                sheet.cell(5, 12).value = indicators_data_dict.get('硬度值', {}).get('upper_limit')
+                sheet.cell(6, 12).value = indicators_data_dict.get('硬度值', {}).get('lower_limit')
+                sheet.cell(5, 13).value = indicators_data_dict.get('MH', {}).get('upper_limit')
+                sheet.cell(6, 13).value = indicators_data_dict.get('MH', {}).get('lower_limit')
+                sheet.cell(5, 14).value = indicators_data_dict.get('ML', {}).get('upper_limit')
+                sheet.cell(6, 14).value = indicators_data_dict.get('ML', {}).get('lower_limit')
+                sheet.cell(5, 15).value = indicators_data_dict.get('TC10', {}).get('upper_limit')
+                sheet.cell(6, 15).value = indicators_data_dict.get('TC10', {}).get('lower_limit')
+                sheet.cell(5, 16).value = indicators_data_dict.get('TC50', {}).get('upper_limit')
+                sheet.cell(6, 16).value = indicators_data_dict.get('TC50', {}).get('lower_limit')
+                sheet.cell(5, 17).value = indicators_data_dict.get('TC90', {}).get('upper_limit')
+                sheet.cell(6, 17).value = indicators_data_dict.get('TC90', {}).get('lower_limit')
             order_results = i['order_results']
             mn_machine_name = ''
             lb_machine_name = ''
@@ -374,14 +374,14 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
             sheet.cell(data_row, 7).value = lb_machine_name
             sheet.cell(data_row, 8).value = i['actual_trains']
             sheet.cell(data_row, 9).value = '复检' if i['is_recheck'] else '正常'
-            sheet.cell(data_row, 10).value = ret.get('MH')
-            sheet.cell(data_row, 11).value = ret.get('ML')
-            sheet.cell(data_row, 12).value = ret.get('TC10')
-            sheet.cell(data_row, 13).value = ret.get('TC50')
-            sheet.cell(data_row, 14).value = ret.get('TC90')
-            sheet.cell(data_row, 15).value = ret.get('比重值')
-            sheet.cell(data_row, 16).value = ret.get('ML(1+4)')
-            sheet.cell(data_row, 17).value = ret.get('硬度值')
+            sheet.cell(data_row, 10).value = ret.get('ML(1+4)')
+            sheet.cell(data_row, 11).value = ret.get('比重值')
+            sheet.cell(data_row, 12).value = ret.get('硬度值')
+            sheet.cell(data_row, 13).value = ret.get('MH')
+            sheet.cell(data_row, 14).value = ret.get('ML')
+            sheet.cell(data_row, 15).value = ret.get('TC10')
+            sheet.cell(data_row, 16).value = ret.get('TC50')
+            sheet.cell(data_row, 17).value = ret.get('TC90')
             sheet.cell(data_row, 18).value = i['state']
             sheet.cell(data_row, 19).value = deal_suggestion
 
@@ -395,14 +395,14 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
             sheet0.cell(data_row0, 7).value = lb_machine_name
             sheet0.cell(data_row0, 8).value = i['actual_trains']
             sheet0.cell(data_row0, 9).value = '复检' if i['is_recheck'] else '正常'
-            sheet0.cell(data_row0, 10).value = ret.get('MH')
-            sheet0.cell(data_row0, 11).value = ret.get('ML')
-            sheet0.cell(data_row0, 12).value = ret.get('TC10')
-            sheet0.cell(data_row0, 13).value = ret.get('TC50')
-            sheet0.cell(data_row0, 14).value = ret.get('TC90')
-            sheet0.cell(data_row0, 15).value = ret.get('比重值')
-            sheet0.cell(data_row0, 16).value = ret.get('ML(1+4)')
-            sheet0.cell(data_row0, 17).value = ret.get('硬度值')
+            sheet0.cell(data_row0, 10).value = ret.get('ML(1+4)')
+            sheet0.cell(data_row0, 11).value = ret.get('比重值')
+            sheet0.cell(data_row0, 12).value = ret.get('硬度值')
+            sheet0.cell(data_row0, 13).value = ret.get('MH')
+            sheet0.cell(data_row0, 14).value = ret.get('ML')
+            sheet0.cell(data_row0, 15).value = ret.get('TC10')
+            sheet0.cell(data_row0, 16).value = ret.get('TC50')
+            sheet0.cell(data_row0, 17).value = ret.get('TC90')
             sheet0.cell(data_row0, 18).value = i['state']
             sheet0.cell(data_row0, 19).value = deal_suggestion
 
