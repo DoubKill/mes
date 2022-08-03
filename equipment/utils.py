@@ -1,16 +1,19 @@
 import hmac
 import json
+import os
 import time
 import logging
 from base64 import standard_b64encode
 from datetime import datetime
 from io import BytesIO
 
+import cx_Oracle
 import requests
 from django.db.models import Q, F
 from django.http import HttpResponse
 from openpyxl import load_workbook, cell
 from rest_framework.exceptions import ValidationError
+import pandas as pd
 
 from equipment.models import EquipApplyOrder, EquipMaintenanceAreaSetting, EquipInspectionOrder
 from mes import settings
@@ -309,3 +312,24 @@ def get_ding_uids(ding_api, pks=None, names=None, check_type=None):
         if res:
             user_ids.append(res)
     return user_ids
+
+
+def pd_export_xls(sql,
+                  host=settings.DATABASES['default']['HOST'],
+                  user=settings.DATABASES['default']['USER'],
+                  name=settings.DATABASES['default']['NAME'],
+                  password=settings.DATABASES['default']['PASSWORD']
+                  ):
+    os.environ['NLS_LANG'] = 'SIMPLIFIED CHINESE_CHINA.UTF8'
+    conn = cx_Oracle.connect(user, password, '{}:1521/{}'.format(host, name))
+    df = pd.read_sql(sql, con=conn)
+    bio = BytesIO()
+    writer = pd.ExcelWriter(bio, engine='xlsxwriter')  # 注意安装这个包 pip install xlsxwriter
+    df.to_excel(writer, sheet_name='Sheet1', index=False)
+    writer.save()
+    bio.seek(0)
+    from django.http import FileResponse
+    response = FileResponse(bio)
+    response['Content-Type'] = 'application/octet-stream'
+    response['Content-Disposition'] = 'attachment;filename="mm.xlsx"'
+    return response
