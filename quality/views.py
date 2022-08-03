@@ -1278,6 +1278,7 @@ class TestDataPointCurveView(APIView):
         st = self.request.query_params.get('st')
         et = self.request.query_params.get('et')
         product_no = self.request.query_params.get('product_no')
+        equip_no = self.request.query_params.get('equip_no')
         if not all([st, et, product_no]):
             raise ValidationError('参数缺失')
         # try:
@@ -1288,6 +1289,14 @@ class TestDataPointCurveView(APIView):
         query_set = MaterialTestResult.objects.filter(material_test_order__production_factory_date__gte=st,
                                                       material_test_order__production_factory_date__lte=et,
                                                       material_test_order__product_no=product_no)
+        if equip_no:
+            query_set = query_set.filter(material_test_order__production_equip_no=equip_no)
+            equip_nos = [equip_no]
+        else:
+            equip_nos = list(query_set.values(
+                'material_test_order__production_equip_no'
+            ).annotate(a=Count('id')).values_list('material_test_order__production_equip_no', flat=True))
+
         indicators = MaterialDataPointIndicator.objects.filter(
             material_test_method__material__material_no=product_no,
             level=1).values('data_point__name', 'upper_limit', 'lower_limit')
@@ -1309,7 +1318,7 @@ class TestDataPointCurveView(APIView):
                 continue
             ret.append({'name': data_point_name, 'data': test_data})
         return Response(
-            {'indicators': indicators_dict, 'data': ret}
+            {'indicators': indicators_dict, 'data': ret, 'equip_nos': equip_nos}
         )
 
 
