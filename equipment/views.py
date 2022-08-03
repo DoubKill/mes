@@ -5073,7 +5073,7 @@ class CheckPointStandardViewSet(ModelViewSet):
     def list(self, request, *args, **kwargs):
         all_station = self.request.query_params.get('all_station')  # 获取所有岗位
         if all_station:
-            station_list = list(set(self.get_queryset().values_list('station', flat=True)))
+            station_list = list(set(self.get_queryset().filter(equip_no__icontains=all_station).values_list('station', flat=True)))
             return Response({'results': station_list})
 
         queryset = self.filter_queryset(self.get_queryset())
