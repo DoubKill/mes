@@ -46,7 +46,7 @@ from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMate
     CarbonOutPlan, FinalRubberyOutBoundOrder, MixinRubberyOutBoundOrder, FinalGumInInventoryLog, OutBoundDeliveryOrder, \
     OutBoundDeliveryOrderDetail, WMSReleaseLog, WmsInventoryMaterial, WMSMaterialSafetySettings, WmsNucleinManagement, \
     WMSExceptHandle, MaterialOutHistoryOther, MaterialOutboundOrder, MaterialEntrance, HfBakeMaterialSet, HfBakeLog, \
-    WMSOutboundHistory
+    WMSOutboundHistory, CancelTask
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
@@ -5448,6 +5448,22 @@ class OutBoundDeliveryOrderDetailViewSet(ModelViewSet):
                     OutBoundDeliveryOrderDetail.objects.filter(order_no=work_id).update(status=state)
             else:
                 OutBoundDeliveryOrderDetail.objects.filter(id__in=detail_ids).update(status=2)
+        return Response('ok')
+
+    @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated], url_path='cancel-task',
+            url_name='cancel-task')
+    def cancel_task(self, request):
+        warehouse_name = self.request.data.get('warehouse_name')
+        task_ids = self.request.data.get('task_ids')
+        if warehouse_name == '混炼胶库':
+            db = 'bz'
+        else:
+            db = 'lb'
+        query_set = OutBoundDeliveryOrderDetail.objects.filter(id__in=task_ids)
+        data = query_set.values('order_no', 'pallet_no')
+        query_set.update(status=4)
+        for item in data:
+            CancelTask.objects.using(db).create(**item)
         return Response('ok')
 
 
