@@ -469,6 +469,7 @@ class CheckPointTableFilter(django_filters.rest_framework.FilterSet):
                                                        lookup_expr='range')
     point_standard_name = django_filters.CharFilter(field_name='point_standard_name', help_text='点检表名称',
                                                     lookup_expr='icontains')
+    station = django_filters.CharFilter(field_name='station', help_text='岗位', lookup_expr='icontains')
 
     class Meta:
         model = CheckPointTable
