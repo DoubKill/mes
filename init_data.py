@@ -1045,7 +1045,8 @@ permission_data = [
     {'id': 1045, 'code': 'sendXl_wfproductbatching', 'name': '发送称量配方', 'parent_id': 1034},
 
     # 下一个 1046 开始
-
+    {'id': 1046, 'code': 'product_ratio', 'name': '原材料配比查询', 'parent_id': None},
+    {'id': 1047, 'code': 'view_product_ratio', 'name': '查看', 'parent_id': 1046},
 ]
 
 

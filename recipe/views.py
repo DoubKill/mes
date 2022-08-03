@@ -2,7 +2,7 @@
 import datetime
 import re
 
-from django.db.models import Prefetch, Q, Max
+from django.db.models import Prefetch, Q, Max, F
 from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
@@ -1013,3 +1013,77 @@ class DevTypeProductBatching(APIView):
             return Response(s.data)
         else:
             return Response({})
+
+
+class ProductRatioView(ListAPIView):
+    queryset = ProductBatching.objects.all()
+
+    def list(self, request, *args, **kwargs):
+        used_type = self.request.query_params.get('used_type')
+        recipe_type = self.request.query_params.get('recipe_type')
+        dev_type = self.request.query_params.get('dev_type')
+        stage_product_batch_no = self.request.query_params.get('stage_product_batch_no')
+        material_names = self.request.query_params.get('material_names')
+        if not material_names:
+            raise ValidationError('请选择原材料查询！')
+        material_names = material_names.split(',')
+        names = []
+        for name in material_names:
+            strip_name1 = name+'-C'
+            strip_name2 = name+'-X'
+            names.append(strip_name1)
+            names.append(strip_name2)
+            names.append(name)
+        material_ids = list(Material.objects.filter(material_name__in=material_names).values_list('id', flat=True))
+        queryset = ProductBatching.objects.exclude(used_type=6).filter(batching_type=2)
+
+        if used_type:
+            queryset = queryset.filter(used_type=used_type)
+        if recipe_type:
+            stage_prefix = re.split(r'[,|，]', recipe_type)
+            filter_str = ''
+            for i in stage_prefix:
+                filter_str += ('' if not filter_str else '|') + f"Q(product_info__product_name__startswith='{i.strip()}')"
+            queryset = queryset.filter(eval(filter_str))
+            if 'C' in stage_prefix or 'TC' in stage_prefix:  # 车胎类别(C)与半钢类别(CJ)需要区分
+                queryset = queryset.filter(~Q(product_info__product_name__startswith='CJ'),
+                                           ~Q(product_info__product_name__startswith='TCJ'))
+            if 'U' in stage_prefix or 'TU' in stage_prefix:  # 车胎类别(UC)与斜胶类别(U)需要区分
+                queryset = queryset.filter(~Q(product_info__product_name__startswith='UC'),
+                                           ~Q(product_info__product_name__startswith='TUC'))
+        if dev_type:
+            queryset = queryset.filter(dev_type_id=dev_type)
+        if stage_product_batch_no:
+            queryset = queryset.filter(stage_product_batch_no__icontains=stage_product_batch_no)
+        if material_ids:
+            pb_ids1 = list(queryset.filter(batching_details__material_id__in=material_ids).values_list('id', flat=True))
+            pb_ids2 = list(WeighBatchingDetail.objects.filter(
+                material_id__in=material_ids,
+                delete_flag=0,
+                weigh_cnt_type__delete_flag=0
+            ).values_list('weigh_cnt_type__product_batching_id', flat=True))
+            queryset = queryset.filter(id__in=set(pb_ids1+pb_ids2))
+        page = self.paginate_queryset(queryset)
+        ret = []
+        for item in page:
+            dev_type_name = item.dev_type.category_name
+            used_type = item.used_type
+            stage_product_batch_no = item.stage_product_batch_no
+            details1 = list(item.batching_details.filter(
+                delete_flag=0,
+                material_id__in=material_ids).values('material__material_name', 'actual_weight'))
+            details2 = list(WeighBatchingDetail.objects.filter(
+                        material_id__in=material_ids,
+                        delete_flag=0,
+                        weigh_cnt_type__delete_flag=0,
+                        weigh_cnt_type__product_batching_id=item.id
+            ).values(material__material_name=F('material__material_name'), actual_weight=F('standard_weight')))
+            details = details1 + details2
+            ret.append({
+                'dev_type_name': dev_type_name,
+                'used_type': used_type,
+                'stage_product_batch_no': stage_product_batch_no,
+                'detail': [{'material_name': i['material__material_name'].rstrip('-C').rstrip('-X'),
+                            'weight': i['actual_weight']} for i in details]
+            })
+        return Response({'results': ret, 'count': queryset.count()})
