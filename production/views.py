@@ -2646,8 +2646,8 @@ class DailyProductionCompletionReport(APIView):
             total_190e_fm = sum(data_190e['fm'])
             total_190e_total = sum(data_190e['total'])
 
-        avg_190e = {'jl': 0 if not month_working_days_190e else round(total_190e_jl / month_working_days_190e, 2),
-                    'wl': 0 if not month_working_days_190e else round(total_190e_wl / month_working_days_190e, 2),
+        avg_190e = {'jl': 0 if not month_working_days_190e else round(float(total_190e_jl) / float(month_working_days_190e), 2),
+                    'wl': 0 if not month_working_days_190e else round(float(total_190e_wl) / float(month_working_days_190e), 2),
                     'ds': 0 if not total_190e_fm else round(total_190e_total / total_190e_fm, 2)}
 
         # 计算每日总产量段数
