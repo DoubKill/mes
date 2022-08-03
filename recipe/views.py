@@ -1034,7 +1034,7 @@ class ProductRatioView(ListAPIView):
             names.append(strip_name1)
             names.append(strip_name2)
             names.append(name)
-        material_ids = list(Material.objects.filter(material_name__in=material_names).values_list('id', flat=True))
+        material_ids = list(Material.objects.filter(material_name__in=names).values_list('id', flat=True))
         queryset = ProductBatching.objects.exclude(used_type=6).filter(batching_type=2)
 
         if used_type:
