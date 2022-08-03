@@ -935,7 +935,10 @@ class TrainsFeedbacksAPIView(mixins.ListModelMixin,
                            ELSE EVACUATION_ENERGY END) as 排胶能量,
                        OPERATION_USER as 操作人,
                        to_char(PRODUCT_TIME, 'yyyy-MM-dd HH24:mi:ss') as 存盘时间,
-                       CONSUM_TIME as 密炼时间
+                       ceil((To_date(to_char(END_TIME,'yyyy-mm-dd hh24:mi:ss') , 'yyyy-mm-dd hh24-mi-ss')
+                     - To_date(to_char(BEGIN_TIME,'yyyy-mm-dd hh24:mi:ss'), 'yyyy-mm-dd hh24-mi-ss')
+                    ) * 24 * 60 * 60 ) as 密炼时间,
+                       INTERVAL_TIME as 间隔时间
                 from TRAINS_FEEDBACKS {}
                 order by FACTORY_DATE, EQUIP_NO, CLASSES desc, PRODUCT_NO, ACTUAL_TRAINS""".format(where_str)
             return pd_export_xls(sql)
