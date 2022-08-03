@@ -5073,7 +5073,7 @@ class CheckPointStandardViewSet(ModelViewSet):
     def list(self, request, *args, **kwargs):
         all_station = self.request.query_params.get('all_station')  # 获取所有岗位
         if all_station:
-            station_list = list(self.queryset.values_list('station', flat=True).distinct())
+            station_list = list(set(self.get_queryset().values_list('station', flat=True)))
             return Response({'results': station_list})
 
         queryset = self.filter_queryset(self.get_queryset())
@@ -5230,7 +5230,8 @@ class CheckPointTableViewSet(ModelViewSet):
             elif opera_type == 3:  # 导出
                 data = self.get_serializer(records, many=True).data
                 return gen_excels_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME,
-                                           sheet_keyword=['select_date', 'point_standard_name', 'equip_no', 'station'],
+                                           sheet_keyword=['select_date', 'classes', 'point_standard_name', 'equip_no',
+                                                          'station'],
                                            handle_str=True)
             else:
                 raise ValidationError('异常: 未知操作类型')
