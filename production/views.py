@@ -2647,8 +2647,8 @@ class DailyProductionCompletionReport(APIView):
             total_190e_fm = sum(data_190e['fm'])
             total_190e_total = sum(data_190e['total'])
 
-        avg_190e = {'jl': 0 if not month_working_days_190e else round(total_190e_jl / month_working_days_190e, 2),
-                    'wl': 0 if not month_working_days_190e else round(total_190e_wl / month_working_days_190e, 2),
+        avg_190e = {'jl': 0 if not month_working_days_190e else round(float(total_190e_jl) / float(month_working_days_190e), 2),
+                    'wl': 0 if not month_working_days_190e else round(float(total_190e_wl) / float(month_working_days_190e), 2),
                     'ds': 0 if not total_190e_fm else round(total_190e_total / total_190e_fm, 2)}
 
         # 计算每日总产量段数
@@ -4261,9 +4261,11 @@ class AttendanceClockViewSet(ModelViewSet):
             if time_now > standard_end_time + datetime.timedelta(minutes=30):
                 raise ValidationError('下班超过半小时不可再打卡')
             end_date = time_now
+            if end_date <= standard_begin_time:
+                raise ValidationError('未到班次标准上班时间不可打下班卡')
             # 计算实际工时(打卡时间)
-            actual_begin_time = begin_date if standard_end_time > begin_date > standard_begin_time else standard_begin_time
-            actual_end_time = end_date if standard_end_time > end_date > standard_begin_time else standard_end_time
+            actual_begin_time = begin_date if standard_end_time > begin_date > standard_begin_time or begin_date < standard_begin_time else standard_begin_time
+            actual_end_time = end_date if standard_end_time > end_date > standard_begin_time or end_date < standard_begin_time else standard_end_time
             if extra_work:
                 actual_begin_time = actual_begin_time if actual_begin_time < extra_work.begin_date else extra_work.begin_date
                 actual_end_time = actual_end_time if actual_end_time < extra_work.end_date else extra_work.end_date
@@ -5213,6 +5215,43 @@ class RubberFrameRepairView(APIView):
         times = 1 if not max_times else max_times + 1
         RubberFrameRepair.objects.create(date_time=date_time, content=json.dumps(details), times=times, save_user=save_user)
         return Response('保存成功')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class RubberFrameRepairSummaryView(APIView):
+    """胶架维修记录汇总"""
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_rubber_frame_repair_summary'}))
+
+    def get(self, request):
+        select_date = self.request.query_params.get('select_date')
+        if not select_date:
+            raise ValidationError('未选择日期')
+        send_num, repaired, waited = {"name": "待维修胶架发出量"}, {"name": "已维修胶架数量"}, {"name": "待维修胶架数量"}
+        for i in range(1, 13):
+            s_column = f'{i}月'
+            date_time = select_date + '-' + '%02d' % i
+            month_data = RubberFrameRepair.objects.filter(date_time=date_time).order_by('id').last()
+            if month_data:
+                content = json.loads(month_data.content)[:3]
+                self.handle_data(content, s_column, send_num, repaired, waited)
+            else:
+                send_num[s_column], repaired[s_column], waited[s_column] = 0, 0, 0
+        results = [send_num, repaired, waited]
+        # results = {'待维修胶架发出量': send_num, '已维修胶架数量': repaired, '待维修胶架数量': waited}
+        return Response(results)
+
+    def handle_data(self, content, s_column, send_num, repaired, waited):
+        for index, s_content in enumerate(content):
+            s_total = s_content['总计'] if s_content['总计'] else 0
+            if index == 0:
+                send_num[s_column] = s_total
+                send_num['总计'] = s_total + (send_num['总计'] if '总计' in send_num else 0)
+            elif index == 1:
+                repaired[s_column] = s_total
+                repaired['总计'] = s_total + (repaired['总计'] if '总计' in repaired else 0)
+            else:
+                waited[s_column] = s_total
+                waited['总计'] = s_total + (waited['总计'] if '总计' in waited else 0)
 
 
 @method_decorator([api_recorder], name="dispatch")

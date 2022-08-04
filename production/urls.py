@@ -157,6 +157,8 @@ urlpatterns = [
     path('shift-time-summary/detail/', ShiftTimeSummaryDetailView.as_view()),
     # 胶架维修记录
     path('rubber-frame-repair/', RubberFrameRepairView.as_view()),
+    # 胶架维修记录汇总
+    path('rubber-frame-repair—summary/', RubberFrameRepairSummaryView.as_view()),
     # 工装管理台帐
     path('tool-manage-account/', ToolManageAccountView.as_view()),
 

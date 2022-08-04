@@ -132,6 +132,18 @@ router.register('upload-images', UploadImageViewSet)
 # 设备维护维修计划
 router.register('equip-plan', EquipPlanViewSet)
 
+# 岗位安全装置点检标准
+router.register('check-point-standard', CheckPointStandardViewSet)
+
+# 岗位安全装置点检表
+router.register('check-point-table', CheckPointTableViewSet)
+
+# 除尘袋滤器温度标准
+router.register('check-temperature-standard', CheckTemperatureStandardViewSet)
+
+# 除尘袋滤器温度检查表
+router.register('check-temperature-table', CheckTemperatureTableViewSet)
+
 
 urlpatterns = [
     path('', include(router.urls)),
