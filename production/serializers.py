@@ -286,7 +286,10 @@ class TrainsFeedbacksSerializer2(BaseModelSerializer):
         return data
 
     def get_mixer_time(self, obj):
-        return obj.consum_time
+        try:
+            return obj.end_time - obj.begin_time
+        except:
+            return None
 
     def get_actual_weight(self, obj):
         if not obj.actual_weight:
