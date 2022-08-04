@@ -5226,6 +5226,7 @@ class CheckPointTableViewSet(ModelViewSet):
                 if records.filter(status='已确认'):
                     raise ValidationError('异常: 存在已经确认过的数据,请重新选择后再确认')
                 records.update(confirm_desc=self.request.data.get('confirm_desc'), status='已确认',
+                               sign_name=self.request.data.get('sign_name'),
                                confirm_time=datetime.now(), confirm_user=self.request.user.username)
             elif opera_type == 3:  # 导出
                 data = self.get_serializer(records, many=True).data
