@@ -4259,9 +4259,11 @@ class AttendanceClockViewSet(ModelViewSet):
             if time_now > standard_end_time + datetime.timedelta(minutes=30):
                 raise ValidationError('下班超过半小时不可再打卡')
             end_date = time_now
+            if end_date <= standard_begin_time:
+                raise ValidationError('未到班次标准上班时间不可打下班卡')
             # 计算实际工时(打卡时间)
-            actual_begin_time = begin_date if standard_end_time > begin_date > standard_begin_time else standard_begin_time
-            actual_end_time = end_date if standard_end_time > end_date > standard_begin_time else standard_end_time
+            actual_begin_time = begin_date if standard_end_time > begin_date > standard_begin_time or begin_date < standard_begin_time else standard_begin_time
+            actual_end_time = end_date if standard_end_time > end_date > standard_begin_time or end_date < standard_begin_time else standard_end_time
             if extra_work:
                 actual_begin_time = actual_begin_time if actual_begin_time < extra_work.begin_date else extra_work.begin_date
                 actual_end_time = actual_end_time if actual_end_time < extra_work.end_date else extra_work.end_date
