@@ -2629,25 +2629,25 @@ class DailyProductionCompletionReport(APIView):
 
         if exclude_today_flat:
             total_190e_jl = sum(data_190e['jl']) - data_190e['jl'][now_day-1]
-            length1 = len([i for i in data_190e['jl'] if i > 0])
-            if data_190e['jl'][now_day-1]:
-                length1 -= 1
+            # length1 = len([i for i in data_190e['jl'] if i > 0])
+            # if data_190e['jl'][now_day-1]:
+            #     length1 -= 1
             total_190e_wl = sum(data_190e['wl']) - data_190e['wl'][now_day-1]
-            length2 = len([i for i in data_190e['wl'] if i > 0])
-            if data_190e['wl'][now_day-1]:
-                length2 -= 1
+            # length2 = len([i for i in data_190e['wl'] if i > 0])
+            # if data_190e['wl'][now_day-1]:
+            #     length2 -= 1
             total_190e_fm = sum(data_190e['fm']) - data_190e['fm'][now_day-1]
             total_190e_total = sum(data_190e['total']) - data_190e['total'][now_day-1]
         else:
             total_190e_jl = sum(data_190e['jl'])
-            length1 = len([i for i in data_190e['jl'] if i > 0])
+            # length1 = len([i for i in data_190e['jl'] if i > 0])
             total_190e_wl = sum(data_190e['wl'])
-            length2 = len([i for i in data_190e['wl'] if i > 0])
+            # length2 = len([i for i in data_190e['wl'] if i > 0])
             total_190e_fm = sum(data_190e['fm'])
             total_190e_total = sum(data_190e['total'])
 
-        avg_190e = {'jl': 0 if not length1 else round(total_190e_jl / length1, 2),
-                    'wl': 0 if not length2 else round(total_190e_wl / length2, 2),
+        avg_190e = {'jl': 0 if not month_working_days_190e else round(float(total_190e_jl) / float(month_working_days_190e), 2),
+                    'wl': 0 if not month_working_days_190e else round(float(total_190e_wl) / float(month_working_days_190e), 2),
                     'ds': 0 if not total_190e_fm else round(total_190e_total / total_190e_fm, 2)}
 
         # 计算每日总产量段数
