@@ -5155,6 +5155,43 @@ class RubberFrameRepairView(APIView):
 
 
 @method_decorator([api_recorder], name="dispatch")
+class RubberFrameRepairSummaryView(APIView):
+    """胶架维修记录汇总"""
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_rubber_frame_repair_summary'}))
+
+    def get(self, request):
+        select_date = self.request.query_params.get('select_date')
+        if not select_date:
+            raise ValidationError('未选择日期')
+        send_num, repaired, waited = {"name": "待维修胶架发出量"}, {"name": "已维修胶架数量"}, {"name": "待维修胶架数量"}
+        for i in range(1, 13):
+            s_column = f'{i}月'
+            date_time = select_date + '-' + '%02d' % i
+            month_data = RubberFrameRepair.objects.filter(date_time=date_time).order_by('id').last()
+            if month_data:
+                content = json.loads(month_data.content)[:3]
+                self.handle_data(content, s_column, send_num, repaired, waited)
+            else:
+                send_num[s_column], repaired[s_column], waited[s_column] = 0, 0, 0
+        results = [send_num, repaired, waited]
+        # results = {'待维修胶架发出量': send_num, '已维修胶架数量': repaired, '待维修胶架数量': waited}
+        return Response(results)
+
+    def handle_data(self, content, s_column, send_num, repaired, waited):
+        for index, s_content in enumerate(content):
+            s_total = s_content['总计'] if s_content['总计'] else 0
+            if index == 0:
+                send_num[s_column] = s_total
+                send_num['总计'] = s_total + (send_num['总计'] if '总计' in send_num else 0)
+            elif index == 1:
+                repaired[s_column] = s_total
+                repaired['总计'] = s_total + (repaired['总计'] if '总计' in repaired else 0)
+            else:
+                waited[s_column] = s_total
+                waited['总计'] = s_total + (waited['总计'] if '总计' in waited else 0)
+
+
+@method_decorator([api_recorder], name="dispatch")
 class ToolManageAccountView(APIView):
     """工装管理台帐"""
     permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_tool_manage_account',
