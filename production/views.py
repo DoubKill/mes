@@ -4008,7 +4008,7 @@ class AttendanceClockViewSet(ModelViewSet):
         section_list = PerformanceJobLadder.objects.filter(type=group_type).values_list('name', flat=True)
 
         # 获取当前时间的工厂日期
-        now = now if now else datetime.datetime.now()
+        now = now if now else (datetime.datetime.now() + timedelta(minutes=attendance_group_obj.lead_time))
         current_work_schedule_plan = WorkSchedulePlan.objects.filter(
             start_time__lte=now,
             end_time__gte=now,
@@ -4084,10 +4084,12 @@ class AttendanceClockViewSet(ModelViewSet):
                         results['ids'] = ids
                         results['begin_date'] = datetime.datetime.strftime(last_obj.begin_date, '%H:%M:%S') if last_obj.begin_date else None
                         results['end_date'] = datetime.datetime.strftime(last_obj.end_date, '%H:%M:%S') if last_obj.end_date else None
-                        results['section_list'].remove(last_obj.section)
+                        if last_obj.section in results['section_list']:
+                            results['section_list'].remove(last_obj.section)
                         results['section_list'].insert(0, last_obj.section)  # 放到第一位显示
                         group, classes = last_obj.group, last_obj.classes
-                        results['group_list'].remove({'group': group, 'classes': classes})
+                        if {'group': group, 'classes': classes} in results['group_list']:
+                            results['group_list'].remove({'group': group, 'classes': classes})
                         results['group_list'].insert(0, {'group': group, 'classes': classes})
                     else:
                         flat = True
@@ -4097,26 +4099,103 @@ class AttendanceClockViewSet(ModelViewSet):
                         results['ids'] = ids
                         results['begin_date'] = datetime.datetime.strftime(last_obj.begin_date, '%H:%M:%S') if last_obj.begin_date else None
                         results['end_date'] = datetime.datetime.strftime(last_obj.end_date, '%H:%M:%S') if last_obj.end_date else None
-                        results['section_list'].remove(last_obj.section)
+                        if last_obj.section in results['section_list']:
+                            results['section_list'].remove(last_obj.section)
                         results['section_list'].insert(0, last_obj.section)  # 放到第一位显示
                         group, classes = last_obj.group, last_obj.classes
-                        results['group_list'].remove({'group': group, 'classes': classes})
+                        if {'group': group, 'classes': classes} in results['group_list']:
+                            results['group_list'].remove({'group': group, 'classes': classes})
                         results['group_list'].insert(0, {'group': group, 'classes': classes})
                     else:
                         flat = True
             else:
-                flat = True
+                if datetime.datetime.strptime(date_now, '%Y-%m-%d').date() > last_obj.factory_date + timedelta(days=1) \
+                        or (not last_obj.end_date and (time_now - last_obj.begin_date).total_seconds() / 3600 >
+                            12.5 + attendance_group_obj.lead_time / 60) \
+                        or (last_obj.end_date and (time_now - last_obj.end_date).total_seconds() / 3600 > 0.5):
+                    flat = True
+                else:
+                    begin_time, end_time = get_standard_time(username, date_now)
+                    if not begin_time:
+                        raise ValidationError('未找到排班信息')
+                    p_date_now = datetime.datetime.strptime(date_now, '%Y-%m-%d')
+                    if end_time.hour > 12:  # 白班
+                        if time_now < p_date_now + datetime.timedelta(days=1, hours=2):  # 直到明天凌晨两点，显示当前的打卡记录
+                            results['state'] = 3  # 进行中的
+                            results['ids'] = ids
+                            results['begin_date'] = datetime.datetime.strftime(last_obj.begin_date,
+                                                                               '%H:%M:%S') if last_obj.begin_date else None
+                            results['end_date'] = datetime.datetime.strftime(last_obj.end_date,
+                                                                             '%H:%M:%S') if last_obj.end_date else None
+                            if last_obj.section in results['section_list']:
+                                results['section_list'].remove(last_obj.section)
+                            results['section_list'].insert(0, last_obj.section)  # 放到第一位显示
+                            group, classes = last_obj.group, last_obj.classes
+                            if {'group': group, 'classes': classes} in results['group_list']:
+                                results['group_list'].remove({'group': group, 'classes': classes})
+                            results['group_list'].insert(0, {'group': group, 'classes': classes})
+                        else:
+                            flat = True
+                    else:  # 夜班
+                        if time_now < p_date_now + datetime.timedelta(days=1, hours=14):
+                            results['state'] = 3
+                            results['ids'] = ids
+                            results['begin_date'] = datetime.datetime.strftime(last_obj.begin_date,
+                                                                               '%H:%M:%S') if last_obj.begin_date else None
+                            results['end_date'] = datetime.datetime.strftime(last_obj.end_date,
+                                                                             '%H:%M:%S') if last_obj.end_date else None
+                            if last_obj.section in results['section_list']:
+                                results['section_list'].remove(last_obj.section)
+                            results['section_list'].insert(0, last_obj.section)  # 放到第一位显示
+                            group, classes = last_obj.group, last_obj.classes
+                            if {'group': group, 'classes': classes} in results['group_list']:
+                                results['group_list'].remove({'group': group, 'classes': classes})
+                            results['group_list'].insert(0, {'group': group, 'classes': classes})
+                        else:
+                            flat = True
             if flat:
                 # 默认返回前一条的打卡记录，默认显示
                 results['state'] = 2  # 默认显示
-                results['section_list'].remove(last_obj.section)
+                if last_obj.section in results['section_list']:
+                    results['section_list'].remove(last_obj.section)
                 results['section_list'].insert(0, last_obj.section)  # 放到第一位显示
-                history_gc = {'group': last_obj.group, 'classes': last_obj.classes}
-                if history_gc in results['group_list']:
-                    results['group_list'].remove(history_gc)
-                    results['group_list'].insert(0, history_gc)
+                now = datetime.datetime.now() + timedelta(minutes=attendance_group_obj.lead_time)
+                current_work_schedule_plan = WorkSchedulePlan.objects.filter(
+                    start_time__lte=now,
+                    end_time__gte=now,
+                    plan_schedule__work_schedule__work_procedure__global_name='密炼'
+                ).first()
+                if current_work_schedule_plan:
+                    date_now = str(current_work_schedule_plan.plan_schedule.day_time)
+                else:
+                    date_now = str(now.date())
+                # 获取班次班组
+                queryset = WorkSchedulePlan.objects.filter(plan_schedule__day_time=date_now, start_time__lte=now,
+                                                           end_time__gte=now,
+                                                           plan_schedule__work_schedule__work_procedure__global_name='密炼') \
+                    .values('group__global_name', 'classes__global_name')
+                group_list = [{'group': item['group__global_name'], 'classes': item['classes__global_name']} for item in
+                              queryset]
+                results['group_list'] = group_list
         else:
-            results['state'] = 1  # 没有打卡记录
+            results['state'] = 1  # 没有打卡记录 显示当前时间的班次班组
+            now = datetime.datetime.now() + timedelta(minutes=attendance_group_obj.lead_time)
+            current_work_schedule_plan = WorkSchedulePlan.objects.filter(
+                start_time__lte=now,
+                end_time__gte=now,
+                plan_schedule__work_schedule__work_procedure__global_name='密炼'
+            ).first()
+            if current_work_schedule_plan:
+                date_now = str(current_work_schedule_plan.plan_schedule.day_time)
+            else:
+                date_now = str(now.date())
+            # 获取班次班组
+            queryset = WorkSchedulePlan.objects.filter(plan_schedule__day_time=date_now, start_time__lte=now,
+                                                       end_time__gte=now,
+                                                       plan_schedule__work_schedule__work_procedure__global_name='密炼') \
+                .values('group__global_name', 'classes__global_name')
+            group_list = [{'group': item['group__global_name'], 'classes': item['classes__global_name']} for item in queryset]
+            results['group_list'] = group_list
         return Response(results)
 
     @atomic
@@ -4132,7 +4211,11 @@ class AttendanceClockViewSet(ModelViewSet):
             'ids': [],
         }
         # 标准上下班时间
-        standard_begin_time, standard_end_time = get_standard_time(user.username, date_now, group=data['group'], classes=data['classes'])
+        date_now, group, classes = date_now, data['group'], data['classes']
+        last_record = EmployeeAttendanceRecords.objects.filter(user=user, end_date__isnull=True).last()
+        if last_record and last_record.factory_date != date_now and not (not last_record.end_date and (time_now - last_record.begin_date).total_seconds() / 3600 > 12.5):
+            date_now, group, classes = [str(last_record.factory_date), last_record.group, last_record.classes]
+        standard_begin_time, standard_end_time = get_standard_time(user.username, date_now, group=group, classes=classes)
         if not standard_begin_time:
             raise ValidationError('未找到排班信息')
         # 需要和加班申请做交集
