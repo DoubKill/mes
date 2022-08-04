@@ -1895,7 +1895,7 @@ class CheckPointTableUpdateSerializer(BaseModelSerializer):
 
     class Meta:
         model = CheckPointTable
-        fields = ('desc', 'table_details', 'check_image_urls')
+        fields = ('desc', 'table_details', 'check_image_urls', 'sign_name')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
