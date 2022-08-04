@@ -1048,3 +1048,110 @@ class XLCommonCode(models.Model):
     class Meta:
         db_table = 'xl_common_code'
         verbose_name_plural = verbose_name = '料包通用条码'
+
+
+class CheckPointStandard(AbstractEntity):
+    point_standard_code = models.CharField(max_length=64, help_text='点检表编号', null=True, blank=True)
+    point_standard_name = models.CharField(max_length=64, help_text='点检表名称')
+    doc_code = models.CharField(max_length=64, help_text='文档编号', null=True, blank=True)
+    equip_no = models.CharField(max_length=64, help_text='适用机台')
+    station = models.CharField(max_length=64, help_text='岗位')
+
+    class Meta:
+        db_table = 'check_point_standard'
+        verbose_name_plural = verbose_name = '岗位安全装置点检标准'
+
+
+class CheckPointStandardDetail(AbstractEntity):
+    check_point_standard = models.ForeignKey(CheckPointStandard, help_text='点检标准', on_delete=models.CASCADE,
+                                             related_name='check_details')
+    sn = models.IntegerField(help_text='内容顺序')
+    check_content = models.CharField(max_length=64, help_text='点检内容')
+    check_style = models.CharField(max_length=64, help_text='点检方法')
+
+    class Meta:
+        db_table = 'check_point_standard_detail'
+        verbose_name_plural = verbose_name = '岗位安全装置点检标准详情'
+
+
+class CheckPointTable(AbstractEntity):
+    check_point_standard = models.ForeignKey(CheckPointStandard, help_text='点检标准', on_delete=models.CASCADE,
+                                             related_name='check_tables')
+    point_standard_code = models.CharField(max_length=64, help_text='点检表编号')
+    point_standard_name = models.CharField(max_length=64, help_text='点检表名称')
+    select_date = models.DateField(help_text='日期')
+    classes = models.CharField(max_length=8, help_text='班次')
+    equip_no = models.CharField(max_length=64, help_text='适用机台')
+    station = models.CharField(max_length=64, help_text='岗位')
+    desc = models.CharField(max_length=512, help_text='新建或者更新输入的异常说明', null=True, blank=True)
+    confirm_desc = models.CharField(max_length=256, help_text='异常确认说明', null=True, blank=True)
+    point_time = models.DateTimeField(help_text='最新点检时间', null=True, blank=True)
+    point_user = models.CharField(max_length=64, help_text='点检人', null=True, blank=True)
+    confirm_time = models.DateTimeField(help_text='确认时间', null=True, blank=True)
+    confirm_user = models.CharField(max_length=64, help_text='确认人', null=True, blank=True)
+    status = models.CharField(max_length=16, help_text='状态: 新建、已点检、已确认', default='新建')
+    check_result = models.CharField(max_length=16, help_text='点检结果: 点检正常、点检异常、已修复', default='点检异常')
+    sign_name = models.CharField(max_length=512, help_text='手写签名', null=True, blank=True)
+    check_image_urls = models.TextField(help_text='点检图片', null=True, blank=True)
+
+    class Meta:
+        db_table = 'check_point_table'
+        verbose_name_plural = verbose_name = '岗位安全装置点检表'
+
+
+class CheckPointTableDetail(models.Model):
+    check_point_table = models.ForeignKey(CheckPointTable, help_text='点检标准', on_delete=models.CASCADE,
+                                          related_name='table_details')
+    sn = models.IntegerField(help_text='内容顺序')
+    check_content = models.CharField(max_length=64, help_text='点检内容')
+    check_style = models.CharField(max_length=64, help_text='点检方法')
+    check_result = models.CharField(max_length=16, help_text='点检结果: 好、坏', null=True, blank=True)
+    is_repaired = models.BooleanField(help_text='是否修复', default=False)
+
+    class Meta:
+        db_table = 'check_point_table_detail'
+        verbose_name_plural = verbose_name = '岗位安全装置点检表详情'
+
+
+class CheckTemperatureStandard(AbstractEntity):
+    sn = models.PositiveIntegerField(help_text='序号')
+    location = models.CharField(max_length=64, help_text='具体位置')
+    station_name = models.CharField(max_length=64, help_text='检查点名称')
+    temperature_limit = models.DecimalField(max_digits=4, decimal_places=2, help_text='温度上限')
+
+    class Meta:
+        db_table = 'check_temperature_standard'
+        verbose_name_plural = verbose_name = '除尘袋滤器温度标准'
+
+
+class CheckTemperatureTable(AbstractEntity):
+    select_date = models.DateField(help_text='日期')
+    is_exceed = models.BooleanField(help_text='是否超标', default=True)
+    status = models.CharField(max_length=16, help_text='状态: 新建、已检查、已确认', default='新建')
+    desc = models.CharField(max_length=512, help_text='新建或者更新输入的备注', null=True, blank=True)
+    confirm_desc = models.CharField(max_length=256, help_text='确认备注', null=True, blank=True)
+    point_time = models.DateTimeField(help_text='最新点检时间', null=True, blank=True)
+    point_user = models.CharField(max_length=64, help_text='点检人', null=True, blank=True)
+    confirm_time = models.DateTimeField(help_text='确认时间', null=True, blank=True)
+    confirm_user = models.CharField(max_length=64, help_text='确认人', null=True, blank=True)
+    check_image_urls = models.TextField(help_text='检查温度图片', null=True, blank=True)
+
+    class Meta:
+        db_table = 'check_temperature_table'
+        verbose_name_plural = verbose_name = '除尘袋滤器温度检查表'
+
+
+class CheckTemperatureTableDetail(models.Model):
+    check_temperature_table = models.ForeignKey(CheckTemperatureTable, on_delete=models.CASCADE, related_name='table_details')
+    sn = models.PositiveIntegerField(help_text='序号')
+    location = models.CharField(max_length=64, help_text='具体位置')
+    station_name = models.CharField(max_length=64, help_text='检查点名称')
+    temperature_limit = models.DecimalField(max_digits=4, decimal_places=2, help_text='温度上限')
+    input_value = models.DecimalField(max_digits=4, decimal_places=2, help_text='检查温度', null=True, blank=True)
+    is_exceed = models.BooleanField(help_text='是否超标', default=True)
+
+    class Meta:
+        db_table = 'check_temperature_table_detail'
+        verbose_name_plural = verbose_name = '除尘袋滤器温度检查表详情'
+
+
