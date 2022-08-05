@@ -1822,25 +1822,25 @@ class CheckPointTableSerializer(BaseModelSerializer):
             content.append(CheckPointTableDetail(**detail))
             # 点检结果状态判断  点检正常: 全好  点检异常: 存在没结果/坏结果+未修复  已修复: 除了好全是已修复
             check_result, is_repaired = detail.get('check_result'), detail.get('is_repaired')
+            if not check_result:
+                continue
             if not abnormal:
-                if not check_result:
-                    abnormal.append(detail)
+                if check_result == '好':
+                    normal.append(detail)
                 else:
-                    if check_result == '好':
-                        normal.append(detail)
+                    if is_repaired:
+                        repaired.append(detail)
                     else:
-                        if is_repaired:
-                            repaired.append(detail)
-                        else:
-                            abnormal.append(detail)
+                        abnormal.append(detail)
         CheckPointTableDetail.objects.bulk_create(content)
         if abnormal:
             table_check_result = '点检异常'
         else:
-            if len(table_details) == len(normal):
-                table_check_result = '点检正常'
-            else:
+            if repaired:
                 table_check_result = '已修复'
+            else:
+                if normal:
+                    table_check_result = '点检正常'
         instance.check_result = table_check_result
         instance.save()
         return instance
@@ -1871,24 +1871,24 @@ class CheckPointTableUpdateSerializer(BaseModelSerializer):
                                                           check_style=detail['check_style'])
 
             record.update(**detail)
+            if not check_result:
+                continue
             if not abnormal:
-                if not check_result:
-                    abnormal.append(detail)
+                if check_result == '好':
+                    normal.append(detail)
                 else:
-                    if check_result == '好':
-                        normal.append(detail)
+                    if is_repaired:
+                        repaired.append(detail)
                     else:
-                        if is_repaired:
-                            repaired.append(detail)
-                        else:
-                            abnormal.append(detail)
+                        abnormal.append(detail)
         if abnormal:
             table_check_result = '点检异常'
         else:
-            if len(table_details) == len(normal):
-                table_check_result = '点检正常'
-            else:
+            if repaired:
                 table_check_result = '已修复'
+            else:
+                if normal:
+                    table_check_result = '点检正常'
         validated_data.update(check_result=table_check_result, status='已点检', point_time=datetime.now(),
                               point_user=self.context['request'].user.username)
         return super().update(instance, validated_data)
@@ -1920,9 +1920,9 @@ class CheckTemperatureTableSerializer(BaseModelSerializer):
         for detail in table_details:
             # 判断是否超标
             temperature_limit, input_value = detail.get('temperature_limit'), detail.get('input_value')
-            is_exceed = 1
-            if input_value and input_value <= temperature_limit:
-                is_exceed = 0
+            is_exceed = None
+            if input_value:
+                is_exceed = 0 if input_value <= temperature_limit else 1
             is_exceed_list.append(is_exceed)
             detail.update({'check_temperature_table': instance, 'is_exceed': is_exceed})
             content.append(CheckTemperatureTableDetail(**detail))
@@ -1953,9 +1953,9 @@ class CheckTemperatureTableUpdateSerializer(BaseModelSerializer):
             record = CheckTemperatureTableDetail.objects.filter(check_temperature_table=instance, sn=detail['sn'],
                                                                 location=detail['location'], station_name=detail['station_name']).last()
             r_temperature_limit, r_input_value = record.temperature_limit, record.input_value
-            is_exceed = 1
-            if detail.get('input_value') and detail.get('input_value') <= r_temperature_limit:
-                is_exceed = 0
+            is_exceed = None
+            if detail.get('input_value'):
+                is_exceed = 0 if detail.get('input_value') <= r_temperature_limit else 1
             is_exceed_list.append(is_exceed)
             record.input_value = detail.get('input_value')
             record.is_exceed = is_exceed
