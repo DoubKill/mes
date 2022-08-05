@@ -1126,7 +1126,7 @@ class CheckTemperatureStandard(AbstractEntity):
 
 class CheckTemperatureTable(AbstractEntity):
     select_date = models.DateField(help_text='日期')
-    is_exceed = models.BooleanField(help_text='是否超标', null=True, blank=True)
+    is_exceed = models.NullBooleanField(help_text='是否超标', default=None)
     status = models.CharField(max_length=16, help_text='状态: 新建、已检查、已确认', default='新建')
     desc = models.CharField(max_length=512, help_text='新建或者更新输入的备注', null=True, blank=True)
     confirm_desc = models.CharField(max_length=256, help_text='确认备注', null=True, blank=True)
@@ -1148,7 +1148,7 @@ class CheckTemperatureTableDetail(models.Model):
     station_name = models.CharField(max_length=64, help_text='检查点名称')
     temperature_limit = models.DecimalField(max_digits=4, decimal_places=2, help_text='温度上限')
     input_value = models.DecimalField(max_digits=6, decimal_places=2, help_text='检查温度', null=True, blank=True)
-    is_exceed = models.BooleanField(help_text='是否超标', null=True, blank=True)
+    is_exceed = models.NullBooleanField(help_text='是否超标', default=None)
 
     class Meta:
         db_table = 'check_temperature_table_detail'
