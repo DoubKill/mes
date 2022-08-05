@@ -1398,7 +1398,7 @@ class ProductTestPlanDetailSerializer(BaseModelSerializer):
     class Meta:
         model = ProductTestPlanDetail
         fields = '__all__'
-        read_only_fields = ('test_plan', 'production_group', 'value', 'raw_value', 'test_time')
+        read_only_fields = ('test_plan', 'production_group', 'value', 'raw_value', 'test_time', 'is_qualified')
 
 
 class ProductTestPlanDetailBulkCreateSerializer(serializers.Serializer):
