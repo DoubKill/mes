@@ -5459,7 +5459,7 @@ class OutBoundDeliveryOrderDetailViewSet(ModelViewSet):
             db = 'bz'
         else:
             db = 'lb'
-        query_set = OutBoundDeliveryOrderDetail.objects.filter(id__in=task_ids)
+        query_set = OutBoundDeliveryOrderDetail.objects.filter(id__in=task_ids, status=2)
         data = query_set.values('order_no', 'pallet_no')
         query_set.update(status=4)
         for item in data:

@@ -32,10 +32,10 @@ EQUIP_CONFIG = {
     "Z09": {"HOST": "10.4.23.69", "USER": "sa", "NAME": "GZSFJ", "PASSWORD": "123"},
     "Z10": {"HOST": "10.4.23.70", "USER": "sa", "NAME": "GZSFJ", "PASSWORD": "123"},
     "Z11": {"HOST": "10.4.23.71", "USER": "sa", "NAME": "GZSFJ", "PASSWORD": "123"},
-    "Z12": {"HOST": "10.4.23.72", "USER": "sa", "NAME": "GZSFJ", "PASSWORD": "123"},
-    "Z13": {"HOST": "10.4.23.73", "USER": "sa", "NAME": "GZSFJ", "PASSWORD": "123"},
+    "Z12": {"HOST": "10.4.23.72", "USER": "gz", "NAME": "GZSFJ", "PASSWORD": "123456"},
+    "Z13": {"HOST": "10.4.23.73", "USER": "gz", "NAME": "GZSFJ", "PASSWORD": "123456"},
     "Z14": {"HOST": "10.4.23.74", "USER": "gz", "NAME": "GZSFJ", "PASSWORD": "123456"},
-    "Z15": {"HOST": "10.4.23.75", "USER": "sa", "NAME": "GZSFJ", "PASSWORD": "123"},
+    "Z15": {"HOST": "10.4.23.75", "USER": "gz", "NAME": "GZSFJ", "PASSWORD": "123456"},
 }
 
 
