@@ -1147,8 +1147,8 @@ class CheckTemperatureTableDetail(models.Model):
     location = models.CharField(max_length=64, help_text='具体位置')
     station_name = models.CharField(max_length=64, help_text='检查点名称')
     temperature_limit = models.DecimalField(max_digits=4, decimal_places=2, help_text='温度上限')
-    input_value = models.DecimalField(max_digits=4, decimal_places=2, help_text='检查温度', null=True, blank=True)
-    is_exceed = models.BooleanField(help_text='是否超标',null=True, blank=True)
+    input_value = models.DecimalField(max_digits=6, decimal_places=2, help_text='检查温度', null=True, blank=True)
+    is_exceed = models.BooleanField(help_text='是否超标', null=True, blank=True)
 
     class Meta:
         db_table = 'check_temperature_table_detail'

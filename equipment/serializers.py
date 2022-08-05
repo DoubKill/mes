@@ -1923,12 +1923,17 @@ class CheckTemperatureTableSerializer(BaseModelSerializer):
             is_exceed = None
             if input_value:
                 is_exceed = 0 if input_value <= temperature_limit else 1
-            is_exceed_list.append(is_exceed)
+                is_exceed_list.append(is_exceed)
             detail.update({'check_temperature_table': instance, 'is_exceed': is_exceed})
             content.append(CheckTemperatureTableDetail(**detail))
-        if 1 not in is_exceed_list:
-            instance.is_exceed = False
-            instance.save()
+        if not is_exceed_list:
+            instance.is_exceed = None
+        else:
+            if 1 not in is_exceed_list:
+                instance.is_exceed = False
+            else:
+                instance.is_exceed = True
+        instance.save()
         CheckTemperatureTableDetail.objects.bulk_create(content)
         return instance
 
@@ -1956,11 +1961,11 @@ class CheckTemperatureTableUpdateSerializer(BaseModelSerializer):
             is_exceed = None
             if detail.get('input_value'):
                 is_exceed = 0 if detail.get('input_value') <= r_temperature_limit else 1
-            is_exceed_list.append(is_exceed)
+                is_exceed_list.append(is_exceed)
             record.input_value = detail.get('input_value')
             record.is_exceed = is_exceed
             record.save()
-        table_is_exceed = 0 if is_exceed_list and 1 not in is_exceed_list else 1
+        table_is_exceed = None if not is_exceed_list else (False if 1 not in is_exceed_list else True)
         validated_data.update({'is_exceed': table_is_exceed, 'status': '已检查', 'point_time': datetime.now(),
                                'point_user': self.context['request'].user.username})
         return super().update(instance, validated_data)
