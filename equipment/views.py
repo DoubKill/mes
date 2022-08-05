@@ -1,8 +1,12 @@
 import copy
 import datetime
 import datetime as dt
+import re
 import time
+import logging
 import calendar
+import decimal
+
 import requests
 import xlrd
 import xlwt
@@ -35,14 +39,15 @@ from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipP
     EquipBomFilter, EquipJobItemStandardFilter, EquipMaintenanceStandardFilter, EquipRepairStandardFilter, \
     EquipWarehouseInventoryFilter, EquipWarehouseStatisticalFilter, EquipWarehouseOrderDetailFilter, \
     EquipWarehouseRecordFilter, EquipApplyOrderFilter, EquipApplyRepairFilter, EquipWarehouseOrderFilter, \
-    EquipPlanFilter, EquipInspectionOrderFilter
+    EquipPlanFilter, EquipInspectionOrderFilter, CheckPointStandardFilter, CheckTemperatureStandardFilter, \
+    CheckTemperatureTableFilter, CheckPointTableFilter
 from equipment.models import EquipTargetMTBFMTTRSetting, EquipWarehouseAreaComponent, EquipRepairMaterialReq, \
-    EquipInspectionOrder, EquipRegulationRecord, EquipMaintenanceStandardWork, EquipOrderEntrust, XLCommonCode
+    EquipInspectionOrder, EquipRegulationRecord, EquipMaintenanceStandardWork, EquipOrderEntrust, XLCommonCode, \
+    CheckPointStandard, CheckTemperatureStandard, CheckTemperatureTable, CheckPointTable
 from equipment.serializers import *
-from equipment.serializers import EquipRealtimeSerializer
 from equipment.task import property_template, property_import
 from equipment.utils import gen_template_response, get_staff_status, get_ding_uids, DinDinAPI, get_maintenance_status, \
-    get_children_section
+    get_children_section, gen_excels_response
 from mes.common_code import OMin, OMax, OSum, CommonDeleteMixin
 from mes.conf import JZ_EQUIP_NO
 from mes.derorators import api_recorder
@@ -54,6 +59,8 @@ from quality.utils import get_cur_sheet, get_sheet_data
 from terminal.models import ToleranceDistinguish, ToleranceProject, ToleranceHandle, ToleranceRule, Plan, ReportBasic, \
     JZPlan
 from system.models import Section, User
+
+logger = logging.getLogger('error_log')
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -5041,3 +5048,347 @@ class XLCommonCodeView(APIView):
         instance = XLCommonCode.objects.create(apply_user=self.request.user.username, bra_code=bra_code,
                                                apply_desc=apply_desc)
         return Response({'results': bra_code})
+
+
+@method_decorator([api_recorder], name='dispatch')
+class CheckPointStandardViewSet(ModelViewSet):
+    queryset = CheckPointStandard.objects.filter(delete_flag=False).order_by('-id')
+    serializer_class = CheckPointStandardSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = CheckPointStandardFilter
+    FILE_NAME = '岗位安全装置点检标准'
+    EXPORT_FIELDS_DICT = {
+        "点检表编号(新增不填)": "point_standard_code",
+        "点检表名称": "point_standard_name",
+        "文档编号": "doc_code",
+        "通用机台": "equip_no",
+        "岗位": "station",
+        "点检内容": "check_contents",
+        "点检方法": "check_styles",
+        "录入人(新增不填)": "created_username",
+        "录入时间(新增不填)": "created_date",
+    }
+
+    def list(self, request, *args, **kwargs):
+        all_station = self.request.query_params.get('all_station')  # 获取所有岗位
+        if all_station:
+            station_list = list(set(self.get_queryset().filter(equip_no__icontains=all_station).values_list('station', flat=True)))
+            return Response({'results': station_list})
+
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        link_tables = instance.check_tables.filter(delete_flag=False)
+        if link_tables:
+            raise ValidationError('标准已经关联点检表, 无法删除')
+        instance.delete_flag = True
+        instance.delete_user = self.request.user
+        instance.delete_date = datetime.now()
+        instance.save()
+        return Response('删除成功')
+
+    @atomic
+    @action(methods=['post'], detail=False, url_path='excel-handle', url_name='excel_handle')
+    def excel_handle(self, request):
+        excel_flag = self.request.data.get('excel_flag')
+        if excel_flag == 'export':  # 导出
+            export_ids = self.request.data.get('export_ids')
+            if not export_ids:
+                raise ValidationError('请选择需要导出的标准')
+            records = self.get_queryset().filter(id__in=export_ids).order_by('id')
+            if not records:
+                raise ValidationError('未找到所选便准, 请刷新页面后重试')
+            data = self.get_serializer(records, many=True).data
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+        elif excel_flag == 'import':  # 导入
+            excel_file = request.FILES.get('file', None)
+            if not excel_file:
+                raise ValidationError('文件不可为空！')
+            cur_sheet = get_cur_sheet(excel_file)
+            if cur_sheet.ncols != len(self.EXPORT_FIELDS_DICT):
+                raise ValidationError('导入文件数据错误！')
+            data = get_sheet_data(cur_sheet)
+            create_data = []
+            try:
+                for item in data:
+                    if self.get_queryset().filter(point_standard_code=item[0]):  # 存在的编码过滤掉
+                        continue
+                    if not all([item[1], item[3], item[4]]):
+                        raise ValidationError('点检标准名称、通用机台、岗位为必填')
+                    if self.get_queryset().filter(equip_no=item[3], station=item[4]):
+                        raise ValidationError('导入标准存在冲突[通用机台+岗位需要不相同]')
+                    contents, styles = item[5].split('；')[:-1], item[6].split('；')[:-1]
+                    if len(set(contents)) != len(contents):
+                        raise ValidationError('同一标准中点检内容不可存在重复项')
+                    if len(contents) != len(styles):
+                        raise ValidationError('点检内容与点检方法条目数不相同')
+                    equip_no = ','.join(sorted([i.strip() for i in re.split(',', item[3])]))
+                    check_details = [{'check_content': contents[i].split('、')[-1], 'check_style': styles[i].split('、')[-1]} for i in range(len(contents))]
+                    create_data.append({
+                        'point_standard_name': item[1], 'doc_code': item[2], 'equip_no': equip_no, 'station': item[4],
+                        'check_details': check_details
+                    })
+                if not create_data:
+                    raise ValidationError('规则校验完后无可导入数据')
+                serializer = self.get_serializer(data=create_data, many=True)
+                if not serializer.is_valid(raise_exception=False):
+                    raise ValidationError(f'导入数据异常: {serializer.error_messages}')
+                serializer.save()
+            except Exception as e:
+                raise ValidationError(e.args[0])
+        else:
+            raise ValidationError('未知操作[仅支持导入、导出]')
+        return Response(f"{'导出' if excel_flag == 'export' else '导入'}成功")
+
+
+@method_decorator([api_recorder], name='dispatch')
+class CheckPointTableViewSet(ModelViewSet):
+    queryset = CheckPointTable.objects.filter(delete_flag=False).order_by('-id')
+    serializer_class = CheckPointTableSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = CheckPointTableFilter
+    FILE_NAME = '岗位安全装置点检表'
+    EXPORT_FIELDS_DICT = {
+        "点检内容": "check_content",
+        "检查方式": "check_style",
+        "点检结果": "check_result",
+        "是否修复": "is_repaired",
+    }
+
+    def list(self, request, *args, **kwargs):
+        params = self.request.query_params
+        all_detail = params.get('all_detail')
+        if all_detail:  # 查询所有温度检查项目
+            equip_no, station, res, check_point_standard, point_standard_code, point_standard_name = \
+                params.get('equip_no'), params.get('station'), [], None, '', ''
+            if all([equip_no, station]):
+                point_standard = CheckPointStandard.objects.filter(delete_flag=False, equip_no__icontains=equip_no,
+                                                                   station=station).last()
+                if point_standard:
+                    res = list(point_standard.check_details.all().values('sn', 'check_content', 'check_style'))
+                    check_point_standard = point_standard.id
+                    point_standard_code = point_standard.point_standard_code
+                    point_standard_name = point_standard.point_standard_name
+            return Response({"check_point_standard": check_point_standard, "point_standard_code": point_standard_code,
+                             "point_standard_name": point_standard_name, "table_details": res})
+
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.delete_flag = True
+        instance.delete_user = self.request.user
+        instance.delete_date = datetime.now()
+        instance.save()
+        return Response('删除成功')
+
+    @atomic
+    @action(methods=['post'], detail=False, url_path='handle-table', url_name='handle_table')
+    def handle_table(self, request):
+        opera_type = self.request.data.pop('opera_type')
+        ids = self.request.data.pop('ids')
+        if not all([opera_type, ids]):
+            raise ValidationError('参数异常')
+        records = self.get_queryset().filter(id__in=ids)
+        if not records:
+            raise ValidationError('未找到数据行,刷新后重试')
+        key_word = '检查' if opera_type == 1 else ('确认' if opera_type == 2 else '导出')
+        try:
+            if opera_type == 1:  # 编辑点检检查表
+                instance = records.last()
+                if not instance:
+                    raise ValidationError('异常: 数据行异常, 请刷新页面后重试')
+                if instance.status == '已确认':
+                    raise ValidationError('异常: 已确认的表不可再操作')
+                serializer = CheckPointTableUpdateSerializer(instance, self.request.data, context={'request': request})
+                serializer.is_valid(raise_exception=True)
+                serializer.save()
+            elif opera_type == 2:  # 确认点检检查表
+                if records.filter(status='已确认'):
+                    raise ValidationError('异常: 存在已经确认过的数据,请重新选择后再确认')
+                records.update(confirm_desc=self.request.data.get('confirm_desc'), status='已确认',
+                               sign_name=self.request.data.get('sign_name'),
+                               confirm_time=datetime.now(), confirm_user=self.request.user.username)
+            elif opera_type == 3:  # 导出
+                data = self.get_serializer(records, many=True).data
+                return gen_excels_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME,
+                                           sheet_keyword=['select_date', 'classes', 'point_standard_name', 'equip_no',
+                                                          'station'],
+                                           handle_str=True)
+            else:
+                raise ValidationError('异常: 未知操作类型')
+        except Exception as e:
+            logger.error(f'点检-检查表{key_word}操作异常: {e.args[0]}')
+            raise ValidationError(f'{key_word}操作异常' if '异常' not in e.args[0] else e.args[0])
+        return Response(f"点检检查表{key_word}操作成功")
+
+
+@method_decorator([api_recorder], name='dispatch')
+class CheckTemperatureStandardViewSet(ModelViewSet):
+    queryset = CheckTemperatureStandard.objects.filter(delete_flag=False).order_by('sn')
+    serializer_class = CheckTemperatureStandardSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = CheckTemperatureStandardFilter
+    FILE_NAME = '除尘袋滤器温度标准'
+    EXPORT_FIELDS_DICT = {
+        "序号(新增不填)": "sn",
+        "具体位置": "location",
+        "名称": "station_name",
+        "温度上限": "temperature_limit"
+    }
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.delete_flag = True
+        instance.delete_user = self.request.user
+        instance.delete_date = datetime.now()
+        instance.save()
+        return Response('删除成功')
+
+    @atomic
+    @action(methods=['post'], detail=False, url_path='excel-handle', url_name='excel_handle')
+    def excel_handle(self, request):
+        excel_flag = self.request.data.get('excel_flag')
+        if excel_flag == 'export':  # 导出
+            export_ids = self.request.data.get('export_ids')
+            if not export_ids:
+                raise ValidationError('请选择需要导出的标准')
+            records = self.get_queryset().filter(id__in=export_ids).order_by('sn')
+            if not records:
+                raise ValidationError('未找到所选便准, 请刷新页面后重试')
+            data = self.get_serializer(records, many=True).data
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+        elif excel_flag == 'import':  # 导入
+            excel_file = request.FILES.get('file', None)
+            if not excel_file:
+                raise ValidationError('文件不可为空！')
+            cur_sheet = get_cur_sheet(excel_file)
+            if cur_sheet.ncols != len(self.EXPORT_FIELDS_DICT):
+                raise ValidationError('导入文件数据错误！')
+            data = get_sheet_data(cur_sheet)
+            create_data = []
+            try:
+                for item in data:
+                    if not item[0] or not isinstance(item, float):
+                        item[0] = 0
+                    if self.get_queryset().filter(sn=item[0]):  # 存在的序号过滤掉
+                        continue
+                    if not all([item[1], item[2], item[3]]):
+                        raise ValidationError('具体位置、名称、温度为必填')
+                    temperature = round(decimal.Decimal(item[3]), 2)
+                    if temperature < 0:
+                        raise ValidationError('温度上限需大于0')
+                    if self.get_queryset().filter(location=item[1], station_name=item[2]):
+                        raise ValidationError('导入标准存在冲突[具体位置+名称需要不相同]')
+                    create_data.append({'location': item[1], 'station_name': item[2], 'temperature_limit': temperature})
+                if not create_data:
+                    raise ValidationError('规则校验完后无可导入数据')
+                serializer = self.get_serializer(data=create_data, many=True)
+                if not serializer.is_valid(raise_exception=False):
+                    raise ValidationError(f'导入数据异常: {serializer.error_messages}')
+                serializer.save()
+            except decimal.InvalidOperation as e:
+                raise ValidationError('温度上限设置异常')
+            except Exception as e:
+                raise ValidationError(e.args[0])
+        else:
+            raise ValidationError('未知操作[仅支持导入、导出]')
+        return Response(f"{'导出' if excel_flag == 'export' else '导入'}成功")
+
+
+@method_decorator([api_recorder], name='dispatch')
+class CheckTemperatureTableViewSet(ModelViewSet):
+    queryset = CheckTemperatureTable.objects.filter(delete_flag=False).order_by('-id')
+    serializer_class = CheckTemperatureTableSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = CheckTemperatureTableFilter
+    FILE_NAME = '除尘袋滤器温度检查表'
+    EXPORT_FIELDS_DICT = {
+        "序号": "sn",
+        "具体位置": "location",
+        "名称": "station_name",
+        "温度上限": "temperature_limit",
+        "检测温度": "input_value"
+    }
+
+    def list(self, request, *args, **kwargs):
+        all_detail = self.request.query_params.get('all_detail')
+        if all_detail:  # 查询所有温度检查项目
+            res = list(CheckTemperatureStandard.objects.filter(delete_flag=False).order_by('sn')
+                       .values('sn', 'location', 'station_name', 'temperature_limit'))
+            return Response({'results': res})
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.delete_flag = True
+        instance.delete_user = self.request.user
+        instance.delete_date = datetime.now()
+        instance.save()
+        return Response('删除成功')
+
+    @atomic
+    @action(methods=['post'], detail=False, url_path='handle-table', url_name='handle_table')
+    def handle_table(self, request):
+        opera_type = self.request.data.pop('opera_type')
+        ids = self.request.data.pop('ids')
+        if not all([opera_type, ids]):
+            raise ValidationError('参数异常')
+        records = self.get_queryset().filter(id__in=ids)
+        if not records:
+            raise ValidationError('未找到数据行,刷新后重试')
+        key_word = '检查' if opera_type == 1 else ('确认' if opera_type == 2 else '导出')
+        try:
+            if opera_type == 1:  # 编辑温度检查表
+                instance = records.last()
+                if not instance:
+                    raise ValidationError('异常: 数据行异常, 请刷新页面后重试')
+                if instance.status == '已确认':
+                    raise ValidationError('异常: 已确认的表不可再操作')
+                serializer = CheckTemperatureTableUpdateSerializer(instance, self.request.data, context={'request': request})
+                serializer.is_valid(raise_exception=True)
+                serializer.save()
+            elif opera_type == 2:  # 确认温度检查表
+                if records.filter(status='已确认'):
+                    raise ValidationError('异常: 存在已经确认过的数据,请重新选择后再确认')
+                records.update(confirm_desc=self.request.data.get('confirm_desc'), status='已确认',
+                               confirm_time=datetime.now(), confirm_user=self.request.user.username)
+            elif opera_type == 3:  # 导出
+                data = self.get_serializer(records, many=True).data
+                return gen_excels_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, sheet_keyword=['select_date'],
+                                           handle_str=True)
+            else:
+                raise ValidationError('异常: 未知操作类型')
+        except Exception as e:
+            logger.error(f'点检-温度检查表{key_word}操作异常: {e.args[0]}')
+            raise ValidationError(f'{key_word}操作异常' if '异常' not in e.args[0] else e.args[0])
+        return Response(f"温度表{key_word}操作成功")

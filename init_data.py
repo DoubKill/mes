@@ -1007,7 +1007,15 @@ permission_data = [
     {'id': 1011, 'code': 'handle_d_equip_apply_order', 'name': '考勤打卡', 'parent_id': 1004},
     {'id': 1012, 'code': 'accept_d_equip_apply_order', 'name': '补卡申请', 'parent_id': 1004},
     {'id': 1013, 'code': 'export_d_equip_apply_order', 'name': '加班申请', 'parent_id': 1004},
+    {'id': 1081, 'code': 'approval_d_equip_apply_order', 'name': '审批', 'parent_id': 1004},
     {'id': 1030, 'code': 'code_d_equip_apply_order', 'name': '申请料包通用码', 'parent_id': 1004},
+    {'id': 1072, 'code': 'view1_d_equip_apply_order', 'name': '安全点检查询', 'parent_id': 1004},
+    {'id': 1073, 'code': 'execute1_d_equip_apply_order', 'name': '安全点检实施', 'parent_id': 1004},
+    {'id': 1074, 'code': 'confirm1_d_equip_apply_order', 'name': '安全点检确认', 'parent_id': 1004},
+    {'id': 1075, 'code': 'view2_d_equip_apply_order', 'name': '除尘袋滤器查询', 'parent_id': 1004},
+    {'id': 1076, 'code': 'execute2_d_equip_apply_order', 'name': '除尘袋滤器确认实施', 'parent_id': 1004},
+    {'id': 1077, 'code': 'confirm2_d_equip_apply_order', 'name': '除尘袋滤器确认', 'parent_id': 1004},
+    {'id': 1080, 'code': 'view3_d_equip_apply_order', 'name': '细料胶块放行处理', 'parent_id': 1004},
 
     {'id': 1014, 'code': 'wms_mooney_level', 'name': '原材料门尼值等级管理', 'parent_id': None},
     {'id': 1015, 'code': 'view_wms_mooney_level', 'name': '查看', 'parent_id': 1014},
@@ -1044,9 +1052,43 @@ permission_data = [
     {'id': 1044, 'code': 'stop_wfproductbatching', 'name': '停用', 'parent_id': 1034},
     {'id': 1045, 'code': 'sendXl_wfproductbatching', 'name': '发送称量配方', 'parent_id': 1034},
 
-    # 下一个 1046 开始
-    {'id': 1046, 'code': 'product_ratio', 'name': '原材料配比查询', 'parent_id': None},
-    {'id': 1047, 'code': 'view_product_ratio', 'name': '查看', 'parent_id': 1046},
+    {'id': 1046, 'code': 'check_point_standard', 'name': '岗位安全装置点检标准', 'parent_id': None},
+    {'id': 1047, 'code': 'view_check_point_standard', 'name': '查看', 'parent_id': 1046},
+    {'id': 1048, 'code': 'add_check_point_standard', 'name': '新增', 'parent_id': 1046},
+    {'id': 1049, 'code': 'change_check_point_standard', 'name': '编辑', 'parent_id': 1046},
+    {'id': 1050, 'code': 'delete_check_point_standard', 'name': '删除', 'parent_id': 1046},
+    {'id': 1051, 'code': 'excel_check_point_standard', 'name': '导入/导出', 'parent_id': 1046},
+
+    {'id': 1052, 'code': 'check_point_table', 'name': '岗位安全装置点检表', 'parent_id': None},
+    {'id': 1053, 'code': 'view_check_point_table', 'name': '查看', 'parent_id': 1052},
+    {'id': 1054, 'code': 'add_check_point_table', 'name': '新增', 'parent_id': 1052},
+    {'id': 1055, 'code': 'change_check_point_table', 'name': '编辑', 'parent_id': 1052},
+    {'id': 1056, 'code': 'confirm_check_point_table', 'name': '确认', 'parent_id': 1052},
+    {'id': 1057, 'code': 'delete_check_point_table', 'name': '删除', 'parent_id': 1052},
+    {'id': 1058, 'code': 'export_check_point_table', 'name': '导出', 'parent_id': 1052},
+
+    {'id': 1059, 'code': 'check_temperature_standard', 'name': '除尘袋滤器温度标准', 'parent_id': None},
+    {'id': 1060, 'code': 'view_check_temperature_standard', 'name': '查看', 'parent_id': 1059},
+    {'id': 1061, 'code': 'add_check_temperature_standard', 'name': '新增', 'parent_id': 1059},
+    {'id': 1062, 'code': 'change_check_temperature_standard', 'name': '编辑', 'parent_id': 1059},
+    {'id': 1063, 'code': 'delete_check_temperature_standard', 'name': '删除', 'parent_id': 1059},
+    {'id': 1064, 'code': 'excel_check_temperature_standard', 'name': '导出/导入', 'parent_id': 1059},
+
+    {'id': 1065, 'code': 'check_temperature_table', 'name': '除尘袋滤器温度检查表', 'parent_id': None},
+    {'id': 1066, 'code': 'view_check_temperature_table', 'name': '查看', 'parent_id': 1065},
+    {'id': 1067, 'code': 'add_check_temperature_table', 'name': '新增', 'parent_id': 1065},
+    {'id': 1068, 'code': 'change_check_temperature_table', 'name': '编辑', 'parent_id': 1065},
+    {'id': 1069, 'code': 'delete_check_temperature_table', 'name': '删除', 'parent_id': 1065},
+    {'id': 1070, 'code': 'confirm_check_temperature_table', 'name': '批量确认', 'parent_id': 1065},
+    {'id': 1071, 'code': 'export_check_temperature_table', 'name': '导出', 'parent_id': 1065},
+
+    {'id': 1078, 'code': 'rubber_frame_repair_summary', 'name': '胶架维修记录汇总', 'parent_id': None},
+    {'id': 1079, 'code': 'view_rubber_frame_repair_summary', 'name': '查看', 'parent_id': 1078},
+
+    {'id': 1082, 'code': 'product_ratio', 'name': '原材料配比查询', 'parent_id': None},
+    {'id': 1083, 'code': 'view_product_ratio', 'name': '查看', 'parent_id': 1082},
+
+    # 下一个 1084 开始
 ]
 
 
