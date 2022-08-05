@@ -23,7 +23,8 @@ from quality.views import TestIndicatorViewSet, TestTypeViewSet, DataPointViewSe
     ReportValueView, TestDataView, CheckEquip, UnqualifiedPalletFeedBackListView, DataPointListView, \
     ProductTestStaticsView, ClassTestStaticsView, UnqialifiedEquipView, LabelPrintLogView, \
     MaterialDataPointIndicatorHistoryView, ProductSynthesisRate, ProductSynthesisEquipRate, ProductSynthesisGroupRate, \
-    ProductSynthesisProductRate, ProductSynthesisMonthRate, ProductTestValueHistoryView, ProductIndicatorStandard
+    ProductSynthesisProductRate, ProductSynthesisMonthRate, ProductTestValueHistoryView, ProductIndicatorStandard, \
+    ProductMaterials
 
 router = DefaultRouter()
 
@@ -118,6 +119,7 @@ router.register('wms-mooney-level', WMSMooneyLevelView)
 urlpatterns = [
     path('', include(router.urls)),
     path('batching-materials/', ProductBatchingMaterialListView.as_view()),  # 胶料原材料列表
+    path('product-materials/', ProductMaterials.as_view()),  # 胶料配方下拉框（标识启用）
     path('test-indicator-data-points/', TestIndicatorDataPointListView.as_view()),  # 获取试验指标下所有的数据点
     path('result-status/', MaterialDealStatusListView.as_view()),  # 不合格状态筛选
     path('deal-type/', DealTypeView.as_view()),  # 创建处理类型

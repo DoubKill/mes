@@ -322,7 +322,7 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
                 if result_data['deal_user']:
                     deal_suggestion = result_data['deal_suggestion']
                 else:
-                    deal_suggestion = 'PASS'
+                    deal_suggestion = 'PASS' if result_data['test_result'] == 'PASS' else None
             if i['product_no'] != product_no:
                 product_no = i['product_no']
                 sheet = wb.copy_worksheet(ws)
@@ -452,7 +452,7 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
             lot_nos = set(queryset.values_list('lot_no', flat=True))
             deal_results = MaterialDealResult.objects.filter(
                 lot_no__in=lot_nos,
-                test_result='PASS').values('lot_no', 'deal_suggestion', 'deal_user')
+                test_result__in=('PASS', '三等品')).values('lot_no', 'deal_suggestion', 'deal_user', 'test_result')
             lot_deal_result_dict = {i['lot_no']: i for i in deal_results}
             data = MaterialTestOrderExportSerializer(queryset, many=True).data
             return self.export_xls(data, lot_deal_result_dict)
@@ -463,7 +463,7 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
             lot_nos = [i['lot_no'] for i in s_data]
             result = MaterialDealResult.objects.filter(
                 lot_no__in=lot_nos,
-                test_result='PASS').values('lot_no', 'deal_suggestion', 'deal_user')
+                test_result__in=('PASS', '三等品')).values('lot_no', 'deal_suggestion', 'deal_user', 'test_result')
             lot_dict = {i['lot_no']: i for i in result}
             for item in s_data:
                 result_data = lot_dict.get(item['lot_no'])
@@ -471,7 +471,7 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
                     if result_data['deal_user']:
                         item['deal_suggestion'] = result_data['deal_suggestion']
                     else:
-                        item['deal_suggestion'] = 'PASS'
+                        item['deal_suggestion'] = 'PASS' if result_data['test_result'] == 'PASS' else None
             return self.get_paginated_response(s_data)
 
         serializer = self.get_serializer(queryset, many=True)
@@ -1278,6 +1278,7 @@ class TestDataPointCurveView(APIView):
         st = self.request.query_params.get('st')
         et = self.request.query_params.get('et')
         product_no = self.request.query_params.get('product_no')
+        equip_no = self.request.query_params.get('equip_no')
         if not all([st, et, product_no]):
             raise ValidationError('参数缺失')
         # try:
@@ -1288,6 +1289,14 @@ class TestDataPointCurveView(APIView):
         query_set = MaterialTestResult.objects.filter(material_test_order__production_factory_date__gte=st,
                                                       material_test_order__production_factory_date__lte=et,
                                                       material_test_order__product_no=product_no)
+        if equip_no:
+            query_set = query_set.filter(material_test_order__production_equip_no=equip_no)
+            equip_nos = [equip_no]
+        else:
+            equip_nos = list(query_set.values(
+                'material_test_order__production_equip_no'
+            ).annotate(a=Count('id')).values_list('material_test_order__production_equip_no', flat=True))
+
         indicators = MaterialDataPointIndicator.objects.filter(
             material_test_method__material__material_no=product_no,
             level=1).values('data_point__name', 'upper_limit', 'lower_limit')
@@ -1309,7 +1318,7 @@ class TestDataPointCurveView(APIView):
                 continue
             ret.append({'name': data_point_name, 'data': test_data})
         return Response(
-            {'indicators': indicators_dict, 'data': ret}
+            {'indicators': indicators_dict, 'data': ret, 'equip_nos': equip_nos}
         )
 
 
@@ -4342,3 +4351,14 @@ class ProductIndicatorStandard(APIView):
             delete_flag=False
         ).values('data_point__name', 'upper_limit', 'lower_limit', 'data_point__unit')
         return Response(indicators_data)
+
+
+class ProductMaterials(APIView):
+
+    def get(self, request):
+        all_product_nos = set(ProductBatching.objects.values_list('stage_product_batch_no', flat=True))
+        used_recipes = set(ProductBatching.objects.using('SFJ').filter(
+            used_type=4, batching_type=1).order_by('-used_time').values_list('stage_product_batch_no', flat=True))
+        unused_products = all_product_nos - used_recipes
+        ret = [{'product_no': j, 'used': True} for j in used_recipes] + [{'product_no': i, 'used': False} for i in unused_products]
+        return Response(ret)
