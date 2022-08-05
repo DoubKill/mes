@@ -18,7 +18,8 @@ from equipment.models import EquipDownType, EquipDownReason, EquipCurrentStatus,
     EquipWarehouseLocation, EquipWarehouseArea, EquipWarehouseOrderDetail, EquipWarehouseOrder, EquipWarehouseInventory, \
     EquipWarehouseRecord, EquipApplyRepair, EquipPlan, EquipApplyOrder, EquipResultDetail, UploadImage, \
     EquipRepairMaterialReq, EquipInspectionOrder, EquipWarehouseAreaComponent, EquipRegulationRecord, \
-    EquipMaintenanceStandardWork
+    EquipMaintenanceStandardWork, CheckPointStandard, CheckPointStandardDetail, CheckTemperatureStandard, \
+    CheckTemperatureTable, CheckTemperatureTableDetail, CheckPointTableDetail, CheckPointTable
 
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
@@ -1681,3 +1682,291 @@ class EquipPlanSerializer(BaseModelSerializer):
 
         instance = super().create(validated_data)
         return instance
+
+
+class CheckPointStandardDetailSerializer(BaseModelSerializer):
+
+    class Meta:
+        model = CheckPointStandardDetail
+        fields = ('check_content', 'check_style')
+
+
+class CheckPointStandardSerializer(BaseModelSerializer):
+    check_details = CheckPointStandardDetailSerializer(many=True)
+
+    def to_representation(self, instance):
+        res = super().to_representation(instance)
+        check_contents, check_styles = '', ''
+        contents = instance.check_details.filter(delete_flag=False)
+        if contents:
+            for index, content in enumerate(contents):
+                check_contents += f'{index + 1}、{content.check_content}；'
+                check_styles += f'{index + 1}、{content.check_style}；'
+        res.update({'check_contents': check_contents, 'check_styles': check_styles})
+        return res
+
+    @atomic
+    def create(self, validated_data):
+        check_details = validated_data.pop('check_details', None)
+        equip_no, station = validated_data.get('equip_no'), validated_data.get('station')
+        # 同岗位机台不能重叠
+        equip_record = list(CheckPointStandard.objects.filter(station=station, delete_flag=False).values_list('equip_no', flat=True))
+        if equip_record:
+            already_equip_no = set(','.join(equip_record).split(','))
+            if set(equip_no.split(',')) & already_equip_no:
+                raise serializers.ValidationError('同岗位机台不可重叠')
+        # 生成点检标准编号
+        max_code = CheckPointStandard.objects.aggregate(max_code=Max('point_standard_code'))['max_code']
+        point_standard_code = 'GWAQDJ' + ('0001' if not max_code else '%04d' % (int(max_code[-4:]) + 1))
+        validated_data['point_standard_code'] = point_standard_code
+        validated_data['equip_no'] = ','.join(sorted(equip_no.split(',')))
+        instance = super().create(validated_data)
+        # 增加标准详情
+        if check_details:
+            content = []
+            for index, detail in enumerate(check_details):
+                check_content = detail['check_content']
+                detail['check_point_standard'] = instance
+                detail['sn'] = index + 1
+                if check_content not in content:
+                    CheckPointStandardDetail.objects.create(**detail)
+                    content.append(check_content)
+                else:
+                    raise serializers.ValidationError('同一标准中内容不可相同')
+        return instance
+
+    @atomic
+    def update(self, instance, validated_data):
+        check_details = validated_data.pop('check_details')
+        equip_no = ','.join(sorted(validated_data.get('equip_no').split(',')))
+        station = validated_data.get('station')
+        # 同岗位机台不能重叠
+        if instance.equip_no != equip_no or instance.station != station:
+            equip_record = list(CheckPointStandard.objects.filter(~Q(id=instance.id), station=station, delete_flag=False)
+                                .values_list('equip_no', flat=True))
+            if equip_record:
+                already_equip_no = set(','.join(equip_record).split(','))
+                if set(equip_no.split(',')) & already_equip_no:
+                    raise serializers.ValidationError('同岗位机台不可重叠')
+        # 删除标准详情并更新
+        instance.check_details.all().delete()
+        # 增加标准详情
+        if check_details:
+            content = []
+            for index, detail in enumerate(check_details):
+                check_content = detail['check_content']
+                detail['check_point_standard'] = instance
+                detail['sn'] = index + 1
+                if check_content not in content:
+                    CheckPointStandardDetail.objects.create(**detail)
+                    content.append(check_content)
+                else:
+                    raise serializers.ValidationError('同一标准中内容不可相同')
+        return super().update(instance, validated_data)
+
+    class Meta:
+        model = CheckPointStandard
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+        validators = [UniqueTogetherValidator(queryset=CheckPointStandard.objects.filter(delete_flag=False),
+                                              fields=('equip_no', 'station'), message='已存在机台+岗位点检标准')]
+
+
+class CheckTemperatureStandardSerializer(BaseModelSerializer):
+
+    @atomic
+    def create(self, validated_data):
+        # 生成序号
+        max_code = CheckTemperatureStandard.objects.aggregate(max_code=Max('sn'))['max_code']
+        sn = 1 if not max_code else (max_code + 1)
+        validated_data['sn'] = sn
+        return super().create(validated_data)
+
+    class Meta:
+        model = CheckTemperatureStandard
+        fields = '__all__'
+        read_only_fields = ('sn', )
+        validators = [UniqueTogetherValidator(queryset=CheckTemperatureStandard.objects.filter(delete_flag=False),
+                                              fields=('location', 'station_name'), message='已存在具体位置+名称')]
+
+
+class CheckPointTableDetailSerializer(BaseModelSerializer):
+
+    class Meta:
+        model = CheckPointTableDetail
+        fields = '__all__'
+        read_only_fields = ('check_point_table', )
+
+
+class CheckPointTableSerializer(BaseModelSerializer):
+    table_details = CheckPointTableDetailSerializer(many=True, default=[])
+
+    @atomic
+    def create(self, validated_data):
+        check_point_standard = validated_data.pop('check_point_standard')
+        table_details = validated_data.pop('table_details', [])
+        if not table_details:
+            raise serializers.ValidationError('没有需要点检的内容')
+        # 生成编号
+        now_date = datetime.now().strftime('%Y%m%d')
+        prefix = f"{validated_data['point_standard_code']}-{now_date}"
+        code = CheckPointTable.objects.filter(point_standard_code__startswith=prefix).aggregate(code=Max('point_standard_code'))['code']
+        validated_data['point_standard_code'] = prefix + ('0001' if not code else ('%04d' % (int(code[-4:]) + 1)))
+        validated_data['check_point_standard'] = check_point_standard
+        instance = super().create(validated_data)
+        if not table_details:
+            raise serializers.ValidationError('请先设定点检标准')
+        content, table_check_result, normal, abnormal, repaired = [], None, [], [], []
+        for detail in table_details:
+            detail.update({'check_point_table': instance})
+            content.append(CheckPointTableDetail(**detail))
+            # 点检结果状态判断  点检正常: 全好  点检异常: 存在没结果/坏结果+未修复  已修复: 除了好全是已修复
+            check_result, is_repaired = detail.get('check_result'), detail.get('is_repaired')
+            if not abnormal:
+                if not check_result:
+                    abnormal.append(detail)
+                else:
+                    if check_result == '好':
+                        normal.append(detail)
+                    else:
+                        if is_repaired:
+                            repaired.append(detail)
+                        else:
+                            abnormal.append(detail)
+        CheckPointTableDetail.objects.bulk_create(content)
+        if abnormal:
+            table_check_result = '点检异常'
+        else:
+            if len(table_details) == len(normal):
+                table_check_result = '点检正常'
+            else:
+                table_check_result = '已修复'
+        instance.check_result = table_check_result
+        instance.save()
+        return instance
+
+    class Meta:
+        model = CheckPointTable
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+        validators = [UniqueTogetherValidator(queryset=CheckPointTable.objects.filter(delete_flag=False),
+                                              fields=('point_standard_name', 'equip_no', 'station', 'select_date', 'classes'),
+                                              message='已存在点检表名称+岗位+适用机台+日期+班次')]
+
+
+class CheckPointTableUpdateSerializer(BaseModelSerializer):
+    table_details = CheckPointTableDetailSerializer(many=True, default=[])
+
+    @atomic
+    def update(self, instance, validated_data):
+        table_details = validated_data.pop('table_details')
+        if not table_details:
+            raise serializers.ValidationError('没有需要点检的内容')
+        content, table_check_result, normal, abnormal, repaired = [], None, [], [], []
+        for detail in table_details:
+            # 点检结果状态判断  点检正常: 全好  点检异常: 存在没结果/坏结果+未修复  已修复: 除了好全是已修复
+            check_result, is_repaired = detail.get('check_result'), detail.get('is_repaired')
+            record = CheckPointTableDetail.objects.filter(check_point_table=instance, sn=detail['sn'],
+                                                          check_content=detail['check_content'],
+                                                          check_style=detail['check_style'])
+
+            record.update(**detail)
+            if not abnormal:
+                if not check_result:
+                    abnormal.append(detail)
+                else:
+                    if check_result == '好':
+                        normal.append(detail)
+                    else:
+                        if is_repaired:
+                            repaired.append(detail)
+                        else:
+                            abnormal.append(detail)
+        if abnormal:
+            table_check_result = '点检异常'
+        else:
+            if len(table_details) == len(normal):
+                table_check_result = '点检正常'
+            else:
+                table_check_result = '已修复'
+        validated_data.update(check_result=table_check_result, status='已点检', point_time=datetime.now(),
+                              point_user=self.context['request'].user.username)
+        return super().update(instance, validated_data)
+
+    class Meta:
+        model = CheckPointTable
+        fields = ('desc', 'table_details', 'check_image_urls', 'sign_name')
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class CheckTemperatureTableDetailSerializer(BaseModelSerializer):
+
+    class Meta:
+        model = CheckTemperatureTableDetail
+        fields = '__all__'
+        read_only_fields = ('check_temperature_table',)
+
+
+class CheckTemperatureTableSerializer(BaseModelSerializer):
+    table_details = CheckTemperatureTableDetailSerializer(many=True, default=[])
+
+    @atomic
+    def create(self, validated_data):
+        table_details = validated_data.pop('table_details', [])
+        instance = super().create(validated_data)
+        if not table_details:
+            raise serializers.ValidationError('请先设定除尘袋滤器温度标准')
+        content, is_exceed_list = [], []
+        for detail in table_details:
+            # 判断是否超标
+            temperature_limit, input_value = detail.get('temperature_limit'), detail.get('input_value')
+            is_exceed = 1
+            if input_value and input_value <= temperature_limit:
+                is_exceed = 0
+            is_exceed_list.append(is_exceed)
+            detail.update({'check_temperature_table': instance, 'is_exceed': is_exceed})
+            content.append(CheckTemperatureTableDetail(**detail))
+        if 1 not in is_exceed_list:
+            instance.is_exceed = False
+            instance.save()
+        CheckTemperatureTableDetail.objects.bulk_create(content)
+        return instance
+
+    class Meta:
+        model = CheckTemperatureTable
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+        validators = [UniqueTogetherValidator(queryset=CheckTemperatureTable.objects.filter(delete_flag=False),
+                                              fields=('select_date',), message='已经存在当前日期温度检查表')]
+
+
+class CheckTemperatureTableUpdateSerializer(BaseModelSerializer):
+    table_details = CheckTemperatureTableDetailSerializer(many=True, default=[])
+
+    @atomic
+    def update(self, instance, validated_data):
+        table_details = validated_data.pop('table_details')
+        is_exceed_list = []
+        if not table_details:
+            raise serializers.ValidationError('没有需要点检的内容')
+        for detail in table_details:
+            record = CheckTemperatureTableDetail.objects.filter(check_temperature_table=instance, sn=detail['sn'],
+                                                                location=detail['location'], station_name=detail['station_name']).last()
+            r_temperature_limit, r_input_value = record.temperature_limit, record.input_value
+            is_exceed = 1
+            if detail.get('input_value') and detail.get('input_value') <= r_temperature_limit:
+                is_exceed = 0
+            is_exceed_list.append(is_exceed)
+            record.input_value = detail.get('input_value')
+            record.is_exceed = is_exceed
+            record.save()
+        table_is_exceed = 0 if is_exceed_list and 1 not in is_exceed_list else 1
+        validated_data.update({'is_exceed': table_is_exceed, 'status': '已检查', 'point_time': datetime.now(),
+                               'point_user': self.context['request'].user.username})
+        return super().update(instance, validated_data)
+
+    class Meta:
+        model = CheckTemperatureTable
+        fields = ('desc', 'table_details', 'check_image_urls')
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
