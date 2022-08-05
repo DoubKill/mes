@@ -5223,6 +5223,8 @@ class CheckPointTableViewSet(ModelViewSet):
                 serializer.is_valid(raise_exception=True)
                 serializer.save()
             elif opera_type == 2:  # 确认点检检查表
+                if records.filter(status='新建'):
+                    raise ValidationError('异常: 新建单据不可确认')
                 if records.filter(status='已确认'):
                     raise ValidationError('异常: 存在已经确认过的数据,请重新选择后再确认')
                 records.update(confirm_desc=self.request.data.get('confirm_desc'), status='已确认',
@@ -5377,6 +5379,8 @@ class CheckTemperatureTableViewSet(ModelViewSet):
                 serializer.is_valid(raise_exception=True)
                 serializer.save()
             elif opera_type == 2:  # 确认温度检查表
+                if records.filter(status='新建'):
+                    raise ValidationError('异常: 新建单据不可确认')
                 if records.filter(status='已确认'):
                     raise ValidationError('异常: 存在已经确认过的数据,请重新选择后再确认')
                 records.update(confirm_desc=self.request.data.get('confirm_desc'), status='已确认',
