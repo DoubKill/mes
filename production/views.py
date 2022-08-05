@@ -14,7 +14,7 @@ import xlrd
 import xlwt
 from django.http import HttpResponse
 
-from equipment.utils import gen_template_response
+from equipment.utils import gen_template_response, pd_export_xls
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
 from django.db.models import Max, Sum, Count, Min, F, Q, DecimalField
@@ -877,29 +877,6 @@ class TrainsFeedbacksAPIView(mixins.ListModelMixin,
     serializer_class = TrainsFeedbacksSerializer2
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filter_class = TrainsFeedbacksFilter
-    FILE_NAME = '车次报表'
-    EXPORT_FIELDS_DICT = {
-        'No': 'no',
-        '机台': 'equip_no',
-        '配方编号': 'product_no',
-        '班次': 'classes',
-        '计划编号': 'plan_classes_uid',
-        '开始时间': 'begin_time',
-        '结束时间': 'end_time',
-        '设定车次': 'plan_trains',
-        '实际车次': 'actual_trains',
-        '本/远控': 'control_mode',
-        'AI值': 'ai_value',
-        '手/自动': 'operating_type',
-        '总重量(kg)': 'actual_weight',
-        '排胶时间(s)': 'evacuation_time',
-        '排胶温度(°c)': 'evacuation_temperature',
-        '排胶能量(J)': 'evacuation_energy',
-        '操作人': 'operation_user',
-        '存盘时间(s)': 'product_time',
-        '密炼时间(s)': 'mixer_time',
-        '间隔时间(s)': 'interval_time',
-    }
 
     def list(self, request, *args, **kwargs):
         params = request.query_params
@@ -908,6 +885,10 @@ class TrainsFeedbacksAPIView(mixins.ListModelMixin,
         st = params.get('begin_time')
         et = params.get('end_time')
         export = params.get('export')
+        equip_no = params.get('equip_no')
+        product_no = params.get('product_no')
+        operation_user = params.get('operation_user')
+        classes = params.get('classes')
         if st:
             queryset = queryset.filter(factory_date__gte=st[:10])
         if et:
@@ -919,9 +900,49 @@ class TrainsFeedbacksAPIView(mixins.ListModelMixin,
                 raise ValidationError("trains参数错误,参考: trains=5,10")
             queryset = queryset.filter(actual_trains__range=train_range)
         if export:
-            data = list(self.get_serializer(queryset, many=True).data)
-            [i.update({'no': data.index(i) + 1}) for i in data]
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            if not all([st, et]):
+                raise ValidationError('请选择时间范围进行导出！')
+            where_str = """where to_char(FACTORY_DATE, 'yyyy-mm-dd')>='{}' and to_char(FACTORY_DATE, 'yyyy-mm-dd')<='{}'""".format(st[:10], et[:10])
+            if equip_no:
+                where_str += " and EQUIP_NO='{}'".format(equip_no)
+            if product_no:
+                where_str += " and PRODUCT_NO='{}'".format(product_no)
+            if operation_user:
+                where_str += " and OPERATION_USER='{}'".format(operation_user)
+            if classes:
+                where_str += " and CLASSES='{}'".format(classes)
+
+            sql = """select EQUIP_NO as 机台,
+                       to_char(FACTORY_DATE, 'yyyy-mm-dd') as 工厂日期,
+                       PRODUCT_NO as 配方编号,
+                       CLASSES as 班次,
+                       PLAN_CLASSES_UID as 计划编号,
+                       to_char(BEGIN_TIME, 'yyyy-MM-dd HH24:mi:ss') as 开始时间,
+                       to_char(END_TIME, 'yyyy-MM-dd HH24:mi:ss') as 结束时间,
+                       PLAN_TRAINS as 设定车次,
+                       ACTUAL_TRAINS as 实际车次,
+                       CONTROL_MODE as 本远控,
+                       OPERATING_TYPE as 手自动,
+                       PLAN_WEIGHT as 计划重量,
+                       ACTUAL_WEIGHT/100 as 实际重量,
+                       EVACUATION_TIME as 排胶实际,
+                       EVACUATION_TEMPERATURE as 排胶温度,
+                       (CASE
+                           WHEN EQUIP_NO='Z01' THEN EVACUATION_ENERGY / 10
+                           WHEN EQUIP_NO='Z02' THEN EVACUATION_ENERGY / 0.6
+                           WHEN EQUIP_NO='Z04' THEN EVACUATION_ENERGY * 0.28 * PLAN_WEIGHT / 1000
+                           WHEN EQUIP_NO='Z12' THEN EVACUATION_ENERGY / 5.3
+                           WHEN EQUIP_NO='Z13' THEN EVACUATION_ENERGY / 31.7
+                           ELSE EVACUATION_ENERGY END) as 排胶能量,
+                       OPERATION_USER as 操作人,
+                       to_char(PRODUCT_TIME, 'yyyy-MM-dd HH24:mi:ss') as 存盘时间,
+                       ceil((To_date(to_char(END_TIME,'yyyy-mm-dd hh24:mi:ss') , 'yyyy-mm-dd hh24-mi-ss')
+                     - To_date(to_char(BEGIN_TIME,'yyyy-mm-dd hh24:mi:ss'), 'yyyy-mm-dd hh24-mi-ss')
+                    ) * 24 * 60 * 60 ) as 密炼时间,
+                       INTERVAL_TIME as 间隔时间
+                from TRAINS_FEEDBACKS {}
+                order by FACTORY_DATE, EQUIP_NO, CLASSES desc, PRODUCT_NO, ACTUAL_TRAINS""".format(where_str)
+            return pd_export_xls(sql)
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
