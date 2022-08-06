@@ -59,6 +59,7 @@ from quality.utils import get_cur_sheet, get_sheet_data
 from terminal.models import ToleranceDistinguish, ToleranceProject, ToleranceHandle, ToleranceRule, Plan, ReportBasic, \
     JZPlan
 from system.models import Section, User
+from terminal.utils import handle_spare
 
 logger = logging.getLogger('error_log')
 
@@ -4632,19 +4633,11 @@ class EquipOldRateView(APIView):
 class GetSpare(APIView):
     @atomic
     def get(self, request, *args, **kwargs):
-        last = EquipSpareErp.objects.filter(sync_date__isnull=False).order_by('sync_date').last()  # 第一次先在数据库插入一条假数据
-        last_time = (last.sync_date + dt.timedelta(seconds=1)).strftime('%Y-%m-%d %H:%M:%S')
-        url = 'http://10.1.10.136/zcxjws_web/zcxjws/pc/jc/getbjwlxx.io'
-        try:
-            res = requests.post(url=url, json={"syncDate": last_time}, timeout=10)
-        except Exception:
-            raise ValidationError("网络异常")
-        if res.status_code != 200:
-            raise ValidationError("请求失败")
-        data = json.loads(res.content)
-        if not data.get('flag'):
-            raise ValidationError(data.get('message'))
-        ret = data.get('obj')
+        days = self.request.query_params.get('days')
+        last_time = (datetime.now() - dt.timedelta(days=int(days))).strftime('%Y-%m-%d %H:%M:%S') if days else None
+        flag, ret = handle_spare(last_time)
+        if not flag:
+            raise ValidationError(ret)
         for item in ret:
             equip_component_type = EquipComponentType.objects.filter(component_type_name=item['wllb']).first()
             if not equip_component_type:

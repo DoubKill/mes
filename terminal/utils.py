@@ -15,6 +15,7 @@ from django.db.transaction import atomic
 from suds.client import Client
 
 from basics.models import WorkSchedulePlan
+from equipment.models import EquipSpareErp
 from inventory.conf import cb_ip, cb_port
 from inventory.models import MaterialOutHistory
 from inventory.utils import wms_out
@@ -1041,3 +1042,22 @@ def send_dk(equip_no, dk_signal):
         return False, f"{equip_no}导开机信号发送失败"
     logger.info(f"{equip_no}导开机{'启动' if dk_signal == 'Start' else '停止'}信号发送成功")
     return True, f"{equip_no}导开机{'启动' if dk_signal == 'Start' else '停止'}信号发送成功"
+
+
+def handle_spare(last_time):
+    if not last_time:
+        last = EquipSpareErp.objects.filter(sync_date__isnull=False).order_by('sync_date').last()  # 第一次先在数据库插入一条假数据
+        if not last:
+            return False, '未找到最新一次同步时间数据'
+        last_time = (last.sync_date + timedelta(seconds=1)).strftime('%Y-%m-%d %H:%M:%S')
+    url = 'http://10.1.10.136/zcxjws_web/zcxjws/pc/jc/getbjwlxx.io'
+    try:
+        res = requests.post(url=url, json={"syncDate": last_time}, timeout=5)
+    except Exception:
+        return False, '网络异常'
+    if res.status_code != 200:
+        return False, '请求失败'
+    data = json.loads(res.content)
+    if not data.get('flag'):
+        return False, data.get('message')
+    return True, data.get('obj')
