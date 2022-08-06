@@ -916,7 +916,7 @@ class TrainsFeedbacksAPIView(mixins.ListModelMixin,
             qs_df = read_frame(qs=queryset,
                                fieldnames=['equip_no', 'factory_date', 'product_no', 'classes', 'plan_classes_uid',
                                            'begin_time', 'end_time', 'plan_trains', 'actual_trains', 'control_mode',
-                                           'operating_type', 'plan_weight', 'evacuation_time',
+                                           'operating_type', 'plan_weight', 'actual_weight', 'evacuation_time',
                                            'evacuation_temperature', 'evacuation_energy',  'operation_user',
                                            'interval_time'])
             bio = BytesIO()
@@ -925,19 +925,20 @@ class TrainsFeedbacksAPIView(mixins.ListModelMixin,
             qs_df['factory_date'] = qs_df['factory_date'].apply(lambda x: x.strftime('%Y-%m-%d'))
             qs_df['begin_time'] = qs_df['begin_time'].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S'))
             qs_df['end_time'] = qs_df['end_time'].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S'))
+            qs_df['actual_weight'] = qs_df['actual_weight'].apply(lambda x: x/100)
             qs_df = qs_df.apply(self.calculate_energy, axis=1)
             order = ['equip_no', 'factory_date', 'product_no', 'classes', 'plan_classes_uid', 'begin_time', 'end_time',
-                     'plan_trains', 'actual_trains', 'control_mode', 'operating_type', 'plan_weight',
+                     'plan_trains', 'actual_trains', 'control_mode', 'operating_type', 'plan_weight', 'actual_weight',
                      'evacuation_time', 'evacuation_temperature', 'evacuation_energy',  'operation_user',
                      'mixer_time', 'interval_time']
             qs_df = qs_df[order]
             qs_df.rename(columns={'equip_no': '机台', 'factory_date': '工厂日期', 'product_no': '配方编号',
                                   'classes': '班次', 'plan_classes_uid': '计划编号', 'begin_time': '开始时间',
                                   'end_time': '结束时间', 'plan_trains': '设定车次', 'actual_trains': '实际车次',
-                                  'control_mode': '本远控', 'operating_type': '手自动', 'plan_weight': '总重量(kg)',
-                                  'evacuation_time': '排胶时间(s)', 'evacuation_temperature': '排胶温度',
-                                  'evacuation_energy': '排胶能量(kW.h)', 'operation_user': '操作人', 'mixer_time': '密炼时间(s)',
-                                  'interval_time': '间隔时间(s)'},
+                                  'control_mode': '本远控', 'operating_type': '手自动', 'plan_weight': '计划重量(kg)',
+                                  'actual_weight': '实际重量(kg)', 'evacuation_time': '排胶时间(s)',
+                                  'evacuation_temperature': '排胶温度', 'evacuation_energy': '排胶能量(kW.h)',
+                                  'operation_user': '操作人', 'mixer_time': '密炼时间(s)', 'interval_time': '间隔时间(s)'},
                          inplace=True)
             qs_df.to_excel(writer, sheet_name='Sheet1', index=False)
             writer.save()
