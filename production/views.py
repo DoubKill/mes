@@ -7,23 +7,22 @@ import re
 from io import BytesIO
 from itertools import groupby
 from operator import itemgetter
-from math import ceil
 
 import requests
-import xlrd
 import xlwt
-from django.http import HttpResponse
+from django.http import HttpResponse, FileResponse
+from django_pandas.io import read_frame
+import pandas as pd
 
-from equipment.utils import gen_template_response, pd_export_xls
+from equipment.utils import gen_template_response
 from django.db.models.functions import TruncMonth
-from django.utils import timezone
 from django.db.models import Max, Sum, Count, Min, F, Q, DecimalField
 from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 
 from rest_framework import mixins, status
-from rest_framework.decorators import action, permission_classes
+from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.filters import OrderingFilter
 from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated
@@ -41,7 +40,7 @@ from plan.filters import ProductClassesPlanFilter
 from plan.models import ProductClassesPlan, SchedulingEquipShutDownPlan
 from basics.models import Equip
 from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, QualityControlFilter, EquipStatusFilter, \
-    PlanStatusFilter, ExpendMaterialFilter, CollectTrainsFeedbacksFilter, UnReachedCapacityCause, \
+    PlanStatusFilter, ExpendMaterialFilter, UnReachedCapacityCause, \
     ProductInfoDingJiFilter, SubsidyInfoFilter, PerformanceJobLadderFilter, AttendanceGroupSetupFilter, Equip190EFilter, \
     AttendanceClockDetailFilter
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, OperationLog, \
@@ -59,16 +58,16 @@ from production.serializers import QualityControlSerializer, OperationLogSeriali
     ProcessFeedbackSerializer, TrainsFixSerializer, PalletFeedbacksBatchModifySerializer, ProductPlanRealViewSerializer, \
     RubberCannotPutinReasonSerializer, PerformanceJobLadderSerializer, ProductInfoDingJiSerializer, \
     SetThePriceSerializer, SubsidyInfoSerializer, AttendanceGroupSetupSerializer, EmployeeAttendanceRecordsSerializer, \
-    FillCardApplySerializer, ApplyForExtraWorkSerializer, Equip190EWeightSerializer, OuterMaterialSerializer, \
+    FillCardApplySerializer, ApplyForExtraWorkSerializer, Equip190EWeightSerializer, \
     Equip190ESerializer, EquipStatusBatchSerializer, AttendanceClockDetailSerializer
-from rest_framework.generics import ListAPIView, GenericAPIView, ListCreateAPIView, CreateAPIView, UpdateAPIView, \
+from rest_framework.generics import ListAPIView, UpdateAPIView, \
     get_object_or_404
 from datetime import timedelta
 
 from production.utils import get_standard_time
 from quality.models import MaterialTestOrder, MaterialDealResult, MaterialTestResult, MaterialDataPointIndicator
 from quality.utils import get_cur_sheet, get_sheet_data
-from system.models import User, Section
+from system.models import Section
 from recipe.models import Material
 from system.models import User
 from terminal.models import Plan, JZPlan
@@ -871,11 +870,28 @@ class IntervalOutputStatisticsView(APIView):
 class TrainsFeedbacksAPIView(mixins.ListModelMixin,
                              GenericViewSet):
     """车次报表展示接口"""
-    queryset = TrainsFeedbacks.objects.all().order_by('factory_date', 'equip_no', 'product_no', 'actual_trains')
+    queryset = TrainsFeedbacks.objects.order_by('factory_date', 'equip_no', 'product_no', 'actual_trains')
     permission_classes = (IsAuthenticatedOrReadOnly,)
     serializer_class = TrainsFeedbacksSerializer2
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filter_class = TrainsFeedbacksFilter
+
+    @staticmethod
+    def calculate_energy(df):
+        try:
+            if df['equip_no'] == 'Z01':
+                df['evacuation_energy'] = df['evacuation_energy'] / 10
+            elif df['equip_no'] == 'Z02':
+                df['evacuation_energy'] = df['evacuation_energy'] / 0.6
+            elif df['equip_no'] == 'Z04':
+                df['evacuation_energy'] = df['evacuation_energy'] * 0.28 * df['plan_weight'] / 1000
+            elif df['equip_no'] == 'Z12':
+                df['evacuation_energy'] = df['evacuation_energy'] / 5.3
+            elif df['equip_no'] == 'Z01':
+                df['evacuation_energy'] = df['evacuation_energy'] / 31.7
+        except Exception:
+            pass
+        return df
 
     def list(self, request, *args, **kwargs):
         params = request.query_params
@@ -884,10 +900,6 @@ class TrainsFeedbacksAPIView(mixins.ListModelMixin,
         st = params.get('begin_time')
         et = params.get('end_time')
         export = params.get('export')
-        equip_no = params.get('equip_no')
-        product_no = params.get('product_no')
-        operation_user = params.get('operation_user')
-        classes = params.get('classes')
         if st:
             queryset = queryset.filter(factory_date__gte=st[:10])
         if et:
@@ -901,47 +913,40 @@ class TrainsFeedbacksAPIView(mixins.ListModelMixin,
         if export:
             if not all([st, et]):
                 raise ValidationError('请选择时间范围进行导出！')
-            where_str = """where to_char(FACTORY_DATE, 'yyyy-mm-dd')>='{}' and to_char(FACTORY_DATE, 'yyyy-mm-dd')<='{}'""".format(st[:10], et[:10])
-            if equip_no:
-                where_str += " and EQUIP_NO='{}'".format(equip_no)
-            if product_no:
-                where_str += " and PRODUCT_NO='{}'".format(product_no)
-            if operation_user:
-                where_str += " and OPERATION_USER='{}'".format(operation_user)
-            if classes:
-                where_str += " and CLASSES='{}'".format(classes)
+            qs_df = read_frame(qs=queryset,
+                               fieldnames=['equip_no', 'factory_date', 'product_no', 'classes', 'plan_classes_uid',
+                                           'begin_time', 'end_time', 'plan_trains', 'actual_trains', 'control_mode',
+                                           'operating_type', 'plan_weight', 'evacuation_time',
+                                           'evacuation_temperature', 'evacuation_energy',  'operation_user',
+                                           'interval_time'])
+            bio = BytesIO()
+            writer = pd.ExcelWriter(bio, engine='xlsxwriter')  # 注意安装这个包 pip install xlsxwriter
+            qs_df["mixer_time"] = round((qs_df["end_time"] - qs_df["begin_time"]).dt.seconds)
+            qs_df['factory_date'] = qs_df['factory_date'].apply(lambda x: x.strftime('%Y-%m-%d'))
+            qs_df['begin_time'] = qs_df['begin_time'].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S'))
+            qs_df['end_time'] = qs_df['end_time'].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S'))
+            qs_df = qs_df.apply(self.calculate_energy, axis=1)
+            order = ['equip_no', 'factory_date', 'product_no', 'classes', 'plan_classes_uid', 'begin_time', 'end_time',
+                     'plan_trains', 'actual_trains', 'control_mode', 'operating_type', 'plan_weight',
+                     'evacuation_time', 'evacuation_temperature', 'evacuation_energy',  'operation_user',
+                     'mixer_time', 'interval_time']
+            qs_df = qs_df[order]
+            qs_df.rename(columns={'equip_no': '机台', 'factory_date': '工厂日期', 'product_no': '配方编号',
+                                  'classes': '班次', 'plan_classes_uid': '计划编号', 'begin_time': '开始时间',
+                                  'end_time': '结束时间', 'plan_trains': '设定车次', 'actual_trains': '实际车次',
+                                  'control_mode': '本远控', 'operating_type': '手自动', 'plan_weight': '总重量(kg)',
+                                  'evacuation_time': '排胶时间(s)', 'evacuation_temperature': '排胶温度',
+                                  'evacuation_energy': '排胶能量(kW.h)', 'operation_user': '操作人', 'mixer_time': '密炼时间(s)',
+                                  'interval_time': '间隔时间(s)'},
+                         inplace=True)
+            qs_df.to_excel(writer, sheet_name='Sheet1', index=False)
+            writer.save()
+            bio.seek(0)
+            response = FileResponse(bio)
+            response['Content-Type'] = 'application/octet-stream'
+            response['Content-Disposition'] = 'attachment;filename="mm.xlsx"'
+            return response
 
-            sql = """select EQUIP_NO as 机台,
-                       to_char(FACTORY_DATE, 'yyyy-mm-dd') as 工厂日期,
-                       PRODUCT_NO as 配方编号,
-                       CLASSES as 班次,
-                       PLAN_CLASSES_UID as 计划编号,
-                       to_char(BEGIN_TIME, 'yyyy-MM-dd HH24:mi:ss') as 开始时间,
-                       to_char(END_TIME, 'yyyy-MM-dd HH24:mi:ss') as 结束时间,
-                       PLAN_TRAINS as 设定车次,
-                       ACTUAL_TRAINS as 实际车次,
-                       CONTROL_MODE as 本远控,
-                       OPERATING_TYPE as 手自动,
-                       PLAN_WEIGHT as 计划重量,
-                       ACTUAL_WEIGHT/100 as 实际重量,
-                       EVACUATION_TIME as 排胶实际,
-                       EVACUATION_TEMPERATURE as 排胶温度,
-                       (CASE
-                           WHEN EQUIP_NO='Z01' THEN EVACUATION_ENERGY / 10
-                           WHEN EQUIP_NO='Z02' THEN EVACUATION_ENERGY / 0.6
-                           WHEN EQUIP_NO='Z04' THEN EVACUATION_ENERGY * 0.28 * PLAN_WEIGHT / 1000
-                           WHEN EQUIP_NO='Z12' THEN EVACUATION_ENERGY / 5.3
-                           WHEN EQUIP_NO='Z13' THEN EVACUATION_ENERGY / 31.7
-                           ELSE EVACUATION_ENERGY END) as 排胶能量,
-                       OPERATION_USER as 操作人,
-                       to_char(PRODUCT_TIME, 'yyyy-MM-dd HH24:mi:ss') as 存盘时间,
-                       ceil((To_date(to_char(END_TIME,'yyyy-mm-dd hh24:mi:ss') , 'yyyy-mm-dd hh24-mi-ss')
-                     - To_date(to_char(BEGIN_TIME,'yyyy-mm-dd hh24:mi:ss'), 'yyyy-mm-dd hh24-mi-ss')
-                    ) * 24 * 60 * 60 ) as 密炼时间,
-                       INTERVAL_TIME as 间隔时间
-                from TRAINS_FEEDBACKS {}
-                order by FACTORY_DATE, EQUIP_NO, CLASSES desc, PRODUCT_NO, ACTUAL_TRAINS""".format(where_str)
-            return pd_export_xls(sql)
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
