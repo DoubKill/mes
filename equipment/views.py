@@ -3019,7 +3019,8 @@ class EquipAutoPlanView(APIView):
         order_id = self.request.query_params.get('order_id')
         default_staff = self.request.query_params.get('default_staff')  # 保养组名单->变更为设备科
         if default_staff:
-            init_section = Section.objects.filter(name='设备科').last()
+            section_name = self.request.query_params.get('section_name', '设备科')
+            init_section = Section.objects.filter(name=section_name).last()
             if not init_section:
                 return Response({"success": False, "message": "未找到设备科", "data": []})
             section_list = get_children_section(init_section, include_self=True)
@@ -4702,6 +4703,7 @@ class GetSpareOrder(APIView):
             else:
                order_id = 'RK' + str(dt.date.today().strftime('%Y%m%d')) + '0001'
             order = EquipWarehouseOrder.objects.create(
+                created_user=self.request.user,
                 order_id=order_id,
                 submission_department='设备科',
                 status=1,
