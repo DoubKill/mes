@@ -3544,7 +3544,7 @@ class PerformanceSummaryView(APIView):
         user_query = EmployeeAttendanceRecords.objects.filter(Q(**kwargs) & ~Q(is_use='废弃') &
                                                              Q(Q(end_date__isnull=False, begin_date__isnull=False) |
                                                                Q(end_date__isnull=True, begin_date__isnull=True)))
-        queryset = user_query.values_list('user__username', 'section', 'factory_date__day', 'group', 'equip', 'actual_time', 'classes')
+        queryset = user_query.values_list('user__username', 'section', 'factory_date__day', 'group', 'equip', 'actual_time', 'classes', 'begin_date', 'end_date')
         user_dic = {}
         equip_shut_down_dic = {}
         equip_shut_down = SchedulingEquipShutDownPlan.objects.filter(begin_time__year=year, begin_time__month=month).values(
@@ -3567,7 +3567,9 @@ class PerformanceSummaryView(APIView):
                 if user_dic.get(key):  # 可能出现调岗后又换回来的情况，两次时间累加
                     user_dic[key]['actual_time'] += item[5]
                 else:
-                    user_dic[key] = {'name': item[0], 'section': item[1], 'day': item[2], 'group': item[3], 'equip': equip, 'actual_time': item[5], 'classes': item[6]}
+                    user_dic[key] = {'name': item[0], 'section': item[1], 'day': item[2], 'group': item[3],
+                                     'equip': equip, 'actual_time': item[5], 'classes': item[6], 'begin_date': item[7],
+                                     'end_date': item[8]}
         group = WorkSchedulePlan.objects.filter(start_time__year=year, start_time__month=month,
                                                 plan_schedule__work_schedule__work_procedure__global_name='密炼')\
             .values_list('group__global_name', 'classes__global_name', 'start_time__day').order_by('start_time')
@@ -3575,13 +3577,13 @@ class PerformanceSummaryView(APIView):
         for key, g in groupby(list(group), key=lambda x: x[2]):
             group_list.append([item[0] for item in g])
 
-        # 密炼的产量
-        queryset = TrainsFeedbacks.objects.filter(Q(~Q(equip_no='Z04')) | Q(equip_no='Z04', operation_user='Mixer1'))
-        product_qty = list(queryset.filter(**kwargs2).values('classes', 'equip_no', 'factory_date__day', 'product_no')
-                           .annotate(actual_trains=Count('id')).values('actual_trains', 'classes', 'equip_no', 'factory_date__day', 'product_no'))
-        # 人工录入产量
-        add_qty = list(ManualInputTrains.objects.filter(**kwargs2).values('actual_trains', 'classes', 'equip_no', 'factory_date__day', 'product_no'))
-        product_qty = product_qty + add_qty
+        # # 密炼的产量
+        # queryset = TrainsFeedbacks.objects.filter(Q(~Q(equip_no='Z04')) | Q(equip_no='Z04', operation_user='Mixer1'))
+        # product_qty = list(queryset.filter(**kwargs2).values('classes', 'equip_no', 'factory_date__day', 'product_no')
+        #                    .annotate(actual_trains=Count('id')).values('actual_trains', 'classes', 'equip_no', 'factory_date__day', 'product_no'))
+        # # 人工录入产量
+        # add_qty = list(ManualInputTrains.objects.filter(**kwargs2).values('actual_trains', 'classes', 'equip_no', 'factory_date__day', 'product_no'))
+        # product_qty = product_qty + add_qty
         price_dic = {}
         price_list = PerformanceUnitPrice.objects.values('equip_type', 'state', 'pt', 'dj')
         for item in price_list:
@@ -3591,45 +3593,46 @@ class PerformanceSummaryView(APIView):
         for item in equip_list:
             equip_dic[item['equip_no']] = item['category__category_no']
         dj_list = ProductInfoDingJi.objects.filter(is_use=True).values_list('product_name', flat=True)
-        for key in user_dic.keys():
+        for key, detail in user_dic.items():
             day, group, section, equip, classes = key.split('_')
-            for item in product_qty:
-                if item['equip_no'] == equip and str(item['factory_date__day']) == day and classes == item['classes']:
-                    equip_type = equip_dic.get(equip)
-                    try:
-                        state = item['product_no'].split('-')[1]
-                        if state in ['XCJ', 'DJXCJ']:
-                            if item['product_no'].split('-')[0] == 'FM':
-                                state = 'RFM'
-                            elif item['product_no'].split('-')[0] == 'WL':
-                                state = 'RMB'
-                            else:
-                                continue
-                    except:
-                        continue
-                    if not price_dic.get(f"{equip_type}_{state}"):
-                        PerformanceUnitPrice.objects.create(state=state, equip_type=equip_type, dj=1.2, pt=1.1)
-                        price_dic[f"{equip_type}_{state}"] = {'pt': 1.2, 'dj': 1.1}
-                    # 判断是否是丁基胶
-                    if item['product_no'] in dj_list:
-                        # 根据工作时长求机台的产量
-                        work_time = user_dic[key]['actual_time']
-                        if '叉车' in section:
-                            unit = price_dic.get(f"fz_{state}").get('dj')
+            begin_date, end_date = detail.pop('begin_date'), detail.pop('end_date')
+            if not all([begin_date, end_date]):
+                continue
+            equip_kwargs = {'equip_no': equip, 'classes': classes, 'factory_date__day': day}
+            add_qty = list(ManualInputTrains.objects.filter(**equip_kwargs).values('id', 'actual_trains', 'product_no'))
+            if equip == 'Z04':
+                equip_kwargs['operation_user'] = 'Mixer1'
+            equip_kwargs.update({'begin_time__gte': begin_date, 'end_time__lte': end_date})
+            queryset = list(TrainsFeedbacks.objects.filter(**equip_kwargs).values('product_no')
+                            .annotate(actual_trains=Count('id')).values('actual_trains', 'product_no'))
+            for item in queryset + add_qty:
+                m_id, equip_type = item.get('id'), equip_dic.get(equip)
+                try:
+                    state = item['product_no'].split('-')[1]
+                    if state in ['XCJ', 'DJXCJ']:
+                        if item['product_no'].split('-')[0] == 'FM':
+                            state = 'RFM'
+                        elif item['product_no'].split('-')[0] == 'WL':
+                            state = 'RMB'
                         else:
-                            unit = price_dic.get(f"{equip_type}_{state}").get('dj')
-                        user_dic[key][f"{state}_dj_qty"] = round(user_dic[key].get(f"{state}_dj_qty", 0) + \
-                                                           item['actual_trains'] / 12 * work_time, 2)
-                        user_dic[key][f"{state}_dj_unit"] = unit
-                    else:
-                        work_time = user_dic[key]['actual_time']
-                        if '叉车' in section:
-                            unit = price_dic.get(f"fz_{state}").get('pt')
-                        else:
-                            unit = price_dic.get(f"{equip_type}_{state}").get('pt')
-                        user_dic[key][f"{state}_pt_qty"] = round(user_dic[key].get(f"{state}_pt_qty", 0) + \
-                                                           item['actual_trains'] / 12 * work_time, 2)
-                        user_dic[key][f"{state}_pt_unit"] = unit
+                            continue
+                except:
+                    continue
+                if not price_dic.get(f"{equip_type}_{state}"):
+                    PerformanceUnitPrice.objects.create(state=state, equip_type=equip_type, dj=1.2, pt=1.1)
+                    price_dic[f"{equip_type}_{state}"] = {'pt': 1.2, 'dj': 1.1}
+                # 判断是否是丁基胶
+                frame_type = 'dj' if item['product_no'] in dj_list else 'pt'
+                # 根据工作时长求机台的产量
+                work_time = user_dic[key]['actual_time']
+                if '叉车' in section:
+                    unit = price_dic.get(f"fz_{state}").get(frame_type)
+                else:
+                    unit = price_dic.get(f"{equip_type}_{state}").get(frame_type)
+                now_qty = (item['actual_trains'] / 12 * work_time) if m_id else item['actual_trains']
+                user_dic[key][f"{state}_{frame_type}_qty"] = round(user_dic[key].get(f"{state}_{frame_type}_qty", 0)
+                                                                   + now_qty, 2)
+                user_dic[key][f"{state}_{frame_type}_unit"] = unit
         results1 = {}
         # 是否独立上岗
         independent = {}
@@ -4285,8 +4288,9 @@ class AttendanceClockViewSet(ModelViewSet):
             if end_date <= standard_begin_time:
                 raise ValidationError('未到班次标准上班时间不可打下班卡')
             # 计算实际工时(打卡时间)
-            actual_begin_time = begin_date if standard_end_time > begin_date > standard_begin_time or begin_date < standard_begin_time else standard_begin_time
-            actual_end_time = end_date if standard_end_time > end_date > standard_begin_time or end_date < standard_begin_time else standard_end_time
+            actual_begin_time = begin_date if standard_end_time > begin_date > standard_begin_time or (
+                        begin_date < standard_begin_time and end_date < standard_begin_time) else standard_begin_time
+            actual_end_time = end_date if end_date < standard_end_time else standard_end_time
             if extra_work:
                 actual_begin_time = actual_begin_time if actual_begin_time < extra_work.begin_date else extra_work.begin_date
                 actual_end_time = actual_end_time if actual_end_time < extra_work.end_date else extra_work.end_date
