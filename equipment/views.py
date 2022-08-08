@@ -2783,7 +2783,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
             item['unit'] = item['equip_spare__unit']
             if not self.request.query_params.get('use'):
                 item['single_price'] = round(item['equip_spare__cost'] if item['equip_spare__cost'] else 0, 2)
-                item['total_price'] = item['equip_spare__cost'] * item['quantity']
+                item['total_price'] = item['single_price'] * item['quantity']
         if self.request.query_params.get('export'):
             return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         st = (int(page) - 1) * int(page_size)
@@ -5223,6 +5223,8 @@ class CheckPointTableViewSet(ModelViewSet):
                 serializer.is_valid(raise_exception=True)
                 serializer.save()
             elif opera_type == 2:  # 确认点检检查表
+                if records.filter(status='新建'):
+                    raise ValidationError('异常: 新建单据不可确认')
                 if records.filter(status='已确认'):
                     raise ValidationError('异常: 存在已经确认过的数据,请重新选择后再确认')
                 records.update(confirm_desc=self.request.data.get('confirm_desc'), status='已确认',
@@ -5231,8 +5233,7 @@ class CheckPointTableViewSet(ModelViewSet):
             elif opera_type == 3:  # 导出
                 data = self.get_serializer(records, many=True).data
                 return gen_excels_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME,
-                                           sheet_keyword=['select_date', 'classes', 'point_standard_name', 'equip_no',
-                                                          'station'],
+                                           sheet_keyword=['select_date', 'classes', 'equip_no', 'station'],
                                            handle_str=True)
             else:
                 raise ValidationError('异常: 未知操作类型')
@@ -5378,6 +5379,8 @@ class CheckTemperatureTableViewSet(ModelViewSet):
                 serializer.is_valid(raise_exception=True)
                 serializer.save()
             elif opera_type == 2:  # 确认温度检查表
+                if records.filter(status='新建'):
+                    raise ValidationError('异常: 新建单据不可确认')
                 if records.filter(status='已确认'):
                     raise ValidationError('异常: 存在已经确认过的数据,请重新选择后再确认')
                 records.update(confirm_desc=self.request.data.get('confirm_desc'), status='已确认',
