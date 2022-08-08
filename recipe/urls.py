@@ -6,7 +6,7 @@ from recipe.views import MaterialViewSet, ProductInfoViewSet, \
     ValidateProductVersionsView, RecipeNoticeAPiView, MaterialSupplierViewSet, \
     WeighCntTypeViewSet, ProductBatchingDetailListView, ERPMaterialViewSet, ZCMaterialListView, GetERPZcMaterialAPiView, \
     ProductDevBatchingReceive, DevTypeProductBatching, ReplaceRecipeMaterialViewSet, ProductBatchingNoNew, \
-    WFProductBatchingViewSet
+    WFProductBatchingViewSet, ProductRatioView
 
 router = DefaultRouter()
 
@@ -46,5 +46,6 @@ urlpatterns = [
     path('zc-materials-though-mes/', GetERPZcMaterialAPiView.as_view()),  # 通过mes物料名获取绑定关系的中策物料信息
     path('product-dev-batching-receive/', ProductDevBatchingReceive.as_view()),
     path('dev-type-batching/', DevTypeProductBatching.as_view()),
-    path('product-batching-no-new/', ProductBatchingNoNew.as_view())  # 不生成new配方修改对搭设置, 单配信息, 可用机台
-    ]
+    path('product-batching-no-new/', ProductBatchingNoNew.as_view()),  # 不生成new配方修改对搭设置, 单配信息, 可用机台
+    path('product-ratio/', ProductRatioView.as_view()),  # 胶料配方原材料配比查询
+]
