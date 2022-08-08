@@ -3457,6 +3457,11 @@ class XlRecipeNoticeView(APIView):
                     self.issue_xl_system(xl_equip, send_data)
         except Exception as e:
             raise ValidationError(f"{error_msg}:{e.args[0]}")
+        if '成功' in detail_msg:
+            e_xl_equip = mes_xl_details.last().send_xl_equip
+            if xl_equip not in e_xl_equip:
+                update_info = f'{e_xl_equip},{xl_equip}' if e_xl_equip else xl_equip
+                ProductBatchingEquip.objects.filter(product_batching=product_batching).update(send_xl_equip=update_info)
         return Response(f'{xl_equip}:\n {detail_msg}')
 
     def issue_xl_system(self, xl_equip, data):
