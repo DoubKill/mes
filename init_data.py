@@ -1085,7 +1085,10 @@ permission_data = [
     {'id': 1078, 'code': 'rubber_frame_repair_summary', 'name': '胶架维修记录汇总', 'parent_id': None},
     {'id': 1079, 'code': 'view_rubber_frame_repair_summary', 'name': '查看', 'parent_id': 1078},
 
-    # 下一个 1082 开始
+    {'id': 1082, 'code': 'product_ratio', 'name': '原材料配比查询', 'parent_id': None},
+    {'id': 1083, 'code': 'view_product_ratio', 'name': '查看', 'parent_id': 1082},
+
+    # 下一个 1084 开始
 ]
 
 
