@@ -4689,6 +4689,8 @@ class GetSpareOrder(APIView):
         data = json.loads(res.content)
         if not data.get('flag'):
             raise ValidationError(data.get('message'))
+        # 获取备件ERP同步屏蔽类别码
+        overcome = GlobalCode.objects.filter(global_type__use_flag=True, global_type__type_name='备件ERP同步屏蔽类别码', use_flag=True).values_list('global_name', flat=True).distinct()
         lst = data.get('obj')
         for dic in lst:
             order = dic.get('lld')
@@ -4711,15 +4713,22 @@ class GetSpareOrder(APIView):
                 processing_time=order.get('clsj'),
                 lluser=order.get('llUser', None)
             )
+            overcome_list = []
             for spare in order_detail:
                 equip_spare = EquipSpareErp.objects.filter(unique_id=spare.get('wlxxid')).first()
                 if not equip_spare:
                     equip_spare = EquipSpareErp.objects.create(unique_id=spare.get('wlxxid'))
-                    # raise ValidationError('调用库存领料单接口失败，单据中备件不存在，请先去同步erp备件')
-                kwargs = {'equip_warehouse_order': order,
-                          'equip_spare': equip_spare,
-                          'plan_in_quantity': spare.get('cksl')}
-                EquipWarehouseOrderDetail.objects.create(**kwargs)
+                spare_code = equip_spare.spare_code
+                if not spare_code or len(spare_code) < 2 or spare_code[:2] not in overcome:
+                    kwargs = {'equip_warehouse_order': order,
+                              'equip_spare': equip_spare,
+                              'plan_in_quantity': spare.get('cksl')}
+                    EquipWarehouseOrderDetail.objects.create(**kwargs)
+                else:  # 屏蔽备件
+                    overcome_list.append(spare)
+            if order_detail and len(overcome_list) == len(order_detail):  # 领料单中全是屏蔽类别码
+                order.status = 7
+                order.save()
         return Response('请求成功')
 
 
