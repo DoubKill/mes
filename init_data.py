@@ -140,9 +140,10 @@ permission_data = [
     {'id': 114, 'code': 'view_test_result', 'name': '查看', 'parent_id': 113},
     {'id': 115, 'code': 'add_test_result', 'name': '新增', 'parent_id': 113},
 
-    {'id': 116, 'code': 'result_info', 'name': '胶料快检结果详细信息', 'parent_id': None},
+    {'id': 116, 'code': 'result_info', 'name': '胶料快检详细信息', 'parent_id': None},
     {'id': 117, 'code': 'view_result_info', 'name': '查看', 'parent_id': 116},
     {'id': 163, 'code': 'export_result_info', 'name': '导出', 'parent_id': 116},
+    {'id': 1084, 'code': 'curve_result_info', 'name': '查看推移图', 'parent_id': 116},
 
     {'id': 118, 'code': 'deal_result', 'name': '胶料快检信息综合管理', 'parent_id': None},
     {'id': 119, 'code': 'view_deal_result', 'name': '查看', 'parent_id': 118},
@@ -1085,7 +1086,10 @@ permission_data = [
     {'id': 1078, 'code': 'rubber_frame_repair_summary', 'name': '胶架维修记录汇总', 'parent_id': None},
     {'id': 1079, 'code': 'view_rubber_frame_repair_summary', 'name': '查看', 'parent_id': 1078},
 
-    # 下一个 1082 开始
+    {'id': 1082, 'code': 'product_ratio', 'name': '原材料配比查询', 'parent_id': None},
+    {'id': 1083, 'code': 'view_product_ratio', 'name': '查看', 'parent_id': 1082},
+
+    # 下一个 1084 开始
 ]
 
 

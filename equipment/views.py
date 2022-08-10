@@ -59,6 +59,7 @@ from quality.utils import get_cur_sheet, get_sheet_data
 from terminal.models import ToleranceDistinguish, ToleranceProject, ToleranceHandle, ToleranceRule, Plan, ReportBasic, \
     JZPlan
 from system.models import Section, User
+from terminal.utils import handle_spare
 
 logger = logging.getLogger('error_log')
 
@@ -3018,7 +3019,8 @@ class EquipAutoPlanView(APIView):
         order_id = self.request.query_params.get('order_id')
         default_staff = self.request.query_params.get('default_staff')  # 保养组名单->变更为设备科
         if default_staff:
-            init_section = Section.objects.filter(name='设备科').last()
+            section_name = self.request.query_params.get('section_name', '设备科')
+            init_section = Section.objects.filter(name=section_name).last()
             if not init_section:
                 return Response({"success": False, "message": "未找到设备科", "data": []})
             section_list = get_children_section(init_section, include_self=True)
@@ -4632,19 +4634,11 @@ class EquipOldRateView(APIView):
 class GetSpare(APIView):
     @atomic
     def get(self, request, *args, **kwargs):
-        last = EquipSpareErp.objects.filter(sync_date__isnull=False).order_by('sync_date').last()  # 第一次先在数据库插入一条假数据
-        last_time = (last.sync_date + dt.timedelta(seconds=1)).strftime('%Y-%m-%d %H:%M:%S')
-        url = 'http://10.1.10.136/zcxjws_web/zcxjws/pc/jc/getbjwlxx.io'
-        try:
-            res = requests.post(url=url, json={"syncDate": last_time}, timeout=10)
-        except Exception:
-            raise ValidationError("网络异常")
-        if res.status_code != 200:
-            raise ValidationError("请求失败")
-        data = json.loads(res.content)
-        if not data.get('flag'):
-            raise ValidationError(data.get('message'))
-        ret = data.get('obj')
+        days = self.request.query_params.get('days')
+        last_time = (datetime.now() - dt.timedelta(days=int(days))).strftime('%Y-%m-%d %H:%M:%S') if days else None
+        flag, ret = handle_spare(last_time)
+        if not flag:
+            raise ValidationError(ret)
         for item in ret:
             equip_component_type = EquipComponentType.objects.filter(component_type_name=item['wllb']).first()
             if not equip_component_type:
@@ -4695,6 +4689,8 @@ class GetSpareOrder(APIView):
         data = json.loads(res.content)
         if not data.get('flag'):
             raise ValidationError(data.get('message'))
+        # 获取备件ERP同步屏蔽类别码
+        overcome = GlobalCode.objects.filter(global_type__use_flag=True, global_type__type_name='备件ERP同步屏蔽类别码', use_flag=True).values_list('global_name', flat=True).distinct()
         lst = data.get('obj')
         for dic in lst:
             order = dic.get('lld')
@@ -4709,6 +4705,7 @@ class GetSpareOrder(APIView):
             else:
                order_id = 'RK' + str(dt.date.today().strftime('%Y%m%d')) + '0001'
             order = EquipWarehouseOrder.objects.create(
+                created_user=self.request.user,
                 order_id=order_id,
                 submission_department='设备科',
                 status=1,
@@ -4716,15 +4713,22 @@ class GetSpareOrder(APIView):
                 processing_time=order.get('clsj'),
                 lluser=order.get('llUser', None)
             )
+            overcome_list = []
             for spare in order_detail:
                 equip_spare = EquipSpareErp.objects.filter(unique_id=spare.get('wlxxid')).first()
                 if not equip_spare:
                     equip_spare = EquipSpareErp.objects.create(unique_id=spare.get('wlxxid'))
-                    # raise ValidationError('调用库存领料单接口失败，单据中备件不存在，请先去同步erp备件')
-                kwargs = {'equip_warehouse_order': order,
-                          'equip_spare': equip_spare,
-                          'plan_in_quantity': spare.get('cksl')}
-                EquipWarehouseOrderDetail.objects.create(**kwargs)
+                spare_code = equip_spare.spare_code
+                if not spare_code or len(spare_code) < 2 or spare_code[:2] not in overcome:
+                    kwargs = {'equip_warehouse_order': order,
+                              'equip_spare': equip_spare,
+                              'plan_in_quantity': spare.get('cksl')}
+                    EquipWarehouseOrderDetail.objects.create(**kwargs)
+                else:  # 屏蔽备件
+                    overcome_list.append(spare)
+            if order_detail and len(overcome_list) == len(order_detail):  # 领料单中全是屏蔽类别码
+                order.status = 7
+                order.save()
         return Response('请求成功')
 
 
