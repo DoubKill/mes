@@ -23,7 +23,12 @@ from quality.models import MaterialTestOrder, MaterialTestResult, MaterialTestMe
 def main():
     for pcp in ProductClassesPlan.objects.filter(delete_flag=False, status__in=('已保存', '已下达', '运行中')):
         max_train = TrainsFeedbacks.objects.filter(
-            plan_classes_uid=pcp.plan_classes_uid).aggregate(max_train=Max('actual_trains'))['max_train']
+            factory_date=pcp.work_schedule_plan.plan_schedule.day_time,
+            classes=pcp.work_schedule_plan.classes.global_name,
+            equip_no=pcp.equip.equip_no,
+            product_no=pcp.product_batching.stage_product_batch_no
+        ).aggregate(max_train=Max('actual_trains'))['max_train']
+        max_train = 0 if not max_train else max_train
         if not max_train:
             st = 1
         else:
@@ -33,7 +38,7 @@ def main():
         e_day = datetime.timedelta(seconds=-random.randint(1, 10))
         begin_time = now + b_day
         end_time = now + e_day
-        if st <= pcp.plan_trains:
+        if st <= pcp.plan_trains + max_train:
             TrainsFeedbacks.objects.create(
                 plan_classes_uid=pcp.plan_classes_uid,
                 plan_trains=pcp.plan_trains,
