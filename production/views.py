@@ -5067,6 +5067,7 @@ class AttendanceResultAuditView(APIView):
             # 未整体提交的考勤数据不能审核、审批
             if not_overall:
                 raise ValidationError('存在未确认的考勤数据, 请处理后再进行审批/审核操作')
+            opera_flag = 0
             if approve:
                 if s_record.opera_flag == 2:
                     raise ValidationError('考勤数据已经审批完成')
@@ -5084,6 +5085,8 @@ class AttendanceResultAuditView(APIView):
             # 审核或审批不通过,当月考勤数据全为红色 #DA1F27 红色
             if not data.get('result'):
                 attendance_data.update(record_status='#DA1F27', opera_flag=0)
+            else:
+                attendance_data.update(opera_flag=opera_flag)
         # 记录履历
         EmployeeAttendanceRecordsLog.objects.create(**{'opera_user': is_user, 'opera_type': opera_type})
         return Response('ok')
