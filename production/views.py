@@ -31,6 +31,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet, ViewSet
 from basics.models import GlobalCode, WorkSchedulePlan
 from equipment.models import EquipMaintenanceOrder
+from inventory.models import ProductInventoryLocked, BzFinalMixingRubberInventory, BzFinalMixingRubberInventoryLB
 from mes.common_code import OSum, date_range, days_cur_month_dates
 from mes.conf import EQUIP_LIST, JZ_EQUIP_NO
 from mes.derorators import api_recorder
@@ -68,7 +69,7 @@ from production.utils import get_standard_time
 from quality.models import MaterialTestOrder, MaterialDealResult, MaterialTestResult, MaterialDataPointIndicator
 from quality.utils import get_cur_sheet, get_sheet_data
 from system.models import Section
-from recipe.models import Material
+from recipe.models import Material, MaterialAttribute
 from system.models import User
 from terminal.models import Plan, JZPlan
 from equipment.utils import DinDinAPI
@@ -474,6 +475,63 @@ class ProductionRecordViewSet(mixins.ListModelMixin,
     serializer_class = ProductionRecordSerializer
     filter_backends = [DjangoFilterBackend, ]
     filter_class = PalletFeedbacksFilter
+
+    def list(self, request, *args, **kwargs):
+        locked_status = self.request.query_params.get('locked_status')
+        is_instock = self.request.query_params.get('is_instock')
+        queryset = self.filter_queryset(self.get_queryset())
+        if locked_status:
+            # if locked_status == '0':  # 空白
+            #     locked_lot_nos = list(
+            #         ProductInventoryLocked.objects.filter(is_locked=True).values_list('lot_no', flat=True))
+            #     queryset = queryset.exclude(lot_no__in=locked_lot_nos)
+            if locked_status == '1':  # 工艺锁定
+                locked_lot_nos = list(
+                    ProductInventoryLocked.objects.filter(is_locked=True, locked_status__in=(1, 3)).values_list('lot_no', flat=True))
+                queryset = queryset.filter(lot_no__in=locked_lot_nos)
+            elif locked_status == '2':  # 快检锁定
+                locked_lot_nos = list(
+                    ProductInventoryLocked.objects.filter(is_locked=True, locked_status__in=(2, 3)).values_list('lot_no',
+                                                                                                       flat=True))
+                queryset = queryset.filter(lot_no__in=locked_lot_nos)
+        if is_instock:
+            stock_lot_nos = list(BzFinalMixingRubberInventory.objects.using('bz').values_list('lot_no', flat=True)) + \
+                            list(BzFinalMixingRubberInventoryLB.objects.using('lb').filter(
+                                store_name='炼胶库').values_list('lot_no', flat=True))
+            if is_instock == 'Y':
+                queryset = queryset.filter(lot_no__in=stock_lot_nos)
+            else:
+                queryset = queryset.exclude(lot_no__in=stock_lot_nos)
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            s_data = serializer.data
+            lot_nos = [i['lot_no'] for i in s_data]
+            plan_classes_uids = [i['plan_classes_uid'] for i in s_data]
+            locked_dict = dict(
+                ProductInventoryLocked.objects.filter(lot_no__in=lot_nos).values_list('lot_no', 'locked_status'))
+            stock_lot_nos = list(
+                BzFinalMixingRubberInventory.objects.using('bz').filter(lot_no__in=lot_nos).values_list('lot_no',
+                                                                                                        flat=True)) + \
+                            list(BzFinalMixingRubberInventoryLB.objects.using('lb').filter(
+                                store_name='炼胶库', lot_no__in=lot_nos).values_list('lot_no', flat=True))
+            product_validity_dict = dict(MaterialAttribute.objects.filter(
+                period_of_validity__isnull=False
+            ).values_list('material__material_no', 'period_of_validity'))
+            group_dict = dict(
+                ProductClassesPlan.objects.filter(
+                    plan_classes_uid__in=plan_classes_uids
+                ).values_list('plan_classes_uid', 'work_schedule_plan__group__global_name'))
+            for item in s_data:
+                lot_no = item['lot_no']
+                item['locked_status'] = locked_dict.get(lot_no, 0)
+                item['is_instock'] = lot_no in stock_lot_nos
+                item['class_group'] = group_dict.get(item['plan_classes_uid'])
+                if product_validity_dict.get(item['product_no']):
+                    item['validtime'] = (datetime.datetime.strptime(item['end_time'], '%Y-%m-%d %H:%M:%S') + datetime.timedelta(days=product_validity_dict.get(item['product_no']))).strftime('%Y-%m-%d %H:%M:%S')
+            return self.get_paginated_response(s_data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     def get_queryset(self):
         queryset = self.queryset
