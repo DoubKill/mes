@@ -3206,11 +3206,16 @@ class EmployeeAttendanceRecordsView(APIView):
         approve_obj = AttendanceResultAudit.objects.filter(date=date, approve_user__isnull=False).last()
         # 增加能否导出的标记
         export_flag = True
-        attendance_data = EmployeeAttendanceRecords.objects.filter(factory_date__in=days_cur_month_dates())
+        attendance_data = EmployeeAttendanceRecords.objects.filter(~Q(is_use='废弃'),
+                                                                   Q(begin_date__isnull=False, end_date__isnull=False)
+                                                                   | Q(begin_date__isnull=True, end_date__isnull=True),
+                                                                   factory_date__in=days_cur_month_dates())
         if not attendance_data:
             export_flag = False
         not_overall = attendance_data.exclude(record_status='#141414')  # 非整体提交数据
         if not_overall:
+            export_flag = False
+        if set(attendance_data.values_list('opera_flag', flat=True)) != {3}:
             export_flag = False
         return Response({'results': results_sort, 'group_list': group_list, 'export_flag': export_flag,
                          'audit_user':  audit_obj.audit_user if audit_obj else None,
@@ -4946,18 +4951,20 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
                 ids, is_use, factory_date = item['id'], item.get('is_use'), item.get('factory_date')
                 id_param = [ids] if isinstance(ids, int) else ids
                 EmployeeAttendanceRecords.objects.filter(pk__in=id_param).update(actual_time=item.get('actual_time', 0),
-                                                                                 is_use=is_use, record_status='#141414')
+                                                                                 is_use=is_use, record_status='#141414',
+                                                                                 opera_flag=1)
         elif reject_list:  # 审批驳回某一天的数据 #DA1F27 红色
             opera_type = '单天驳回'
             for item in reject_list:
                 is_use, factory_date = item.get('is_use'), item.get('factory_date')
-                EmployeeAttendanceRecords.objects.filter(pk=item['id']).update(is_use=is_use, record_status='#DA1F27')
+                EmployeeAttendanceRecords.objects.filter(pk=item['id']).update(is_use=is_use, record_status='#DA1F27',
+                                                                               opera_flag=0)
         elif abandon_list:  # 废弃
             opera_type = '废弃'
             for item in abandon_list:
                 ids, is_use, factory_date = item['id'], item.get('is_use'), item.get('factory_date')
                 id_param = [ids] if isinstance(ids, int) else ids
-                EmployeeAttendanceRecords.objects.filter(pk__in=id_param).update(is_use=is_use)
+                EmployeeAttendanceRecords.objects.filter(pk__in=id_param).update(is_use=is_use, opera_flag=0)
                 delete_ids += id_param
         else:
             raise ValidationError('不支持的操作')
@@ -5040,30 +5047,43 @@ class AttendanceResultAuditView(APIView):
         approve = data.pop('approve', None)  # 审批人
         is_user = self.request.user.username
         opera_type = None
-        attendance_data = EmployeeAttendanceRecords.objects.filter(factory_date__in=days_cur_month_dates())
+        attendance_data = EmployeeAttendanceRecords.objects.filter(~Q(is_use='废弃'),
+                                                                   Q(begin_date__isnull=False, end_date__isnull=False)
+                                                                   | Q(begin_date__isnull=True, end_date__isnull=True),
+                                                                   factory_date__in=days_cur_month_dates())
         if not attendance_data:
             raise ValidationError('暂无本月考勤数据需要处理')
+        s_record = attendance_data.last()  # 获取已确认的某条数据
         not_overall = attendance_data.exclude(record_status='#141414')  # 非整体提交数据
         if overall:  # #141414 黑色
             opera_type = '整体提交'
             if not_overall:
-                attendance_data.update(record_status='#141414')
+                if s_record.opera_type != 0:
+                    raise ValidationError('未操作数据才可以确认')
+                attendance_data.update(record_status='#141414', opera_flag=1)
             else:
                 raise ValidationError('请勿重复提交')
         else:
-            if audit:
-                opera_type = '审核'
-                data['audit_user'] = is_user
-            if approve:
-                opera_type = '审批'
-                data['approve_user'] = is_user
-            # 未整体提交的考勤数据不能审核、审批[]
+            # 未整体提交的考勤数据不能审核、审批
             if not_overall:
-                raise ValidationError(f'存在未确认的考勤数据, 请处理后再{opera_type}')
+                raise ValidationError('存在未确认的考勤数据, 请处理后再进行审批/审核操作')
+            if approve:
+                if s_record.opera_flag == 2:
+                    raise ValidationError('考勤数据已经审批完成')
+                if s_record.opera_flag != 1:
+                    raise ValidationError('确认的考勤数据才可审批')
+                opera_type, opera_flag, data['approve_user'] = '审批', 2, is_user
+            if audit:
+                if s_record.opera_flag == 3:
+                    raise ValidationError('考勤数据已经审核完成')
+                if s_record.opera_flag != 2:
+                    raise ValidationError('审批通过的考勤数据才可审核')
+                opera_type, opera_flag, data['audit_user'] = '审核', 3, is_user
+
             AttendanceResultAudit.objects.create(**data)
             # 审核或审批不通过,当月考勤数据全为红色 #DA1F27 红色
             if not data.get('result'):
-                attendance_data.update(record_status='#DA1F27')
+                attendance_data.update(record_status='#DA1F27', opera_flag=0)
         # 记录履历
         EmployeeAttendanceRecordsLog.objects.create(**{'opera_user': is_user, 'opera_type': opera_type})
         return Response('ok')

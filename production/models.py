@@ -411,7 +411,9 @@ class EmployeeAttendanceRecords(models.Model):
     equip = models.CharField(help_text='机台', max_length=12, null=True, blank=True)
     status = models.CharField(max_length=12, help_text='上岗/调岗/加班', null=True, blank=True)
     is_use = models.CharField(max_length=12, help_text='确认/添加/废弃', null=True, blank=True)
-    record_status = models.CharField(max_length=12, help_text='考勤记录颜色: 蓝色[#1010FF]-未确认,绿色[#51A651]-已确认,红色[#DA1F27]-驳回,黑色[#141414]-整体提交', default='#1010FF')
+    record_status = models.CharField(max_length=12, help_text='考勤记录颜色: 蓝色[#1010FF]-未确认,绿色[#51A651]-已确认,'
+                                                              '红色[#DA1F27]-驳回,黑色[#141414]-整体提交', default='#1010FF')
+    opera_flag = models.PositiveIntegerField(help_text='0:未操作 1:已确认 2:已审批 3:已审核', default=0)
 
     class Meta:
         db_table = 'employee_attendance_records'
