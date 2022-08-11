@@ -744,15 +744,25 @@ class PalletFeedbacksTestListView(ModelViewSet):
             return MaterialDealResultListSerializer1
 
     def list(self, request, *args, **kwargs):
-        is_locked = self.request.query_params.get('is_locked')
+        locked_status = self.request.query_params.get('locked_status')
         is_instock = self.request.query_params.get('is_instock')
         queryset = self.filter_queryset(self.get_queryset())
-        if is_locked:
-            locked_lot_nos = list(ProductInventoryLocked.objects.filter(is_locked=True).values_list('lot_no', flat=True))
-            if is_locked == 'Y':
+        if locked_status:
+            # if locked_status == '0':  # 空白
+            #     locked_lot_nos = list(
+            #         ProductInventoryLocked.objects.filter(is_locked=True).values_list('lot_no', flat=True))
+            #     queryset = queryset.exclude(lot_no__in=locked_lot_nos)
+            if locked_status == '1':  # 工艺锁定
+                locked_lot_nos = list(
+                    ProductInventoryLocked.objects.filter(is_locked=True, locked_status__in=(1, 3)).values_list(
+                        'lot_no', flat=True))
                 queryset = queryset.filter(lot_no__in=locked_lot_nos)
-            else:
-                queryset = queryset.exclude(lot_no__in=locked_lot_nos)
+            elif locked_status == '2':  # 快检锁定
+                locked_lot_nos = list(
+                    ProductInventoryLocked.objects.filter(is_locked=True, locked_status__in=(2, 3)).values_list(
+                        'lot_no',
+                        flat=True))
+                queryset = queryset.filter(lot_no__in=locked_lot_nos)
         if is_instock:
             stock_lot_nos = list(BzFinalMixingRubberInventory.objects.using('bz').values_list('lot_no', flat=True)) + \
                             list(BzFinalMixingRubberInventoryLB.objects.using('lb').filter(
@@ -778,7 +788,7 @@ class PalletFeedbacksTestListView(ModelViewSet):
                                             'test_factory_date',
                                             'created_user__username')
             last_test_dict = {i['material_test_order__lot_no']: i for i in last_test_data}
-            locked_dict = dict(ProductInventoryLocked.objects.filter(lot_no__in=lot_nos).values_list('lot_no', 'is_locked'))
+            locked_dict = dict(ProductInventoryLocked.objects.filter(lot_no__in=lot_nos).values_list('lot_no', 'locked_status'))
             stock_lot_nos = list(BzFinalMixingRubberInventory.objects.using('bz').filter(lot_no__in=lot_nos).values_list('lot_no', flat=True)) + \
                             list(BzFinalMixingRubberInventoryLB.objects.using('lb').filter(
                                 store_name='炼胶库', lot_no__in=lot_nos).values_list('lot_no', flat=True))
@@ -793,7 +803,7 @@ class PalletFeedbacksTestListView(ModelViewSet):
                 item['residual_weight'] = None
                 item['day_time'] = item['factory_date']
                 item["trains"] = ",".join([str(x) for x in range(item['begin_trains'], item['end_trains'] + 1)])
-                item['is_locked'] = locked_dict.get(lot_no, False)
+                item['is_locked'] = locked_dict.get(lot_no, 0)
                 item['is_instock'] = lot_no in stock_lot_nos
             return self.get_paginated_response(s_data)
         serializer = self.get_serializer(queryset, many=True)
