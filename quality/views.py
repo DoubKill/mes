@@ -1273,6 +1273,7 @@ class DealMethodHistoryView(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class TestDataPointCurveView(APIView):
     """胶料数据点检测值曲线"""
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'curve_result_info'}))
 
     def get(self, request):
         st = self.request.query_params.get('st')
