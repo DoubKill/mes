@@ -55,7 +55,7 @@ class LoadMaterialLogFilter(django_filters.rest_framework.FilterSet):
 
 
 class WeightBatchingLogListFilter(django_filters.rest_framework.FilterSet):
-    batch_time = django_filters.DateFilter(field_name='batch_time__date', help_text='工厂时间')
+    batch_time = django_filters.DateFromToRangeFilter(field_name='batch_time__date', help_text='工厂时间', lookup_expr='range')
     tank_no = django_filters.CharFilter(field_name='tank_no', help_text='罐号')
     equip_no = django_filters.CharFilter(field_name='equip_no', help_text='投入设备')
     material_name = django_filters.CharFilter(field_name='material_name', help_text='物料名', lookup_expr='icontains')
