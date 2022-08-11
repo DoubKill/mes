@@ -592,6 +592,26 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
 
 
 @method_decorator([api_recorder], name="dispatch")
+class TestedMaterials(APIView):
+
+    def get(self, request):
+        stage = self.request.query_params.get('stage')
+        product_type = self.request.query_params.get('product_type')
+        test_indicator_id = self.request.query_params.get('test_indicator_id')
+        test_type_id = self.request.query_params.get('test_type_id')
+        queryset = MaterialTestMethod.objects.filter(delete_flag=False)
+        if stage:
+            queryset = queryset.filter(material__material_name__icontains='-{}-'.format(stage))
+        if product_type:
+            queryset = queryset.filter(material__material_name__icontains='{}-'.format(product_type))
+        if test_indicator_id:
+            queryset = queryset.filter(test_method__test_type__test_indicator_id=test_indicator_id)
+        if test_type_id:
+            queryset = queryset.filter(test_method__test_type_id=test_type_id)
+        return Response(set(queryset.values_list('material__material_no', flat=True)))
+
+
+@method_decorator([api_recorder], name="dispatch")
 class MaterialTestMethodViewSet(ModelViewSet):
     """物料试验方法"""
     queryset = MaterialTestMethod.objects.filter(delete_flag=False)
@@ -599,6 +619,54 @@ class MaterialTestMethodViewSet(ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     permission_classes = (IsAuthenticated,)
     filter_class = MaterialTestMethodFilter
+
+    def list(self, request, *args, **kwargs):
+        stage = self.request.query_params.get('stage')
+        product_type = self.request.query_params.get('product_type')
+        queryset = self.filter_queryset(self.get_queryset())
+        if stage:
+            queryset = queryset.filter(material__material_name__icontains='-{}-'.format(stage))
+        if product_type:
+            queryset = queryset.filter(material__material_name__icontains='{}-'.format(product_type))
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated], url_path='batch-set',
+            url_name='batch-set')
+    def batch_set(self, request):
+        data = self.request.data
+        method_ids = data.get('test_method_ids')
+        indicator_data = data.get('indicator_data')  # [{'data_point': 1, upper_limit:12, lower_limit:1, level:1, result:1}]
+        for item in indicator_data:
+            qs = MaterialDataPointIndicator.objects.filter(delete_flag=0,
+                                                           data_point_id=item['data_point'],
+                                                           material_test_method__id__in=method_ids,
+                                                           level=item['level'],
+                                                           )
+            for instance in qs:
+                if not instance.last_updated_user:
+                    username = self.request.user.username
+                else:
+                    username = instance.last_updated_user.username
+                MaterialDataPointIndicatorHistory.objects.create(
+                    product_no=instance.material_test_method.material.material_no,
+                    test_method=instance.material_test_method.test_method,
+                    data_point=instance.data_point,
+                    level=instance.level,
+                    result=instance.result,
+                    upper_limit=instance.upper_limit,
+                    lower_limit=instance.lower_limit,
+                    created_username=username,
+                    created_date=instance.last_updated_date
+                )
+            qs.update(upper_limit=item['upper_limit'],
+                      lower_limit=item['lower_limit'])
+        return Response('ok')
 
 
 @method_decorator([api_recorder], name="dispatch")

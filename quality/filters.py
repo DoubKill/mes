@@ -55,7 +55,7 @@ class MaterialTestMethodFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = MaterialTestMethod
-        fields = ('material_no', 'test_indicator_id', 'test_type_id')
+        fields = ('material_no', 'test_indicator_id', 'test_type_id', 'test_method_id')
 
 
 class DealSuggestionFilter(django_filters.rest_framework.FilterSet):
