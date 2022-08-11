@@ -4640,33 +4640,34 @@ class GetSpare(APIView):
         if not flag:
             raise ValidationError(ret)
         for item in ret:
+            # 备件编码和erp_id都存在才同步[只有erp_id同步过来会和页面新建的备件冲突]
+            if not all([item['wlxxid'], item['wlbh']]):
+                continue
+            if item['state'] != '启用':
+                continue
+            if EquipSpareErp.objects.filter(spare_code=item['wlbh'], unique_id=item['wlxxid']).exists():
+                continue
             equip_component_type = EquipComponentType.objects.filter(component_type_name=item['wllb']).first()
             if not equip_component_type:
                 code = EquipComponentType.objects.order_by('component_type_code').last().component_type_code
                 component_type_code = code[0:4] + '%03d' % (int(code[-3:]) + 1) if code else '001'
                 equip_component_type = EquipComponentType.objects.create(component_type_code=component_type_code,
-                                                                         component_type_name=item['wllb'], use_flag=True)
-            if item['state'] != '启用':
-                continue
-            if EquipSpareErp.objects.filter(spare_code=item['wlbh']).exists():
-                continue
-            EquipSpareErp.objects.update_or_create(
-                defaults={"spare_code": item['wlbh'],
-                          "spare_name": item['wlmc'],
-                          "equip_component_type": equip_component_type,
-                          "specification": item['gg'],
-                          "unit": item['bzdwmc'],
-                          "unique_id": item['wlxxid'],
-                          "sync_date": dt.datetime.now()
-                          }, **{"unique_id": item['wlxxid']}
-                # spare_code=item['wlbh'],
-                # spare_name=item['wlmc'],
-                # equip_component_type=equip_component_type,
-                # specification=item['gg'],
-                # unit=item['bzdwmc'],
-                # unique_id=item['wlxxid'],
-                # sync_date=dt.datetime.now()
-            )
+                                                                         component_type_name=item['wllb'],
+                                                                         use_flag=True)
+            unique_info = EquipSpareErp.objects.filter(unique_id=item['wlxxid'], spare_code__isnull=True)
+            if unique_info:
+                unique_info.update(**{"spare_code": item['wlbh'], "spare_name": item['wlmc'],
+                                      "equip_component_type": equip_component_type,
+                                      "specification": item['gg'], "unit": item['bzdwmc'], "unique_id": item['wlxxid'],
+                                      "sync_date": dt.datetime.now()})
+            spare_info = EquipSpareErp.objects.filter(spare_code=item['wlbh'], unique_id__isnull=True)
+            if not spare_info and not unique_info:
+                EquipSpareErp.objects.create(**{"spare_code": item['wlbh'], "spare_name": item['wlmc'],
+                                                "equip_component_type": equip_component_type,
+                                                "specification": item['gg'],
+                                                "unit": item['bzdwmc'],
+                                                "unique_id": item['wlxxid'],
+                                                "sync_date": dt.datetime.now()})
         return Response('同步完成')
 
 
