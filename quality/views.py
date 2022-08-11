@@ -803,7 +803,7 @@ class PalletFeedbacksTestListView(ModelViewSet):
                 item['residual_weight'] = None
                 item['day_time'] = item['factory_date']
                 item["trains"] = ",".join([str(x) for x in range(item['begin_trains'], item['end_trains'] + 1)])
-                item['is_locked'] = locked_dict.get(lot_no, 0)
+                item['locked_status'] = locked_dict.get(lot_no, 0)
                 item['is_instock'] = lot_no in stock_lot_nos
             return self.get_paginated_response(s_data)
         serializer = self.get_serializer(queryset, many=True)
