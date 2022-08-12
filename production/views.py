@@ -65,7 +65,7 @@ from rest_framework.generics import ListAPIView, UpdateAPIView, \
     get_object_or_404
 from datetime import timedelta
 
-from production.utils import get_standard_time
+from production.utils import get_standard_time, get_classes_plan
 from quality.models import MaterialTestOrder, MaterialDealResult, MaterialTestResult, MaterialDataPointIndicator
 from quality.utils import get_cur_sheet, get_sheet_data
 from system.models import Section
@@ -3552,10 +3552,10 @@ class PerformanceSummaryView(APIView):
         if day_d:
             kwargs['factory_date__day'] = day_d
             kwargs2['factory_date__day'] = day_d
-        user_query = EmployeeAttendanceRecords.objects.filter(Q(**kwargs) & ~Q(is_use='废弃') &
+        user_query = EmployeeAttendanceRecords.objects.filter(Q(**kwargs) & ~Q(is_use__in=['废弃', '驳回']) &
                                                              Q(Q(end_date__isnull=False, begin_date__isnull=False) |
                                                                Q(end_date__isnull=True, begin_date__isnull=True)))
-        queryset = user_query.values_list('user__username', 'section', 'factory_date__day', 'group', 'equip', 'actual_time', 'classes', 'begin_date', 'end_date')
+        queryset = user_query.values_list('user__username', 'section', 'factory_date__day', 'group', 'equip', 'actual_time', 'classes', 'actual_begin_date', 'actual_end_date')
         user_dic = {}
         equip_shut_down_dic = {}
         equip_shut_down = SchedulingEquipShutDownPlan.objects.filter(begin_time__year=year, begin_time__month=month).values(
@@ -3579,8 +3579,8 @@ class PerformanceSummaryView(APIView):
                     user_dic[key]['actual_time'] += item[5]
                 else:
                     user_dic[key] = {'name': item[0], 'section': item[1], 'day': item[2], 'group': item[3],
-                                     'equip': equip, 'actual_time': item[5], 'classes': item[6], 'begin_date': item[7],
-                                     'end_date': item[8]}
+                                     'equip': equip, 'actual_time': item[5], 'classes': item[6],
+                                     'actual_begin_date': item[7], 'actual_end_date': item[8]}
         group = WorkSchedulePlan.objects.filter(start_time__year=year, start_time__month=month,
                                                 plan_schedule__work_schedule__work_procedure__global_name='密炼')\
             .values_list('group__global_name', 'classes__global_name', 'start_time__day').order_by('start_time')
@@ -3606,7 +3606,7 @@ class PerformanceSummaryView(APIView):
         dj_list = ProductInfoDingJi.objects.filter(is_use=True).values_list('product_name', flat=True)
         for key, detail in user_dic.items():
             day, group, section, equip, classes = key.split('_')
-            begin_date, end_date = detail.pop('begin_date'), detail.pop('end_date')
+            begin_date, end_date = detail.pop('actual_begin_date'), detail.pop('actual_end_date')
             if not all([begin_date, end_date]):
                 continue
             equip_kwargs = {'equip_no': equip, 'classes': classes, 'factory_date__day': day}
@@ -4308,7 +4308,7 @@ class AttendanceClockViewSet(ModelViewSet):
                 actual_end_time = actual_end_time if actual_end_time < extra_work.end_date else extra_work.end_date
             work_time = round((actual_end_time - actual_begin_time).seconds / 3600, 2)
             EmployeeAttendanceRecords.objects.filter(id__in=ids).update(
-                end_date=end_date, actual_begin_date=end_date, work_time=work_time, actual_time=work_time
+                end_date=end_date, actual_end_date=end_date, work_time=work_time, actual_time=work_time
             )
             results['ids'] = ids
         elif status == '调岗':
@@ -4876,6 +4876,11 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
     permission_classes = (IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):
+        work_time = self.request.query_params.get('work_time')  # 获取当天的班次和时间信息
+        if work_time:
+            work_procedure = self.request.query_params.get('work_procedure')  # 密炼/称量
+            res = get_classes_plan(work_time, work_procedure)
+            return Response(res)
         classes_handle = self.request.query_params.get('classes_handle')  # 班次提交过滤数据
         if classes_handle:
             filter_kwargs = {}
@@ -4955,9 +4960,9 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
             for item in confirm_list:  # #141414黑色
                 ids, is_use, factory_date = item['id'], item.get('is_use'), item.get('factory_date')
                 id_param = [ids] if isinstance(ids, int) else ids
-                EmployeeAttendanceRecords.objects.filter(pk__in=id_param).update(actual_time=item.get('actual_time', 0),
-                                                                                 is_use=is_use, record_status='#141414',
-                                                                                 opera_flag=1)
+                EmployeeAttendanceRecords.objects.filter(pk__in=id_param)\
+                    .update(actual_time=item.get('actual_time', 0), is_use=is_use, record_status='#141414', opera_flag=1,
+                            actual_begin_date=item.get('actual_begin_date'), actual_end_date=item.get('actual_end_date'))
         elif reject_list:  # 审批驳回某一天的数据 #DA1F27 红色
             opera_type = '单天驳回'
             for item in reject_list:
