@@ -24,7 +24,7 @@ from quality.views import TestIndicatorViewSet, TestTypeViewSet, DataPointViewSe
     ProductTestStaticsView, ClassTestStaticsView, UnqialifiedEquipView, LabelPrintLogView, \
     MaterialDataPointIndicatorHistoryView, ProductSynthesisRate, ProductSynthesisEquipRate, ProductSynthesisGroupRate, \
     ProductSynthesisProductRate, ProductSynthesisMonthRate, ProductTestValueHistoryView, ProductIndicatorStandard, \
-    ProductMaterials, TestedMaterials
+    ProductMaterials, TestedMaterials, ProductTestedTrains
 
 router = DefaultRouter()
 
@@ -162,8 +162,8 @@ urlpatterns = [
 
     path('product-test-value-history/', ProductTestValueHistoryView.as_view()),  # 规格胶料检测历史车次
 
-    path('product-indicator-standard/', ProductIndicatorStandard.as_view()),
+    path('product-indicator-standard/', ProductIndicatorStandard.as_view()),  # 某个胶料各个检测项目判定标准区间
 
-    path('tested-materials/', TestedMaterials.as_view())
-
+    path('tested-materials/', TestedMaterials.as_view()),  # 胶料快检详情列表下拉框，区分启用配方
+    path('product-tested-trains/', ProductTestedTrains.as_view()),  # 快检检测计划，查询已经检测过的车次
 ]

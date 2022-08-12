@@ -456,7 +456,7 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
             data = MaterialTestOrderExportSerializer(queryset, many=True).data
             if sum_project:
                 return self.export_xls(data, lot_deal_result_dict, 'xlsx_template/product_test_result2.xlsx', 13)
-            return self.export_xls(data, lot_deal_result_dict, 'xlsx_template/product_test_result2.xlsx', 7)
+            return self.export_xls(data, lot_deal_result_dict, 'xlsx_template/product_test_result.xlsx', 7)
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
@@ -4393,6 +4393,7 @@ class ProductSynthesisProductRate(APIView):
         return Response({'data': data4.values()})
 
 
+@method_decorator([api_recorder], name="dispatch")
 class ProductTestValueHistoryView(APIView):
 
     def get(self, request):
@@ -4414,6 +4415,7 @@ class ProductTestValueHistoryView(APIView):
         return Response(test_result)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class ProductIndicatorStandard(APIView):
 
     def get(self, request):
@@ -4464,12 +4466,13 @@ class ProductIndicatorStandard(APIView):
                 id_data = indicators_data_dict.get(data_point_name)
                 if id_data:
                     item['upper_limit'] = id_data['upper_limit']
-                    item['lower_limit'] = id_data['upper_limit']
+                    item['lower_limit'] = id_data['lower_limit']
                     item['data_point__unit'] = id_data['data_point__unit']
             return Response(summary_data)
         return Response(indicators_data)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class ProductMaterials(APIView):
 
     def get(self, request):
@@ -4479,3 +4482,27 @@ class ProductMaterials(APIView):
         unused_products = all_product_nos - used_recipes
         ret = [{'product_no': j, 'used': True} for j in used_recipes] + [{'product_no': i, 'used': False} for i in unused_products]
         return Response(ret)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductTestedTrains(APIView):
+
+    def get(self, request):
+        factory_date = self.request.query_params.get('factory_date')
+        classes = self.request.query_params.get('classes')
+        product_no = self.request.query_params.get('product_no')
+        equip_no = self.request.query_params.get('equip_no')
+        test_indicator_name = self.request.query_params.get('test_indicator_name')
+        test_plan_data = list(ProductTestPlanDetail.objects.filter(
+            factory_date=factory_date,
+            product_no=product_no,
+            equip_no=equip_no,
+            production_classes=classes,
+            test_plan__test_indicator_name=test_indicator_name
+        ).order_by('actual_trains').values('actual_trains', 'test_plan__test_interval'))
+        if not test_plan_data:
+            return Response({})
+        last_test_plan = test_plan_data[-1]
+        first_test_plan = test_plan_data[0]
+        return Response({'max_trains': last_test_plan['actual_trains'] + last_test_plan['test_plan__test_interval'] - 1,
+                        'min_trains': first_test_plan['actual_trains']})
