@@ -21,7 +21,10 @@ from quality.models import MaterialTestOrder, MaterialTestResult, MaterialTestMe
 
 
 def main():
-    for pcp in ProductClassesPlan.objects.filter(delete_flag=False, status__in=('已保存', '已下达', '运行中')):
+    for pcp in ProductClassesPlan.objects.filter(
+            work_schedule_plan__plan_schedule__day_time=datetime.datetime.now().date(),
+            delete_flag=False,
+            status__in=('已保存', '已下达', '运行中')):
         max_train = TrainsFeedbacks.objects.filter(
             factory_date=pcp.work_schedule_plan.plan_schedule.day_time,
             classes=pcp.work_schedule_plan.classes.global_name,
