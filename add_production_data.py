@@ -41,7 +41,7 @@ def main():
         e_day = datetime.timedelta(seconds=-random.randint(1, 10))
         begin_time = now + b_day
         end_time = now + e_day
-        if st <= pcp.plan_trains + max_train:
+        if TrainsFeedbacks.objects.filter(plan_classes_uid=pcp.plan_classes_uid).count() != pcp.plan_trains:
             TrainsFeedbacks.objects.create(
                 plan_classes_uid=pcp.plan_classes_uid,
                 plan_trains=pcp.plan_trains,
