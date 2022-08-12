@@ -1463,10 +1463,12 @@ class EquipWarehouseOrderListSerializer(BaseModelSerializer):
     order_id = serializers.CharField(help_text='单据条码', validators=[
         UniqueValidator(EquipWarehouseOrder.objects.all(), message='该条码已存在')])
 
+    add_username = serializers.ReadOnlyField(source='created_user.username', help_text='提交人')
+
     class Meta:
         model = EquipWarehouseOrder
-        fields = ("id", "created_username", "order_id", "submission_department", "lluser",
-        "status", "desc", "work_order_no", 'status_name', 'equip_spare', 'created_date', 'barcode')
+        fields = ("id", "created_username", "order_id", "submission_department", "lluser", "status", "desc",
+                  "work_order_no", 'status_name', 'equip_spare', 'created_date', 'barcode', 'add_username')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
@@ -1475,18 +1477,28 @@ class EquipWarehouseOrderSerializer(BaseModelSerializer):
     order_id = serializers.CharField(help_text='单据条码', validators=[
         UniqueValidator(EquipWarehouseOrder.objects.all(), message='该条码已存在')])
     order_detail = EquipWarehouseOrderDetailSerializer(many=True, read_only=True)
+    add_username = serializers.CharField(help_text='提交人', write_only=True)
 
     class Meta:
         model = EquipWarehouseOrder
-        fields = ("id", "created_username", "order_id", "order_detail", "submission_department",
-        "status", "desc", "work_order_no", 'status_name', 'equip_spare', 'created_date', 'barcode')
+        fields = ("id", "created_username", "order_id", "order_detail", "submission_department", "status", 'lluser',
+                  "desc", "work_order_no", 'status_name', 'equip_spare', 'created_date', 'barcode', 'created_user',
+                  'add_username')
         read_only_fields = COMMON_READ_ONLY_FIELDS
+
+    def to_representation(self, instance):
+        res = super().to_representation(instance)
+        res['add_username'] = instance.created_user.username
+        return res
 
     @atomic
     def create(self, validated_data):
-        equip_spare_list = validated_data.pop('equip_spare')
+        equip_spare_list, add_username = validated_data.pop('equip_spare'), validated_data.pop('add_username')
         desc = validated_data.get('desc') if validated_data.get('desc') else None
-        validated_data.update({'desc': desc})
+        u = User.objects.filter(username=add_username).last()
+        if not u:
+            raise serializers.ValidationError(f'未找到{add_username}')
+        validated_data.update({'desc': desc, 'created_user_id': u.id})
         order = super().create(validated_data)
         status = validated_data['status']
         for equip_sapre in equip_spare_list:

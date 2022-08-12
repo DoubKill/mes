@@ -140,9 +140,10 @@ permission_data = [
     {'id': 114, 'code': 'view_test_result', 'name': '查看', 'parent_id': 113},
     {'id': 115, 'code': 'add_test_result', 'name': '新增', 'parent_id': 113},
 
-    {'id': 116, 'code': 'result_info', 'name': '胶料快检结果详细信息', 'parent_id': None},
+    {'id': 116, 'code': 'result_info', 'name': '胶料快检详细信息', 'parent_id': None},
     {'id': 117, 'code': 'view_result_info', 'name': '查看', 'parent_id': 116},
     {'id': 163, 'code': 'export_result_info', 'name': '导出', 'parent_id': 116},
+    {'id': 1084, 'code': 'curve_result_info', 'name': '查看推移图', 'parent_id': 116},
 
     {'id': 118, 'code': 'deal_result', 'name': '胶料快检信息综合管理', 'parent_id': None},
     {'id': 119, 'code': 'view_deal_result', 'name': '查看', 'parent_id': 118},
