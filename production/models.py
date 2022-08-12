@@ -404,6 +404,8 @@ class EmployeeAttendanceRecords(models.Model):
     factory_date = models.DateField(help_text='工厂时间', null=True, blank=True)
     begin_date = models.DateTimeField(help_text='上岗时间', null=True, blank=True)
     end_date = models.DateTimeField(help_text='离岗时间', null=True, blank=True)
+    actual_begin_date = models.DateTimeField(help_text='修改上岗时间[默认等于上岗时间]', null=True, blank=True)
+    actual_end_date = models.DateTimeField(help_text='修改离岗时间[默认等于离岗时间]', null=True, blank=True)
     work_time = models.FloatField(help_text='计算工作时间', null=True, blank=True, default=12)
     actual_time = models.FloatField(help_text='承认工作时间', null=True, blank=True, default=12)
     classes = models.CharField(help_text='班次', max_length=12, null=True, blank=True)
