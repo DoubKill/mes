@@ -2538,8 +2538,8 @@ class XLPlanCViewSet(ListModelMixin, GenericViewSet):
             return response(success=False, message='机台{}无进行中或已完成的配料计划'.format(equip_no))
         serializer = self.get_serializer(all_filter_plan[:5], many=True)
         for i in serializer.data:
-            recipe_pre = pre_model.objects.using(equip_no).filter(name=i['recipe'])
-            dev_type = recipe_pre.first().ver.upper().strip() if recipe_pre else ''
+            recipe_pre = pre_model.objects.using(equip_no).filter(name=i['recipe']).last()
+            dev_type = recipe_pre.ver.upper().strip() if recipe_pre and recipe_pre.ver else ''
             i.update({'dev_type': dev_type, 'planid': i['planid'].strip()})
         return response(success=True, data=serializer.data)
 

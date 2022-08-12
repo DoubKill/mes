@@ -2858,6 +2858,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
             return super().update(request, *args, **kwargs)
 
 
+@method_decorator([api_recorder], name='dispatch')
 class EquipWarehouseRecordViewSet(ModelViewSet):
     queryset = EquipWarehouseRecord.objects.filter(status__in=['入库', '出库']).order_by('-created_date')
     serializer_class = EquipWarehouseRecordSerializer
@@ -2889,7 +2890,7 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
     def list(self, request, *args, **kwargs):
         if self.request.query_params.get('export'):
             serializer = self.get_serializer(self.filter_queryset(self.queryset), many=True)
-            return gen_template_response(self.EXPORT_FIELDS_DICT, list(serializer.data), self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, list(serializer.data), self.FILE_NAME, handle_str=True)
         if self.request.query_params.get('work_order_no'):
             work_order_no = self.request.query_params.get('work_order_no')
             order = EquipApplyOrder.objects.filter(work_order_no=work_order_no).first()
