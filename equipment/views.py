@@ -59,7 +59,7 @@ from quality.utils import get_cur_sheet, get_sheet_data
 from terminal.models import ToleranceDistinguish, ToleranceProject, ToleranceHandle, ToleranceRule, Plan, ReportBasic, \
     JZPlan
 from system.models import Section, User
-from terminal.utils import handle_spare
+from equipment.utils import handle_spare
 
 logger = logging.getLogger('error_log')
 
