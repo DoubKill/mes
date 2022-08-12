@@ -75,7 +75,7 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestPlanDetailSerializer, MaterialTestOrderExportSerializer, MaterialInspectionRegistrationSerializer, \
     MaterialDataPointIndicatorHistorySerializer, WMSMooneyLevelSerializer, ERPMESMaterialRelationSerializer
 
-from django.db.models import Prefetch, F
+from django.db.models import Prefetch, F, StdDev
 from django.db.models import Q
 from quality.utils import get_cur_sheet, get_sheet_data, export_mto, gen_pallet_test_result
 from recipe.models import Material, ProductBatching, ERPMESMaterialRelation, ZCMaterial
@@ -279,17 +279,16 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
         else:
             return MaterialTestOrderListSerializer
 
-    def export_xls(self, result, lot_deal_result_dict):
+    def export_xls(self, result, lot_deal_result_dict, template, data_row):
         if not result:
             return Response('暂无数据！')
-        wb = load_workbook('xlsx_template/product_test_result.xlsx')
+        wb = load_workbook(template)
         ws = wb.worksheets[0]
         sheet0 = wb.copy_worksheet(ws)
         sheet0.title = '汇总'
-        sheet0.delete_rows(2, 5)
+        sheet0.delete_rows(2, data_row)
         sheet = wb.copy_worksheet(ws)
         data_row0 = 2
-        data_row = 7
         product_no = result[0]['product_no']
         sheet.title = product_no
         indicators_data = MaterialDataPointIndicator.objects.filter(
@@ -327,7 +326,6 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
                 product_no = i['product_no']
                 sheet = wb.copy_worksheet(ws)
                 sheet.title = product_no
-                data_row = 7
                 indicators_data = MaterialDataPointIndicator.objects.filter(
                     material_test_method__material__material_no=product_no,
                     level=1,
@@ -424,6 +422,7 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
         state = self.request.query_params.get('state')
         export = self.request.query_params.get('export')
         queryset = self.filter_queryset(self.get_queryset())
+        sum_project = self.request.query_params.get('sum_project')
         if state:
             if state == '检测中':
                 queryset = queryset.filter(is_finished=False)
@@ -455,7 +454,9 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
                 test_result__in=('PASS', '三等品')).values('lot_no', 'deal_suggestion', 'deal_user', 'test_result')
             lot_deal_result_dict = {i['lot_no']: i for i in deal_results}
             data = MaterialTestOrderExportSerializer(queryset, many=True).data
-            return self.export_xls(data, lot_deal_result_dict)
+            if sum_project:
+                return self.export_xls(data, lot_deal_result_dict, 'xlsx_template/product_test_result2.xlsx', 13)
+            return self.export_xls(data, lot_deal_result_dict, 'xlsx_template/product_test_result2.xlsx', 7)
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
@@ -4417,11 +4418,55 @@ class ProductIndicatorStandard(APIView):
 
     def get(self, request):
         product_no = self.request.query_params.get('product_no')
+        st = self.request.query_params.get('st')
+        et = self.request.query_params.get('et')
+        equip_no = self.request.query_params.get('equip_no')
+        classes = self.request.query_params.get('classes')
+        stage = self.request.query_params.get('stage')
+        production_group = self.request.query_params.get('production_group')
+        state = self.request.query_params.get('state')
+        sum_project = self.request.query_params.get('sum_project')
         indicators_data = MaterialDataPointIndicator.objects.filter(
             material_test_method__material__material_no=product_no,
             level=1,
             delete_flag=False
         ).values('data_point__name', 'upper_limit', 'lower_limit', 'data_point__unit')
+        if sum_project:
+            queryset = MaterialTestResult.objects.all()
+            if st:
+                queryset = queryset.filter(material_test_order__production_factory_date__gte=st)
+            if et:
+                queryset = queryset.filter(material_test_order__production_factory_date__lte=et)
+            if equip_no:
+                queryset = queryset.filter(material_test_order__production_equip_no=equip_no)
+            if product_no:
+                queryset = queryset.filter(material_test_order__product_no=product_no)
+            if classes:
+                queryset = queryset.filter(material_test_order__production_class=classes)
+            if stage:
+                queryset = queryset.filter(material_test_order__product_no__icontains='-{}-'.format(stage))
+            if production_group:
+                queryset = queryset.filter(material_test_order__production_group=production_group)
+            if state:
+                if state == '检测中':
+                    queryset = queryset.filter(material_test_order__is_finished=False)
+                elif state == '合格':
+                    queryset = queryset.filter(material_test_order__is_finished=True,
+                                               material_test_order__is_qualified=True)
+                elif state == '不合格':
+                    queryset = queryset.filter(material_test_order__is_finished=True,
+                                               material_test_order__is_qualified=False)
+            summary_data = queryset.values('data_point_name').annotate(avg=Avg('value'), std=StdDev('value', sample=True))
+            indicators_data_dict = {i['data_point__name']: i for i in indicators_data}
+            for item in summary_data:
+                data_point_name = item.pop('data_point_name')
+                item['data_point__name'] = data_point_name
+                id_data = indicators_data_dict.get(data_point_name)
+                if id_data:
+                    item['upper_limit'] = id_data['upper_limit']
+                    item['lower_limit'] = id_data['upper_limit']
+                    item['data_point__unit'] = id_data['data_point__unit']
+            return Response(summary_data)
         return Response(indicators_data)
 
 
