@@ -665,7 +665,10 @@ class MaterialTestMethodViewSet(ModelViewSet):
                     created_date=instance.last_updated_date
                 )
             qs.update(upper_limit=item['upper_limit'],
-                      lower_limit=item['lower_limit'])
+                      lower_limit=item['lower_limit'],
+                      last_updated_date=datetime.datetime.now(),
+                      last_updated_user=self.request.user
+                      )
         return Response('ok')
 
 
