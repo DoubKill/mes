@@ -377,15 +377,20 @@ def pd_export_xls(sql,
     return response
 
 
-def handle_spare(last_time):
-    if not last_time:
-        last = EquipSpareErp.objects.filter(sync_date__isnull=False).order_by('sync_date').last()  # 第一次先在数据库插入一条假数据
-        if not last:
-            return False, '未找到最新一次同步时间数据'
-        last_time = (last.sync_date + timedelta(seconds=1)).strftime('%Y-%m-%d %H:%M:%S')
+def handle_spare(last_time=None, wlxxid=None):
+    params = {}
+    if wlxxid:
+        params['wlxxid'] = wlxxid
+    else:
+        if not last_time:
+            last = EquipSpareErp.objects.filter(sync_date__isnull=False).order_by('sync_date').last()  # 第一次先在数据库插入一条假数据
+            if not last:
+                return False, '未找到最新一次同步时间数据'
+            last_time = (last.sync_date + timedelta(seconds=1)).strftime('%Y-%m-%d %H:%M:%S')
+        params['syncDate'] = last_time
     url = 'http://10.1.10.136/zcxjws_web/zcxjws/pc/jc/getbjwlxx.io'
     try:
-        res = requests.post(url=url, json={"syncDate": last_time}, timeout=5)
+        res = requests.post(url=url, json=params, timeout=3)
     except Exception:
         return False, '网络异常'
     if res.status_code != 200:
