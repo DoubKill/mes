@@ -1623,6 +1623,7 @@ class LoadMaterialLogListSerializer(serializers.ModelSerializer):
     production_classes = serializers.ReadOnlyField(source='feed_log.production_classes')
     equip_no = serializers.ReadOnlyField(source='feed_log.equip_no')
     plan_classes_uid = serializers.ReadOnlyField(source='feed_log.plan_classes_uid')
+    replace_material = serializers.ReadOnlyField(source='display_name')
 
     def get_mixing_finished(self, obj):
         product_no = obj.feed_log.product_no

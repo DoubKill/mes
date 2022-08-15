@@ -1464,7 +1464,8 @@ class BatchChargeLogListViewSet(ListAPIView):
         queryset = LoadMaterialLog.objects.using('SFJ').filter(status=1).order_by('-id')
         mixing_finished = self.request.query_params.get('mixing_finished', None)
         plan_classes_uid = self.request.query_params.get('plan_classes_uid')
-        production_factory_date = self.request.query_params.get('production_factory_date')
+        st = self.request.query_params.get('st')
+        et = self.request.query_params.get('et')
         equip_no = self.request.query_params.get('equip_no')
         trains = self.request.query_params.get('trains')
         production_classes = self.request.query_params.get('production_classes')
@@ -1474,8 +1475,8 @@ class BatchChargeLogListViewSet(ListAPIView):
         product_no = self.request.query_params.get('product_no')
         if plan_classes_uid:
             queryset = queryset.filter(feed_log__plan_classes_uid__icontains=plan_classes_uid)
-        if production_factory_date:
-            queryset = queryset.filter(feed_log__production_factory_date=production_factory_date)
+        if st and et:
+            queryset = queryset.filter(feed_log__production_factory_date__gte=st, feed_log__production_factory_date__lte=et)
         if equip_no:
             queryset = queryset.filter(feed_log__equip_no=equip_no)
         if production_classes:
@@ -1556,6 +1557,9 @@ class BatchChargeLogListViewSet(ListAPIView):
             for i in serializer.data:
                 repeat_keyword = {i['plan_classes_uid'], i['bra_code'], i['trains']}
                 if repeat_keyword not in repeat_bra_code:
+                    replace_material = OtherMaterialLog.objects.filter(status=1, plan_classes_uid=i['plan_classes_uid'], bra_code=i['bra_code']).last()
+                    if replace_material:
+                        i['replace_material'] = replace_material.material_name
                     data.append(i)
                     repeat_bra_code.append(repeat_keyword)
             page = self.paginate_queryset(data)
