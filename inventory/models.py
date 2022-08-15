@@ -1318,3 +1318,23 @@ class CancelTask(models.Model):
         db_table = 'Z_MES_CANCLE_TASK'
         verbose_name_plural = verbose_name = '胶料库任务取消列表'
         managed = False
+
+
+class ProductInventoryLocked(models.Model):
+    lot_no = models.CharField(max_length=64, unique=True, help_text='条码')
+    gy_locked_user = models.CharField(max_length=64, help_text='工艺锁定人', blank=True, null=True)
+    gy_locked_reason = models.CharField(max_length=64, help_text='工艺锁定原因', blank=True, null=True)
+    gy_unlocked_user = models.CharField(max_length=64, help_text='工艺解锁人', blank=True, null=True)
+    gy_unlocked_reason = models.CharField(max_length=64, help_text='工艺锁定原因', blank=True, null=True)
+
+    kj_locked_user = models.CharField(max_length=64, help_text='快检锁定人', blank=True, null=True)
+    kj_locked_reason = models.CharField(max_length=64, help_text='快检锁定原因', blank=True, null=True)
+    kj_unlocked_user = models.CharField(max_length=64, help_text='快检解锁人', blank=True, null=True)
+    kj_unlocked_reason = models.CharField(max_length=64, help_text='快检锁定原因', blank=True, null=True)
+
+    is_locked = models.BooleanField(help_text='是否锁定', default=True)
+    locked_status = models.IntegerField(help_text='锁定状态 0:未锁定 1:工艺锁定 2:快检锁定 3:工艺/快检锁定', default=0)
+
+    class Meta:
+        db_table = 'product_inventory_locked'
+        verbose_name_plural = verbose_name = '胶料库存锁定'

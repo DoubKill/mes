@@ -26,11 +26,11 @@ class PalletFeedbacksFilter(django_filters.rest_framework.FilterSet):
     # et = django_filters.DateFilter(field_name="factory_date", help_text='生产时间', lookup_expr="lte")
     classes = django_filters.CharFilter(field_name="classes", help_text='班次')
     day_time = django_filters.DateFilter(field_name="factory_date", help_text="班日期")
-    lot_no = django_filters.CharFilter(field_name='lot_no', help_text='条码', lookup_expr='icontains')
+    # lot_no = django_filters.CharFilter(field_name='lot_no', help_text='条码', lookup_expr='icontains')
 
     class Meta:
         model = PalletFeedbacks
-        fields = ('plan_classes_uid', 'equip_no', 'product_no', "classes", "day_time", 'lot_no')
+        fields = ('plan_classes_uid', 'equip_no', 'product_no', "classes", "day_time", 'lot_no', 'plan_classes_uid')
 
 
 class EquipStatusFilter(django_filters.rest_framework.FilterSet):
