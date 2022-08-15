@@ -46,7 +46,7 @@ from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMate
     CarbonOutPlan, FinalRubberyOutBoundOrder, MixinRubberyOutBoundOrder, FinalGumInInventoryLog, OutBoundDeliveryOrder, \
     OutBoundDeliveryOrderDetail, WMSReleaseLog, WmsInventoryMaterial, WMSMaterialSafetySettings, WmsNucleinManagement, \
     WMSExceptHandle, MaterialOutHistoryOther, MaterialOutboundOrder, MaterialEntrance, HfBakeMaterialSet, HfBakeLog, \
-    WMSOutboundHistory, CancelTask
+    WMSOutboundHistory, CancelTask, ProductInventoryLocked
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
@@ -4053,11 +4053,14 @@ class BzMixingRubberInventory(ListAPIView):
         product_validity_data = dict(MaterialAttribute.objects.filter(
             period_of_validity__isnull=False
         ).values_list('material__material_no', 'period_of_validity'))
+        locked_lot_data = dict(
+            ProductInventoryLocked.objects.filter(is_locked=True).values_list('lot_no', 'locked_status'))
         return {
             'request': self.request,
             'format': self.format_kwarg,
             'view': self,
             'product_validity_data': product_validity_data,
+            'locked_lot_data': locked_lot_data
         }
 
     def export_xls(self, result):
@@ -4255,11 +4258,14 @@ class BzMixingRubberInventorySearch(ListAPIView):
         product_validity_data = dict(MaterialAttribute.objects.filter(
             period_of_validity__isnull=False
         ).values_list('material__material_no', 'period_of_validity'))
+        locked_lot_data = dict(
+            ProductInventoryLocked.objects.filter(is_locked=True).values_list('lot_no', 'locked_status'))
         return {
             'request': self.request,
             'format': self.format_kwarg,
             'view': self,
             'product_validity_data': product_validity_data,
+            'locked_lot_data': locked_lot_data
         }
 
     def list(self, request, *args, **kwargs):
@@ -4364,11 +4370,14 @@ class BzFinalRubberInventory(ListAPIView):
         product_validity_data = dict(MaterialAttribute.objects.filter(
             period_of_validity__isnull=False
         ).values_list('material__material_no', 'period_of_validity'))
+        locked_lot_data = dict(
+            ProductInventoryLocked.objects.filter(is_locked=True).values_list('lot_no', 'locked_status'))
         return {
             'request': self.request,
             'format': self.format_kwarg,
             'view': self,
             'product_validity_data': product_validity_data,
+            'locked_lot_data': locked_lot_data
         }
 
     def export_xls(self, result):
@@ -4564,11 +4573,14 @@ class BzFinalRubberInventorySearch(ListAPIView):
         product_validity_data = dict(MaterialAttribute.objects.filter(
             period_of_validity__isnull=False
         ).values_list('material__material_no', 'period_of_validity'))
+        locked_lot_data = dict(
+            ProductInventoryLocked.objects.filter(is_locked=True).values_list('lot_no', 'locked_status'))
         return {
             'request': self.request,
             'format': self.format_kwarg,
             'view': self,
             'product_validity_data': product_validity_data,
+            'locked_lot_data': locked_lot_data
         }
 
     def list(self, request, *args, **kwargs):
@@ -4958,7 +4970,11 @@ class LIBRARYINVENTORYView(APIView):
                                                                            min_inventory_time=Min('in_storage_time')
                                                                            ).values(
             'material_no', 'quality_level', 'qty', 'total_weight', 'min_inventory_time').order_by('material_no')
-
+        locked_lot_nos = list(ProductInventoryLocked.objects.filter(is_locked=True).values_list('lot_no', flat=True))
+        stock_locked_data = dict(
+            query_set.filter(
+                lot_no__in=locked_lot_nos
+            ).values('material_no').annotate(qty=Sum('qty')).values_list('material_no', 'qty'))
         res = {}
         for i in result:
             material_no = i['material_no'].strip()
@@ -4987,6 +5003,7 @@ class LIBRARYINVENTORYView(APIView):
                     'stage': stage,
                     'all_qty': i['qty'],
                     'total_weight': i['total_weight'],
+                    'locked_trains': stock_locked_data.get(i['material_no']),
                     i['quality_level']: {'qty': i['qty'], 'total_weight': i['total_weight'], 'expire_flag': expire_flag, 'dj_flag': dj_flag, 'yj_flag': yj_flag},
                     'expire_flag': expire_flag,
                     'dj_flag': dj_flag,
@@ -5084,6 +5101,7 @@ class LIBRARYINVENTORYView(APIView):
         quality_level = params.get('quality_level')
         equip_no = params.get('equip_no')
         export = params.get("export", None)
+        locked_status = params.get("locked_status")
         product_validity_dict = dict(MaterialAttribute.objects.filter(
             period_of_validity__isnull=False
         ).values_list('material__material_no', 'period_of_validity'))
@@ -5109,7 +5127,18 @@ class LIBRARYINVENTORYView(APIView):
         if quality_level:
             filter_kwargs['quality_level'] = quality_level
         if equip_no:
-            filter_kwargs['lot_no__icontains'] = equip_no
+            filter_kwargs['bill_id__iendswith'] = equip_no
+        if locked_status:
+            if locked_status == '1':
+                locked_lot_nos = list(
+                    ProductInventoryLocked.objects.filter(is_locked=True, locked_status=1).values_list('lot_no',
+                                                                                                       flat=True))
+                filter_kwargs['lot_no__in'] = locked_lot_nos
+            elif locked_status == '2':
+                locked_lot_nos = list(
+                    ProductInventoryLocked.objects.filter(is_locked=True, locked_status=2).values_list('lot_no',
+                                                                                                       flat=True))
+                filter_kwargs['lot_no__in'] = locked_lot_nos
         if warehouse_name == '混炼胶库':
             model = BzFinalMixingRubberInventory
             store_name = '立体库'
@@ -5131,7 +5160,7 @@ class LIBRARYINVENTORYView(APIView):
             temp2 = self.get_result(model2, 'lb', store_name2, warehouse_name2, location_status, product_validity_dict, **filter_kwargs)
             temp = list(temp1) + list(temp2)
         temp = sorted(temp, key=itemgetter('expire_flag', 'yj_flag', 'dj_flag', 'material_no'), reverse=True)  # 按多个字段排序
-        weight_1 = qty_1 = weight_3 = qty_3 = weight_dj = qty_dj = weight_fb = qty_fb = 0
+        weight_1 = qty_1 = weight_3 = qty_3 = weight_dj = qty_dj = weight_fb = qty_fb = total_locked_qty = 0
 
         for i in temp:
             weight_1 += i['一等品']['total_weight'] if i.get('一等品') else 0
@@ -5142,6 +5171,7 @@ class LIBRARYINVENTORYView(APIView):
             qty_dj += i['待检品']['qty'] if i.get('待检品') else 0
             weight_fb += i['封闭']['total_weight'] if i.get('封闭') else 0
             qty_fb += i['封闭']['qty'] if i.get('封闭') else 0
+            total_locked_qty += 0 if not i['locked_trains'] else i['locked_trains']
 
         total_qty = qty_1 + qty_3 + qty_dj
         total_weight = weight_1 + weight_3 + weight_dj
@@ -5178,7 +5208,8 @@ class LIBRARYINVENTORYView(APIView):
                          'count': count,
                          'total_goods_num': total_goods_num,
                          'used_goods_num': used_goods_num,
-                         'empty_goods_num': total_goods_num - used_goods_num
+                         'empty_goods_num': total_goods_num - used_goods_num,
+                         'total_locked_qty': total_locked_qty
                          })
 
 
@@ -7076,6 +7107,19 @@ class ProductInOutHistoryView(ListAPIView):
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = ProductInOutHistorySerializer(page, many=True, context={'ware_house': warehouse_name, "inout_type": inout_type})
+            s_data = serializer.data
+            lot_nos = [i['lot_no'] for i in s_data]
+            locked_data = ProductInventoryLocked.objects.filter(
+                lot_no__in=lot_nos).values('lot_no', 'gy_locked_user', 'kj_locked_user',
+                                           'gy_locked_reason', 'kj_locked_reason',
+                                           'gy_unlocked_user', 'kj_unlocked_user')
+            locked_dict = {i['lot_no']: i for i in locked_data}
+            for item in s_data:
+                locked_dict_data = locked_dict.get(item['lot_no'])
+                if locked_dict_data:
+                    item['locked_user'] = locked_dict_data['gy_locked_user'] or locked_dict_data['kj_locked_user']
+                    item['locked_reason'] = locked_dict_data['gy_locked_reason'] or locked_dict_data['kj_locked_reason']
+                    item['unlocked_user'] = locked_dict_data['gy_unlocked_user'] or locked_dict_data['kj_unlocked_user']
             return self.get_paginated_response(serializer.data)
 
         serializer = ProductInOutHistorySerializer(queryset, many=True, context={'ware_house': warehouse_name, "inout_type": inout_type})
@@ -7160,3 +7204,99 @@ class WMSMnLevelSearchView(APIView):
                  }
             )
         return Response({'message': "OK", "success:": True, "data": ret})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductInventoryLockedView(APIView):
+
+    @atomic()
+    def post(self, request):
+        data = self.request.data
+        operation_type = data.get('operation_type')  # 1:工艺 2:快检
+        locked_type = data.get('locked_type')  # 1:锁定 2:解锁
+        lot_nos = data.get('lot_nos')
+        reason = data.get('reason')
+        for lot_no in lot_nos:
+            instance, _ = ProductInventoryLocked.objects.get_or_create(lot_no=lot_no)
+            if locked_type == 1:  # 锁定
+                if operation_type == 1:  # 工艺
+                    locked_status = 1
+                    if instance.locked_status == 2:
+                        locked_status = 3
+                    instance.gy_locked_user = self.request.user.username
+                    instance.gy_locked_reason = reason
+                    instance.locked_status = locked_status
+                    instance.is_locked = True
+                else:  # 快检
+                    locked_status = 2
+                    if instance.locked_status == 1:
+                        locked_status = 3
+                    instance.kj_locked_user = self.request.user.username
+                    instance.kj_locked_reason = reason
+                    instance.locked_status = locked_status
+                    instance.is_locked = True
+            else:
+                locked_status = 0
+                is_locked = False
+                if operation_type == 1:  # 工艺
+                    if instance.locked_status in (2, 3):
+                        locked_status = 2
+                        is_locked = True
+                    instance.gy_unlocked_user = self.request.user.username
+                    instance.gy_unlocked_reason = reason
+                    instance.locked_status = locked_status
+                    instance.is_locked = is_locked
+                else:  # 快检
+                    if instance.locked_status in (1, 3):
+                        locked_status = 1
+                        is_locked = True
+                    instance.kj_unlocked_user = self.request.user.username
+                    instance.kj_unlocked_reason = reason
+                    instance.locked_status = locked_status
+                    instance.is_locked = is_locked
+            instance.save()
+        return Response('ok')
+
+    def get(self, request):
+        material_no = self.request.query_params.get('material_no')
+        warehouse_name = self.request.query_params.get('warehouse_name')
+        locked_status = self.request.query_params.get('locked_status')
+        queryset = ProductInventoryLocked.objects.filter(is_locked=True)
+        tunnel = self.request.query_params.get('tunnel')  # 巷道
+        quality_status = self.request.query_params.get('quality_status')
+        equip_no = self.request.query_params.get('equip_no')  # 机台
+        if locked_status:
+            if locked_status == '1':  # 工艺锁定
+                queryset = queryset.filter(locked_status__in=(1, 3))
+            elif locked_status == '2':  # 快检锁定
+                queryset = queryset.filter(locked_status__in=(2, 3))
+        locked_lot_nos = list(queryset.values_list('lot_no', flat=True))
+        if warehouse_name == '混炼胶库':
+            stock_query_set = BzFinalMixingRubberInventory.objects.using('bz').filter(
+                material_no=material_no, lot_no__in=locked_lot_nos)
+        else:
+            stock_query_set = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(
+                                store_name='炼胶库',
+                                material_no=material_no,
+                                lot_no__in=locked_lot_nos)
+        if equip_no:
+            stock_query_set = stock_query_set.filter(bill_id__iendswith=equip_no)
+        if tunnel:
+            stock_query_set = stock_query_set.filter(location__istartswith=tunnel)
+        if quality_status:
+            stock_query_set = stock_query_set.filter(quality_level=quality_status)
+        s = BzFinalMixingRubberInventorySerializer(stock_query_set, many=True)
+        locked_data = queryset.values('lot_no', 'locked_status', 'gy_locked_user', 'kj_locked_user', 'gy_locked_reason', 'kj_locked_reason')
+        locked_dict = {i['lot_no']: i for i in locked_data}
+        s_data = s.data
+        for item in s_data:
+            locked_dict_data = locked_dict.get(item['lot_no'])
+            locked_status = locked_dict_data['locked_status']
+            item['locked_status'] = locked_status
+            if locked_status == 1:
+                item['locked_user'] = locked_dict_data['gy_locked_user']
+                item['locked_reason'] = locked_dict_data['gy_locked_reason']
+            else:
+                item['locked_user'] = locked_dict_data['kj_locked_user']
+                item['locked_reason'] = locked_dict_data['kj_locked_reason']
+        return Response(s.data)
