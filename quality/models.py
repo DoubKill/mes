@@ -373,10 +373,15 @@ class IgnoredProductInfo(AbstractEntity):
 
 class UnqualifiedDealOrder(AbstractEntity):
     """不合格处置单"""
+    STATE_CHOICES = (
+        (0, '新建'),
+        (1, '技术科已处理'),
+        (2, '检查科已处理')
+    )
     unqualified_deal_order_uid = models.CharField(max_length=64, help_text='唯一码')
     department = models.CharField(max_length=64, help_text='发生部门', blank=True, null=True)
     deal_department = models.CharField(max_length=64, help_text='部门', blank=True, null=True)
-    status = models.CharField(max_length=64, help_text='状态', blank=True, null=True)
+    status = models.CharField(max_length=64, help_text='不合格状态', blank=True, null=True)
     deal_user = models.CharField(max_length=64, help_text='经办人', blank=True, null=True)
     deal_date = models.DateField(help_text='经办日期', blank=True, null=True)
     reason = models.TextField(help_text='不合格情况', blank=True, null=True)
@@ -389,6 +394,7 @@ class UnqualifiedDealOrder(AbstractEntity):
     c_agreed = models.NullBooleanField(help_text='检查科是否同意', default=None)
     desc = models.TextField(help_text='备注', blank=True, null=True)
     deal_method = models.CharField(max_length=64, help_text='处理方式', null=True)
+    state = models.IntegerField(default=0, help_text='单据状态', choices=STATE_CHOICES)
 
     class Meta:
         db_table = 'unqualified_deal_order'

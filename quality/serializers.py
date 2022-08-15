@@ -398,6 +398,7 @@ class UnqualifiedDealOrderUpdateSerializer(BaseModelSerializer):
             validated_data['c_deal_user'] = None
             validated_data['c_deal_date'] = None
             validated_data['c_agreed'] = None
+            validated_data['state'] = 1
             for item in tech_deal_result:
                 deal_details = UnqualifiedDealOrderDetail.objects.filter(id=item['id'])
                 deal_details.update(suggestion=item['suggestion'], is_release=item['is_release'])
@@ -406,6 +407,8 @@ class UnqualifiedDealOrderUpdateSerializer(BaseModelSerializer):
 
         # 检查科处理
         if c_agreed is not None:
+            instance.state = 2
+            instance.save()
             if c_agreed:
                 # 同意
                 for detail in instance.deal_details.all():

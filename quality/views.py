@@ -1291,13 +1291,13 @@ class UnqualifiedDealOrderViewSet(ModelViewSet):
         classes = self.request.query_params.get('classes')
         product_no = self.request.query_params.get('product_no')
         if t_deal == 'Y':  # 技术部门已处理
-            queryset = queryset.filter(t_deal_user__isnull=False)
+            queryset = queryset.filter(state=1)
         elif t_deal == 'N':  # 技术部门未处理
-            queryset = queryset.filter(t_deal_user__isnull=True)
+            queryset = queryset.filter(state=0)
         if c_deal == 'Y':  # 检查部门已处理
-            queryset = queryset.filter(c_deal_user__isnull=False)
+            queryset = queryset.filter(state=2)
         elif c_deal == 'N':  # 检查部门未处理
-            queryset = queryset.filter(c_deal_user__isnull=True)
+            queryset = queryset.filter(state=1)
         if factory_date:
             ids1 = UnqualifiedDealOrderDetail.objects.filter(
                 factory_date=factory_date).values_list('unqualified_deal_order_id', flat=True)
