@@ -796,34 +796,6 @@ class MaterialDealResultListSerializer1(serializers.ModelSerializer):
     def get_print_times(self, obj):
         return obj.print_logs.count()
 
-    def to_representation(self, instance):
-        ret = super(MaterialDealResultListSerializer1, self).to_representation(instance)
-        pallet_data = PalletFeedbacks.objects.filter(lot_no=instance.lot_no,
-                                                     product_no=instance.product_no).first()
-        # test_order_data = MaterialTestOrder.objects.filter(lot_no=instance.lot_no).first()
-        test_results = MaterialTestResult.objects.filter(material_test_order__lot_no=instance.lot_no).order_by('id')
-        plan = ProductClassesPlan.objects.filter(plan_classes_uid=pallet_data.plan_classes_uid).first()
-        if not plan:
-            # classes = pallet_data.classes
-            group = ''
-        else:
-            # classes = plan.work_schedule_plan.classes.global_name
-            group = plan.work_schedule_plan.group.global_name
-        ret['day_time'] = str(instance.factory_date)
-        # ret['product_no'] = pallet_data.product_no
-        # ret['equip_no'] = pallet_data.equip_no
-        ret['residual_weight'] = None
-        ret['actual_weight'] = pallet_data.actual_weight
-        ret['classes_group'] = instance.classes + '/' + group  # 班次班组
-        last_test_result = test_results.last()
-        ret['test'] = {'test_status': '正常',
-                       'test_factory_date': last_test_result.test_factory_date,
-                       'test_class': instance.classes,
-                       'test_user': None if not last_test_result.created_user else last_test_result.created_user.username}
-        trains = [str(x) for x in range(instance.begin_trains, instance.end_trains + 1)]
-        ret["trains"] = ",".join(trains)
-        return ret
-
     class Meta:
         model = MaterialDealResult
         fields = "__all__"

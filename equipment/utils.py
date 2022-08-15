@@ -4,7 +4,7 @@ import os
 import time
 import logging
 from base64 import standard_b64encode
-from datetime import datetime
+from datetime import datetime, timedelta
 from io import BytesIO
 
 import cx_Oracle
@@ -17,7 +17,7 @@ from openpyxl import load_workbook, cell
 from rest_framework.exceptions import ValidationError
 import pandas as pd
 
-from equipment.models import EquipApplyOrder, EquipMaintenanceAreaSetting, EquipInspectionOrder
+from equipment.models import EquipApplyOrder, EquipMaintenanceAreaSetting, EquipInspectionOrder, EquipSpareErp
 from mes import settings
 from system.models import User, Section
 
@@ -375,3 +375,27 @@ def pd_export_xls(sql,
     response['Content-Type'] = 'application/octet-stream'
     response['Content-Disposition'] = 'attachment;filename="mm.xlsx"'
     return response
+
+
+def handle_spare(last_time=None, wlxxid=None):
+    params = {}
+    if wlxxid:
+        params['wlxxid'] = wlxxid
+    else:
+        if not last_time:
+            last = EquipSpareErp.objects.filter(sync_date__isnull=False).order_by('sync_date').last()  # 第一次先在数据库插入一条假数据
+            if not last:
+                return False, '未找到最新一次同步时间数据'
+            last_time = (last.sync_date + timedelta(seconds=1)).strftime('%Y-%m-%d %H:%M:%S')
+        params['syncDate'] = last_time
+    url = 'http://10.1.10.136/zcxjws_web/zcxjws/pc/jc/getbjwlxx.io'
+    try:
+        res = requests.post(url=url, json=params, timeout=3)
+    except Exception:
+        return False, '网络异常'
+    if res.status_code != 200:
+        return False, '请求失败'
+    data = json.loads(res.content)
+    if not data.get('flag'):
+        return False, data.get('message')
+    return True, data.get('obj')
