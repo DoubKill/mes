@@ -1731,34 +1731,33 @@ class XLBinVIewSet(GenericViewSet, ListModelMixin):
             queryset = JZBin.objects.using(equip_no).all()
         else:
             queryset = Bin.objects.using(equip_no).all()
-        with atomic(using=equip_no):
-            for item in data:
-                filter_kwargs = {'id': item.get('id')}
+        for item in data:
+            filter_kwargs = {'id': item.get('id')}
+            try:
+                obj = get_object_or_404(queryset, **filter_kwargs)
+            except ConnectionDoesNotExist:
+                raise ValidationError('称量机台{}服务错误！'.format(equip_no))
+            except Exception:
+                raise
+            # 无变化则pass, 不保存
+            if obj.name == item.get('name'):
+                continue
+            if jz:  # 嘉正需要修改中间表数据并且通知称量同步本地数据
+                s_bin = int(item.get('bin')[:-1]) * 2 - (1 if 'A' in item.get('bin') else 0)
+                item['bin'] = s_bin
+                s = JZBinSerializer(instance=obj, data=item)
+                s.is_valid(raise_exception=True)
+                s.save()
+                # 通知称量同步中间表数据
                 try:
-                    obj = get_object_or_404(queryset, **filter_kwargs)
-                except ConnectionDoesNotExist:
-                    raise ValidationError('称量机台{}服务错误！'.format(equip_no))
-                except Exception:
-                    raise
-                # 无变化则pass, 不保存
-                if obj.name == item.get('name'):
-                    continue
-                if jz:  # 嘉正需要修改中间表数据并且通知称量同步本地数据
-                    s_bin = int(item.get('bin')[:-1]) * 2 - (1 if 'A' in item.get('bin') else 0)
-                    item['bin'] = s_bin
-                    s = JZBinSerializer(instance=obj, data=item)
-                    s.is_valid(raise_exception=True)
-                    s.save()
-                    # 通知称量同步中间表数据
-                    try:
-                        res = jz.notice(table_seq=1, table_id=item.get('id'), opera_type=3)
-                    except Exception as e:
-                        logger.error(f'修改料仓信息失败{e.args[0]}')
-                        raise ValidationError(e.args[0])
-                else:
-                    s = BinSerializer(instance=obj, data=item)
-                    s.is_valid(raise_exception=True)
-                    s.save()
+                    res = jz.notice(table_seq=1, table_id=item.get('id'), opera_type=3)
+                except Exception as e:
+                    logger.error(f'修改料仓信息失败{e.args[0]}')
+                    raise ValidationError(e.args[0])
+            else:
+                s = BinSerializer(instance=obj, data=item)
+                s.is_valid(raise_exception=True)
+                s.save()
         return Response('更新成功！')
 
 
