@@ -150,27 +150,6 @@ class QualityControlSerializer(BaseModelSerializer):
 
 class ProductionRecordSerializer(BaseModelSerializer):
     """密炼生产履历"""
-    validtime = serializers.SerializerMethodField(read_only=True)
-    class_group = serializers.SerializerMethodField(read_only=True)
-    margin = serializers.CharField(default=None, read_only=True)
-
-    def get_validtime(self, obj):
-        attr = MaterialAttribute.objects.filter(material__material_no=obj.product_no).first()
-        if attr:
-            if attr.period_of_validity:
-                validtime = obj.end_time + datetime.timedelta(days=attr.period_of_validity)
-                return validtime.strftime("%Y-%m-%d %H:%M:%S")
-            return ""
-        else:
-            return ""
-
-    def get_class_group(self, object):
-        product = ProductClassesPlan.objects.filter(plan_classes_uid=object.plan_classes_uid).first()
-        if product:
-            group = product.work_schedule_plan.group
-            return group.global_name if group else None
-        else:
-            return None
 
     class Meta:
         model = PalletFeedbacks

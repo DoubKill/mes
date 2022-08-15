@@ -723,6 +723,11 @@ class BzFinalMixingRubberInventorySerializer(serializers.ModelSerializer):
 class BzMixingRubberInventorySearchSerializer(BzFinalMixingRubberInventorySerializer):
     deal_suggestion = serializers.SerializerMethodField(read_only=True)
     yx_state = serializers.SerializerMethodField(read_only=True)
+    locked_status = serializers.SerializerMethodField()
+
+    def get_locked_status(self, obj):
+        locked_lot_data = self.context['locked_lot_data']
+        return locked_lot_data.get(obj.lot_no)
 
     def get_deal_suggestion(self, obj):
         if obj.lot_no:
@@ -840,6 +845,11 @@ class BzFinalMixingRubberLBInventorySerializer(serializers.ModelSerializer):
 class BzFinalRubberInventorySearchSerializer(BzFinalMixingRubberLBInventorySerializer):
     deal_suggestion = serializers.SerializerMethodField(read_only=True)
     yx_state = serializers.SerializerMethodField(read_only=True)
+    locked_status = serializers.SerializerMethodField()
+
+    def get_locked_status(self, obj):
+        locked_lot_data = self.context['locked_lot_data']
+        return locked_lot_data.get(obj.lot_no)
 
     def get_deal_suggestion(self, obj):
         if obj.lot_no:
