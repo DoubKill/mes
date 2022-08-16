@@ -31,7 +31,8 @@ from basics.serializers import GlobalCodeSerializer
 import uuid
 
 from equipment.utils import gen_template_response
-from inventory.models import WmsNucleinManagement
+from inventory.models import WmsNucleinManagement, ProductInventoryLocked, BzFinalMixingRubberInventory, \
+    BzFinalMixingRubberInventoryLB
 from mes import settings
 from mes.common_code import CommonDeleteMixin, date_range, get_template_response, GroupConcat
 from mes.conf import WMS_URL
@@ -75,7 +76,7 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestPlanDetailSerializer, MaterialTestOrderExportSerializer, MaterialInspectionRegistrationSerializer, \
     MaterialDataPointIndicatorHistorySerializer, WMSMooneyLevelSerializer, ERPMESMaterialRelationSerializer
 
-from django.db.models import Prefetch, F
+from django.db.models import Prefetch, F, StdDev
 from django.db.models import Q
 from quality.utils import get_cur_sheet, get_sheet_data, export_mto, gen_pallet_test_result
 from recipe.models import Material, ProductBatching, ERPMESMaterialRelation, ZCMaterial
@@ -279,17 +280,16 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
         else:
             return MaterialTestOrderListSerializer
 
-    def export_xls(self, result, lot_deal_result_dict):
+    def export_xls(self, result, lot_deal_result_dict, template, data_row):
         if not result:
             return Response('暂无数据！')
-        wb = load_workbook('xlsx_template/product_test_result.xlsx')
+        wb = load_workbook(template)
         ws = wb.worksheets[0]
         sheet0 = wb.copy_worksheet(ws)
         sheet0.title = '汇总'
-        sheet0.delete_rows(2, 5)
+        sheet0.delete_rows(2, data_row)
         sheet = wb.copy_worksheet(ws)
         data_row0 = 2
-        data_row = 7
         product_no = result[0]['product_no']
         sheet.title = product_no
         indicators_data = MaterialDataPointIndicator.objects.filter(
@@ -327,7 +327,6 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
                 product_no = i['product_no']
                 sheet = wb.copy_worksheet(ws)
                 sheet.title = product_no
-                data_row = 7
                 indicators_data = MaterialDataPointIndicator.objects.filter(
                     material_test_method__material__material_no=product_no,
                     level=1,
@@ -424,6 +423,7 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
         state = self.request.query_params.get('state')
         export = self.request.query_params.get('export')
         queryset = self.filter_queryset(self.get_queryset())
+        sum_project = self.request.query_params.get('sum_project')
         if state:
             if state == '检测中':
                 queryset = queryset.filter(is_finished=False)
@@ -455,7 +455,9 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
                 test_result__in=('PASS', '三等品')).values('lot_no', 'deal_suggestion', 'deal_user', 'test_result')
             lot_deal_result_dict = {i['lot_no']: i for i in deal_results}
             data = MaterialTestOrderExportSerializer(queryset, many=True).data
-            return self.export_xls(data, lot_deal_result_dict)
+            if sum_project:
+                return self.export_xls(data, lot_deal_result_dict, 'xlsx_template/product_test_result2.xlsx', 13)
+            return self.export_xls(data, lot_deal_result_dict, 'xlsx_template/product_test_result.xlsx', 7)
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
@@ -592,6 +594,26 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
 
 
 @method_decorator([api_recorder], name="dispatch")
+class TestedMaterials(APIView):
+
+    def get(self, request):
+        stage = self.request.query_params.get('stage')
+        product_type = self.request.query_params.get('product_type')
+        test_indicator_id = self.request.query_params.get('test_indicator_id')
+        test_type_id = self.request.query_params.get('test_type_id')
+        queryset = MaterialTestMethod.objects.filter(delete_flag=False)
+        if stage:
+            queryset = queryset.filter(material__material_name__icontains='-{}-'.format(stage))
+        if product_type:
+            queryset = queryset.filter(material__material_name__icontains='{}-'.format(product_type))
+        if test_indicator_id:
+            queryset = queryset.filter(test_method__test_type__test_indicator_id=test_indicator_id)
+        if test_type_id:
+            queryset = queryset.filter(test_method__test_type_id=test_type_id)
+        return Response(set(queryset.values_list('material__material_no', flat=True)))
+
+
+@method_decorator([api_recorder], name="dispatch")
 class MaterialTestMethodViewSet(ModelViewSet):
     """物料试验方法"""
     queryset = MaterialTestMethod.objects.filter(delete_flag=False)
@@ -599,6 +621,57 @@ class MaterialTestMethodViewSet(ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     permission_classes = (IsAuthenticated,)
     filter_class = MaterialTestMethodFilter
+
+    def list(self, request, *args, **kwargs):
+        stage = self.request.query_params.get('stage')
+        product_type = self.request.query_params.get('product_type')
+        queryset = self.filter_queryset(self.get_queryset())
+        if stage:
+            queryset = queryset.filter(material__material_name__icontains='-{}-'.format(stage))
+        if product_type:
+            queryset = queryset.filter(material__material_name__icontains='{}-'.format(product_type))
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated], url_path='batch-set',
+            url_name='batch-set')
+    def batch_set(self, request):
+        data = self.request.data
+        method_ids = data.get('test_method_ids')
+        indicator_data = data.get('indicator_data')  # [{'data_point': 1, upper_limit:12, lower_limit:1, level:1, result:1}]
+        for item in indicator_data:
+            qs = MaterialDataPointIndicator.objects.filter(delete_flag=0,
+                                                           data_point_id=item['data_point'],
+                                                           material_test_method__id__in=method_ids,
+                                                           level=item['level'],
+                                                           )
+            for instance in qs:
+                if not instance.last_updated_user:
+                    username = self.request.user.username
+                else:
+                    username = instance.last_updated_user.username
+                MaterialDataPointIndicatorHistory.objects.create(
+                    product_no=instance.material_test_method.material.material_no,
+                    test_method=instance.material_test_method.test_method,
+                    data_point=instance.data_point,
+                    level=instance.level,
+                    result=instance.result,
+                    upper_limit=instance.upper_limit,
+                    lower_limit=instance.lower_limit,
+                    created_username=username,
+                    created_date=instance.last_updated_date
+                )
+            qs.update(upper_limit=item['upper_limit'],
+                      lower_limit=item['lower_limit'],
+                      last_updated_date=datetime.datetime.now(),
+                      last_updated_user=self.request.user
+                      )
+        return Response('ok')
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -737,12 +810,76 @@ class PalletFeedbacksTestListView(ModelViewSet):
     permission_classes = (IsAuthenticated, )
 
     def get_serializer_class(self):
-        if self.action == 'list':
-            return MaterialDealResultListSerializer1
-        elif self.action == "retrieve":
+        if self.action == "retrieve":
             return MaterialDealResultListSerializer
         else:
-            raise ValidationError('本接口只提供查询功能')
+            return MaterialDealResultListSerializer1
+
+    def list(self, request, *args, **kwargs):
+        locked_status = self.request.query_params.get('locked_status')
+        is_instock = self.request.query_params.get('is_instock')
+        queryset = self.filter_queryset(self.get_queryset())
+        if locked_status:
+            # if locked_status == '0':  # 空白
+            #     locked_lot_nos = list(
+            #         ProductInventoryLocked.objects.filter(is_locked=True).values_list('lot_no', flat=True))
+            #     queryset = queryset.exclude(lot_no__in=locked_lot_nos)
+            if locked_status == '1':  # 工艺锁定
+                locked_lot_nos = list(
+                    ProductInventoryLocked.objects.filter(is_locked=True, locked_status__in=(1, 3)).values_list(
+                        'lot_no', flat=True))
+                queryset = queryset.filter(lot_no__in=locked_lot_nos)
+            elif locked_status == '2':  # 快检锁定
+                locked_lot_nos = list(
+                    ProductInventoryLocked.objects.filter(is_locked=True, locked_status__in=(2, 3)).values_list(
+                        'lot_no',
+                        flat=True))
+                queryset = queryset.filter(lot_no__in=locked_lot_nos)
+        if is_instock:
+            stock_lot_nos = list(BzFinalMixingRubberInventory.objects.using('bz').values_list('lot_no', flat=True)) + \
+                            list(BzFinalMixingRubberInventoryLB.objects.using('lb').filter(
+                                store_name='炼胶库').values_list('lot_no', flat=True))
+            if is_instock == 'Y':
+                queryset = queryset.filter(lot_no__in=stock_lot_nos)
+            else:
+                queryset = queryset.exclude(lot_no__in=stock_lot_nos)
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            s_data = serializer.data
+            lot_nos = [i['lot_no'] for i in s_data]
+            pallet_weight_dict = dict(PalletFeedbacks.objects.filter(
+                lot_no__in=lot_nos).values_list('lot_no', 'actual_weight'))
+            pallet_group_dict = dict(MaterialTestOrder.objects.filter(
+                lot_no__in=lot_nos).values_list('lot_no', 'production_group'))
+            max_test_ids = list(MaterialTestResult.objects.filter(
+                material_test_order__lot_no__in=lot_nos
+            ).values('material_test_order__lot_no').annotate(mid=Max('id')).values_list('mid', flat=True))
+            last_test_data = MaterialTestResult.objects.filter(
+                id__in=max_test_ids).values('material_test_order__lot_no',
+                                            'test_factory_date',
+                                            'created_user__username')
+            last_test_dict = {i['material_test_order__lot_no']: i for i in last_test_data}
+            locked_dict = dict(ProductInventoryLocked.objects.filter(lot_no__in=lot_nos).values_list('lot_no', 'locked_status'))
+            stock_lot_nos = list(BzFinalMixingRubberInventory.objects.using('bz').filter(lot_no__in=lot_nos).values_list('lot_no', flat=True)) + \
+                            list(BzFinalMixingRubberInventoryLB.objects.using('lb').filter(
+                                store_name='炼胶库', lot_no__in=lot_nos).values_list('lot_no', flat=True))
+            for item in s_data:
+                lot_no = item['lot_no']
+                item['actual_weight'] = pallet_weight_dict.get(lot_no)
+                item['classes_group'] = item['classes'] + '/' + pallet_group_dict.get(lot_no)  # 班次班组
+                item['test'] = {'test_status': '正常',
+                                'test_factory_date': last_test_dict.get(lot_no, {}).get('test_factory_date'),
+                                'test_class': item['classes'],
+                                'test_user': last_test_dict.get(lot_no, {}).get('created_user__username')}
+                item['residual_weight'] = None
+                item['day_time'] = item['factory_date']
+                item["trains"] = ",".join([str(x) for x in range(item['begin_trains'], item['end_trains'] + 1)])
+                item['locked_status'] = locked_dict.get(lot_no, 0)
+                item['is_instock'] = lot_no in stock_lot_nos
+            return self.get_paginated_response(s_data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     def get_queryset(self):
         equip_no = self.request.query_params.get('equip_no', None)
@@ -4321,6 +4458,7 @@ class ProductSynthesisProductRate(APIView):
         return Response({'data': data4.values()})
 
 
+@method_decorator([api_recorder], name="dispatch")
 class ProductTestValueHistoryView(APIView):
 
     def get(self, request):
@@ -4342,18 +4480,64 @@ class ProductTestValueHistoryView(APIView):
         return Response(test_result)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class ProductIndicatorStandard(APIView):
 
     def get(self, request):
         product_no = self.request.query_params.get('product_no')
+        st = self.request.query_params.get('st')
+        et = self.request.query_params.get('et')
+        equip_no = self.request.query_params.get('equip_no')
+        classes = self.request.query_params.get('classes')
+        stage = self.request.query_params.get('stage')
+        production_group = self.request.query_params.get('production_group')
+        state = self.request.query_params.get('state')
+        sum_project = self.request.query_params.get('sum_project')
         indicators_data = MaterialDataPointIndicator.objects.filter(
             material_test_method__material__material_no=product_no,
             level=1,
             delete_flag=False
         ).values('data_point__name', 'upper_limit', 'lower_limit', 'data_point__unit')
+        if sum_project:
+            queryset = MaterialTestResult.objects.all()
+            if st:
+                queryset = queryset.filter(material_test_order__production_factory_date__gte=st)
+            if et:
+                queryset = queryset.filter(material_test_order__production_factory_date__lte=et)
+            if equip_no:
+                queryset = queryset.filter(material_test_order__production_equip_no=equip_no)
+            if product_no:
+                queryset = queryset.filter(material_test_order__product_no=product_no)
+            if classes:
+                queryset = queryset.filter(material_test_order__production_class=classes)
+            if stage:
+                queryset = queryset.filter(material_test_order__product_no__icontains='-{}-'.format(stage))
+            if production_group:
+                queryset = queryset.filter(material_test_order__production_group=production_group)
+            if state:
+                if state == '检测中':
+                    queryset = queryset.filter(material_test_order__is_finished=False)
+                elif state == '合格':
+                    queryset = queryset.filter(material_test_order__is_finished=True,
+                                               material_test_order__is_qualified=True)
+                elif state == '不合格':
+                    queryset = queryset.filter(material_test_order__is_finished=True,
+                                               material_test_order__is_qualified=False)
+            summary_data = queryset.values('data_point_name').annotate(avg=Avg('value'), std=StdDev('value', sample=True))
+            indicators_data_dict = {i['data_point__name']: i for i in indicators_data}
+            for item in summary_data:
+                data_point_name = item.pop('data_point_name')
+                item['data_point__name'] = data_point_name
+                id_data = indicators_data_dict.get(data_point_name)
+                if id_data:
+                    item['upper_limit'] = id_data['upper_limit']
+                    item['lower_limit'] = id_data['lower_limit']
+                    item['data_point__unit'] = id_data['data_point__unit']
+            return Response(summary_data)
         return Response(indicators_data)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class ProductMaterials(APIView):
 
     def get(self, request):
@@ -4363,3 +4547,27 @@ class ProductMaterials(APIView):
         unused_products = all_product_nos - used_recipes
         ret = [{'product_no': j, 'used': True} for j in used_recipes] + [{'product_no': i, 'used': False} for i in unused_products]
         return Response(ret)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductTestedTrains(APIView):
+
+    def get(self, request):
+        factory_date = self.request.query_params.get('factory_date')
+        classes = self.request.query_params.get('classes')
+        product_no = self.request.query_params.get('product_no')
+        equip_no = self.request.query_params.get('equip_no')
+        test_indicator_name = self.request.query_params.get('test_indicator_name')
+        test_plan_data = list(ProductTestPlanDetail.objects.filter(
+            factory_date=factory_date,
+            product_no=product_no,
+            equip_no=equip_no,
+            production_classes=classes,
+            test_plan__test_indicator_name=test_indicator_name
+        ).order_by('actual_trains').values('actual_trains', 'test_plan__test_interval'))
+        if not test_plan_data:
+            return Response({})
+        last_test_plan = test_plan_data[-1]
+        first_test_plan = test_plan_data[0]
+        return Response({'max_trains': last_test_plan['actual_trains'] + last_test_plan['test_plan__test_interval'] - 1,
+                        'min_trains': first_test_plan['actual_trains']})

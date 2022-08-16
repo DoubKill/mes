@@ -104,6 +104,8 @@ permission_data = [
 
     {'id': 69, 'code': 'product_record', 'name': '密炼生产履历', 'parent_id': None},
     {'id': 70, 'code': 'view_product_record', 'name': '查看', 'parent_id': 69},
+    {'id': 1085, 'code': 'lock_product_record', 'name': '出库锁定', 'parent_id': 69},
+    {'id': 1086, 'code': 'unlock_product_record', 'name': '出库解锁', 'parent_id': 69},
 
     {'id': 75, 'code': 'product_inventory', 'name': '胶料库内库存统计', 'parent_id': None},
     {'id': 76, 'code': 'view_product_inventory', 'name': '查看', 'parent_id': 75},
@@ -151,6 +153,8 @@ permission_data = [
     {'id': 540, 'code': 'all_deal_result', 'name': '批量修改车次', 'parent_id': 118},
     {'id': 541, 'code': 'only_deal_result', 'name': '修改指定车次', 'parent_id': 118},
     {'id': 777, 'code': 'range_deal_result', 'name': '打印区间显示', 'parent_id': 118},
+    {'id': 1087, 'code': 'lock_deal_result', 'name': '出库锁定', 'parent_id': 118},
+    {'id': 1088, 'code': 'unlock_deal_result', 'name': '出库解锁', 'parent_id': 118},
 
     {'id': 120, 'code': 'class_production_summary', 'name': '班次密炼时间汇总', 'parent_id': None},
     {'id': 121, 'code': 'view_class_production_summary', 'name': '查看', 'parent_id': 120},
@@ -1089,7 +1093,7 @@ permission_data = [
     {'id': 1082, 'code': 'product_ratio', 'name': '原材料配比查询', 'parent_id': None},
     {'id': 1083, 'code': 'view_product_ratio', 'name': '查看', 'parent_id': 1082},
 
-    # 下一个 1084 开始
+    # 下一个 1089 开始
 ]
 
 

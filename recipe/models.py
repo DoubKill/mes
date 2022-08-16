@@ -429,6 +429,7 @@ class ProductBatchingEquip(models.Model):
     is_used = models.BooleanField(default=True)
     send_recipe_flag = models.BooleanField(default=False, help_text='发送配方结果标志: 0 未发送或者发送失败; 1 发送成功')
     is_manual = models.BooleanField(default=False, help_text='是否人工单配')
+    send_xl_equip = models.CharField(max_length=64, help_text='已经下传的纤体', default='')
 
     class Meta:
         db_table = 'product_batching_equip'

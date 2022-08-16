@@ -1570,33 +1570,34 @@ class WeightBatchingLogListViewSet(ListAPIView):
     """
     queryset = WeightBatchingLog.objects.all()
     serializer_class = WeightBatchingLogListSerializer
-    permission_classes = (IsAuthenticated,)
+    # permission_classes = (IsAuthenticated,)
     filter_backends = [DjangoFilterBackend]
     filter_class = WeightBatchingLogListFilter
 
     def list(self, request, *args, **kwargs):
         opera_type = self.request.query_params.get('opera_type')
-        bra_code = self.request.query_params.get('bra_code')
         queryset = self.filter_queryset(self.get_queryset())
         data = []
-        if opera_type == '1':
+        if opera_type == '1':  # 条码对应原材料信息
             try:
+                bra_code = self.request.query_params.get('bra_code')
                 res = material_out_barcode(bra_code)
             except Exception as e:
                 raise ValidationError(e.args[0])
             if res:
                 data.append(res)
-        elif opera_type == '2':
-            data = queryset.filter(status=1).order_by('-id').annotate(created_username=F('created_user__username'))\
-                .values('id', 'bra_code', 'batch_time', 'created_username')
-        else:
-            # 按条码分组
-            group_data = queryset.filter(status=1).values('bra_code').annotate(max_id=Max('id'), total_num=Count('id')).order_by('-max_id')
-            for i in group_data:
-                total_num = i['total_num'] if i['total_num'] else 0
-                display_record = dict(queryset.filter(id=i['max_id']).annotate(created_username=F('created_user__username')).values()[0])
-                display_record.update({'total_num': total_num, 'batch_time': display_record.get('batch_time').strftime('%Y:%m:%d %H:%M:%S')})
-                data.append(display_record)
+        elif opera_type == '2':  # 点击物料名获取投料详情
+            data = queryset.filter(status=1).values('material_name', 'bra_code', 'batch_classes')\
+                .annotate(batch_time=Max('batch_time'), total_num=Count('id'), max_id=Max('id'))\
+                .values('max_id', 'material_name', 'bra_code', 'total_num', 'batch_classes', 'batch_time')
+            for i in data:  # 补齐开门时间、操作人
+                s_info = self.get_queryset().filter(id=i['max_id']).values('created_user__username', 'open_time')
+                u_data = s_info[0] if s_info else {'created_user__username': '', 'open_time': ''}
+                i.update(batch_time=i['batch_time'].strftime('%Y-%m-%d %H:%M:%S'), **u_data)
+        else:  # 列表
+            data = queryset.filter(status=1).values('equip_no', 'tank_no', 'material_name')\
+                .annotate(total_num=Count('id')).values('equip_no', 'tank_no', 'material_name')\
+                .distinct().order_by('equip_no', 'tank_no')
             page = self.paginate_queryset(data)
             if page is not None:
                 return self.get_paginated_response(page)
@@ -1730,34 +1731,33 @@ class XLBinVIewSet(GenericViewSet, ListModelMixin):
             queryset = JZBin.objects.using(equip_no).all()
         else:
             queryset = Bin.objects.using(equip_no).all()
-        with atomic(using=equip_no):
-            for item in data:
-                filter_kwargs = {'id': item.get('id')}
+        for item in data:
+            filter_kwargs = {'id': item.get('id')}
+            try:
+                obj = get_object_or_404(queryset, **filter_kwargs)
+            except ConnectionDoesNotExist:
+                raise ValidationError('称量机台{}服务错误！'.format(equip_no))
+            except Exception:
+                raise
+            # 无变化则pass, 不保存
+            if obj.name == item.get('name'):
+                continue
+            if jz:  # 嘉正需要修改中间表数据并且通知称量同步本地数据
+                s_bin = int(item.get('bin')[:-1]) * 2 - (1 if 'A' in item.get('bin') else 0)
+                item['bin'] = s_bin
+                s = JZBinSerializer(instance=obj, data=item)
+                s.is_valid(raise_exception=True)
+                s.save()
+                # 通知称量同步中间表数据
                 try:
-                    obj = get_object_or_404(queryset, **filter_kwargs)
-                except ConnectionDoesNotExist:
-                    raise ValidationError('称量机台{}服务错误！'.format(equip_no))
-                except Exception:
-                    raise
-                # 无变化则pass, 不保存
-                if obj.name == item.get('name'):
-                    continue
-                if jz:  # 嘉正需要修改中间表数据并且通知称量同步本地数据
-                    s_bin = int(item.get('bin')[:-1]) * 2 - (1 if 'A' in item.get('bin') else 0)
-                    item['bin'] = s_bin
-                    s = JZBinSerializer(instance=obj, data=item)
-                    s.is_valid(raise_exception=True)
-                    s.save()
-                    # 通知称量同步中间表数据
-                    try:
-                        res = jz.notice(table_seq=1, table_id=item.get('id'), opera_type=3)
-                    except Exception as e:
-                        logger.error(f'修改料仓信息失败{e.args[0]}')
-                        raise ValidationError(e.args[0])
-                else:
-                    s = BinSerializer(instance=obj, data=item)
-                    s.is_valid(raise_exception=True)
-                    s.save()
+                    res = jz.notice(table_seq=1, table_id=item.get('id'), opera_type=3)
+                except Exception as e:
+                    logger.error(f'修改料仓信息失败{e.args[0]}')
+                    raise ValidationError(e.args[0])
+            else:
+                s = BinSerializer(instance=obj, data=item)
+                s.is_valid(raise_exception=True)
+                s.save()
         return Response('更新成功！')
 
 
@@ -2538,8 +2538,8 @@ class XLPlanCViewSet(ListModelMixin, GenericViewSet):
             return response(success=False, message='机台{}无进行中或已完成的配料计划'.format(equip_no))
         serializer = self.get_serializer(all_filter_plan[:5], many=True)
         for i in serializer.data:
-            recipe_pre = pre_model.objects.using(equip_no).filter(name=i['recipe'])
-            dev_type = recipe_pre.first().ver.upper().strip() if recipe_pre else ''
+            recipe_pre = pre_model.objects.using(equip_no).filter(name=i['recipe']).last()
+            dev_type = recipe_pre.ver.upper().strip() if recipe_pre and recipe_pre.ver else ''
             i.update({'dev_type': dev_type, 'planid': i['planid'].strip()})
         return response(success=True, data=serializer.data)
 
@@ -2594,6 +2594,20 @@ class WeightingTankStatus(APIView):
         # 获取该机台号下所有料罐信息
         tanks_info = WeightTankStatus.objects.filter(equip_no=equip_no, use_flag=True) \
             .values('id', 'tank_no', 'tank_name', 'status', 'material_name', 'material_no', 'open_flag')
+        # 更新履历开门时间
+        open_tank = list(tanks_info.filter(open_flag=1).values_list('tank_no', flat=True).distinct())
+        if open_tank:
+            w_record = WeightBatchingLog.objects.filter(status=1, batch_time__date__gte=date_before).order_by('id').last()
+            if w_record and not w_record.open_time and w_record.tank_no in open_tank:
+                update_ids, now_id = [w_record.id], w_record.id
+                all_info = WeightBatchingLog.objects.filter(id__lt=now_id, status=1, material_name=w_record.material_name, batch_time__date__gte=date_before).order_by('-id')
+                for i in all_info:
+                    if i.id != now_id - 1:
+                        break
+                    else:
+                        update_ids.append(i.id)
+                        now_id -= 1
+                WeightBatchingLog.objects.filter(id__in=update_ids).update(open_time=datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         # 筛选计划
         all_filter_plan = plan_model.objects.using(equip_no).filter(
             Q(planid__startswith=date_now_planid) | Q(planid__startswith=date_before_planid),
@@ -3457,6 +3471,11 @@ class XlRecipeNoticeView(APIView):
                     self.issue_xl_system(xl_equip, send_data)
         except Exception as e:
             raise ValidationError(f"{error_msg}:{e.args[0]}")
+        if '成功' in detail_msg:
+            e_xl_equip = mes_xl_details.last().send_xl_equip
+            if xl_equip not in e_xl_equip:
+                update_info = f'{e_xl_equip},{xl_equip}' if e_xl_equip else xl_equip
+                ProductBatchingEquip.objects.filter(product_batching=product_batching).update(send_xl_equip=update_info)
         return Response(f'{xl_equip}:\n {detail_msg}')
 
     def issue_xl_system(self, xl_equip, data):

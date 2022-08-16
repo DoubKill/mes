@@ -187,12 +187,15 @@ class ProductBatchingListSerializer(BaseModelSerializer):
             new_recipe_id = new_recipe.id if new_recipe else 0
         res['new_recipe_id'] = new_recipe_id
         # 返回配方可用机台
-        enable_equip = list(ProductBatchingEquip.objects.filter(product_batching=instance).values_list('equip_no', flat=True).distinct())
-        send_success_equip = list(ProductBatchingEquip.objects.filter(product_batching=instance, send_recipe_flag=True).values_list('equip_no', flat=True).distinct())
+        equip_info = ProductBatchingEquip.objects.filter(product_batching=instance)
+        enable_equip = list(equip_info.values_list('equip_no', flat=True).distinct())
+        send_success_equip = list(equip_info.filter(send_recipe_flag=True).values_list('equip_no', flat=True).distinct())
         mixed = ProductBatchingMixed.objects.filter(product_batching=instance).first()
         mixed_ratio = {} if not mixed else {'stage': {'f_feed': mixed.f_feed, 's_feed': mixed.s_feed},
                                             'ratio': {'f_ratio': mixed.f_ratio, 's_ratio': mixed.s_ratio}}
-        res.update({'enable_equip': enable_equip, 'send_success_equip': send_success_equip, 'mixed_ratio': mixed_ratio})
+        send_xl_equip = equip_info.last().send_xl_equip if equip_info else ''
+        res.update({'enable_equip': enable_equip, 'send_success_equip': send_success_equip, 'mixed_ratio': mixed_ratio,
+                    'send_xl_equip': send_xl_equip})
         return res
 
     class Meta:
@@ -216,8 +219,10 @@ class WFProductBatchingListSerializer(BaseModelSerializer):
 
     def to_representation(self, instance):
         res = super().to_representation(instance)
-        send_success_equip = list(ProductBatchingEquip.objects.filter(product_batching=instance, send_recipe_flag=True).values_list('equip_no', flat=True).distinct())
-        res.update({'send_success_equip': send_success_equip})
+        equip_info = ProductBatchingEquip.objects.filter(product_batching=instance)
+        send_success_equip = list(equip_info.filter(send_recipe_flag=True).values_list('equip_no', flat=True).distinct())
+        send_xl_equip = equip_info.last().send_xl_equip if equip_info else ''
+        res.update({'send_success_equip': send_success_equip, 'send_xl_equip': send_xl_equip})
         return res
 
     class Meta:
@@ -535,7 +540,7 @@ class ProductBatchingRetrieveSerializer(ProductBatchingListSerializer):
         fields = '__all__'
 
 
-class WFProductBatchingRetrieveSerializer(ProductBatchingListSerializer):
+class WFProductBatchingRetrieveSerializer(WFProductBatchingListSerializer):
     weight_cnt_types = WeighCntTypeRetrieveSerializer(many=True, required=False, help_text="""
     [
         {   
@@ -731,7 +736,7 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
                   'batching_detail_ids', 'cnt_type_ids', 'weight_detail_ids', 'del_batching_equip', 'mixed_ratio')
 
 
-class WFProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
+class WFProductBatchingUpdateSerializer(WFProductBatchingRetrieveSerializer):
     cnt_type_ids = serializers.ListField(required=False, allow_empty=True, allow_null=True)
     weight_detail_ids = serializers.ListField(required=False, allow_empty=True, allow_null=True)
     weigh_type = serializers.IntegerField(write_only=True, help_text='1-硫磺包 2-细料包')
