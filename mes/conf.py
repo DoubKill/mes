@@ -41,7 +41,7 @@ WMS_CONF = dict(host=settings.DATABASES['wms']['HOST'],
                 password=settings.DATABASES['wms']['PASSWORD'])
 WMS_URL = "http://10.4.24.25:8169"   # 原材料库地址
 
-TH_URL = "http://10.4.24.33:8169/"  # 炭黑库地址
+TH_URL = "http://10.4.24.33:8169"  # 炭黑库地址
 TH_CONF = dict(host=settings.DATABASES['cb']['HOST'],
                user=settings.DATABASES['cb']['USER'],
                database=settings.DATABASES['cb']['NAME'],
