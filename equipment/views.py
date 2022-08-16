@@ -2918,6 +2918,7 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
         "库区": "area_name",
         "库位": "location_name",
         "操作人": "created_username",
+        "出库/入库时间": "real_time",
         "操作日期": "created_date",
         "是否撤销": "revocation",
         "撤销备注": "revocation_desc",
