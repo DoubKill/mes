@@ -501,47 +501,39 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
             if tunnel:
                 filter_dict.update(location__startswith='{}-'.format(tunnel))
             if order_type == "出库":
-                if self.request.query_params.get("type") == "正常出库":
-                    actual_type = "生产出库"
-                    filter_dict.update(inout_num_type=actual_type)
-                elif self.request.query_params.get("type") == "指定出库":
-                    actual_type = "快检出库"
-                    filter_dict.update(inout_num_type=actual_type)
-                else:
-                    actual_type = "生产出库"
-                temp_set = list(FinalGumOutInventoryLog.objects.using('lb').filter(**filter_dict).filter(
-                    material_no__icontains="M").order_by('-start_time'))
-                # 目前先只查北自出入库履历
-                # filter_dict.pop("inout_num_type", None)
-                # temp_set += list(InventoryLog.objects.filter(warehouse_name=store_name, inventory_type=actual_type,
-                #                                              **filter_dict).order_by('-start_time'))
-                return temp_set
+                # if self.request.query_params.get("type") == "正常出库":
+                #     actual_type = "生产出库"
+                #     filter_dict.update(inout_num_type=actual_type)
+                # elif self.request.query_params.get("type") == "指定出库":
+                #     actual_type = "快检出库"
+                #     filter_dict.update(inout_num_type=actual_type)
+                # else:
+                #     actual_type = "生产出库"
+                return FinalGumOutInventoryLog.objects.using('lb').filter(**filter_dict).filter(material_no__icontains="M").order_by('-start_time')
             else:
-                return MixGumInInventoryLog.objects.using('lb').filter(**filter_dict).filter(material_no__icontains="M")
+                return FinalGumInInventoryLog.objects.using('lb').filter(**filter_dict).filter(material_no__icontains="M").order_by('-start_time')
         elif store_name == "帘布库":
             if start_time:
                 filter_dict.update(start_time__gte=start_time)
             if end_time:
                 filter_dict.update(start_time__lte=end_time)
             if order_type == "出库":
-                if self.request.query_params.get("type") == "正常出库":
-                    actual_type = "生产出库"
-                    filter_dict.update(inout_num_type=actual_type)
-                elif self.request.query_params.get("type") == "指定出库":
-                    actual_type = "快检出库"
-                    filter_dict.update(inout_num_type=actual_type)
-                else:
-                    actual_type = "生产出库"
-                temp_set = list(MixGumOutInventoryLog.objects.using('lb').filter(**filter_dict).exclude(
-                    material_no__icontains="M").order_by('-start_time'))
-                # 目前先只查北自出入库履历
-                # filter_dict.pop("inout_num_type", None)
-                # temp_set += list(InventoryLog.objects.filter(warehouse_name=store_name, inventory_type=actual_type,
-                #                                              **filter_dict).order_by('-start_time'))
-                return temp_set
+                # if self.request.query_params.get("type") == "正常出库":
+                #     actual_type = "生产出库"
+                #     filter_dict.update(inout_num_type=actual_type)
+                # elif self.request.query_params.get("type") == "指定出库":
+                #     actual_type = "快检出库"
+                #     filter_dict.update(inout_num_type=actual_type)
+                # else:
+                #     actual_type = "生产出库"
+                return FinalGumOutInventoryLog.objects.using('lb').filter(**filter_dict).filter(
+                    Q(location__startswith=5) |
+                    Q(location__startswith=6)).order_by('-start_time')
             else:
-                return MixGumInInventoryLog.objects.using('lb').filter(**filter_dict).exclude(
-                    material_no__icontains="M")
+                return FinalGumInInventoryLog.objects.using('lb').filter(
+                    **filter_dict).filter(Q(location__startswith=5) |
+                                          Q(location__startswith=6)
+                                          ).order_by('-start_time')
         elif store_name in ("原材料库", '炭黑库'):
             database = 'wms' if store_name == '原材料库' else 'cb'
             if order_type == "出库":
