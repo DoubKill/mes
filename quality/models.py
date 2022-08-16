@@ -493,6 +493,10 @@ class ProductTestPlanDetail(models.Model):
     class Meta:
         db_table = 'product_test_plan_detail'
         verbose_name_plural = verbose_name = '胶料快检计划详情'
+        indexes = [models.Index(fields=['factory_date']),
+                   models.Index(fields=['equip_no']),
+                   models.Index(fields=['production_classes']),
+                   models.Index(fields=['product_no'])]
 
     @property
     def classes(self):
