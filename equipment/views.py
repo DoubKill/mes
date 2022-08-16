@@ -2659,7 +2659,8 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
                                                 equip_spare=instance.equip_spare,
                                                 quantity=in_quantity,
                                                 equip_warehouse_order_detail=instance,
-                                                created_user=self.request.user
+                                                created_user=self.request.user,
+                                                real_time=enter_time
                                                 )
             return Response({"success": True, "message": '入库成功', "data": data})
         if status == 2:
@@ -2699,7 +2700,8 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
                                                 equip_spare=instance.equip_spare,
                                                 quantity=out_quantity,
                                                 equip_warehouse_order_detail=instance,
-                                                created_user=self.request.user
+                                                created_user=self.request.user,
+                                                real_time=outer_time
                                                 )
             return Response({"success": True, "message": '出库成功', "data": data})
 
@@ -2947,7 +2949,7 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
         instance = self.get_object()
         quantity = int(instance.quantity)
         inventory = EquipWarehouseInventory.objects.filter(equip_spare_id=equip_spare,
-                                                          equip_warehouse_location_id=equip_warehouse_location).first()
+                                                           equip_warehouse_location_id=equip_warehouse_location).first()
         if instance.created_user == self.request.user:
             order_detail = instance.equip_warehouse_order_detail
             if instance.status == '入库':
