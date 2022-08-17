@@ -437,12 +437,9 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
                 stage_prefix = re.split(r'[,|，]', recipe_type)
                 filter_str = ''
                 for i in stage_prefix:
-                    filter_str += ('' if not filter_str else '|') + f"Q(product_no__startswith='{i.strip()}')"
-                pd_infos = ProductInfo.objects.filter(eval(filter_str)).values_list('product_no', flat=True)
-                filter_str1 = ''
-                for i in pd_infos:
-                    filter_str1 += ('' if not filter_str1 else '|') + f"Q(product_no__icontains='-{i.strip()}-')"
-                queryset = queryset.filter(eval(filter_str1))
+                    filter_str += ('' if not filter_str else '|') + f"Q(product_info__product_name__startswith='{i.strip()}')"
+                product_nos = ProductBatching.objects.filter(eval(filter_str)).values_list('stage_product_batch_no', flat=True)
+                queryset = queryset.filter(product_no__in=product_nos)
 
         if export:
             st = self.request.query_params.get('st')
