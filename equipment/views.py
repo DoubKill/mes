@@ -2974,7 +2974,7 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
                 EquipWarehouseOrder.objects.filter(order_detail=order_detail).update(status=5)
                 inventory.quantity += quantity
                 inventory.save()
-            EquipWarehouseRecord.objects.filter(id=instance.id).update(revocation='Y')
+            EquipWarehouseRecord.objects.filter(id=instance.id).update(revocation='Y', real_time=None)
             order_detail.save()
             # 记录履历
             EquipWarehouseRecord.objects.create(
