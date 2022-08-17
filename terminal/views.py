@@ -1557,9 +1557,9 @@ class BatchChargeLogListViewSet(ListAPIView):
             for i in serializer.data:
                 repeat_keyword = {i['plan_classes_uid'], i['bra_code'], i['trains']}
                 if repeat_keyword not in repeat_bra_code:
-                    replace_material = OtherMaterialLog.objects.filter(status=1, plan_classes_uid=i['plan_classes_uid'], bra_code=i['bra_code']).last()
+                    replace_material = ReplaceMaterial.objects.filter(status='已处理', result=True, plan_classes_uid=i['plan_classes_uid'], bra_code=i['bra_code']).last()
                     if replace_material:
-                        i['replace_material'] = replace_material.material_name
+                        i['replace_material'] = replace_material.real_material
                     data.append(i)
                     repeat_bra_code.append(repeat_keyword)
             page = self.paginate_queryset(data)
