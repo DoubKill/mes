@@ -286,6 +286,7 @@ class MaterialDealResult(AbstractEntity):
     is_deal = models.BooleanField(help_text='是否有过不合格处理', default=False)
     begin_trains = models.IntegerField(help_text='开始车次', verbose_name='开始车次', blank=True, null=True)
     end_trains = models.IntegerField(help_text='结束车次', verbose_name='结束车次', blank=True, null=True)
+    desc = models.CharField(max_length=64, help_text='备注', blank=True, null=True)
 
     class Meta:
         db_table = 'material_deal_result'

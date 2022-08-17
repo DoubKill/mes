@@ -371,10 +371,11 @@ class UnqualifiedDealOrderSerializer(BaseModelSerializer):
 
 
 class TechDealOrderDetailSerializer(serializers.ModelSerializer):
+    rehandle = serializers.BooleanField(write_only=True)
 
     class Meta:
         model = UnqualifiedDealOrderDetail
-        fields = ('id', 'is_release', 'suggestion')
+        fields = ('id', 'is_release', 'suggestion', 'rehandle')
         extra_kwargs = {'id': {'read_only': False}}
 
 
@@ -403,7 +404,12 @@ class UnqualifiedDealOrderUpdateSerializer(BaseModelSerializer):
             validated_data['t_deal_date'] = datetime.now()
             for item in tech_deal_result:
                 deal_details = UnqualifiedDealOrderDetail.objects.filter(id=item['id'])
-                deal_details.update(suggestion=item['suggestion'], is_release=item['is_release'])
+                if item.get('rehandle'):
+                    MaterialDealResult.objects.filter(
+                        lot_no=deal_details.first().lot_no).update(is_deal=False, desc='发起未处理')
+                    deal_details.delete()
+                else:
+                    deal_details.update(suggestion=item['suggestion'], is_release=item['is_release'])
 
         UnqualifiedDealOrder.objects.filter(id=instance.id).update(**validated_data)
 

@@ -424,6 +424,7 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
         export = self.request.query_params.get('export')
         queryset = self.filter_queryset(self.get_queryset())
         sum_project = self.request.query_params.get('sum_project')
+        recipe_type = self.request.query_params.get('recipe_type')
         if state:
             if state == '检测中':
                 queryset = queryset.filter(is_finished=False)
@@ -431,6 +432,18 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
                 queryset = queryset.filter(is_finished=True, is_qualified=True)
             elif state == '不合格':
                 queryset = queryset.filter(is_finished=True, is_qualified=False)
+        if recipe_type:
+            if recipe_type:
+                stage_prefix = re.split(r'[,|，]', recipe_type)
+                filter_str = ''
+                for i in stage_prefix:
+                    filter_str += ('' if not filter_str else '|') + f"Q(product_no__icontains='-{i.strip()}')"
+                queryset = queryset.filter(eval(filter_str))
+                if 'C' in stage_prefix or 'TC' in stage_prefix:  # 车胎类别(C)与半钢类别(CJ)需要区分
+                    queryset = queryset.filter(~Q(product_no__icontains='CJ'), ~Q(product_no__icontains='TCJ'))
+                if 'U' in stage_prefix or 'TU' in stage_prefix:  # 车胎类别(UC)与斜胶类别(U)需要区分
+                    queryset = queryset.filter(~Q(product_no__icontains='UC'), ~Q(product_no__icontains='TUC'))
+
         if export:
             st = self.request.query_params.get('st')
             et = self.request.query_params.get('et')
