@@ -2601,10 +2601,11 @@ class WeightingTankStatus(APIView):
         # 更新履历开门时间
         open_tank = list(tanks_info.filter(open_flag=1).values_list('tank_no', flat=True).distinct())
         if open_tank:
-            w_record = WeightBatchingLog.objects.filter(status=1, batch_time__date__gte=date_before).order_by('id').last()
+            records = WeightBatchingLog.objects.filter(status=1, batch_time__date__gte=date_before, equip_no=equip_no).order_by('-id')
+            w_record = records.first()
             if w_record and not w_record.open_time and w_record.tank_no in open_tank:
                 update_ids, now_id = [w_record.id], w_record.id
-                all_info = WeightBatchingLog.objects.filter(id__lt=now_id, status=1, material_name=w_record.material_name, batch_time__date__gte=date_before).order_by('-id')
+                all_info = records.filter(id__lt=now_id, material_name=w_record.material_name)
                 for i in all_info:
                     if i.id != now_id - 1:
                         break

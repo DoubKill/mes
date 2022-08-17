@@ -350,11 +350,12 @@ class EquipWarehouseRecordFilter(django_filters.rest_framework.FilterSet):
         field_name='equip_spare__equip_component_type__component_type_name', lookup_expr='icontains')
     receive_user = django_filters.CharFilter(field_name='equip_warehouse_order_detail__receive_user', lookup_expr='icontains')
     purpose = django_filters.CharFilter(field_name='equip_warehouse_order_detail__purpose', lookup_expr='icontains')
+    real_time = django_filters.CharFilter(field_name='real_time__date')
 
     class Meta:
         model = EquipWarehouseRecord
         fields = (
-            'equip_warehouse_order_detail', 's_time', 'e_time', 'status', 'spare_name', 'spare_code',
+            'equip_warehouse_order_detail', 's_time', 'e_time', 'status', 'spare_name', 'spare_code', 'real_time',
             'specification', 'equip_component_type', 'order_id', 'created_user', 'revocation', 'receive_user', 'purpose')
 
 
