@@ -5111,11 +5111,11 @@ class LIBRARYINVENTORYView(APIView):
             et = int(page) * int(page_size)
         except:
             raise ValidationError("page/page_size异常，请修正后重试")
-        else:
-            if st not in range(0, 99999):
-                raise ValidationError("page/page_size值异常")
-            if et not in range(0, 99999):
-                raise ValidationError("page/page_size值异常")
+        # else:
+        #     if st not in range(0, 99999):
+        #         raise ValidationError("page/page_size值异常")
+        #     if et not in range(0, 99999):
+        #         raise ValidationError("page/page_size值异常")
 
         filter_kwargs = {}
         if material_no:
