@@ -25,9 +25,10 @@ from plan.models import BatchingClassesPlan
 from recipe.models import ProductBatching, ProductBatchingDetail, ProductBatchingEquip
 from system.models import ChildSystemInfo
 from terminal.models import WeightTankStatus, RecipePre, RecipeMaterial, Plan, Bin, ToleranceRule, JZRecipeMaterial, \
-    JZPlan
+    JZPlan, BatchScanLog
 
 logger = logging.getLogger("send_log")
+e_logger = logging.getLogger("error_log")
 
 
 class INWeighSystem(object):
@@ -789,7 +790,7 @@ class JZCLSystem(object):
         if rep != 1:
             logger.error(f'通知接口异常: {resp_string}, detail: table_seq[{table_seq}]-table_id[{table_id}]-opera_type[{opera_type}]')
             raise ValueError(f'通知接口异常: {resp_string}, detail: table_seq[{table_seq}]-table_id[{table_id}]-opera_type[{opera_type}]')
-        logger.error(f'通知接口调用成功 detail: table_seq[{table_seq}]-table_id[{table_id}]-opera_type[{opera_type}]')
+        logger.info(f'通知接口调用成功 detail: table_seq[{table_seq}]-table_id[{table_id}]-opera_type[{opera_type}]')
         return resp_string
 
     def execute_result(self, param):
@@ -1042,3 +1043,10 @@ def send_dk(equip_no, dk_signal):
     logger.info(f"{equip_no}导开机{'启动' if dk_signal == 'Start' else '停止'}信号发送成功")
     return True, f"{equip_no}导开机{'启动' if dk_signal == 'Start' else '停止'}信号发送成功"
 
+
+def save_scan_log(scan_data, **kwargs):
+    try:
+        scan_data.update(kwargs)
+        BatchScanLog.objects.create(**scan_data)
+    except Exception as e:
+        e_logger.error(f"记录扫码日志错误触发异常, 参数: {scan_data}, 错误详情: {e.args[0]}")

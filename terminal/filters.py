@@ -3,7 +3,7 @@ import django_filters
 from plan.models import BatchingClassesEquipPlan
 from terminal.models import FeedingLog, WeightPackageLog, WeightTankStatus, LoadMaterialLog, WeightBatchingLog, \
     CarbonTankFeedWeightSet, FeedingOperationLog, ReplaceMaterial, ReturnRubber, WeightPackageManual, \
-    WeightPackageSingle
+    WeightPackageSingle, BatchScanLog
 
 
 class BatchingClassesEquipPlanFilter(django_filters.rest_framework.FilterSet):
@@ -52,6 +52,21 @@ class LoadMaterialLogFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = LoadMaterialLog
         fields = ("production_factory_date", 'equip_no', 'production_classes', 'material_no')
+
+
+class BatchScanLogFilter(django_filters.rest_framework.FilterSet):
+    factory_date = django_filters.DateFromToRangeFilter(field_name='factory_date', help_text='扫码日期', lookup_expr='range')
+    plan_classes_uid = django_filters.CharFilter(field_name='plan_classes_uid', help_text='计划编号', lookup_expr='icontains')
+    product_no = django_filters.CharFilter(field_name='product_no', help_text='胶料编码', lookup_expr='icontains')
+    scan_material = django_filters.CharFilter(field_name='scan_material', help_text='扫码物料', lookup_expr='icontains')
+    bar_code = django_filters.CharFilter(field_name='bar_code', help_text='条码', lookup_expr='icontains')
+    scan_username = django_filters.CharFilter(field_name='scan_username', help_text='扫码人', lookup_expr='icontains')
+    material_name = django_filters.CharFilter(field_name='material_name', help_text='物料名', lookup_expr='icontains')
+
+    class Meta:
+        model = BatchScanLog
+        fields = ('factory_date', 'plan_classes_uid', 'product_no', 'scan_material', 'bar_code', 'scan_username',
+                  'equip_no', 'material_name', 'mix_classes', 'mixing_finished', 'scan_result')
 
 
 class WeightBatchingLogListFilter(django_filters.rest_framework.FilterSet):

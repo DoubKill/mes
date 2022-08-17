@@ -39,7 +39,7 @@ from recipe.models import ProductBatchingDetail, ProductBatching, ERPMESMaterial
     WeighBatchingDetail, ProductBatchingEquip, ProductBatchingDetailPlan
 from terminal.filters import FeedingLogFilter, WeightTankStatusFilter, WeightBatchingLogListFilter, \
     BatchingClassesEquipPlanFilter, CarbonTankSetFilter, \
-    FeedingOperationLogFilter, ReplaceMaterialFilter, ReturnRubberFilter
+    FeedingOperationLogFilter, ReplaceMaterialFilter, ReturnRubberFilter, BatchScanLogFilter
 from terminal.models import TerminalLocation, EquipOperationLog, WeightBatchingLog, FeedingLog, \
     WeightTankStatus, WeightPackageLog, Version, FeedingMaterialLog, LoadMaterialLog, MaterialInfo, Bin, RecipePre, \
     RecipeMaterial, ReportBasic, ReportWeight, Plan, LoadTankMaterialLog, PackageExpire, MaterialChangeLog, \
@@ -47,7 +47,7 @@ from terminal.models import TerminalLocation, EquipOperationLog, WeightBatchingL
     ReplaceMaterial, ReturnRubber, ToleranceDistinguish, ToleranceProject, ToleranceHandle, ToleranceRule, \
     WeightPackageManual, WeightPackageSingle, WeightPackageWms, OtherMaterialLog, EquipHaltReason, \
     WeightPackageLogManualDetails, WmsAddPrint, JZReportWeight, JZMaterialInfo, JZBin, JZReportBasic, JZPlan, \
-    JZRecipeMaterial, JZRecipePre, JZExecutePlan
+    JZRecipeMaterial, JZRecipePre, JZExecutePlan, BatchScanLog
 from terminal.serializers import LoadMaterialLogCreateSerializer, \
     EquipOperationLogSerializer, BatchingClassesEquipPlanSerializer, WeightBatchingLogSerializer, \
     WeightBatchingLogCreateSerializer, FeedingLogSerializer, WeightTankStatusSerializer, \
@@ -61,7 +61,7 @@ from terminal.serializers import LoadMaterialLogCreateSerializer, \
     CarbonFeedingPromptCreateSerializer, PowderTankSettingSerializer, OilTankSettingSerializer, \
     ReplaceMaterialSerializer, ReturnRubberSerializer, ToleranceRuleSerializer, WeightPackageManualSerializer, \
     WeightPackageSingleSerializer, WeightPackageLogCUpdateSerializer, WmsAddPrintSerializer, JZBinSerializer, \
-    JZPlanSerializer, JZPlanUpdateSerializer, WeightPackageManualUpdateSerializer
+    JZPlanSerializer, JZPlanUpdateSerializer, WeightPackageManualUpdateSerializer, BatchScanLogSerializer
 from terminal.utils import TankStatusSync, CarbonDeliverySystem, out_task_carbon, get_tolerance, material_out_barcode, \
     get_manual_materials, CLSystem, get_common_equip, xl_c_calculate, JZCLSystem, JZTankStatusSync, \
     get_current_factory_date
@@ -1566,6 +1566,17 @@ class BatchChargeLogListViewSet(ListAPIView):
             if page is not None:
                 return self.get_paginated_response(page)
         return Response(data)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class BatchScanLogViewSet(ListAPIView):
+    """密炼投入履历
+    """
+    queryset = BatchScanLog.objects.all().order_by('-id')
+    serializer_class = BatchScanLogSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = [DjangoFilterBackend]
+    filter_class = BatchScanLogFilter
 
 
 @method_decorator([api_recorder], name="dispatch")
