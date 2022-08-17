@@ -79,7 +79,7 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
 from django.db.models import Prefetch, F, StdDev
 from django.db.models import Q
 from quality.utils import get_cur_sheet, get_sheet_data, export_mto, gen_pallet_test_result
-from recipe.models import Material, ProductBatching, ERPMESMaterialRelation, ZCMaterial
+from recipe.models import Material, ProductBatching, ERPMESMaterialRelation, ZCMaterial, ProductInfo
 from django.db.models import Max, Sum, Avg, Count, Min
 
 
@@ -437,12 +437,12 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
                 stage_prefix = re.split(r'[,|，]', recipe_type)
                 filter_str = ''
                 for i in stage_prefix:
-                    filter_str += ('' if not filter_str else '|') + f"Q(product_no__icontains='-{i.strip()}')"
-                queryset = queryset.filter(eval(filter_str))
-                if 'C' in stage_prefix or 'TC' in stage_prefix:  # 车胎类别(C)与半钢类别(CJ)需要区分
-                    queryset = queryset.filter(~Q(product_no__icontains='CJ'), ~Q(product_no__icontains='TCJ'))
-                if 'U' in stage_prefix or 'TU' in stage_prefix:  # 车胎类别(UC)与斜胶类别(U)需要区分
-                    queryset = queryset.filter(~Q(product_no__icontains='UC'), ~Q(product_no__icontains='TUC'))
+                    filter_str += ('' if not filter_str else '|') + f"Q(product_no__startswith='{i.strip()}')"
+                pd_infos = ProductInfo.objects.filter(eval(filter_str)).values_list('product_no', flat=True)
+                filter_str1 = ''
+                for i in pd_infos:
+                    filter_str1 += ('' if not filter_str1 else '|') + f"Q(product_no__icontains='-{i.strip()}-')"
+                queryset = queryset.filter(eval(filter_str1))
 
         if export:
             st = self.request.query_params.get('st')
