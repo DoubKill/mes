@@ -1085,11 +1085,14 @@ class ProductRatioView(ListAPIView):
                         weigh_cnt_type__product_batching_id=item.id
             ).values(material__material_name=F('material__material_name'), actual_weight=F('standard_weight')))
             details = details1 + details2
-            re_result = re.match(r'[A-Z]+', stage_product_batch_no)
-            if not re_result:
+            try:
+                re_result = re.match(r'[A-Z]+', stage_product_batch_no.split('-')[2])
+                if not re_result:
+                    recipe_type = '未知'
+                else:
+                    recipe_type = pt_dict.get(re_result.group(), '未知')
+            except Exception:
                 recipe_type = '未知'
-            else:
-                recipe_type = pt_dict.get(re_result.group(), '未知')
             ret.append({
                 'recipe_type': recipe_type,
                 'dev_type_name': dev_type_name,
