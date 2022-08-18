@@ -18,7 +18,7 @@ from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan
 from production.models import PalletFeedbacks
 from quality.models import TestMethod, MaterialTestOrder, \
-    MaterialTestResult, MaterialDataPointIndicator, MaterialTestMethod, TestType, DataPoint, DealSuggestion,\
+    MaterialTestResult, MaterialDataPointIndicator, MaterialTestMethod, TestType, DataPoint, DealSuggestion, \
     MaterialDealResult, LevelResult, \
     TestIndicator, LabelPrint, UnqualifiedDealOrder, UnqualifiedDealOrderDetail, ExamineMaterial, \
     MaterialExamineResult, MaterialSingleTypeExamineResult, MaterialExamineType, \
@@ -26,7 +26,7 @@ from quality.models import TestMethod, MaterialTestOrder, \
     IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, ProductReportEquip, \
     ProductReportValue, QualifiedRangeDisplay, ProductTestPlan, ProductTestPlanDetail, RubberMaxStretchTestResult, \
     LabelPrintLog, MaterialTestPlan, MaterialTestPlanDetail, MaterialDataPointIndicatorHistory, \
-    MaterialInspectionRegistration, WMSMooneyLevel
+    MaterialInspectionRegistration, WMSMooneyLevel, ScorchTime
 from quality.utils import gen_pallet_test_result
 from recipe.models import MaterialAttribute, ERPMESMaterialRelation, ZCMaterial
 
@@ -1650,4 +1650,12 @@ class WMSMooneyLevelSerializer(BaseModelSerializer):
         model = WMSMooneyLevel
         fields = '__all__'
         extra_kwargs = {'material_no': {'validators': []}}
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class ScorchTimeSerializer(BaseModelSerializer):
+
+    class Meta:
+        model = ScorchTime
+        fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
