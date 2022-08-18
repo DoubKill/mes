@@ -438,7 +438,14 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
                 filter_str = ''
                 for i in stage_prefix:
                     filter_str += ('' if not filter_str else '|') + f"Q(product_info__product_name__startswith='{i.strip()}')"
-                product_nos = ProductBatching.objects.filter(eval(filter_str)).values_list('stage_product_batch_no', flat=True)
+                product_qs = ProductBatching.objects.filter(eval(filter_str))
+                if 'C' in stage_prefix or 'TC' in stage_prefix:  # 车胎类别(C)与半钢类别(CJ)需要区分
+                    product_qs = product_qs.filter(~Q(product_info__product_name__startswith='CJ'),
+                                                   ~Q(product_info__product_name__startswith='TCJ'))
+                if 'U' in stage_prefix or 'TU' in stage_prefix:  # 车胎类别(UC)与斜胶类别(U)需要区分
+                    product_qs = product_qs.filter(~Q(product_info__product_name__startswith='UC'),
+                                                   ~Q(product_info__product_name__startswith='TUC'))
+                product_nos = product_qs.values_list('stage_product_batch_no', flat=True)
                 queryset = queryset.filter(product_no__in=product_nos)
 
         if export:
