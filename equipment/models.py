@@ -805,6 +805,7 @@ class EquipWarehouseRecord(AbstractEntity):
     equip_warehouse_order_detail = models.ForeignKey(EquipWarehouseOrderDetail, help_text='出入库单据明细',
                                                      on_delete=models.CASCADE, null=True, blank=True)
     status = models.CharField(max_length=64, help_text='入库/出库/盘库/撤销/移库', default='入库')
+    real_time = models.DateTimeField(help_text='出库时间', null=True, blank=True)
 
     class Meta:
         db_table = 'equip_warehouse_record'
