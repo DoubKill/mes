@@ -1065,6 +1065,12 @@ class ProductRatioView(ListAPIView):
             queryset = queryset.filter(id__in=set(pb_ids1+pb_ids2))
         page = self.paginate_queryset(queryset)
         ret = []
+        pt_dict = {}
+        pt = GlobalCode.objects.filter(global_type__type_name='配方类别').order_by('id').values('global_no', 'global_name')
+        for item in pt:
+            type_name = item['global_no']
+            for i in item['global_name'].split(','):
+                pt_dict[i] = type_name
         for item in page:
             dev_type_name = item.dev_type.category_name
             used_type = item.used_type
@@ -1079,7 +1085,13 @@ class ProductRatioView(ListAPIView):
                         weigh_cnt_type__product_batching_id=item.id
             ).values(material__material_name=F('material__material_name'), actual_weight=F('standard_weight')))
             details = details1 + details2
+            re_result = re.match(r'[A-Z]+', stage_product_batch_no)
+            if not re_result:
+                recipe_type = '未知'
+            else:
+                recipe_type = pt_dict.get(re_result.group(), '未知')
             ret.append({
+                'recipe_type': recipe_type,
                 'dev_type_name': dev_type_name,
                 'used_type': used_type,
                 'stage_product_batch_no': stage_product_batch_no,
