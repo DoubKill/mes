@@ -9,10 +9,11 @@ from quality.models import MaterialTestOrder, MaterialDataPointIndicator, \
 
 class TestMethodFilter(django_filters.rest_framework.FilterSet):
     test_indicator_id = django_filters.NumberFilter(field_name='test_type__test_indicator_id', help_text='试验指标id')
+    test_type_name = django_filters.NumberFilter(field_name='test_type__name', help_text='试验类型名称')
 
     class Meta:
         model = TestMethod
-        fields = ('test_indicator_id', 'test_type_id')
+        fields = ('test_indicator_id', 'test_type_id', 'test_type_name')
 
 
 class DataPointFilter(django_filters.rest_framework.FilterSet):
