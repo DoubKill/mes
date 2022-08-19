@@ -706,15 +706,27 @@ class ProductBatchingMaterialListView(ListAPIView):
         factory_date = self.request.query_params.get('factory_date')  # 工厂日期
         equip_no = self.request.query_params.get('equip_no')  # 设备编号
         classes = self.request.query_params.get('classes')  # 班次
-        used_type = self.request.query_params.get('used_type')
-        stages = self.request.query_params.get('stage')
+        used_type = self.request.query_params.get('used_type')  # 启用状态
+        stages = self.request.query_params.get('stage')  # 段次
+        recipe_type = self.request.query_params.get('recipe_type')  # 配方类别
 
         pbs = ProductBatching.objects.all()
         if used_type:
             pbs = pbs.filter(used_type=used_type)
         if stages:
             pbs = pbs.filter(stage__global_name__in=stages.split(','))
-
+        if recipe_type:
+            stage_prefix = re.split(r'[,|，]', recipe_type)
+            filter_str = ''
+            for i in stage_prefix:
+                filter_str += ('' if not filter_str else '|') + f"Q(product_info__product_name__startswith='{i.strip()}')"
+            pbs = pbs.filter(eval(filter_str))
+            if 'C' in stage_prefix or 'TC' in stage_prefix:  # 车胎类别(C)与半钢类别(CJ)需要区分
+                pbs = pbs.filter(~Q(product_info__product_name__startswith='CJ'),
+                                 ~Q(product_info__product_name__startswith='TCJ'))
+            if 'U' in stage_prefix or 'TU' in stage_prefix:  # 车胎类别(UC)与斜胶类别(U)需要区分
+                pbs = pbs.filter(~Q(product_info__product_name__startswith='UC'),
+                                 ~Q(product_info__product_name__startswith='TUC'))
         batching_no = set(pbs.values_list('stage_product_batch_no', flat=True))
         if m_type == '1':
             kwargs = {}
