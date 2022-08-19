@@ -3225,11 +3225,14 @@ class EmployeeAttendanceRecordsView(APIView):
         for key, group in groupby(list(group), key=lambda x: x['start_time__date']):
             group_list.append([item['group__global_name'] for item in group])
 
+        # 获取当前登录人员的班组
+        user_groups = list(AttendanceGroupSetup.objects.filter(group__isnull=False, principal__icontains=self.request.user.username).values_list('group', flat=True).distinct())
+
         results = {}
         data = EmployeeAttendanceRecords.objects.filter(
             Q(Q(end_date__isnull=True, begin_date__isnull=True) | Q(begin_date__isnull=False, end_date__isnull=False)) &
             Q(factory_date__year=year, factory_date__month=month, user__username__icontains=name) &
-            ~Q(is_use='废弃')
+            ~Q(is_use='废弃'), group__in=user_groups,
             ).values(
             'equip', 'section', 'group', 'factory_date__day', 'user__username', 'actual_time', 'record_status')
         for item in data:
@@ -3262,21 +3265,21 @@ class EmployeeAttendanceRecordsView(APIView):
         results_sort = sorted(list(results.values()), key=lambda x: (x['sort'], x['equip']))
         audit_obj = AttendanceResultAudit.objects.filter(date=date, audit_user__isnull=False).last()
         approve_obj = AttendanceResultAudit.objects.filter(date=date, approve_user__isnull=False).last()
-        # 增加能否导出的标记
+        # 增加能否导出的标记  08-19:默认可以导出[去除审核以后才能导出的限制]
         export_flag = True
-        attendance_data = EmployeeAttendanceRecords.objects.filter(~Q(is_use='废弃'),
-                                                                   Q(begin_date__isnull=False, end_date__isnull=False)
-                                                                   | Q(begin_date__isnull=True, end_date__isnull=True),
-                                                                   factory_date__in=days_cur_month_dates())
-        if not attendance_data:
-            export_flag = False
-        not_overall = attendance_data.exclude(record_status='#141414')  # 非整体提交数据
-        if not_overall:
-            export_flag = False
-        if set(attendance_data.values_list('opera_flag', flat=True)) != {3}:
-            export_flag = False
+        # attendance_data = EmployeeAttendanceRecords.objects.filter(~Q(is_use='废弃'),
+        #                                                            Q(begin_date__isnull=False, end_date__isnull=False)
+        #                                                            | Q(begin_date__isnull=True, end_date__isnull=True),
+        #                                                            factory_date__in=days_cur_month_dates())
+        # if not attendance_data:
+        #     export_flag = False
+        # not_overall = attendance_data.exclude(record_status='#141414')  # 非整体提交数据
+        # if not_overall:
+        #     export_flag = False
+        # if set(attendance_data.values_list('opera_flag', flat=True)) != {3}:
+        #     export_flag = False
         return Response({'results': results_sort, 'group_list': group_list, 'export_flag': export_flag,
-                         'audit_user':  audit_obj.audit_user if audit_obj else None,
+                         'audit_user':  audit_obj.audit_user if audit_obj else None, 'user_groups': user_groups,
                          'approve_user': approve_obj.approve_user if approve_obj else None})
 
     # 导入出勤记录
@@ -4308,7 +4311,7 @@ class AttendanceClockViewSet(ModelViewSet):
         # 标准上下班时间
         date_now, group, classes = date_now, data['group'], data['classes']
         last_record = EmployeeAttendanceRecords.objects.filter(user=user, end_date__isnull=True).last()
-        if last_record and last_record.factory_date != date_now and not (not last_record.end_date and (time_now - last_record.begin_date).total_seconds() / 3600 > 12.5):
+        if last_record and last_record.factory_date != date_now and not (not last_record.end_date and last_record.begin_date and (time_now - last_record.begin_date).total_seconds() / 3600 > 12.5):
             date_now, group, classes = [str(last_record.factory_date), last_record.group, last_record.classes]
         standard_begin_time, standard_end_time = get_standard_time(user.username, date_now, group=group, classes=classes)
         if not standard_begin_time:

@@ -4,7 +4,7 @@ import math
 
 from django.db.models import Q
 from rest_framework import serializers
-from rest_framework.validators import UniqueValidator
+from rest_framework.validators import UniqueValidator, UniqueTogetherValidator
 
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
@@ -437,6 +437,7 @@ class AttendanceGroupSetupSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AttendanceGroupSetup
+        validators = [UniqueTogetherValidator(queryset=AttendanceGroupSetup.objects.all(), fields=('type', 'group'), message='类别+班组重复')]
         fields = '__all__'
 
     def update(self, instance, validated_data):
