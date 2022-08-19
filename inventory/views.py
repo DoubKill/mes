@@ -5003,7 +5003,7 @@ class LIBRARYINVENTORYView(APIView):
                     'stage': stage,
                     'all_qty': i['qty'],
                     'total_weight': i['total_weight'],
-                    'locked_trains': stock_locked_data.get(i['material_no']),
+                    'locked_trains': stock_locked_data.get(i['material_no'], 0),
                     i['quality_level']: {'qty': i['qty'], 'total_weight': i['total_weight'], 'expire_flag': expire_flag, 'dj_flag': dj_flag, 'yj_flag': yj_flag},
                     'expire_flag': expire_flag,
                     'dj_flag': dj_flag,
