@@ -1659,7 +1659,8 @@ class ScorchTimeSerializer(BaseModelSerializer):
         instance = ScorchTime.objects.filter(product_no=validated_data['product_no'],
                                              equip_no=validated_data['equip_no'],
                                              input_date=validated_data['input_date'],
-                                             test_method_name=validated_data['test_method_name']).first()
+                                             test_method_name=validated_data['test_method_name'],
+                                             classes=validated_data['classes']).first()
         if instance:
             return super().update(instance, validated_data)
         else:
@@ -1669,7 +1670,8 @@ class ScorchTimeSerializer(BaseModelSerializer):
         obj = ScorchTime.objects.filter(product_no=validated_data['product_no'],
                                         equip_no=validated_data['equip_no'],
                                         input_date=validated_data['input_date'],
-                                        test_method_name=validated_data['test_method_name']
+                                        test_method_name=validated_data['test_method_name'],
+                                        classes=validated_data['classes']
                                         ).exclude(id=instance.id).first()
         if obj:
             raise serializers.ValidationError('已存在相同焦烧时间数据，请修改后重试！')
