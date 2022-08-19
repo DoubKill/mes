@@ -66,7 +66,7 @@ from rest_framework.generics import ListAPIView, UpdateAPIView, \
     get_object_or_404
 from datetime import timedelta
 
-from production.utils import get_standard_time, get_classes_plan
+from production.utils import get_standard_time, get_classes_plan, get_user_group
 from quality.models import MaterialTestOrder, MaterialDealResult, MaterialTestResult, MaterialDataPointIndicator
 from quality.utils import get_cur_sheet, get_sheet_data
 from system.models import Section
@@ -3226,8 +3226,7 @@ class EmployeeAttendanceRecordsView(APIView):
             group_list.append([item['group__global_name'] for item in group])
 
         # 获取当前登录人员的班组
-        user_groups = list(AttendanceGroupSetup.objects.filter(group__isnull=False, principal__icontains=self.request.user.username).values_list('group', flat=True).distinct())
-
+        user_groups = get_user_group(self.request.user.username)
         results = {}
         data = EmployeeAttendanceRecords.objects.filter(
             Q(Q(end_date__isnull=True, begin_date__isnull=True) | Q(begin_date__isnull=False, end_date__isnull=False)) &
@@ -4955,7 +4954,9 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
             if classes:
                 filter_kwargs['classes'] = classes
             if group:
-                filter_kwargs['group'] = group
+                filter_kwargs['group__in'] = group
+            else:
+                filter_kwargs['group__in'] = get_user_group(self.request.user.username)
             if equip:
                 filter_kwargs['equip__in'] = equip.split(',')
             else:  # 所有机台

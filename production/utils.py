@@ -8,7 +8,7 @@ import json
 from datetime import datetime
 
 from basics.models import WorkSchedulePlan
-from production.models import OperationLog, EmployeeAttendanceRecords
+from production.models import OperationLog, EmployeeAttendanceRecords, AttendanceGroupSetup
 from production.serializers import OperationLogSerializer
 
 
@@ -59,3 +59,15 @@ def get_classes_plan(select_date=None, work_procedure=None):
                                        i['end_time'].strftime('%Y-%m-%d %H:%M:%S')] for i in
            classes_plan} if classes_plan else {}
     return res
+
+
+def get_user_group(user_name):
+    """获取考勤组负责人对应班组数据"""
+    user_groups = []
+    att_set = AttendanceGroupSetup.objects.filter(group__isnull=False)
+    for i in att_set:
+        if not i.principal:
+            continue
+        if user_name in i.principal.split(',') and i.group not in user_groups:
+            user_groups.append(i.group)
+    return user_groups
