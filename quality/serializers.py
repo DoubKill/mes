@@ -1655,6 +1655,26 @@ class WMSMooneyLevelSerializer(BaseModelSerializer):
 
 class ScorchTimeSerializer(BaseModelSerializer):
 
+    def create(self, validated_data):
+        instance = ScorchTime.objects.filter(product_no=validated_data['product_no'],
+                                             equip_no=validated_data['equip_no'],
+                                             input_date=validated_data['input_date'],
+                                             test_method_name=validated_data['test_method_name']).first()
+        if instance:
+            return super().update(instance, validated_data)
+        else:
+            return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        obj = ScorchTime.objects.filter(product_no=validated_data['product_no'],
+                                        equip_no=validated_data['equip_no'],
+                                        input_date=validated_data['input_date'],
+                                        test_method_name=validated_data['test_method_name']
+                                        ).exclude(id=instance.id).first()
+        if obj:
+            raise serializers.ValidationError('已存在相同焦烧时间数据，请修改后重试！')
+        return super().update(instance, validated_data)
+
     class Meta:
         model = ScorchTime
         fields = '__all__'
