@@ -1462,6 +1462,7 @@ class EquipWarehouseOrderListSerializer(BaseModelSerializer):
     equip_spare = serializers.ListField(default=[], write_only=True)
     order_id = serializers.CharField(help_text='单据条码', validators=[
         UniqueValidator(EquipWarehouseOrder.objects.all(), message='该条码已存在')])
+
     add_username = serializers.ReadOnlyField(source='created_user.username', help_text='提交人')
 
     class Meta:
