@@ -288,6 +288,7 @@ def gen_pallet_test_result(lot_nos):
                 'factory_date': pfb_obj.factory_date,
                 'begin_trains': pfb_obj.begin_trains,
                 'end_trains': pfb_obj.end_trains,
-                'update_store_test_flag': 4
+                'update_store_test_flag': 4,
+                'is_deal': False
             }
             MaterialDealResult.objects.update_or_create(defaults=deal_result_dict, **{'lot_no': lot_no})
