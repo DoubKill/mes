@@ -404,6 +404,8 @@ class EmployeeAttendanceRecords(models.Model):
     factory_date = models.DateField(help_text='工厂时间', null=True, blank=True)
     begin_date = models.DateTimeField(help_text='上岗时间', null=True, blank=True)
     end_date = models.DateTimeField(help_text='离岗时间', null=True, blank=True)
+    actual_begin_date = models.DateTimeField(help_text='修改上岗时间[默认等于上岗时间]', null=True, blank=True)
+    actual_end_date = models.DateTimeField(help_text='修改离岗时间[默认等于离岗时间]', null=True, blank=True)
     work_time = models.FloatField(help_text='计算工作时间', null=True, blank=True, default=12)
     actual_time = models.FloatField(help_text='承认工作时间', null=True, blank=True, default=12)
     classes = models.CharField(help_text='班次', max_length=12, null=True, blank=True)
@@ -411,7 +413,9 @@ class EmployeeAttendanceRecords(models.Model):
     equip = models.CharField(help_text='机台', max_length=12, null=True, blank=True)
     status = models.CharField(max_length=12, help_text='上岗/调岗/加班', null=True, blank=True)
     is_use = models.CharField(max_length=12, help_text='确认/添加/废弃', null=True, blank=True)
-    record_status = models.CharField(max_length=12, help_text='考勤记录颜色: 蓝色[#1010FF]-未确认,绿色[#51A651]-已确认,红色[#DA1F27]-驳回,黑色[#141414]-整体提交', default='#1010FF')
+    record_status = models.CharField(max_length=12, help_text='考勤记录颜色: 蓝色[#1010FF]-未确认,绿色[#51A651]-已确认,'
+                                                              '红色[#DA1F27]-驳回,黑色[#141414]-整体提交', default='#1010FF')
+    opera_flag = models.PositiveIntegerField(help_text='0:未操作 1:已确认 2:已审批 3:已审核', default=0)
 
     class Meta:
         db_table = 'employee_attendance_records'
@@ -554,6 +558,7 @@ class IndependentPostTemplate(models.Model):
 
 class AttendanceGroupSetup(models.Model):
     attendance_group = models.CharField(max_length=64, help_text='考勤组名称')
+    group = models.CharField(max_length=8, help_text='班组', null=True, blank=True)
     users = models.ManyToManyField(to=User, related_name='attendance_group', help_text='考勤组人员')
     principal = models.CharField(max_length=1024, help_text='考勤负责人')
     range_time = models.IntegerField(help_text='上班多久后可打下班卡', null=True, blank=True)
