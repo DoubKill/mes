@@ -80,7 +80,7 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
 from django.db.models import Prefetch, F, StdDev
 from django.db.models import Q
 from quality.utils import get_cur_sheet, get_sheet_data, export_mto, gen_pallet_test_result
-from recipe.models import Material, ProductBatching, ERPMESMaterialRelation, ZCMaterial
+from recipe.models import Material, ProductBatching, ERPMESMaterialRelation, ZCMaterial, ProductInfo
 from django.db.models import Max, Sum, Avg, Count, Min
 
 
@@ -425,6 +425,7 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
         export = self.request.query_params.get('export')
         queryset = self.filter_queryset(self.get_queryset())
         sum_project = self.request.query_params.get('sum_project')
+        recipe_type = self.request.query_params.get('recipe_type')
         if state:
             if state == '检测中':
                 queryset = queryset.filter(is_finished=False)
@@ -432,6 +433,22 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
                 queryset = queryset.filter(is_finished=True, is_qualified=True)
             elif state == '不合格':
                 queryset = queryset.filter(is_finished=True, is_qualified=False)
+        if recipe_type:
+            if recipe_type:
+                stage_prefix = re.split(r'[,|，]', recipe_type)
+                filter_str = ''
+                for i in stage_prefix:
+                    filter_str += ('' if not filter_str else '|') + f"Q(product_info__product_name__startswith='{i.strip()}')"
+                product_qs = ProductBatching.objects.filter(eval(filter_str))
+                if 'C' in stage_prefix or 'TC' in stage_prefix:  # 车胎类别(C)与半钢类别(CJ)需要区分
+                    product_qs = product_qs.filter(~Q(product_info__product_name__startswith='CJ'),
+                                                   ~Q(product_info__product_name__startswith='TCJ'))
+                if 'U' in stage_prefix or 'TU' in stage_prefix:  # 车胎类别(UC)与斜胶类别(U)需要区分
+                    product_qs = product_qs.filter(~Q(product_info__product_name__startswith='UC'),
+                                                   ~Q(product_info__product_name__startswith='TUC'))
+                product_nos = product_qs.values_list('stage_product_batch_no', flat=True)
+                queryset = queryset.filter(product_no__in=product_nos)
+
         if export:
             st = self.request.query_params.get('st')
             et = self.request.query_params.get('et')
@@ -1379,13 +1396,13 @@ class UnqualifiedDealOrderViewSet(ModelViewSet):
         classes = self.request.query_params.get('classes')
         product_no = self.request.query_params.get('product_no')
         if t_deal == 'Y':  # 技术部门已处理
-            queryset = queryset.filter(t_deal_user__isnull=False)
+            queryset = queryset.filter(state=1)
         elif t_deal == 'N':  # 技术部门未处理
-            queryset = queryset.filter(t_deal_user__isnull=True)
+            queryset = queryset.filter(state=0)
         if c_deal == 'Y':  # 检查部门已处理
-            queryset = queryset.filter(c_deal_user__isnull=False)
+            queryset = queryset.filter(state=2)
         elif c_deal == 'N':  # 检查部门未处理
-            queryset = queryset.filter(c_deal_user__isnull=True)
+            queryset = queryset.filter(state=1)
         if factory_date:
             ids1 = UnqualifiedDealOrderDetail.objects.filter(
                 factory_date=factory_date).values_list('unqualified_deal_order_id', flat=True)

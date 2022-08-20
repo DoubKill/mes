@@ -8,7 +8,7 @@ import json
 from datetime import datetime
 
 from basics.models import WorkSchedulePlan
-from production.models import OperationLog, EmployeeAttendanceRecords
+from production.models import OperationLog, EmployeeAttendanceRecords, AttendanceGroupSetup
 from production.serializers import OperationLogSerializer
 
 
@@ -49,3 +49,25 @@ def get_standard_time(user_name, factory_date, global_name='密炼', group=None,
     return begin_time, end_time
 
 
+def get_classes_plan(select_date=None, work_procedure=None):
+    pre_date = select_date if select_date else datetime.now().strftime('%Y-%m-%d')
+    work_procedure = work_procedure if work_procedure else '密炼'
+    classes_plan = WorkSchedulePlan.objects.filter(plan_schedule__day_time=pre_date,
+                                                   plan_schedule__work_schedule__work_procedure__global_name=work_procedure) \
+        .values('classes__global_name', 'start_time', 'end_time')
+    res = {i['classes__global_name']: [i['start_time'].strftime('%Y-%m-%d %H:%M:%S'),
+                                       i['end_time'].strftime('%Y-%m-%d %H:%M:%S')] for i in
+           classes_plan} if classes_plan else {}
+    return res
+
+
+def get_user_group(user_name):
+    """获取考勤组负责人对应班组数据"""
+    user_groups = []
+    att_set = AttendanceGroupSetup.objects.filter(group__isnull=False)
+    for i in att_set:
+        if not i.principal:
+            continue
+        if user_name in i.principal.split(',') and i.group not in user_groups:
+            user_groups.append(i.group)
+    return user_groups

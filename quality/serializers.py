@@ -371,10 +371,11 @@ class UnqualifiedDealOrderSerializer(BaseModelSerializer):
 
 
 class TechDealOrderDetailSerializer(serializers.ModelSerializer):
+    rehandle = serializers.BooleanField(write_only=True)
 
     class Meta:
         model = UnqualifiedDealOrderDetail
-        fields = ('id', 'is_release', 'suggestion')
+        fields = ('id', 'is_release', 'suggestion', 'rehandle')
         extra_kwargs = {'id': {'read_only': False}}
 
 
@@ -398,14 +399,26 @@ class UnqualifiedDealOrderUpdateSerializer(BaseModelSerializer):
             validated_data['c_deal_user'] = None
             validated_data['c_deal_date'] = None
             validated_data['c_agreed'] = None
+            validated_data['state'] = 1
+            validated_data['t_deal_user'] = self.context['request'].user.username
+            validated_data['t_deal_date'] = datetime.now()
             for item in tech_deal_result:
                 deal_details = UnqualifiedDealOrderDetail.objects.filter(id=item['id'])
-                deal_details.update(suggestion=item['suggestion'], is_release=item['is_release'])
+                if item.get('rehandle'):
+                    MaterialDealResult.objects.filter(
+                        lot_no=deal_details.first().lot_no).update(is_deal=False, desc='发起未处理')
+                    deal_details.delete()
+                else:
+                    deal_details.update(suggestion=item['suggestion'], is_release=item['is_release'])
 
         UnqualifiedDealOrder.objects.filter(id=instance.id).update(**validated_data)
 
         # 检查科处理
         if c_agreed is not None:
+            instance.state = 2
+            instance.c_deal_user = self.context['request'].user.username
+            instance.c_deal_date = datetime.now()
+            instance.save()
             if c_agreed:
                 # 同意
                 for detail in instance.deal_details.all():
@@ -431,7 +444,7 @@ class UnqualifiedDealOrderUpdateSerializer(BaseModelSerializer):
 
     class Meta:
         model = UnqualifiedDealOrder
-        exclude = ('unqualified_deal_order_uid', )
+        exclude = ('unqualified_deal_order_uid', 't_deal_user', 't_deal_date', 'c_deal_user', 'c_deal_date')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
