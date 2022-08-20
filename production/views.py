@@ -3262,8 +3262,27 @@ class EmployeeAttendanceRecordsView(APIView):
             item['equip'] = '' if not item.get('equip') else item['equip']
             item['sort'] = 2 if not item.get('equip') else 1
         results_sort = sorted(list(results.values()), key=lambda x: (x['sort'], x['equip']))
-        audit_obj = AttendanceResultAudit.objects.filter(date=date, audit_user__isnull=False).last()
-        approve_obj = AttendanceResultAudit.objects.filter(date=date, approve_user__isnull=False).last()
+        # 当月考勤是否全部审核审批(已审核审批不能添加考勤数据)
+        audit_user, approve_user, state = None, None, 0  # state 0 空白 1 确认中 2 已审批 3已审核
+        attendance_data = EmployeeAttendanceRecords.objects.filter(~Q(is_use='废弃'),
+                                                                   Q(begin_date__isnull=False, end_date__isnull=False)
+                                                                   | Q(begin_date__isnull=True, end_date__isnull=True),
+                                                                   factory_date__in=days_cur_month_dates())
+        if attendance_data:
+            a_records = attendance_data.exclude(opera_flag__in=[2, 3])
+            if a_records:
+                state = 1
+            else:
+                basic_info = AttendanceResultAudit.objects.filter(date=date).order_by('id')
+                audit_approve = basic_info.last()
+                if audit_approve and audit_approve.result:
+                    if audit_approve.audit_user:  # 审核完成
+                        state, audit_user = 3, audit_approve.audit_user
+                        approve_info = basic_info.filter(id=audit_approve.id - 1).last()
+                        if approve_info:
+                            approve_user = approve_info.approve_user
+                    else:  # 审批完成
+                        state, approve_user = 2, audit_approve.approve_user
         # 增加能否导出的标记  08-19:默认可以导出[去除审核以后才能导出的限制]
         export_flag = True
         # attendance_data = EmployeeAttendanceRecords.objects.filter(~Q(is_use='废弃'),
@@ -3277,9 +3296,8 @@ class EmployeeAttendanceRecordsView(APIView):
         #     export_flag = False
         # if set(attendance_data.values_list('opera_flag', flat=True)) != {3}:
         #     export_flag = False
-        return Response({'results': results_sort, 'group_list': group_list, 'export_flag': export_flag,
-                         'audit_user':  audit_obj.audit_user if audit_obj else None, 'user_groups': user_groups,
-                         'approve_user': approve_obj.approve_user if approve_obj else None})
+        return Response({'results': results_sort, 'group_list': group_list, 'export_flag': export_flag, 'status': state,
+                         'audit_user':  audit_user, 'user_groups': user_groups, 'approve_user': approve_user})
 
     # 导入出勤记录
     @atomic
@@ -5027,10 +5045,14 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
                             actual_begin_date=item.get('actual_begin_date'), actual_end_date=item.get('actual_end_date'))
         elif reject_list:  # 审批驳回某一天的数据 #DA1F27 红色
             opera_type = '单天驳回'
+            id_list = []
             for item in reject_list:
-                is_use, factory_date = item.get('is_use'), item.get('factory_date')
-                EmployeeAttendanceRecords.objects.filter(pk=item['id']).update(is_use=is_use, record_status='#DA1F27',
-                                                                               opera_flag=0)
+                s_record = EmployeeAttendanceRecords.objects.filter(id=item['id']).last()
+                if s_record.opera_flag in [2, 3]:
+                    raise ValidationError('已经审核/审批的数据不可驳回')
+                id_list.append(item['id'])
+            EmployeeAttendanceRecords.objects.filter(id__in=id_list).update(is_use='驳回', record_status='#DA1F27',
+                                                                            opera_flag=0)
         elif abandon_list:  # 废弃
             opera_type = '废弃'
             for item in abandon_list:
@@ -5141,13 +5163,15 @@ class AttendanceResultAuditView(APIView):
                 raise ValidationError('存在未确认的考勤数据, 请处理后再进行审批/审核操作')
             opera_flag = 0
             if approve:
-                if s_record.opera_flag == 2:
+                s_record = attendance_data.exclude(opera_flag__in=[2, 3]).last()
+                if not s_record:
                     raise ValidationError('考勤数据已经审批完成')
                 if s_record.opera_flag != 1:
                     raise ValidationError('确认的考勤数据才可审批')
                 opera_type, opera_flag, data['approve_user'] = '审批', 2, is_user
             if audit:
-                if s_record.opera_flag == 3:
+                s_record = attendance_data.exclude(opera_flag__in=[3]).last()
+                if not s_record:
                     raise ValidationError('考勤数据已经审核完成')
                 if s_record.opera_flag != 2:
                     raise ValidationError('审批通过的考勤数据才可审核')
