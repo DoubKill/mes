@@ -61,12 +61,13 @@ class BatchScanLogFilter(django_filters.rest_framework.FilterSet):
     scan_material = django_filters.CharFilter(field_name='scan_material', help_text='扫码物料', lookup_expr='icontains')
     bar_code = django_filters.CharFilter(field_name='bar_code', help_text='条码', lookup_expr='icontains')
     scan_username = django_filters.CharFilter(field_name='scan_username', help_text='扫码人', lookup_expr='icontains')
-    material_name = django_filters.CharFilter(field_name='material_name', help_text='物料名', lookup_expr='icontains')
+    trains = django_filters.CharFilter(field_name='scan_train', help_text='车次')
+    production_classes = django_filters.CharFilter(field_name='mix_classes', help_text='班次', lookup_expr='icontains')
 
     class Meta:
         model = BatchScanLog
         fields = ('factory_date', 'plan_classes_uid', 'product_no', 'scan_material', 'bar_code', 'scan_username',
-                  'equip_no', 'material_name', 'mix_classes', 'mixing_finished', 'scan_result')
+                  'equip_no', 'production_classes', 'mixing_finished', 'scan_result', 'trains')
 
 
 class WeightBatchingLogListFilter(django_filters.rest_framework.FilterSet):
