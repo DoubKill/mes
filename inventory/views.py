@@ -5154,7 +5154,7 @@ class LIBRARYINVENTORYView(APIView):
             warehouse_name2 = '终炼胶库'
             temp2 = self.get_result(model2, 'lb', store_name2, warehouse_name2, location_status, product_validity_dict, **filter_kwargs)
             temp = list(temp1) + list(temp2)
-        if ordering_field:
+        if ordering_field and order_by:
             if ordering_field == 'locked_trains':
                 temp = sorted(temp, key=lambda x: x.get('locked_trains', 0), reverse=True if order_by == 'descending' else False)
             elif ordering_field == '1_qty':
