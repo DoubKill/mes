@@ -2566,6 +2566,7 @@ class DailyProductionCompletionReport(APIView):
             results['name_1'][f"{item['factory_date__day']}日"] = results['name_1'].get(f"{item['factory_date__day']}日", 0) + weight
             data_190e['wl'][item['factory_date__day']-1] = weight
         for d, v in total_manual_input_trains_mixin_dict.items():
+            v = round(v, 2)
             if not(d == now_day and exclude_today_flat):
                 results['name_1']['weight'] += v
             results['name_1'][f"{d}日"] = results['name_1'].get(f"{d}日", 0) + v
@@ -2589,6 +2590,7 @@ class DailyProductionCompletionReport(APIView):
             results['name_4'][f"{item['factory_date__day']}日"] = results['name_4'].get(f"{item['factory_date__day']}日", 0) + final_weight
             results['name_5'][f"{item['factory_date__day']}日"] = results['name_5'].get(f"{item['factory_date__day']}日", 0) + final_weight
         for d, v in total_manual_input_trains_final_dict.items():
+            v = round(v, 2)
             if not(d == now_day and exclude_today_flat):
                 results['name_2']['weight'] += v
                 results['name_4']['weight'] += v
@@ -2605,14 +2607,17 @@ class DailyProductionCompletionReport(APIView):
                 results['name_4']['weight'] += round((item['weight']) * decimal.Decimal(0.7), 2)
                 results['name_5']['weight'] += round(item['weight'], 2)
         for k, v in actual_working_day_dict.items():
+            v = round(v, 2)
             results['name_6'][f"{k}日"] = v
             if not(k == now_day and exclude_today_flat):
                 results['name_6']['weight'] = round(results['name_6']['weight'] + v, 2)
         for k, v in actual_working_equip_dict.items():
+            v = round(v, 2)
             results['name_9'][f"{k}日"] = v
             if not(k == now_day and exclude_today_flat):
                 results['name_9']['weight'] = round(results['name_9']['weight'] + v, 2)
         for k, v in actual_working_day_190e_dict.items():
+            v = round(v, 2)
             results['name_10'][f"{k}日"] = v
             if not(k == now_day and exclude_today_flat):
                 results['name_10']['weight'] = round(results['name_10']['weight'] + v, 2)
