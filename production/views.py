@@ -4333,7 +4333,7 @@ class AttendanceClockViewSet(ModelViewSet):
         # 标准上下班时间
         date_now, group, classes = date_now, data['group'], data['classes']
         last_record = EmployeeAttendanceRecords.objects.filter(user=user, end_date__isnull=True).last()
-        if last_record and last_record.factory_date != date_now and not (not last_record.end_date and last_record.begin_date and (time_now - last_record.begin_date).total_seconds() / 3600 > 16):
+        if last_record and last_record.factory_date != date_now and not (last_record.begin_date and (time_now - last_record.begin_date).total_seconds() / 3600 > 16):
             date_now, group, classes = [str(last_record.factory_date), last_record.group, last_record.classes]
         standard_begin_time, standard_end_time = get_standard_time(user.username, date_now, group=group, classes=classes)
         if not standard_begin_time:
