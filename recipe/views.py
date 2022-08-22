@@ -1041,16 +1041,10 @@ class ProductRatioView(ListAPIView):
             queryset = queryset.filter(used_type=used_type)
         if recipe_type:
             stage_prefix = re.split(r'[,|，]', recipe_type)
-            filter_str = ''
-            for i in stage_prefix:
-                filter_str += ('' if not filter_str else '|') + f"Q(product_info__product_name__startswith='{i.strip()}')"
-            queryset = queryset.filter(eval(filter_str))
-            if 'C' in stage_prefix or 'TC' in stage_prefix:  # 车胎类别(C)与半钢类别(CJ)需要区分
-                queryset = queryset.filter(~Q(product_info__product_name__startswith='CJ'),
-                                           ~Q(product_info__product_name__startswith='TCJ'))
-            if 'U' in stage_prefix or 'TU' in stage_prefix:  # 车胎类别(UC)与斜胶类别(U)需要区分
-                queryset = queryset.filter(~Q(product_info__product_name__startswith='UC'),
-                                           ~Q(product_info__product_name__startswith='TUC'))
+            product_nos = list(ProductInfo.objects.values_list('product_no', flat=True))
+            filter_product_nos = list(
+                filter(lambda x: ''.join(re.findall(r'[A-Za-z]', x)) in stage_prefix, product_nos))
+            queryset = queryset.filter(product_info__product_no__in=filter_product_nos)
         if dev_type:
             queryset = queryset.filter(dev_type_id=dev_type)
         if stage_product_batch_no:
@@ -1065,6 +1059,12 @@ class ProductRatioView(ListAPIView):
             queryset = queryset.filter(id__in=set(pb_ids1+pb_ids2))
         page = self.paginate_queryset(queryset)
         ret = []
+        pt_dict = {}
+        pt = GlobalCode.objects.filter(global_type__type_name='配方类别').order_by('id').values('global_no', 'global_name')
+        for item in pt:
+            type_name = item['global_no']
+            for i in item['global_name'].split(','):
+                pt_dict[i] = type_name
         for item in page:
             dev_type_name = item.dev_type.category_name
             used_type = item.used_type
@@ -1079,7 +1079,16 @@ class ProductRatioView(ListAPIView):
                         weigh_cnt_type__product_batching_id=item.id
             ).values(material__material_name=F('material__material_name'), actual_weight=F('standard_weight')))
             details = details1 + details2
+            try:
+                re_result = re.match(r'[A-Z]+', stage_product_batch_no.split('-')[2])
+                if not re_result:
+                    recipe_type = '未知'
+                else:
+                    recipe_type = pt_dict.get(re_result.group(), '未知')
+            except Exception:
+                recipe_type = '未知'
             ret.append({
+                'recipe_type': recipe_type,
                 'dev_type_name': dev_type_name,
                 'used_type': used_type,
                 'stage_product_batch_no': stage_product_batch_no,

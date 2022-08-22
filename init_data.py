@@ -250,8 +250,8 @@ permission_data = [
     {'id': 291, 'code': 'batch_log', 'name': '密炼投入履历', 'parent_id': None},
     {'id': 292, 'code': 'view_batch_log', 'name': '查看', 'parent_id': 291},
 
-    {'id': 1089, 'code': 'batch_scan_log', 'name': '密炼扫码结果查询', 'parent_id': None},
-    {'id': 1090, 'code': 'view_batch_scan_log', 'name': '查看', 'parent_id': 1089},
+    {'id': 1095, 'code': 'batch_scan_log', 'name': '密炼扫码结果查询', 'parent_id': None},
+    {'id': 1096, 'code': 'view_batch_scan_log', 'name': '查看', 'parent_id': 1095},
 
     {'id': 293, 'code': 'drug_analyze', 'name': '称量投入履历', 'parent_id': None},
     {'id': 294, 'code': 'view_drug_analyze', 'name': '查看', 'parent_id': 293},
@@ -1096,7 +1096,14 @@ permission_data = [
     {'id': 1082, 'code': 'product_ratio', 'name': '原材料配比查询', 'parent_id': None},
     {'id': 1083, 'code': 'view_product_ratio', 'name': '查看', 'parent_id': 1082},
 
-    # 下一个 1091 开始
+    {'id': 1089, 'code': 'scorch_time', 'name': '焦烧时间录入及查询', 'parent_id': None},
+    {'id': 1090, 'code': 'view_scorch_time', 'name': '查看', 'parent_id': 1089},
+    {'id': 1091, 'code': 'add_scorch_time', 'name': '新增', 'parent_id': 1089},
+    {'id': 1092, 'code': 'change_scorch_time', 'name': '编辑', 'parent_id': 1089},
+    {'id': 1093, 'code': 'delete_scorch_time', 'name': '删除', 'parent_id': 1089},
+    {'id': 1094, 'code': 'export_scorch_time', 'name': '导出', 'parent_id': 1089},
+
+    # 下一个 1097 开始
 ]
 
 
