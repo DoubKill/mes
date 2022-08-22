@@ -798,3 +798,17 @@ class WMSMooneyLevel(AbstractEntity):
     class Meta:
         db_table = 'wms_mooney_level'
         verbose_name_plural = verbose_name = '立库原材料门尼等级设定'
+
+
+class ScorchTime(AbstractEntity):
+    recipe_type = models.CharField(max_length=12, help_text='配方类别')
+    product_no = models.CharField(max_length=64, help_text='规格名称')
+    equip_no = models.CharField(max_length=12, help_text='机台')
+    input_date = models.DateField(help_text='日期')
+    classes = models.CharField(max_length=12, help_text='班次')
+    test_method_name = models.CharField(max_length=64, help_text='试验方法名称')
+    test_time = models.FloatField(help_text='检测结果（分钟）')
+
+    class Meta:
+        db_table = 'scorch_time'
+        verbose_name_plural = verbose_name = '焦烧时间录入及查询'

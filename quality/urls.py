@@ -24,7 +24,7 @@ from quality.views import TestIndicatorViewSet, TestTypeViewSet, DataPointViewSe
     ProductTestStaticsView, ClassTestStaticsView, UnqialifiedEquipView, LabelPrintLogView, \
     MaterialDataPointIndicatorHistoryView, ProductSynthesisRate, ProductSynthesisEquipRate, ProductSynthesisGroupRate, \
     ProductSynthesisProductRate, ProductSynthesisMonthRate, ProductTestValueHistoryView, ProductIndicatorStandard, \
-    ProductMaterials, TestedMaterials, ProductTestedTrains
+    ProductMaterials, TestedMaterials, ProductTestedTrains, ScorchTimeView
 
 router = DefaultRouter()
 
@@ -115,6 +115,8 @@ router.register('material-test-plan', MaterialTestPlanViewSet, basename='materia
 router.register('material-test-plan-detail', MaterialTestPlanDetailViewSet, basename='material-test-plan-detail')
 
 router.register('wms-mooney-level', WMSMooneyLevelView)
+
+router.register('scorch-time', ScorchTimeView)
 
 urlpatterns = [
     path('', include(router.urls)),
