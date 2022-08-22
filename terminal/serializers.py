@@ -73,7 +73,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         # 条码来源有三种，wms子系统、收皮条码，称量打包条码
         bra_code = attrs['bra_code']
         plan_classes_uid = attrs['plan_classes_uid']
-        batch_classes = attrs.get('batch_classes')
+        batch_classes = attrs.get('batch_classes')[:-1] if len(attrs.get('batch_classes')) > 2 else attrs.get('batch_classes')
         batch_group = attrs.get('batch_group')
         trains = attrs.get('trains', 0)
         # 非胶皮、不加硫、抛出正常扫码信息
