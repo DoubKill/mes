@@ -734,16 +734,9 @@ class ProductBatchingMaterialListView(ListAPIView):
             pbs = pbs.filter(stage__global_name__in=stages.split(','))
         if recipe_type:
             stage_prefix = re.split(r'[,|，]', recipe_type)
-            filter_str = ''
-            for i in stage_prefix:
-                filter_str += ('' if not filter_str else '|') + f"Q(product_info__product_name__startswith='{i.strip()}')"
-            pbs = pbs.filter(eval(filter_str))
-            if 'C' in stage_prefix or 'TC' in stage_prefix:  # 车胎类别(C)与半钢类别(CJ)需要区分
-                pbs = pbs.filter(~Q(product_info__product_name__startswith='CJ'),
-                                 ~Q(product_info__product_name__startswith='TCJ'))
-            if 'U' in stage_prefix or 'TU' in stage_prefix:  # 车胎类别(UC)与斜胶类别(U)需要区分
-                pbs = pbs.filter(~Q(product_info__product_name__startswith='UC'),
-                                 ~Q(product_info__product_name__startswith='TUC'))
+            product_nos = list(ProductInfo.objects.values_list('product_no', flat=True))
+            filter_product_nos = list(filter(lambda x: ''.join(re.findall(r'[A-Za-z]', x)) in stage_prefix, product_nos))
+            pbs = pbs.filter(product_info__product_no__in=filter_product_nos)
         batching_no = set(pbs.values_list('stage_product_batch_no', flat=True))
         if m_type == '1':
             kwargs = {}

@@ -1041,16 +1041,10 @@ class ProductRatioView(ListAPIView):
             queryset = queryset.filter(used_type=used_type)
         if recipe_type:
             stage_prefix = re.split(r'[,|，]', recipe_type)
-            filter_str = ''
-            for i in stage_prefix:
-                filter_str += ('' if not filter_str else '|') + f"Q(product_info__product_name__startswith='{i.strip()}')"
-            queryset = queryset.filter(eval(filter_str))
-            if 'C' in stage_prefix or 'TC' in stage_prefix:  # 车胎类别(C)与半钢类别(CJ)需要区分
-                queryset = queryset.filter(~Q(product_info__product_name__startswith='CJ'),
-                                           ~Q(product_info__product_name__startswith='TCJ'))
-            if 'U' in stage_prefix or 'TU' in stage_prefix:  # 车胎类别(UC)与斜胶类别(U)需要区分
-                queryset = queryset.filter(~Q(product_info__product_name__startswith='UC'),
-                                           ~Q(product_info__product_name__startswith='TUC'))
+            product_nos = list(ProductInfo.objects.values_list('product_no', flat=True))
+            filter_product_nos = list(
+                filter(lambda x: ''.join(re.findall(r'[A-Za-z]', x)) in stage_prefix, product_nos))
+            queryset = queryset.filter(product_info__product_no__in=filter_product_nos)
         if dev_type:
             queryset = queryset.filter(dev_type_id=dev_type)
         if stage_product_batch_no:
