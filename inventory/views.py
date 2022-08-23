@@ -4995,7 +4995,7 @@ class LIBRARYINVENTORYView(APIView):
                     'stage': stage,
                     'all_qty': i['qty'],
                     'total_weight': i['total_weight'],
-                    'locked_trains': stock_locked_data.get(i['material_no']),
+                    'locked_trains': stock_locked_data.get(i['material_no'], 0),
                     i['quality_level']: {'qty': i['qty'], 'total_weight': i['total_weight'], 'expire_flag': expire_flag, 'dj_flag': dj_flag, 'yj_flag': yj_flag},
                     'expire_flag': expire_flag,
                     'dj_flag': dj_flag,
@@ -5094,6 +5094,9 @@ class LIBRARYINVENTORYView(APIView):
         equip_no = params.get('equip_no')
         export = params.get("export", None)
         locked_status = params.get("locked_status")
+        ordering_field = params.get("ordering_field")
+        order_by = params.get("order_by")
+
         product_validity_dict = dict(MaterialAttribute.objects.filter(
             period_of_validity__isnull=False
         ).values_list('material__material_no', 'period_of_validity'))
@@ -5151,7 +5154,23 @@ class LIBRARYINVENTORYView(APIView):
             warehouse_name2 = '终炼胶库'
             temp2 = self.get_result(model2, 'lb', store_name2, warehouse_name2, location_status, product_validity_dict, **filter_kwargs)
             temp = list(temp1) + list(temp2)
-        temp = sorted(temp, key=itemgetter('expire_flag', 'yj_flag', 'dj_flag', 'material_no'), reverse=True)  # 按多个字段排序
+        if ordering_field and order_by:
+            if ordering_field == 'locked_trains':
+                temp = sorted(temp, key=lambda x: x.get('locked_trains', 0), reverse=True if order_by == 'descending' else False)
+            elif ordering_field == '1_qty':
+                temp = sorted(temp, key=lambda x: x.get('一等品', {}).get('qty', 0), reverse=True if order_by == 'descending' else False)
+            elif ordering_field == '3_qty':
+                temp = sorted(temp, key=lambda x: x.get('三等品', {}).get('qty', 0), reverse=True if order_by == 'descending' else False)
+            elif ordering_field == '2_qty':
+                temp = sorted(temp, key=lambda x: x.get('待检品', {}).get('qty', 0), reverse=True if order_by == 'descending' else False)
+            elif ordering_field == '1_weight':
+                temp = sorted(temp, key=lambda x: x.get('一等品', {}).get('total_weight', 0), reverse=True if order_by == 'descending' else False)
+            elif ordering_field == '3_weight':
+                temp = sorted(temp, key=lambda x: x.get('三等品', {}).get('total_weight', 0), reverse=True if order_by == 'descending' else False)
+            elif ordering_field == '2_weight':
+                temp = sorted(temp, key=lambda x: x.get('待检品', {}).get('total_weight', 0), reverse=True if order_by == 'descending' else False)
+        else:
+            temp = sorted(temp, key=itemgetter('expire_flag', 'yj_flag', 'dj_flag', 'material_no'), reverse=True)  # 按多个字段排序
         weight_1 = qty_1 = weight_3 = qty_3 = weight_dj = qty_dj = weight_fb = qty_fb = total_locked_qty = 0
 
         for i in temp:

@@ -18,7 +18,7 @@ from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan
 from production.models import PalletFeedbacks
 from quality.models import TestMethod, MaterialTestOrder, \
-    MaterialTestResult, MaterialDataPointIndicator, MaterialTestMethod, TestType, DataPoint, DealSuggestion,\
+    MaterialTestResult, MaterialDataPointIndicator, MaterialTestMethod, TestType, DataPoint, DealSuggestion, \
     MaterialDealResult, LevelResult, \
     TestIndicator, LabelPrint, UnqualifiedDealOrder, UnqualifiedDealOrderDetail, ExamineMaterial, \
     MaterialExamineResult, MaterialSingleTypeExamineResult, MaterialExamineType, \
@@ -26,7 +26,7 @@ from quality.models import TestMethod, MaterialTestOrder, \
     IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, ProductReportEquip, \
     ProductReportValue, QualifiedRangeDisplay, ProductTestPlan, ProductTestPlanDetail, RubberMaxStretchTestResult, \
     LabelPrintLog, MaterialTestPlan, MaterialTestPlanDetail, MaterialDataPointIndicatorHistory, \
-    MaterialInspectionRegistration, WMSMooneyLevel
+    MaterialInspectionRegistration, WMSMooneyLevel, ScorchTime
 from quality.utils import gen_pallet_test_result
 from recipe.models import MaterialAttribute, ERPMESMaterialRelation, ZCMaterial
 
@@ -1663,4 +1663,34 @@ class WMSMooneyLevelSerializer(BaseModelSerializer):
         model = WMSMooneyLevel
         fields = '__all__'
         extra_kwargs = {'material_no': {'validators': []}}
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class ScorchTimeSerializer(BaseModelSerializer):
+
+    def create(self, validated_data):
+        instance = ScorchTime.objects.filter(product_no=validated_data['product_no'],
+                                             equip_no=validated_data['equip_no'],
+                                             input_date=validated_data['input_date'],
+                                             test_method_name=validated_data['test_method_name'],
+                                             classes=validated_data['classes']).first()
+        if instance:
+            return super().update(instance, validated_data)
+        else:
+            return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        obj = ScorchTime.objects.filter(product_no=validated_data['product_no'],
+                                        equip_no=validated_data['equip_no'],
+                                        input_date=validated_data['input_date'],
+                                        test_method_name=validated_data['test_method_name'],
+                                        classes=validated_data['classes']
+                                        ).exclude(id=instance.id).first()
+        if obj:
+            raise serializers.ValidationError('已存在相同焦烧时间数据，请修改后重试！')
+        return super().update(instance, validated_data)
+
+    class Meta:
+        model = ScorchTime
+        fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS

@@ -4,15 +4,16 @@ from quality.models import MaterialTestOrder, MaterialDataPointIndicator, \
     MaterialTestMethod, TestMethod, DataPoint, DealSuggestion, MaterialDealResult, UnqualifiedDealOrder, \
     ExamineMaterial, MaterialExamineType, MaterialExamineResult, MaterialEquip, MaterialReportEquip, \
     MaterialReportValue, ProductReportEquip, ProductReportValue, ProductTestPlanDetail, MaterialTestPlan, \
-    MaterialInspectionRegistration
+    MaterialInspectionRegistration, ScorchTime
 
 
 class TestMethodFilter(django_filters.rest_framework.FilterSet):
     test_indicator_id = django_filters.NumberFilter(field_name='test_type__test_indicator_id', help_text='试验指标id')
+    test_type_name = django_filters.CharFilter(field_name='test_type__name', help_text='试验类型名称')
 
     class Meta:
         model = TestMethod
-        fields = ('test_indicator_id', 'test_type_id')
+        fields = ('test_indicator_id', 'test_type_id', 'test_type_name')
 
 
 class DataPointFilter(django_filters.rest_framework.FilterSet):
@@ -30,11 +31,11 @@ class MaterialTestOrderFilter(django_filters.rest_framework.FilterSet):
     equip_no = django_filters.CharFilter(field_name='production_equip_no', help_text='机号')
     # product_no = django_filters.CharFilter(field_name='product_no', lookup_expr='icontains', help_text='产出胶料编号')
     classes = django_filters.CharFilter(field_name="production_class", help_text='班次')
-    stage = django_filters.CharFilter(field_name='product_no', lookup_expr='icontains', help_text='段次')
+    # stage = django_filters.CharFilter(field_name='product_no', lookup_expr='icontains', help_text='段次')
 
     class Meta:
         model = MaterialTestOrder
-        fields = ('st', 'et', 'equip_no', 'product_no', "classes", 'stage', 'lot_no', 'is_recheck', 'production_group')
+        fields = ('st', 'et', 'equip_no', 'product_no', "classes", 'lot_no', 'is_recheck', 'production_group')
 
 
 class MaterialDataPointIndicatorFilter(django_filters.rest_framework.FilterSet):
@@ -238,3 +239,12 @@ class UnqualifiedPalletFeedBackListFilter(django_filters.rest_framework.FilterSe
     class Meta:
         model = MaterialDealResult
         fields = ('product_no', 'st', 'et', 'classes', 'equip_no', 'is_deal')
+
+
+class ScorchTimeFilter(django_filters.rest_framework.FilterSet):
+    st = django_filters.DateFilter(field_name="input_date", help_text='开始日期', lookup_expr='gte')
+    et = django_filters.DateFilter(field_name="input_date", help_text='结束日期', lookup_expr='lte')
+
+    class Meta:
+        model = ScorchTime
+        fields = ('recipe_type', 'product_no', 'st', 'et', 'classes', 'input_date')

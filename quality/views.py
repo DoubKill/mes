@@ -47,7 +47,7 @@ from quality.filters import TestMethodFilter, DataPointFilter, \
     DealSuggestionFilter, PalletFeedbacksTestFilter, UnqualifiedDealOrderFilter, MaterialExamineTypeFilter, \
     ExamineMaterialFilter, MaterialEquipFilter, MaterialExamineResultFilter, MaterialReportEquipFilter, \
     MaterialReportValueFilter, ProductReportEquipFilter, ProductReportValueFilter, ProductTestResumeFilter, \
-    MaterialTestPlanFilter, MaterialInspectionRegistrationFilter, UnqualifiedPalletFeedBackListFilter
+    MaterialTestPlanFilter, MaterialInspectionRegistrationFilter, UnqualifiedPalletFeedBackListFilter, ScorchTimeFilter
 from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod, MaterialTestOrder, \
     MaterialTestMethod, TestType, DataPoint, DealSuggestion, MaterialDealResult, LevelResult, MaterialTestResult, \
     LabelPrint, UnqualifiedDealOrder, \
@@ -56,7 +56,7 @@ from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod
     QualifiedRangeDisplay, IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, \
     ProductReportEquip, ProductReportValue, ProductTestPlan, ProductTestPlanDetail, RubberMaxStretchTestResult, \
     LabelPrintLog, MaterialTestPlan, MaterialTestPlanDetail, MaterialDataPointIndicatorHistory, \
-    MaterialInspectionRegistration, WMSMooneyLevel, UnqualifiedDealOrderDetail
+    MaterialInspectionRegistration, WMSMooneyLevel, UnqualifiedDealOrderDetail, ScorchTime
 
 from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestOrderSerializer, MaterialTestOrderListSerializer, \
@@ -74,7 +74,8 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     UnqualifiedPalletFeedBackSerializer, LabelPrintLogSerializer, ProductTestPlanDetailSerializer, \
     ProductTestPlanDetailBulkCreateSerializer, MaterialTestPlanSerializer, MaterialTestPlanCreateSerializer, \
     MaterialTestPlanDetailSerializer, MaterialTestOrderExportSerializer, MaterialInspectionRegistrationSerializer, \
-    MaterialDataPointIndicatorHistorySerializer, WMSMooneyLevelSerializer, ERPMESMaterialRelationSerializer
+    MaterialDataPointIndicatorHistorySerializer, WMSMooneyLevelSerializer, ERPMESMaterialRelationSerializer, \
+    ScorchTimeSerializer
 
 from django.db.models import Prefetch, F, StdDev
 from django.db.models import Q
@@ -425,6 +426,9 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
         queryset = self.filter_queryset(self.get_queryset())
         sum_project = self.request.query_params.get('sum_project')
         recipe_type = self.request.query_params.get('recipe_type')
+        stage = self.request.query_params.get('stage')
+        if stage:
+            queryset = queryset.filter(product_no__icontains='-{}-'.format(stage))
         if state:
             if state == '检测中':
                 queryset = queryset.filter(is_finished=False)
@@ -722,12 +726,20 @@ class ProductBatchingMaterialListView(ListAPIView):
         factory_date = self.request.query_params.get('factory_date')  # 工厂日期
         equip_no = self.request.query_params.get('equip_no')  # 设备编号
         classes = self.request.query_params.get('classes')  # 班次
-        used_type = self.request.query_params.get('used_type')
+        used_type = self.request.query_params.get('used_type')  # 启用状态
+        stages = self.request.query_params.get('stage')  # 段次
+        recipe_type = self.request.query_params.get('recipe_type')  # 配方类别
 
         pbs = ProductBatching.objects.all()
         if used_type:
             pbs = pbs.filter(used_type=used_type)
-
+        if stages:
+            pbs = pbs.filter(stage__global_name__in=stages.split(','))
+        if recipe_type:
+            stage_prefix = re.split(r'[,|，]', recipe_type)
+            product_nos = list(ProductInfo.objects.values_list('product_no', flat=True))
+            filter_product_nos = list(filter(lambda x: ''.join(re.findall(r'[A-Za-z]', x)) in stage_prefix, product_nos))
+            pbs = pbs.filter(product_info__product_no__in=filter_product_nos)
         batching_no = set(pbs.values_list('stage_product_batch_no', flat=True))
         if m_type == '1':
             kwargs = {}
@@ -4588,3 +4600,54 @@ class ProductTestedTrains(APIView):
         first_test_plan = test_plan_data[0]
         return Response({'max_trains': last_test_plan['actual_trains'] + last_test_plan['test_plan__test_interval'] - 1,
                         'min_trains': first_test_plan['actual_trains']})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ScorchTimeView(ModelViewSet):
+    queryset = ScorchTime.objects.order_by('input_date')
+    serializer_class = ScorchTimeSerializer
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_scorch_time',
+                                                            'add': 'add_scorch_time',
+                                                            'change': 'change_scorch_time',
+                                                            'delete': 'delete_scorch_time'}))
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = ScorchTimeFilter
+    pagination_class = None
+
+    def list(self, request, *args, **kwargs):
+        combine_flag = self.request.query_params.get('combine_flag')
+        if combine_flag:
+            queryset = self.filter_queryset(self.get_queryset())
+            data = self.get_serializer(queryset, many=True).data
+            ret = {}
+            # {"product_no": "A",
+            #  "2022-01-01": [{"equip_no": "Z01", "method_name": "test1"}, {"equip_no": "Z02", "method_name": "test2"}],
+            #  "2022-02-02": [{"equip_no": "Z01", "method_name": "test1"}, {"equip_no": "Z02", "method_name": "test2"}]}
+            for item in data:
+                product_no = item['product_no']
+                if product_no in ret:
+                    if item['input_date'] in ret[product_no]:
+                        ret[product_no][item['input_date']].append({"equip_no": item['equip_no'],
+                                                                    "classes": item['classes'],
+                                                                    "test_method_name": item['test_method_name'],
+                                                                    "test_time": item['test_time'],
+                                                                    "id": item['id']})
+                    else:
+                        ret[product_no][item['input_date']] = [{"equip_no": item['equip_no'],
+                                                                "classes": item['classes'],
+                                                                "test_method_name": item['test_method_name'],
+                                                                "test_time": item['test_time'],
+                                                                "id": item['id']}]
+                else:
+                    ret[product_no] = {"product_no": item['product_no'],
+                                       "recipe_type": item['recipe_type'],
+                                       item['input_date']: [{"equip_no": item['equip_no'],
+                                                             "classes": item['classes'],
+                                                             "test_method_name": item['test_method_name'],
+                                                             "test_time": item['test_time'],
+                                                             "id": item['id']}]}
+            dates = queryset.values('input_date').annotate(a=Count('id')).values_list('input_date', flat=True)
+
+            return Response({'data': ret.values(), 'dates': dates})
+        else:
+            return super().list(self, request, *args, **kwargs)

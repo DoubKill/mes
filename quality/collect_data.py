@@ -19,6 +19,7 @@ django.setup()
 
 import pymssql
 import logging
+from func_timeout import func_set_timeout
 logger = logging.getLogger('quality_log')
 from quality.utils import gen_pallet_test_result
 from quality.models import ZCKJConfig, ProductTestPlanDetail, ProductTestPlan, MaterialDataPointIndicator, \
@@ -26,6 +27,7 @@ from quality.models import ZCKJConfig, ProductTestPlanDetail, ProductTestPlan, M
 from production.models import PalletFeedbacks
 
 
+@func_set_timeout(3)
 def get_rids(server, user, password, database, machine_no, rid, test_time):
     sql = """select 
     RID 
@@ -38,7 +40,17 @@ def get_rids(server, user, password, database, machine_no, rid, test_time):
     return [i[0] for i in data]
 
 
-@atomic()
+@func_set_timeout(3)
+def get_result_info(server, user, password, database, rid):
+    sql = """select Dvalue,DataName from Result where RID={};""".format(rid)
+    conn = pymssql.connect(server, user, password, database)
+    cur = conn.cursor()
+    cur.execute(sql)
+    data = cur.fetchall()
+    return data
+
+
+# @atomic()
 def main():
     lot_nos = []
     for config in ZCKJConfig.objects.filter(use_flag=True):
@@ -84,11 +96,11 @@ def main():
                 if not current_test_detail:
                     logger.error('检测机台：{}，检测任务已全部完成'.format(sub_machine.machine_no))
                     continue
-                sql = """select Dvalue,DataName from Result where RID={};""".format(rid)
-                conn = pymssql.connect(server, user, password, name)
-                cur = conn.cursor()
-                cur.execute(sql)
-                data = cur.fetchall()
+                try:
+                    data = get_result_info(server, user, password, name, rid)
+                except Exception:
+                    logger.error('connect database:{} error !'.format(server))
+                    continue
 
                 # 更新当前检测任务结果值
                 test_results = {item[1].strip(' '): {"name": item[1].strip(' '), "value": item[0], "flag": ""} for item in data}
