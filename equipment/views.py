@@ -2624,15 +2624,14 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
         enter_time = datetime.strptime(enter_time, '%Y-%m-%d %H:%M:%S') if enter_time else datetime.now()
         outer_time = datetime.strptime(outer_time, '%Y-%m-%d %H:%M:%S') if outer_time else datetime.now()
         if status == 1:
-            # if instance.plan_in_quantity <= instance.in_quantity:
-            #     return Response({"success": False, "message": '该单据已入库完成', "data": None})
-            # if instance.in_quantity + in_quantity > instance.plan_in_quantity:
-            #     return Response({"success": False, "message": '入库数量大于单据剩余未入库数量', "data": None})
-            # if instance.in_quantity + in_quantity == instance.plan_in_quantity:
-            #     instance.status = 3  # 已完成
-            # elif instance.in_quantity + in_quantity < instance.plan_in_quantity:
-            #     instance.status = 2  # 入库中
-            instance.status = 2
+            if instance.plan_in_quantity <= instance.in_quantity:
+                return Response({"success": False, "message": '该单据已入库完成', "data": None})
+            if instance.in_quantity + in_quantity > instance.plan_in_quantity:
+                return Response({"success": False, "message": '入库数量大于单据剩余未入库数量', "data": None})
+            if instance.in_quantity + in_quantity == instance.plan_in_quantity:
+                instance.status = 3  # 已完成
+            elif instance.in_quantity + in_quantity < instance.plan_in_quantity:
+                instance.status = 2  # 入库中
             instance.in_quantity += data['in_quantity']
             instance.enter_time = enter_time
             instance.save()
@@ -2672,14 +2671,14 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
             if query.quantity < out_quantity:
                 return Response({"success": False, "message": '当前库区中的数量不足', "data": None})
             # 使用库存数量判断
-            if out_quantity > query.quantity:
+            if out_quantity > instance.plan_out_quantity - instance.out_quantity:
                 return Response({"success": False, "message": '出库数量不能大于单据出库数量', "data": None})
-            # if instance.plan_out_quantity <= out_quantity + instance.out_quantity:
-            #     instance.out_quantity += out_quantity
-            #     instance.status = 6  # 出库完成
-            # else:
-            instance.out_quantity += out_quantity
-            instance.status = 5  # 出库中
+            if instance.plan_out_quantity <= out_quantity + instance.out_quantity:
+                instance.out_quantity += out_quantity
+                instance.status = 6  # 出库完成
+            else:
+                instance.out_quantity += out_quantity
+                instance.status = 5  # 出库中
             query.quantity -= out_quantity
             query.save()
             instance.outer_time = outer_time
@@ -2780,11 +2779,12 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
                 'location_id': first.equip_warehouse_location.id,
             }})
         if self.request.query_params.get('use'):
-            if order_id:
-                order_info = EquipWarehouseOrder.objects.filter(id=order_id).last()
-                equip_spare_ids = [] if not order_info else order_info.order_detail.values_list('equip_spare__id', flat=True)
-            else:  # 新建单据过滤掉已经添加的物料
-                equip_spare_ids = set(EquipWarehouseOrderDetail.objects.filter(~Q(status=7), equip_warehouse_order__order_id__startswith='CK').values_list('equip_spare__id', flat=True))
+            # if order_id:
+            #     order_info = EquipWarehouseOrder.objects.filter(id=order_id).last()
+            #     equip_spare_ids = [] if not order_info else order_info.order_detail.values_list('equip_spare__id', flat=True)
+            # else:  # 新建单据过滤掉已经添加的物料
+            #     equip_spare_ids = set(EquipWarehouseOrderDetail.objects.filter(~Q(status=7), equip_warehouse_order__order_id__startswith='CK').values_list('equip_spare__id', flat=True))
+            equip_spare_ids = []  # 去除新建单据-其他单据中存在此备件不可以再次选择的限制
             data = self.filter_queryset(self.queryset.filter(~Q(equip_spare_id__in=equip_spare_ids), quantity__gt=0)).values('equip_spare').annotate(qty=Sum('quantity')).values(
                                             'equip_spare__equip_component_type__component_type_name',
                                             'equip_spare__spare_code',
@@ -3069,15 +3069,16 @@ class EquipAutoPlanView(APIView):
             global_names = list(GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='备件领用科室及人员').values_list('global_name', flat=True).distinct())
             if section_name not in global_names:
                 global_names.append(section_name)
-            res = []
+            res, name_list = [], []
             for i in global_names:
                 init_section = Section.objects.filter(name=i).last()
                 if init_section:
                     section_list = get_children_section(init_section, include_self=True)
-                    res += list(User.objects.filter(~Q(username__in=res), section__name__in=section_list, is_active=True).annotate(order_id=F('username')).values('id', 'order_id').distinct())
+                    s_users = User.objects.filter(~Q(username__in=name_list), section__name__in=section_list, is_active=True)
                 else:
-                    users = list(User.objects.filter(~Q(username__in=res), username__in=global_names, is_active=True).annotate(order_id=F('username')).values('id', 'order_id'))
-                    res += users
+                    s_users = User.objects.filter(~Q(username__in=name_list), username__in=global_names, is_active=True)
+                res += list(s_users.annotate(order_id=F('username')).values('id', 'order_id').distinct())
+                name_list += s_users.values_list('username', flat=True)
             return Response({"success": True, "message": "获取设备科成员信息成功", "data": res})
         if get_code:
             if get_code == "1":
@@ -3121,7 +3122,8 @@ class EquipAutoPlanView(APIView):
                 return Response({"success": False, "message": '条码扫描有误', "data": None})
             obj = EquipSpareErp.objects.filter(spare_code=spare_code).first()
             if order.status in [1, 2, 3]:  # 入库单据
-                quantity = order.plan_in_quantity - order.in_quantity
+                # quantity = order.plan_in_quantity - order.in_quantity
+                quantity = 1
                 queryset = EquipWarehouseInventory.objects.filter(equip_spare__spare_code=spare_code, quantity__gt=0)
                 default = queryset.first()
                 area = EquipWarehouseArea.objects.filter(
