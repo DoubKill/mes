@@ -710,6 +710,12 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 check_flag = True
                 # 胶块6分钟内不超过4框, 胶皮4分钟内不超过4架
                 if n_scan_material_type in ['胶块', '胶皮']:
+                    # 没用完的物料重量限制: 剩余重量必须小于初始重量的一半
+                    l_record = add_materials.last()
+                    if l_record.real_weight * 2 >= l_record.init_weight:
+                        check_flag = False
+                        attrs['tank_data'].update({'msg': '物料剩余重量超过初始重量的一半'})
+                        attrs['status'] = 2
                     limit_minutes, limit_nums = [4, 4] if n_scan_material_type == '胶皮' else [6, 4]
                     g_config = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='密炼扫码限制', global_name__startswith=f'{scan_dev}-{n_scan_material_type}').last()
                     if g_config:
