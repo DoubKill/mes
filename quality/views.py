@@ -288,6 +288,7 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
         ws = wb.worksheets[0]
         sheet0 = wb.copy_worksheet(ws)
         sheet0.title = '汇总'
+        row_num = data_row
         sheet0.delete_rows(2, data_row)
         sheet = wb.copy_worksheet(ws)
         data_row0 = 2
@@ -325,6 +326,7 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
                 else:
                     deal_suggestion = 'PASS' if result_data['test_result'] == 'PASS' else None
             if i['product_no'] != product_no:
+                row_num = data_row
                 product_no = i['product_no']
                 sheet = wb.copy_worksheet(ws)
                 sheet.title = product_no
@@ -365,25 +367,25 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
                         lb_machine_name = machine_name
 
             ret = {i['data_point_name']: i['value'] for i in order_results}
-            sheet.cell(data_row, 1).value = i['product_no']
-            sheet.cell(data_row, 2).value = i['production_factory_date']
-            sheet.cell(data_row, 3).value = i['production_class']
-            sheet.cell(data_row, 4).value = i['production_group']
-            sheet.cell(data_row, 5).value = i['production_equip_no']
-            sheet.cell(data_row, 6).value = mn_machine_name
-            sheet.cell(data_row, 7).value = lb_machine_name
-            sheet.cell(data_row, 8).value = i['actual_trains']
-            sheet.cell(data_row, 9).value = '复检' if i['is_recheck'] else '正常'
-            sheet.cell(data_row, 10).value = ret.get('ML(1+4)')
-            sheet.cell(data_row, 11).value = ret.get('比重值')
-            sheet.cell(data_row, 12).value = ret.get('硬度值')
-            sheet.cell(data_row, 13).value = ret.get('MH')
-            sheet.cell(data_row, 14).value = ret.get('ML')
-            sheet.cell(data_row, 15).value = ret.get('TC10')
-            sheet.cell(data_row, 16).value = ret.get('TC50')
-            sheet.cell(data_row, 17).value = ret.get('TC90')
-            sheet.cell(data_row, 18).value = i['state']
-            sheet.cell(data_row, 19).value = deal_suggestion
+            sheet.cell(row_num, 1).value = i['product_no']
+            sheet.cell(row_num, 2).value = i['production_factory_date']
+            sheet.cell(row_num, 3).value = i['production_class']
+            sheet.cell(row_num, 4).value = i['production_group']
+            sheet.cell(row_num, 5).value = i['production_equip_no']
+            sheet.cell(row_num, 6).value = mn_machine_name
+            sheet.cell(row_num, 7).value = lb_machine_name
+            sheet.cell(row_num, 8).value = i['actual_trains']
+            sheet.cell(row_num, 9).value = '复检' if i['is_recheck'] else '正常'
+            sheet.cell(row_num, 10).value = ret.get('ML(1+4)')
+            sheet.cell(row_num, 11).value = ret.get('比重值')
+            sheet.cell(row_num, 12).value = ret.get('硬度值')
+            sheet.cell(row_num, 13).value = ret.get('MH')
+            sheet.cell(row_num, 14).value = ret.get('ML')
+            sheet.cell(row_num, 15).value = ret.get('TC10')
+            sheet.cell(row_num, 16).value = ret.get('TC50')
+            sheet.cell(row_num, 17).value = ret.get('TC90')
+            sheet.cell(row_num, 18).value = i['state']
+            sheet.cell(row_num, 19).value = deal_suggestion
 
             # 写入汇总
             sheet0.cell(data_row0, 1).value = i['product_no']
@@ -406,7 +408,7 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
             sheet0.cell(data_row0, 18).value = i['state']
             sheet0.cell(data_row0, 19).value = deal_suggestion
 
-            data_row += 1
+            row_num += 1
             data_row0 += 1
         wb.remove_sheet(ws)
         output = BytesIO()
@@ -465,11 +467,7 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
             else:
                 if diff.days > 6:
                     raise ValidationError('导出数据的日期跨度不得超过一个周！')
-            queryset = self.filter_queryset(queryset=MaterialTestOrder.objects.filter(
-                        delete_flag=False).prefetch_related(
-                        Prefetch('order_results',
-                                 queryset=MaterialTestResult.objects.order_by('id'))
-                    ).order_by('product_no', 'production_factory_date', '-production_class', 'production_equip_no', 'actual_trains'))
+            queryset = queryset.order_by('product_no', 'production_factory_date', '-production_class', 'production_equip_no', 'actual_trains')
             lot_nos = set(queryset.values_list('lot_no', flat=True))
             deal_results = MaterialDealResult.objects.filter(
                 lot_no__in=lot_nos,
