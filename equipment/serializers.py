@@ -1498,7 +1498,8 @@ class EquipWarehouseOrderSerializer(BaseModelSerializer):
         u = User.objects.filter(username=add_username).last()
         if not u:
             raise serializers.ValidationError(f'未找到{add_username}')
-        validated_data.update({'desc': desc, 'created_user_id': u.id})
+        state = self.context.get('state', False)
+        validated_data.update({'desc': desc, 'created_user_id': u.id, 'state': state})
         order = super().create(validated_data)
         status = validated_data['status']
         for equip_sapre in equip_spare_list:
