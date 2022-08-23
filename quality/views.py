@@ -426,6 +426,9 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
         queryset = self.filter_queryset(self.get_queryset())
         sum_project = self.request.query_params.get('sum_project')
         recipe_type = self.request.query_params.get('recipe_type')
+        stage = self.request.query_params.get('stage')
+        if stage:
+            queryset = queryset.filter(product_no__icontains='-{}-'.format(stage))
         if state:
             if state == '检测中':
                 queryset = queryset.filter(is_finished=False)
