@@ -3,18 +3,22 @@ import datetime
 import math
 
 from django.db.models import Q
+from django.db.transaction import atomic
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator, UniqueTogetherValidator
 
 from mes.base_serializer import BaseModelSerializer
+from mes.common_code import days_cur_month_dates
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, QualityControl, \
     OperationLog, UnReachedCapacityCause, ProcessFeedback, AlarmLog, RubberCannotPutinReason, PerformanceJobLadder, \
     ProductInfoDingJi, SetThePrice, SubsidyInfo, AttendanceGroupSetup, EmployeeAttendanceRecords, FillCardApply, \
-    ApplyForExtraWork, Equip190EWeight, OuterMaterial, Equip190E, AttendanceClockDetail, EmployeeAttendanceRecordsLog
+    ApplyForExtraWork, Equip190EWeight, OuterMaterial, Equip190E, AttendanceClockDetail, EmployeeAttendanceRecordsLog, \
+    WeightClassPlan, WeightClassPlanDetail
 from recipe.models import MaterialAttribute
 from system.models import User
+from terminal.utils import get_current_factory_date
 
 
 class EquipStatusSerializer(BaseModelSerializer):
@@ -566,3 +570,76 @@ class EmployeeAttendanceRecordsLogSerializer(serializers.ModelSerializer):
         model = EmployeeAttendanceRecordsLog
         fields = '__all__'
 
+
+class WeightClassPlanDetailSerializer(serializers.ModelSerializer):
+
+    def to_representation(self, instance):
+        res = super().to_representation(instance)
+        m, d = res['factory_date'].split('-')[-2:]
+        if m.startswith('0'):
+            m = m[-1]
+        if d.startswith('0'):
+            d = d[-1]
+        res['factory_date'] = m + '/' + d
+        return res
+
+    class Meta:
+        model = WeightClassPlanDetail
+        fields = '__all__'
+        read_only_fields = ('weight_class_plan',)
+
+
+class WeightClassPlanSerializer(serializers.ModelSerializer):
+    username = serializers.ReadOnlyField(source='user.username')
+    weight_class_details = WeightClassPlanDetailSerializer(many=True, default=[])
+
+    @atomic
+    def create(self, validated_data):
+        target_month = validated_data['target_month']
+        weight_class_details = validated_data.pop('weight_class_details')
+        instance = super().create(validated_data)
+        details = []
+        if weight_class_details:
+            for i in weight_class_details:
+                class_date = target_month + '-' + '%02d' % int(i['factory_date'].split('/')[-1])
+                i.update(weight_class_plan=instance, factory_date=class_date)
+                details.append(WeightClassPlanDetail(**i))
+        else:
+            # 获取当月所有天数
+            date_list = days_cur_month_dates(date_time=target_month)
+            for i in date_list:
+                details.append(WeightClassPlanDetail(**{'weight_class_plan': instance, 'factory_date': i}))
+        WeightClassPlanDetail.objects.bulk_create(details)
+        return instance
+
+    class Meta:
+        model = WeightClassPlan
+        fields = ('target_month', 'classes', 'station', 'user', 'weight_class_details', 'username')
+        unique_together = validators = [UniqueTogetherValidator(queryset=WeightClassPlan.objects.filter(delete_flag=False),
+                                                                fields=('user', 'target_month'), message='该人员本月已有排班')]
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class WeightClassPlanUpdateSerializer(serializers.ModelSerializer):
+    weight_class_details = WeightClassPlanDetailSerializer(many=True, default=[])
+
+    @atomic
+    def update(self, instance, validated_data):
+        weight_class_details, target_month = validated_data.pop('weight_class_details'), validated_data['target_month']
+        now_factory_date = get_current_factory_date()['factory_date']
+        flag = True if instance.weight_class_details.all() else False
+        for i in weight_class_details:
+            class_date = target_month + '-' + '%02d' % int(i['factory_date'].split('/')[-1])
+            if not flag:  # 新建
+                i.update(weight_class_plan=instance, factory_date=class_date)
+                WeightClassPlanDetail.objects.create(**i)
+            else:  # 更新
+                if class_date <= now_factory_date.strftime('%Y-%m-%d'):  # 只能修改当天以后的排班
+                    continue
+                WeightClassPlanDetail.objects.filter(weight_class_plan=instance, factory_date=class_date).update(class_code=i['class_code'])
+        return super().update(instance, validated_data)
+
+    class Meta:
+        model = WeightClassPlan
+        fields = ('target_month', 'station', 'weight_class_details')
+        read_only_fields = COMMON_READ_ONLY_FIELDS

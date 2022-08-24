@@ -50,7 +50,7 @@ from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, Pla
     PerformanceUnitPrice, ProductInfoDingJi, SetThePrice, SubsidyInfo, IndependentPostTemplate, AttendanceGroupSetup, \
     FillCardApply, ApplyForExtraWork, EquipMaxValueCache, Equip190EWeight, OuterMaterial, Equip190E, \
     AttendanceClockDetail, AttendanceResultAudit, ManualInputTrains, ActualWorkingDay, EmployeeAttendanceRecordsLog, \
-    RubberFrameRepair, ToolManageAccount, ActualWorkingEquip, ActualWorkingDay190E
+    RubberFrameRepair, ToolManageAccount, ActualWorkingEquip, ActualWorkingDay190E, WeightClassPlan
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, \
@@ -61,7 +61,7 @@ from production.serializers import QualityControlSerializer, OperationLogSeriali
     SetThePriceSerializer, SubsidyInfoSerializer, AttendanceGroupSetupSerializer, EmployeeAttendanceRecordsSerializer, \
     FillCardApplySerializer, ApplyForExtraWorkSerializer, Equip190EWeightSerializer, \
     Equip190ESerializer, EquipStatusBatchSerializer, AttendanceClockDetailSerializer, \
-    EmployeeAttendanceRecordsLogSerializer
+    EmployeeAttendanceRecordsLogSerializer, WeightClassPlanSerializer, WeightClassPlanUpdateSerializer
 from rest_framework.generics import ListAPIView, UpdateAPIView, \
     get_object_or_404
 from datetime import timedelta
@@ -74,6 +74,7 @@ from recipe.models import Material, MaterialAttribute
 from system.models import User
 from terminal.models import Plan, JZPlan
 from equipment.utils import DinDinAPI
+from terminal.serializers import WeightPackagePlanSerializer
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -5440,3 +5441,47 @@ class ToolManageAccountView(APIView):
         times = 1 if not max_times else max_times + 1
         ToolManageAccount.objects.create(date_time=date_time, content=json.dumps(details), times=times, save_user=save_user)
         return Response('保存成功')
+
+
+@method_decorator([api_recorder], name='dispatch')
+class WeightClassPlanViewSet(ModelViewSet):
+
+    queryset = WeightClassPlan.objects.filter(delete_flag=False)
+    serializer_class = WeightClassPlanSerializer
+    permission_classes = (IsAuthenticated,)
+
+    def get_queryset(self):
+        target_month = self.request.query_params.get('target_month')
+        classes = self.request.query_params.get('classes')
+        filter_kwargs = {}
+        if target_month:
+            filter_kwargs['target_month'] = target_month
+        if classes:
+            filter_kwargs['classes'] = classes
+        return self.queryset.filter(**filter_kwargs)
+
+    def get_serializer_class(self):
+        if self.action == 'update':
+            return WeightClassPlanUpdateSerializer
+        else:
+            return WeightClassPlanSerializer
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            instance = self.get_object()
+        except Exception as e:
+            raise ValidationError('未找到对应数据,请刷新页面后重试')
+        instance.delete_flag = 1
+        instance.save()
+        return Response('操作成功')

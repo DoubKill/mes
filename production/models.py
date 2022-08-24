@@ -706,3 +706,26 @@ class ToolManageAccount(models.Model):
         db_table = 'tool_manage_account'
         verbose_name_plural = verbose_name = '工装管理台帐'
 
+
+class WeightClassPlan(AbstractEntity):
+    target_month = models.CharField(max_length=8, help_text='工厂月份')
+    classes = models.CharField(max_length=64, help_text='组别')
+    station = models.CharField(max_length=64, help_text='岗位')
+    user = models.ForeignKey(User, help_text='人员', on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = 'weight_class_plan'
+        verbose_name_plural = verbose_name = '称量排班'
+
+
+class WeightClassPlanDetail(models.Model):
+    weight_class_plan = models.ForeignKey(WeightClassPlan, help_text='排班', on_delete=models.CASCADE,
+                                          related_name='weight_class_details')
+    factory_date = models.CharField(max_length=10, help_text='工厂日期')
+    class_code = models.CharField(max_length=8, help_text='班次类别: Y1/Y3/1/2/3/1-8/常', null=True, blank=True)
+
+    class Meta:
+        db_table = 'weight_class_plan_detail'
+        verbose_name_plural = verbose_name = '称量排班明细'
+
+
