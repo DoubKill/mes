@@ -2780,12 +2780,14 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
                 'location_id': first.equip_warehouse_location.id,
             }})
         if self.request.query_params.get('use'):
-            # if order_id:
-            #     order_info = EquipWarehouseOrder.objects.filter(id=order_id).last()
-            #     equip_spare_ids = [] if not order_info else order_info.order_detail.values_list('equip_spare__id', flat=True)
+            equip_spare_ids = []
+            if order_id:
+                order_info = EquipWarehouseOrder.objects.filter(id=order_id).last()
+                if order_info:
+                    equip_spare_ids = order_info.order_detail.values_list('equip_spare__id', flat=True)
             # else:  # 新建单据过滤掉已经添加的物料
             #     equip_spare_ids = set(EquipWarehouseOrderDetail.objects.filter(~Q(status=7), equip_warehouse_order__order_id__startswith='CK').values_list('equip_spare__id', flat=True))
-            equip_spare_ids = []  # 去除新建单据-其他单据中存在此备件不可以再次选择的限制
+            # 去除新建单据-其他单据中存在此备件不可以再次选择的限制
             data = self.filter_queryset(self.queryset.filter(~Q(equip_spare_id__in=equip_spare_ids), quantity__gt=0)).values('equip_spare').annotate(qty=Sum('quantity')).values(
                                             'equip_spare__equip_component_type__component_type_name',
                                             'equip_spare__spare_code',
