@@ -3202,7 +3202,7 @@ class EquipAutoPlanView(APIView):
             }
             return Response({"success": True, "message": None, "data": data})
         else:  # 备件移库/盘库
-            data = EquipWarehouseInventory.objects.filter(equip_spare__spare_code=spare_code, quantity__gt=0)\
+            data = EquipWarehouseInventory.objects.filter(equip_spare__spare_code=spare_code)\
                 .values('equip_spare', 'equip_warehouse_location').annotate(
                 quantity=Sum('quantity')).values(
                 'equip_warehouse_area__id',
