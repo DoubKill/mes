@@ -2624,14 +2624,15 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
         enter_time = datetime.strptime(enter_time, '%Y-%m-%d %H:%M:%S') if enter_time else datetime.now()
         outer_time = datetime.strptime(outer_time, '%Y-%m-%d %H:%M:%S') if outer_time else datetime.now()
         if status == 1:
-            if instance.plan_in_quantity <= instance.in_quantity:
-                return Response({"success": False, "message": '该单据已入库完成', "data": None})
-            if instance.in_quantity + in_quantity > instance.plan_in_quantity:
-                return Response({"success": False, "message": '入库数量大于单据剩余未入库数量', "data": None})
-            if instance.in_quantity + in_quantity == instance.plan_in_quantity:
-                instance.status = 3  # 已完成
-            elif instance.in_quantity + in_quantity < instance.plan_in_quantity:
-                instance.status = 2  # 入库中
+            # if instance.plan_in_quantity <= instance.in_quantity:
+            #     return Response({"success": False, "message": '该单据已入库完成', "data": None})
+            # if instance.in_quantity + in_quantity > instance.plan_in_quantity:
+            #     return Response({"success": False, "message": '入库数量大于单据剩余未入库数量', "data": None})
+            # if instance.in_quantity + in_quantity == instance.plan_in_quantity:
+            #     instance.status = 3  # 已完成
+            # elif instance.in_quantity + in_quantity < instance.plan_in_quantity:
+            #     instance.status = 2  # 入库中
+            instance.status = 2
             instance.in_quantity += data['in_quantity']
             instance.enter_time = enter_time
             instance.save()
@@ -2671,8 +2672,8 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
             if query.quantity < out_quantity:
                 return Response({"success": False, "message": '当前库区中的数量不足', "data": None})
             # 使用库存数量判断
-            if out_quantity > instance.plan_out_quantity - instance.out_quantity:
-                return Response({"success": False, "message": '出库数量不能大于单据出库数量', "data": None})
+            if out_quantity > query.quantity:
+                return Response({"success": False, "message": '出库数量不能大于库存出库数量', "data": None})
             if instance.plan_out_quantity <= out_quantity + instance.out_quantity:
                 instance.out_quantity += out_quantity
                 instance.status = 6  # 出库完成
