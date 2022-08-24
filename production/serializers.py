@@ -592,12 +592,16 @@ class WeightClassPlanSerializer(serializers.ModelSerializer):
     @atomic
     def create(self, validated_data):
         target_month = validated_data['target_month']
+        now_factory_date = get_current_factory_date()['factory_date']
         weight_class_details = validated_data.pop('weight_class_details')
         instance = super().create(validated_data)
         details = []
         if weight_class_details:
             for k, v in weight_class_details.items():
                 class_date = target_month + '-' + '%02d' % int(k.split('/')[-1])
+                if class_date <= now_factory_date.strftime('%Y-%m-%d'):  # 只能修改当天以后的排班
+                    continue
+                v = v if v else None
                 detail = {'factory_date': class_date, 'class_code': v, 'weight_class_plan': instance}
                 details.append(WeightClassPlanDetail(**detail))
         else:
@@ -632,6 +636,7 @@ class WeightClassPlanUpdateSerializer(serializers.ModelSerializer):
             else:  # 更新
                 if class_date <= now_factory_date.strftime('%Y-%m-%d'):  # 只能修改当天以后的排班
                     continue
+                v = v if v else None
                 WeightClassPlanDetail.objects.filter(weight_class_plan=instance, factory_date=class_date).update(class_code=v)
         return super().update(instance, validated_data)
 

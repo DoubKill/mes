@@ -5454,11 +5454,14 @@ class WeightClassPlanViewSet(ModelViewSet):
     def get_queryset(self):
         target_month = self.request.query_params.get('target_month')
         classes = self.request.query_params.get('classes')
+        username = self.request.query_params.get('username')
         filter_kwargs = {}
         if target_month:
             filter_kwargs['target_month'] = target_month
         if classes:
             filter_kwargs['classes'] = classes
+        if username:
+            filter_kwargs['user__username__icontains'] = username
         return self.queryset.filter(**filter_kwargs)
 
     def get_serializer_class(self):
