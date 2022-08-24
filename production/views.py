@@ -5449,6 +5449,7 @@ class WeightClassPlanViewSet(ModelViewSet):
     queryset = WeightClassPlan.objects.filter(delete_flag=False)
     serializer_class = WeightClassPlanSerializer
     permission_classes = (IsAuthenticated,)
+    pagination_class = None
 
     def get_queryset(self):
         target_month = self.request.query_params.get('target_month')
@@ -5465,17 +5466,6 @@ class WeightClassPlanViewSet(ModelViewSet):
             return WeightClassPlanUpdateSerializer
         else:
             return WeightClassPlanSerializer
-
-    def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
 
     def destroy(self, request, *args, **kwargs):
         try:
