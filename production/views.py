@@ -3301,7 +3301,7 @@ class EmployeeAttendanceRecordsView(APIView):
         #     export_flag = False
         # if set(attendance_data.values_list('opera_flag', flat=True)) != {3}:
         #     export_flag = False
-        return Response({'results': results_sort, 'group_list': group_list, 'export_flag': export_flag, 'status': state,
+        return Response({'results': results_sort, 'group_list': group_list, 'export_flag': export_flag, 'state': state,
                          'audit_user':  audit_user, 'user_groups': user_groups, 'approve_user': approve_user})
 
     # 导入出勤记录
