@@ -1449,7 +1449,7 @@ class EquipWarehouseOrderDetailSerializer(BaseModelSerializer):
 
     class Meta:
         model = EquipWarehouseOrderDetail
-        fields = ("id", "created_username", "spare_code", "spare_name", "component_type_name", "specification", "purpose",
+        fields = ("id", "created_username", "spare_code", "spare_name", "component_type_name", "specification",
             "technical_params", "unit", "created_date", "in_quantity", "out_quantity", "plan_in_quantity", "unique_id",
             "plan_out_quantity", "status", "status_name", "equip_warehouse_order", "equip_spare", "all_qty", "key_parts_flag")
 
@@ -1615,7 +1615,6 @@ class EquipWarehouseRecordSerializer(BaseModelSerializer):
     work_order_no = serializers.ReadOnlyField(source='equip_warehouse_order_detail.equip_warehouse_order.work_order_no',
                                               help_text='工单编号')
     receive_user = serializers.ReadOnlyField(source='equip_warehouse_order_detail.receive_user', help_text='领用人')
-    purpose = serializers.ReadOnlyField(source='equip_warehouse_order_detail.purpose', help_text='用途')
 
     class Meta:
         model = EquipWarehouseRecord

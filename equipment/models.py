@@ -807,6 +807,7 @@ class EquipWarehouseRecord(AbstractEntity):
                                                      on_delete=models.CASCADE, null=True, blank=True)
     status = models.CharField(max_length=64, help_text='入库/出库/盘库/撤销/移库', default='入库')
     real_time = models.DateTimeField(help_text='出库时间', null=True, blank=True)
+    purpose = models.CharField(max_length=128, help_text='领用用途', null=True, blank=True)
 
     class Meta:
         db_table = 'equip_warehouse_record'
