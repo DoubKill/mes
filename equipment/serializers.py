@@ -1449,7 +1449,7 @@ class EquipWarehouseOrderDetailSerializer(BaseModelSerializer):
 
     class Meta:
         model = EquipWarehouseOrderDetail
-        fields = ("id", "created_username", "spare_code", "spare_name", "component_type_name", "specification",
+        fields = ("id", "created_username", "spare_code", "spare_name", "component_type_name", "specification", "purpose",
             "technical_params", "unit", "created_date", "in_quantity", "out_quantity", "plan_in_quantity", "unique_id",
             "plan_out_quantity", "status", "status_name", "equip_warehouse_order", "equip_spare", "all_qty", "key_parts_flag")
 
