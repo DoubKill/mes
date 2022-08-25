@@ -563,6 +563,7 @@ class AttendanceGroupSetup(models.Model):
     principal = models.CharField(max_length=1024, help_text='考勤负责人')
     range_time = models.IntegerField(help_text='上班多久后可打下班卡', null=True, blank=True)
     lead_time = models.IntegerField(help_text='提前几分钟可打工卡', null=True, blank=True)
+    leave_time = models.IntegerField(help_text='下班多久内可打卡', default=30)
     type = models.CharField(help_text='类别', max_length=64, null=True, blank=True)
     work_schedule = models.ForeignKey(WorkSchedule, help_text='倒班规则', on_delete=models.CASCADE, null=True, blank=True)
 

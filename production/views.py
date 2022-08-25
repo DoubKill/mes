@@ -4340,7 +4340,7 @@ class AttendanceClockViewSet(ModelViewSet):
         # 标准上下班时间
         date_now, group, classes = date_now, data['group'], data['classes']
         last_record = EmployeeAttendanceRecords.objects.filter(user=user, end_date__isnull=True).last()
-        if last_record and last_record.factory_date != date_now and not (not last_record.end_date and last_record.begin_date and (time_now - last_record.begin_date).total_seconds() / 3600 > 12.5):
+        if last_record and last_record.factory_date != date_now and not (not last_record.end_date and last_record.begin_date and (time_now - last_record.begin_date).total_seconds() / 3600 > (12 + attendance_group_obj.leave_time / 60)):
             date_now, group, classes = [str(last_record.factory_date), last_record.group, last_record.classes]
         standard_begin_time, standard_end_time = get_standard_time(user.username, date_now, group=group, classes=classes)
         if not standard_begin_time:
@@ -4384,8 +4384,8 @@ class AttendanceClockViewSet(ModelViewSet):
             if time_now < begin_date + range_time:
                 raise ValidationError(f'上班{attendance_group_obj.range_time}分钟内不能打下班卡')
             # 下班半小时后不能再打卡
-            if time_now > standard_end_time + datetime.timedelta(minutes=30):
-                raise ValidationError('下班超过半小时不可再打卡')
+            if time_now > standard_end_time + datetime.timedelta(minutes=attendance_group_obj.leave_time):
+                raise ValidationError(f'下班超过{attendance_group_obj.leave_time}不可再打卡')
             end_date = time_now
             if end_date <= standard_begin_time:
                 raise ValidationError('未到班次标准上班时间不可打下班卡')
