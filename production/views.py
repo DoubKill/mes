@@ -5544,7 +5544,7 @@ class WeightClassPlanViewSet(ModelViewSet):
                 user = User.objects.filter(is_active=True, username=item[1]).last()
                 if not user:
                     raise ValidationError(f'导入异常: 姓名{item[1]}不存在')
-                if not PerformanceJobLadder.objects.filter(type='细料称量' if '细料' in item[0] else ('硫磺称量' if '硫磺' in item[0] else '其它'), name=item[2]):
+                if not PerformanceJobLadder.objects.filter(name=item[2]):
                     raise ValidationError(f'导入异常: 岗位{item[2]}不存在')
                 class_codes = set([i for i in item[3:] if i and i != '休'])
                 class_codes_set = set(GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='配料间排班详细分类').values_list('global_name', flat=True).distinct())
