@@ -3,6 +3,7 @@ import decimal
 import json
 import datetime
 import re
+import logging
 
 from io import BytesIO
 from itertools import groupby
@@ -11,6 +12,7 @@ from operator import itemgetter
 import requests
 import xlwt
 from django.http import HttpResponse, FileResponse
+from django.views.generic import detail
 from django_pandas.io import read_frame
 import pandas as pd
 
@@ -50,7 +52,8 @@ from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, Pla
     PerformanceUnitPrice, ProductInfoDingJi, SetThePrice, SubsidyInfo, IndependentPostTemplate, AttendanceGroupSetup, \
     FillCardApply, ApplyForExtraWork, EquipMaxValueCache, Equip190EWeight, OuterMaterial, Equip190E, \
     AttendanceClockDetail, AttendanceResultAudit, ManualInputTrains, ActualWorkingDay, EmployeeAttendanceRecordsLog, \
-    RubberFrameRepair, ToolManageAccount, ActualWorkingEquip, ActualWorkingDay190E, WeightClassPlan
+    RubberFrameRepair, ToolManageAccount, ActualWorkingEquip, ActualWorkingDay190E, WeightClassPlan, \
+    WeightClassPlanDetail
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, \
@@ -75,6 +78,9 @@ from system.models import User
 from terminal.models import Plan, JZPlan
 from equipment.utils import DinDinAPI
 from terminal.serializers import WeightPackagePlanSerializer
+from terminal.utils import get_current_factory_date
+
+logger = logging.getLogger('error_log')
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -5450,6 +5456,12 @@ class WeightClassPlanViewSet(ModelViewSet):
     serializer_class = WeightClassPlanSerializer
     permission_classes = (IsAuthenticated,)
     pagination_class = None
+    FILE_NAME = '称量排班'
+    EXPORT_FIELDS_DICT = {
+        "班别": "classes",
+        "姓名": "username",
+        "岗位": "station",
+    }
 
     def get_queryset(self):
         target_month = self.request.query_params.get('target_month')
@@ -5470,6 +5482,32 @@ class WeightClassPlanViewSet(ModelViewSet):
         else:
             return WeightClassPlanSerializer
 
+    def list(self, request, *args, **kwargs):
+        target_month = self.request.query_params.get('target_month')
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('export'):
+            date_list = days_cur_month_dates(target_month)
+            add_key = {}
+            for i in date_list:
+                m, d = i.split('-')[-2:]
+                m = m[-1] if m.startswith('0') else m
+                d = d[-1] if d.startswith('0') else d
+                add_key[f'{m}/{d}'] = f'{m}/{d}'
+            self.EXPORT_FIELDS_DICT.update(add_key)
+            data = self.get_serializer(queryset, many=True).data
+            for j in data:
+                weight_class_details = j.pop('weight_class_details')
+                j.update(weight_class_details)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, sheet_name=target_month, handle_str=True)
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
     def destroy(self, request, *args, **kwargs):
         try:
             instance = self.get_object()
@@ -5478,3 +5516,67 @@ class WeightClassPlanViewSet(ModelViewSet):
         instance.delete_flag = 1
         instance.save()
         return Response('操作成功')
+
+    @atomic
+    @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated], url_path='import-xlsx', url_name='import_xlsx')
+    def import_xlsx(self, request):
+        excel_file = request.FILES.get('file', None)
+        if not excel_file:
+            raise ValidationError('文件不可为空！')
+        cur_sheet = get_cur_sheet(excel_file)
+        data = get_sheet_data(cur_sheet)
+        if not data:
+            raise ValidationError('导入文件无内容')
+        target_month = cur_sheet.name
+        try:
+            date_list = days_cur_month_dates(target_month)
+            now_date = get_current_factory_date()['factory_date'].strftime('%Y-%m-%d')
+            check = datetime.datetime.strptime(target_month, '%Y-%m')
+            if target_month < now_date[:7]:
+                raise ValidationError(f'导入异常: 只能导入当月及以后的数据')
+            date_index = date_list.index(now_date) + 1 if now_date in date_list else 0
+            for index, item in enumerate(data):
+                if len(item[3:]) != len(date_list):
+                    raise ValidationError(f'导入异常: 导入天数与月份不符')
+                # 检查班别、姓名、岗位、排班
+                if not GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='配料间排班组别', global_name=item[0]):
+                    raise ValidationError(f'导入异常: 班别{item[0]}不存在')
+                user = User.objects.filter(is_active=True, username=item[1]).last()
+                if not user:
+                    raise ValidationError(f'导入异常: 姓名{item[1]}不存在')
+                if not PerformanceJobLadder.objects.filter(type='细料称量' if '细料' in item[0] else ('硫磺称量' if '硫磺' in item[0] else '其它'), name=item[2]):
+                    raise ValidationError(f'导入异常: 岗位{item[2]}不存在')
+                class_codes = set([i for i in item[3:] if i and i != '休'])
+                class_codes_set = set(GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='配料间排班详细分类').values_list('global_name', flat=True).distinct())
+                if class_codes - class_codes_set:
+                    raise ValidationError(f"导入异常: 排班代码异常{','.join(list(class_codes - class_codes_set))}")
+                self.execute_import(date_index, target_month, item, user, date_list)
+        except Exception as e:
+            logger.error(e.args[0])
+            error_msg = e.args[0] if '导入异常' in e.args[0] else '导入数据异常'
+            raise ValidationError(error_msg)
+        return Response('导入成功')
+
+    def execute_import(self, index, target_month, item, user, date_list):
+        classes, username, station = item[0], item[1], item[2]
+        record = WeightClassPlan.objects.filter(delete_flag=False, target_month=target_month, user__username=username, classes=classes).last()
+        if record:
+            update_item = item[index + 3:]
+            details = record.weight_class_details.all().order_by('factory_date')[index:]
+            for j, content in enumerate(details):
+                class_code = None if not update_item[j] else update_item[j]
+                content.class_code = class_code
+                content.save()
+            if record.station != station:
+                record.station = station
+                record.save()
+        else:
+            instance = WeightClassPlan.objects.create(target_month=target_month, classes=classes, station=station, user=user)
+            create_item = item[3:]
+            for k, content in enumerate(date_list):
+                if k < index:
+                    create_data = {'weight_class_plan': instance, 'factory_date': content, 'class_code': None}
+                else:
+                    create_data = {'weight_class_plan': instance, 'factory_date': content, 'class_code': create_item[k] if create_item[k] else None}
+                WeightClassPlanDetail.objects.create(**create_data)
+

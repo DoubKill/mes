@@ -24,12 +24,14 @@ from system.models import User, Section
 logger = logging.getLogger('error_log')
 
 
-def gen_template_response(export_fields_dict, data, file_name, handle_str=False):
+def gen_template_response(export_fields_dict, data, file_name, sheet_name=None, handle_str=False):
     export_fields = list(export_fields_dict.values())
     sheet_heads = list(export_fields_dict.keys())
     wb = load_workbook('xlsx_template/example.xlsx')
     ws = wb.worksheets[0]
     sheet = wb.copy_worksheet(ws)
+    if sheet_name:
+        sheet.title = sheet_name
     for idx, sheet_head in enumerate(sheet_heads):
         sheet.cell(1, idx + 1).value = sheet_head
 
