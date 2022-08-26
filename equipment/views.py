@@ -2436,14 +2436,20 @@ class EquipWarehouseLocationViewSet(ModelViewSet):
     def list(self, request, *args, **kwargs):
         area_id = self.request.query_params.get('equip_warehouse_area_id')
         move = self.request.query_params.get('move')
+        all_location = self.request.query_params.get('all_location')
         spare_code = self.request.query_params.get('spare_code')
         if self.request.query_params.get('all'):
             queryset = self.filter_queryset(self.queryset)
             if spare_code:
                 if move:
-                    already_locations = set(EquipWarehouseInventory.objects.filter(delete_flag=False,
-                                                                                   equip_warehouse_area__id=area_id)
-                                            .values_list('equip_warehouse_location__id', flat=True))
+                    if all_location:  # 获取库区下的所有库位
+                        already_locations = set(EquipWarehouseLocation.objects.filter(delete_flag=False,
+                                                                                      equip_warehouse_area__id=area_id)
+                                                .values_list('id', flat=True))
+                    else:  # 获取含有备件库区的所有库位
+                        already_locations = set(EquipWarehouseInventory.objects.filter(delete_flag=False,
+                                                                                       equip_warehouse_area__id=area_id)
+                                                .values_list('equip_warehouse_location__id', flat=True))
                 else:
                     already_locations = set(EquipWarehouseInventory.objects.filter(delete_flag=False, quantity__gt=0,
                                                                                    equip_spare__spare_code=spare_code,
@@ -3233,30 +3239,45 @@ class EquipAutoPlanView(APIView):
                 'equip_spare').distinct()
             dic = {}
             if data:
-                areas, location = [], []
-                for item in data:
+                index, areas, location = 0, [], []
+                for i, item in enumerate(data):
                     if item['quantity'] <= 0:
                         continue
+                    else:
+                        if not index:
+                            index = i
                     # 库区
                     _area = {'equip_warehouse_area_id': item['equip_warehouse_area__id'], 'area_name': item['equip_warehouse_area__area_name']}
                     if _area not in areas:
                         areas.append(_area)
                     # 库位
-                    if item['equip_warehouse_area__id'] == data[0]['equip_warehouse_area__id']:
+                    if item['equip_warehouse_area__id'] == data[index]['equip_warehouse_area__id']:
                         location.append({'id': item['equip_warehouse_location__id'],
                                          'location_name': item['equip_warehouse_location__location_name'],
                                          'quantity': item['quantity']})
-                move_location = EquipWarehouseLocation.objects.filter(equip_warehouse_area_id=data[0]['equip_warehouse_area__id'],
-                                                                      delete_flag=False).values('id', 'location_name')
+                if not all([areas, location]):
+                    dic.update({
+                        'areas': areas,
+                        'location': location,
+                        'spare_code': data[0]['equip_spare__spare_code'],
+                        'spare_name': data[0]['equip_spare__spare_name'],
+                        'move_location': [],
+                        'move_area': [],
+                        'equip_spare': data[0]['equip_spare']
+                    })
+                    return Response({"success": True, "message": None, "data": dic})
                 obj = EquipSpareErp.objects.filter(spare_code=spare_code).first()
                 s_area = EquipWarehouseArea.objects.filter(Q(warehouse_area__equip_component_type=obj.equip_component_type) | Q(warehouse_area__isnull=True))
                 if not s_area:
                     return Response({"success": False, "message": '该备件没有可存放的库区', "data": None})
                 move_area = [{'equip_warehouse_area_id': item.id, 'area_name': item.area_name} for item in s_area]
-                temp = {'equip_warehouse_area_id': data[0]['equip_warehouse_area__id'], 'area_name': data[0]['equip_warehouse_area__area_name']}
+                temp = {'equip_warehouse_area_id': data[index]['equip_warehouse_area__id'], 'area_name': data[index]['equip_warehouse_area__area_name']}
                 if temp in move_area:
                     move_area.remove(temp)
                     move_area.insert(0, temp)
+                move_location = EquipWarehouseLocation.objects.filter(
+                    equip_warehouse_area_id=move_area[0]['equip_warehouse_area_id'],
+                    delete_flag=False).values('id', 'location_name')
                 dic.update({
                     'areas': areas,
                     'location': location,
