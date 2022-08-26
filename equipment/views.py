@@ -3256,16 +3256,7 @@ class EquipAutoPlanView(APIView):
                                          'location_name': item['equip_warehouse_location__location_name'],
                                          'quantity': item['quantity']})
                 if not all([areas, location]):
-                    dic.update({
-                        'areas': areas,
-                        'location': location,
-                        'spare_code': data[0]['equip_spare__spare_code'],
-                        'spare_name': data[0]['equip_spare__spare_name'],
-                        'move_location': [],
-                        'move_area': [],
-                        'equip_spare': data[0]['equip_spare']
-                    })
-                    return Response({"success": True, "message": None, "data": dic})
+                    return Response({"success": False, "message": "未找到改备件相关库区库位信息", "data": None})
                 obj = EquipSpareErp.objects.filter(spare_code=spare_code).first()
                 s_area = EquipWarehouseArea.objects.filter(Q(warehouse_area__equip_component_type=obj.equip_component_type) | Q(warehouse_area__isnull=True))
                 if not s_area:
