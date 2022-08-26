@@ -3235,6 +3235,8 @@ class EquipAutoPlanView(APIView):
             if data:
                 areas, location = [], []
                 for item in data:
+                    if item['quantity'] <= 0:
+                        continue
                     # 库区
                     _area = {'equip_warehouse_area_id': item['equip_warehouse_area__id'], 'area_name': item['equip_warehouse_area__area_name']}
                     if _area not in areas:
