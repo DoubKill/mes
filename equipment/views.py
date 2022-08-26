@@ -3212,6 +3212,14 @@ class EquipAutoPlanView(APIView):
             }
             return Response({"success": True, "message": None, "data": data})
         else:  # 备件移库/盘库
+            location_id = self.request.query_params.get('location_id')
+            area_id = self.request.query_params.get('area_id')
+            if location_id and area_id:
+                inventory = EquipWarehouseInventory.objects.filter(equip_spare__spare_code=spare_code, delete_flag=False,
+                                                                   equip_warehouse_area_id=area_id, quantity__gt=0,
+                                                                   equip_warehouse_location_id=location_id).aggregate(total=Sum('quantity'))['total']
+                quantity = inventory if inventory else 0
+                return Response({"success": True, "message": None, "data": {"quantity": quantity}})
             data = EquipWarehouseInventory.objects.filter(equip_spare__spare_code=spare_code, delete_flag=False)\
                 .values('equip_spare', 'equip_warehouse_location').annotate(
                 quantity=Sum('quantity')).values(
@@ -3225,10 +3233,17 @@ class EquipAutoPlanView(APIView):
                 'equip_spare').distinct()
             dic = {}
             if data:
-                location = [{'id': item['equip_warehouse_location__id'],
-                             'location_name': item['equip_warehouse_location__location_name'],
-                             'quantity': item['quantity']
-                             } for item in data]
+                areas, location = [], []
+                for item in data:
+                    # 库区
+                    _area = {'equip_warehouse_area_id': item['equip_warehouse_area__id'], 'area_name': item['equip_warehouse_area__area_name']}
+                    if _area not in areas:
+                        areas.append(_area)
+                    # 库位
+                    if item['equip_warehouse_area__id'] == data[0]['equip_warehouse_area__id']:
+                        location.append({'id': item['equip_warehouse_location__id'],
+                                         'location_name': item['equip_warehouse_location__location_name'],
+                                         'quantity': item['quantity']})
                 move_location = EquipWarehouseLocation.objects.filter(equip_warehouse_area_id=data[0]['equip_warehouse_area__id'],
                                                                       delete_flag=False).values('id', 'location_name')
                 obj = EquipSpareErp.objects.filter(spare_code=spare_code).first()
@@ -3241,8 +3256,7 @@ class EquipAutoPlanView(APIView):
                     move_area.remove(temp)
                     move_area.insert(0, temp)
                 dic.update({
-                    'area_id': data[0]['equip_warehouse_area__id'],
-                    'area_name': data[0]['equip_warehouse_area__area_name'],
+                    'areas': areas,
                     'location': location,
                     'spare_code': data[0]['equip_spare__spare_code'],
                     'spare_name': data[0]['equip_spare__spare_name'],
