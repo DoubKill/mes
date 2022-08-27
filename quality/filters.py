@@ -31,11 +31,11 @@ class MaterialTestOrderFilter(django_filters.rest_framework.FilterSet):
     equip_no = django_filters.CharFilter(field_name='production_equip_no', help_text='机号')
     # product_no = django_filters.CharFilter(field_name='product_no', lookup_expr='icontains', help_text='产出胶料编号')
     classes = django_filters.CharFilter(field_name="production_class", help_text='班次')
-    stage = django_filters.CharFilter(field_name='product_no', lookup_expr='icontains', help_text='段次')
+    # stage = django_filters.CharFilter(field_name='product_no', lookup_expr='icontains', help_text='段次')
 
     class Meta:
         model = MaterialTestOrder
-        fields = ('st', 'et', 'equip_no', 'product_no', "classes", 'stage', 'lot_no', 'is_recheck', 'production_group')
+        fields = ('st', 'et', 'equip_no', 'product_no', "classes", 'lot_no', 'is_recheck', 'production_group')
 
 
 class MaterialDataPointIndicatorFilter(django_filters.rest_framework.FilterSet):
