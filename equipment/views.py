@@ -2977,7 +2977,7 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
         if instance:
             check_move = EquipWarehouseRecord.objects.filter(status__in=['盘库', '移库'], equip_spare=instance.equip_spare,
                                                              equip_warehouse_area=instance.equip_warehouse_area,
-                                                             equip_warehouse_location=instance.equip_warehouse_location)
+                                                             equip_warehouse_location=instance.equip_warehouse_location).order_by('-created_date')
             data = self.get_serializer(check_move, many=True).data
         return Response(data)
 
