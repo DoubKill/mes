@@ -2499,8 +2499,10 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
         if unique_id:
             filter_kwargs['unique_id'] = unique_id
         if work_order_no:
-            data = EquipApplyOrder.objects.exclude(status='已关闭').values('work_order_no',
-                                                                        'created_date', 'plan_name')
+            # 已经关联过的工单
+            order_records = list(self.get_queryset().filter(work_order_no__isnull=False).values_list('work_order_no', flat=True))
+            data = EquipApplyOrder.objects.exclude(Q(status='已关闭') | Q(work_order_no__in=order_records))\
+                .values('work_order_no', 'created_date', 'plan_name')
             [i.update(created_date=i['created_date'].strftime('%Y-%m-%d %H:%M:%S')) for i in data]
             return Response(data)
         if state == '入库':
@@ -2887,7 +2889,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
                     now_quantity=new_quantity,
                     quantity=f"+{data.get('quantity')}",
                     equip_spare_id=data.get('equip_spare'),
-                    created_user=self.request.user),
+                    created_user=self.request.user)
             elif handle == '删除':
                 inventory.quantity = 0
                 quantity = inventory.quantity
@@ -2944,9 +2946,15 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
         "领用用途": "purpose"
     }
 
+    def get_serializer_class(self):
+        if self.action == 'retrieve':
+            return EquipWarehouseRecordRetrieveSerializer
+        else:
+            return EquipWarehouseRecordSerializer
+
     def list(self, request, *args, **kwargs):
         if self.request.query_params.get('export'):
-            queryset = self.filter_queryset(self.queryset.order_by('-real_time'))
+            queryset = self.filter_queryset(self.get_queryset().filter(status__in=['入库', '出库']).order_by('-real_time'))
             serializer = self.get_serializer(queryset, many=True)
             return gen_template_response(self.EXPORT_FIELDS_DICT, list(serializer.data), self.FILE_NAME, handle_str=True)
         if self.request.query_params.get('work_order_no'):
@@ -2961,6 +2969,17 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
                              'result_fault_desc': order.result_fault_desc})
 
         return super().list(request, *args, **kwargs)
+
+    def retrieve(self, request, *args, **kwargs):
+        """查看备件该库位的盘库/移库信息"""
+        data = []
+        instance = EquipWarehouseRecord.objects.filter(id=kwargs.get('pk')).last()
+        if instance:
+            check_move = EquipWarehouseRecord.objects.filter(status__in=['盘库', '移库'], equip_spare=instance.equip_spare,
+                                                             equip_warehouse_area=instance.equip_warehouse_area,
+                                                             equip_warehouse_location=instance.equip_warehouse_location)
+            data = self.get_serializer(check_move, many=True).data
+        return Response(data)
 
     @atomic
     def update(self, request, *args, **kwargs):  # 撤销
