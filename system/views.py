@@ -409,7 +409,7 @@ class GroupPermissions(APIView):
                     else:
                         child['has_permission'] = False
                 ret.append({'name': perm.name, 'permissions': children_list})
-        if user_id:
+        elif user_id:
             try:
                 user = User.objects.get(id=user_id)
             except Exception:
