@@ -389,6 +389,7 @@ class GroupPermissions(APIView):
 
     def get(self, request):
         group_id = self.request.query_params.get('group_id')
+        user_id = self.request.query_params.get('user_id')
         permission_name = self.request.query_params.get('permission_name')
         if group_id:
             try:
@@ -404,6 +405,24 @@ class GroupPermissions(APIView):
                 children_list = perm.children_list
                 for child in children_list:
                     if child['id'] in group_permissions:
+                        child['has_permission'] = True
+                    else:
+                        child['has_permission'] = False
+                ret.append({'name': perm.name, 'permissions': children_list})
+        if user_id:
+            try:
+                user = User.objects.get(id=user_id)
+            except Exception:
+                raise ValidationError('参数错误')
+            user_permissions = list(user.permissions.values_list('id', flat=True))
+            ret = []
+            parent_permissions = Permissions.objects.filter(parent__isnull=True)
+            if permission_name:
+                parent_permissions = parent_permissions.filter(name__icontains=permission_name)
+            for perm in parent_permissions:
+                children_list = perm.children_list
+                for child in children_list:
+                    if child['id'] in user_permissions:
                         child['has_permission'] = True
                     else:
                         child['has_permission'] = False
