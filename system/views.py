@@ -75,6 +75,8 @@ class UserViewSet(ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
+        if not self.request.user.is_superuser:
+            queryset = queryset.filter(is_superuser=False)
         export = self.request.query_params.get('export')
         if self.request.query_params.get('all'):
             if self.request.query_params.get('attendance'):  # 是否在考勤组
