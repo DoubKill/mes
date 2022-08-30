@@ -23,7 +23,7 @@ from mes.common_code import zdy_jwt_payload_handler
 from mes.conf import WMS_URL, TH_URL
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
-from mes.permissions import PermissionClass
+from mes.permissions import PermissionClass, IsSuperUser
 from plan.models import ProductClassesPlan, MaterialDemanded, ProductDayPlan
 from production.models import PlanStatus, AttendanceGroupSetup
 from quality.utils import get_cur_sheet, get_sheet_data
@@ -142,6 +142,18 @@ class UserViewSet(ModelViewSet):
         if len(num_list) != len(set(num_list)):
             raise ValidationError('导入数据中存在相同的员工工号，请修改后重试！')
         s.save()
+        return Response('ok')
+
+    @action(methods=['post'], detail=False, permission_classes=[IsSuperUser, ], url_path='set-superuser',
+            url_name='set-superuser')
+    def set_superuser(self, request):
+        user_id = self.request.data.get('user_id')
+        user = User.objects.get(id=user_id)
+        if user.is_superuser:
+            user.is_superuser = False
+        else:
+            user.is_superuser = True
+        user.save()
         return Response('ok')
 
 
@@ -346,7 +358,8 @@ class LoginView(ObtainJSONWebToken):
                              'id': user.id,
                              "token": token,
                              'wms_url': WMS_URL,
-                             'th_url': TH_URL})
+                             'th_url': TH_URL,
+                             'is_superuser': user.is_superuser})
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 

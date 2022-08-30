@@ -87,7 +87,7 @@ class UserSerializer(BaseModelSerializer):
 
     class Meta:
         model = User
-        exclude = ('user_permissions', 'groups')
+        exclude = ('user_permissions', 'groups', 'is_superuser')
         extra_kwargs = {
             'group_extensions': {
                 'required': False
