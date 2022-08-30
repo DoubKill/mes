@@ -19,7 +19,7 @@ from terminal.views import BatchBasicInfoView, BatchProductionInfoView, BatchPro
     MaterialInfoIssue, ReplaceMaterialViewSet, ReturnRubberViewSet, ToleranceKeyword, ToleranceRuleViewSet, \
     WeightPackageManualViewSet, GetManualInfo, WeightPackageSingleViewSet, GetMaterialTolerance, UpdateFlagCountView, \
     MaterialDetailsAux, GetXlRecipesInfoView, XlRecipeNoticeView, ApplyHaltEquipView, FormulaPreparationView, \
-    ReportWeightViewStaticsView, WmsAddPrintViewSet
+    ReportWeightViewStaticsView, WmsAddPrintViewSet, BatchScanLogViewSet
 
 router = DefaultRouter()
 router.register('batch-log', LoadMaterialLogViewSet)  # 终端投料履历管理
@@ -58,7 +58,8 @@ urlpatterns = [
     path('weighting-package-trains/', WeightPackageTrainsView.as_view()),  # 称量打包车次列表
     path('bar-code-tank/', BarCodeTank.as_view()),
     path('batch-charge-log-list/', BatchChargeLogListViewSet.as_view()),  # 密炼投入履历
-    path('weight-batching-log-list/', WeightBatchingLogListViewSet.as_view()),  # 药品投入统计
+    path('batch-scan-log/', BatchScanLogViewSet.as_view()),  # 密炼投入查询
+    path('weight-batching-log-list/', WeightBatchingLogListViewSet.as_view()),  # 料罐投入履历
     path('product-exchange/', ProductExchange.as_view()),
     path('weighting-package-expire/', PackageExpireView.as_view()),  # 料包有效期
     path('weighting-tank-status/', WeightingTankStatus.as_view()),  # 料罐信息(C#端)
