@@ -242,56 +242,51 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 total_weight = wms.single_weight
                 unit = 'KG'
         else:  # 总厂胶块:查原材料出库履历查到原材料物料编码
-            # try:
-            #     res = material_out_barcode(bra_code) if not settings.DEBUG else None
-            # except Exception as e:
-            #     save_scan_log(scan_data, scan_message='获取原材料信息失败')
-            #     raise serializers.ValidationError(e)
-            # if res:
-            #     scan_material = res.get('WLMC')
-            #     material_name_set = set(ERPMESMaterialRelation.objects.filter(zc_material__wlxxid=res['WLXXID'], use_flag=True).values_list('material__material_name', flat=True))
-            #     if not material_name_set:
-            #         save_scan_log(scan_data, scan_message='该物料未与MES原材料建立绑定关系！')
-            #         raise serializers.ValidationError('该物料未与MES原材料建立绑定关系！')
-            #     cnt_names = [i.get('material__material_name') for i in cnt_type_details]
-            #     same_cnt = list(material_name_set & set(cnt_names))
-            #     if same_cnt:
-            #         material_name = same_cnt[0]
-            #         # 已经通过单配扫入并且没有使用完则不能扫原材料小料条码
-            #         load_material = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid,
-            #                                                            material_name=material_name,
-            #                                                            useup_time__year='1970').last()
-            #         if load_material:
-            #             save_scan_log(scan_data, scan_message=f'该物料已经扫过人工单配{material_name}', scan_material=material_name, unit=load_material.unit, scan_material_type='原材料小料')
-            #             raise serializers.ValidationError(f'该物料已经扫过人工单配{material_name}')
-            #         # 去除原材料小料(群控扣重时需要去除原材料小料物料[mes返回标准内])
-            #         wms_xl_material = OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, status=1,
-            #                                                           material_name=material_name,
-            #                                                           other_type='原材料小料').last()
-            #         if wms_xl_material:
-            #             save_scan_log(scan_data, scan_message=f'原材料小料条码已经扫过', scan_material_type='原材料小料',
-            #                           scan_material=material_name, unit='KG', init_weight=wms_xl_material.plan_weight)
-            #             raise serializers.ValidationError('原材料小料条码已经扫过')
-            #         OtherMaterialLog.objects.create(**{'plan_classes_uid': plan_classes_uid, 'other_type': '原材料小料',
-            #                                            'product_no': plan_product_no, 'material_name': material_name,
-            #                                            'bra_code': bra_code, 'status': 1})
-            #         save_scan_log(scan_data, scan_result='成功', scan_material_type='原材料小料', scan_material=material_name, unit='KG',
-            #                       init_weight=wms_xl_material.plan_weight)
-            #         raise serializers.ValidationError('原材料小料扫码成功')
-            #     comm_material = list(material_name_set & materials)
-            #     if comm_material:
-            #         material_name = comm_material[0]
-            #         material_no = comm_material[0]
-            #     else:  # 胶块替代(1、不能通过直接绑定erp替代; 2、增加这段逻辑确保替代胶块能走到下面物料是否在配方中判断)
-            #         material_name = scan_material
-            #         material_no = scan_material
-            #     total_weight = Decimal(res.get('ZL'))
-            #     unit = res.get('BZDW')
-            scan_material = '268丁基胶-X(美国)'
-            material_name = '268丁基胶-X'
-            material_no = material_name
-            total_weight = 2
-            unit = 'KG'
+            try:
+                res = material_out_barcode(bra_code) if not settings.DEBUG else None
+            except Exception as e:
+                save_scan_log(scan_data, scan_message='获取原材料信息失败')
+                raise serializers.ValidationError(e)
+            if res:
+                scan_material = res.get('WLMC')
+                material_name_set = set(ERPMESMaterialRelation.objects.filter(zc_material__wlxxid=res['WLXXID'], use_flag=True).values_list('material__material_name', flat=True))
+                if not material_name_set:
+                    save_scan_log(scan_data, scan_message='该物料未与MES原材料建立绑定关系！')
+                    raise serializers.ValidationError('该物料未与MES原材料建立绑定关系！')
+                cnt_names = [i.get('material__material_name') for i in cnt_type_details]
+                same_cnt = list(material_name_set & set(cnt_names))
+                if same_cnt:
+                    material_name = same_cnt[0]
+                    # 已经通过单配扫入并且没有使用完则不能扫原材料小料条码
+                    load_material = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid,
+                                                                       material_name=material_name,
+                                                                       useup_time__year='1970').last()
+                    if load_material:
+                        save_scan_log(scan_data, scan_message=f'该物料已经扫过人工单配{material_name}', scan_material=material_name, unit=load_material.unit, scan_material_type='原材料小料')
+                        raise serializers.ValidationError(f'该物料已经扫过人工单配{material_name}')
+                    # 去除原材料小料(群控扣重时需要去除原材料小料物料[mes返回标准内])
+                    wms_xl_material = OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, status=1,
+                                                                      material_name=material_name,
+                                                                      other_type='原材料小料').last()
+                    if wms_xl_material:
+                        save_scan_log(scan_data, scan_message=f'原材料小料条码已经扫过', scan_material_type='原材料小料',
+                                      scan_material=material_name, unit='KG', init_weight=wms_xl_material.plan_weight)
+                        raise serializers.ValidationError('原材料小料条码已经扫过')
+                    OtherMaterialLog.objects.create(**{'plan_classes_uid': plan_classes_uid, 'other_type': '原材料小料',
+                                                       'product_no': plan_product_no, 'material_name': material_name,
+                                                       'bra_code': bra_code, 'status': 1})
+                    save_scan_log(scan_data, scan_result='成功', scan_material_type='原材料小料', scan_material=material_name, unit='KG',
+                                  init_weight=wms_xl_material.plan_weight)
+                    raise serializers.ValidationError('原材料小料扫码成功')
+                comm_material = list(material_name_set & materials)
+                if comm_material:
+                    material_name = comm_material[0]
+                    material_no = comm_material[0]
+                else:  # 胶块替代(1、不能通过直接绑定erp替代; 2、增加这段逻辑确保替代胶块能走到下面物料是否在配方中判断)
+                    material_name = scan_material
+                    material_no = scan_material
+                total_weight = Decimal(res.get('ZL'))
+                unit = res.get('BZDW')
         if not material_name:
             save_scan_log(scan_data, scan_message='未找到该条形码信息！')
             raise serializers.ValidationError('未找到该条形码信息！')
