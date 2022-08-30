@@ -731,6 +731,7 @@ class EquipWarehouseOrder(AbstractEntity):
     barcode = models.CharField(max_length=64, help_text='领料单据', null=True, blank=True)
     processing_time = models.DateTimeField(help_text='处理时间', null=True, blank=True)
     lluser = models.CharField(max_length=64, help_text='领料人', null=True, blank=True)
+    state = models.BooleanField(help_text='单据创建标志[是否为自动新建单据]', default=False)
 
     class Meta:
         db_table = 'equip_warehouse_order'
@@ -806,6 +807,7 @@ class EquipWarehouseRecord(AbstractEntity):
                                                      on_delete=models.CASCADE, null=True, blank=True)
     status = models.CharField(max_length=64, help_text='入库/出库/盘库/撤销/移库', default='入库')
     real_time = models.DateTimeField(help_text='出库时间', null=True, blank=True)
+    purpose = models.CharField(max_length=128, help_text='领用用途', null=True, blank=True)
 
     class Meta:
         db_table = 'equip_warehouse_record'

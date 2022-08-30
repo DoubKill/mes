@@ -3301,7 +3301,7 @@ class EmployeeAttendanceRecordsView(APIView):
         #     export_flag = False
         # if set(attendance_data.values_list('opera_flag', flat=True)) != {3}:
         #     export_flag = False
-        return Response({'results': results_sort, 'group_list': group_list, 'export_flag': export_flag, 'status': state,
+        return Response({'results': results_sort, 'group_list': group_list, 'export_flag': export_flag, 'state': state,
                          'audit_user':  audit_user, 'user_groups': user_groups, 'approve_user': approve_user})
 
     # 导入出勤记录
@@ -4231,7 +4231,7 @@ class AttendanceClockViewSet(ModelViewSet):
             else:
                 if datetime.datetime.strptime(date_now, '%Y-%m-%d').date() > last_obj.factory_date + timedelta(days=1) \
                         or (not last_obj.end_date and (time_now - last_obj.begin_date).total_seconds() / 3600 >
-                            12.5 + attendance_group_obj.lead_time / 60) \
+                            12 - attendance_group_obj.lead_time / 60) \
                         or (last_obj.end_date and (time_now - last_obj.end_date).total_seconds() / 3600 > 0.5):
                     flat = True
                 else:
@@ -4333,7 +4333,7 @@ class AttendanceClockViewSet(ModelViewSet):
         # 标准上下班时间
         date_now, group, classes = date_now, data['group'], data['classes']
         last_record = EmployeeAttendanceRecords.objects.filter(user=user, end_date__isnull=True).last()
-        if last_record and last_record.factory_date != date_now and not (not last_record.end_date and last_record.begin_date and (time_now - last_record.begin_date).total_seconds() / 3600 > 12.5):
+        if last_record and last_record.factory_date != date_now and not (last_record.begin_date and (time_now - last_record.begin_date).total_seconds() / 3600 > 16):
             date_now, group, classes = [str(last_record.factory_date), last_record.group, last_record.classes]
         standard_begin_time, standard_end_time = get_standard_time(user.username, date_now, group=group, classes=classes)
         if not standard_begin_time:
@@ -4563,6 +4563,9 @@ class AttendanceClockViewSet(ModelViewSet):
         user = self.request.user
         select_time = self.request.query_params.get('select_time')
         try:
+            # 跨天处理[下班卡]
+            if select_time and '08:00:00' <= select_time.split(' ')[-1] < '09:00:00':
+                select_time = select_time[:11] + '07:00:00'
             attendance_group_obj, section_list, equip_list, date_now, group_list = self.get_user_group(self.request.user, select_time)
         except Exception as e:
             group_list, equip_list, section_list, principal = [], [], [], ''

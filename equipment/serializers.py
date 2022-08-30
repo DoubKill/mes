@@ -1450,8 +1450,9 @@ class EquipWarehouseOrderDetailSerializer(BaseModelSerializer):
     class Meta:
         model = EquipWarehouseOrderDetail
         fields = ("id", "created_username", "spare_code", "spare_name", "component_type_name", "specification",
-            "technical_params", "unit", "created_date", "in_quantity", "out_quantity", "plan_in_quantity", "unique_id",
-            "plan_out_quantity", "status", "status_name", "equip_warehouse_order", "equip_spare", "all_qty", "key_parts_flag")
+                  "technical_params", "unit", "created_date", "in_quantity", "out_quantity", "plan_in_quantity",
+                  "unique_id", "plan_out_quantity", "status", "status_name", "equip_warehouse_order", "equip_spare",
+                  "all_qty", "key_parts_flag", "outer_time", "enter_time")
 
     def get_all_qty(self, instance):
         res = EquipWarehouseInventory.objects.filter(equip_spare=instance.equip_spare, delete_flag=False).aggregate(all_qty=Sum('quantity'))
@@ -1498,7 +1499,8 @@ class EquipWarehouseOrderSerializer(BaseModelSerializer):
         u = User.objects.filter(username=add_username).last()
         if not u:
             raise serializers.ValidationError(f'未找到{add_username}')
-        validated_data.update({'desc': desc, 'created_user_id': u.id})
+        state = self.context.get('state', False)
+        validated_data.update({'desc': desc, 'created_user_id': u.id, 'state': state})
         order = super().create(validated_data)
         status = validated_data['status']
         for equip_sapre in equip_spare_list:
@@ -1614,7 +1616,6 @@ class EquipWarehouseRecordSerializer(BaseModelSerializer):
     work_order_no = serializers.ReadOnlyField(source='equip_warehouse_order_detail.equip_warehouse_order.work_order_no',
                                               help_text='工单编号')
     receive_user = serializers.ReadOnlyField(source='equip_warehouse_order_detail.receive_user', help_text='领用人')
-    purpose = serializers.ReadOnlyField(source='equip_warehouse_order_detail.purpose', help_text='用途')
 
     class Meta:
         model = EquipWarehouseRecord
@@ -1625,6 +1626,20 @@ class EquipWarehouseRecordSerializer(BaseModelSerializer):
         if instance.equip_spare.cost and instance.status in ['出库', '入库']:
             return round(instance.equip_spare.cost * int(instance.quantity), 2)
         return 0
+
+
+class EquipWarehouseRecordRetrieveSerializer(BaseModelSerializer):
+    spare_code = serializers.ReadOnlyField(source='equip_spare.spare_code', help_text='备件编码')
+    spare_name = serializers.ReadOnlyField(source='equip_spare.spare_name', help_text='备件名称')
+    component_type_name = serializers.ReadOnlyField(source='equip_spare.equip_component_type.component_type_name',
+                                                    help_text='备件分类名称')
+    area_name = serializers.ReadOnlyField(source='equip_warehouse_area.area_name', help_text='库区')
+    location_name = serializers.ReadOnlyField(source='equip_warehouse_location.location_name', help_text='库位')
+
+    class Meta:
+        model = EquipWarehouseRecord
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
 class EquipPlanSerializer(BaseModelSerializer):
