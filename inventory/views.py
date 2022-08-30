@@ -4495,7 +4495,11 @@ class BzFinalRubberInventory(ListAPIView):
             b_e_range = [0, int(end_trains)]
         else:
             b_e_range = []
-        ret = self.get_serializer(queryset, many=True).data
+        if store_name == '炼胶库':
+            ret = self.get_serializer(queryset, many=True).data
+        else:
+            ret = BzFinalMixingRubberLBInventorySerializer(queryset, many=True).data
+
         if b_e_range:
             ret = list(filter(
                 lambda x: max(x['begin_end_trains'][0], b_e_range[0]) <= min(x['begin_end_trains'][1], b_e_range[1]),
