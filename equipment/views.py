@@ -2865,7 +2865,6 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
             if handle == '盘库':
                 quantity = data.get('quantity')
                 inventory.quantity = data['quantity']
-                all_inventory.update(check_desc=data.get('desc'))
             elif handle == '移库':
                 if data['move_equip_warehouse_location__id'] == data['equip_warehouse_location__id']:
                     return Response({"success": False, "message": '不能移动到当前库区', "data": None})
@@ -2873,7 +2872,6 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
                 if inventory.quantity < data['quantity']:
                     return Response({"success": False, "message": '当前库存数量不足', "data": None})
                 inventory.quantity -= data['quantity']
-                all_inventory.update(move_desc=data.get('desc'))
                 new_queryset = self.queryset.filter(equip_spare_id=data['equip_spare'], equip_warehouse_area_id=data['move_equip_warehouse_area__id'],
                                                     equip_warehouse_location_id=data['move_equip_warehouse_location__id'])
                 if new_queryset.exists():
@@ -2905,6 +2903,10 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
             # 记录履历
             inventory.save()
             now_quantity = inventory.quantity
+            if handle == '盘库':
+                all_inventory.update(check_desc=data.get('desc'))
+            if handle == '移库':
+                all_inventory.update(move_desc=data.get('desc'))
             EquipWarehouseRecord.objects.create(
                 status=handle,
                 revocation_desc=data.get('desc'),
