@@ -2825,6 +2825,8 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
                                                  'equip_spare__technical_params',
                                                  'quantity',
                                                  'equip_spare',
+                                                 'check_desc',
+                                                 'move_desc',
                                                  'equip_spare__unit',
                                                  'equip_spare__upper_stock',
                                                  'equip_spare__lower_stock').distinct()
@@ -2861,6 +2863,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
             if handle == '盘库':
                 quantity = data.get('quantity')
                 inventory.quantity = data['quantity']
+                inventory.check_desc = data.get('desc')
             elif handle == '移库':
                 if data['move_equip_warehouse_location__id'] == data['equip_warehouse_location__id']:
                     return Response({"success": False, "message": '不能移动到当前库区', "data": None})
@@ -2868,6 +2871,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
                 if inventory.quantity < data['quantity']:
                     return Response({"success": False, "message": '当前库存数量不足', "data": None})
                 inventory.quantity -= data['quantity']
+                inventory.move_desc = data.get('desc')
                 new_queryset = self.queryset.filter(equip_spare_id=data['equip_spare'], equip_warehouse_area_id=data['move_equip_warehouse_area__id'],
                                                     equip_warehouse_location_id=data['move_equip_warehouse_location__id'])
                 if new_queryset.exists():
@@ -2977,8 +2981,8 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
         if instance:
             check_move = EquipWarehouseRecord.objects.filter(status__in=['盘库', '移库'], equip_spare=instance.equip_spare,
                                                              equip_warehouse_area=instance.equip_warehouse_area,
-                                                             equip_warehouse_location=instance.equip_warehouse_location,
-                                                             created_date__lte=instance.created_date).order_by('-created_date')
+                                                             equip_warehouse_location=instance.equip_warehouse_location)\
+                .order_by('-created_date')
             data = self.get_serializer(check_move, many=True).data
         return Response(data)
 

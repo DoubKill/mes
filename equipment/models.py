@@ -786,6 +786,9 @@ class EquipWarehouseInventory(AbstractEntity):
                                              blank=True)
     equip_warehouse_location = models.ForeignKey(EquipWarehouseLocation, help_text='库位', on_delete=models.CASCADE,
                                                  null=True, blank=True)
+    check_desc = models.CharField(max_length=512, help_text='盘库备注', null=True, blank=True)
+    move_desc = models.CharField(max_length=512, help_text='移库备注', null=True, blank=True)
+
 
     class Meta:
         db_table = 'equip_warehouse_inventory'
