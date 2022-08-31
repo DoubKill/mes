@@ -2744,6 +2744,8 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
         "标准单位": "unit",
         "库存下限": "lower_stock",
         "库存上限": "upper_stock",
+        "盘库备注": "check_desc",
+        "移库备注": "move_desc"
     }
 
     def list(self, request, *args, **kwargs):
