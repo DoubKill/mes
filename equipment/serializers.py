@@ -1405,7 +1405,14 @@ class EquipWarehouseAreaSerializer(BaseModelSerializer):
     @atomic
     def update(self, instance, validated_data):
         component_type_list = validated_data.pop('equip_component_type')
-        EquipWarehouseAreaComponent.objects.filter(equip_warehouse_area=instance).delete()
+        area_components = EquipWarehouseAreaComponent.objects.filter(equip_warehouse_area=instance)
+        inventory_components = EquipWarehouseInventory.objects.filter(equip_warehouse_area=instance, delete_flag=False)
+        inventory_ids = set(inventory_components.values_list('equip_spare__equip_component_type_id', flat=True))
+        if area_components and not component_type_list:
+            raise serializers.ValidationError('库区分类不可清空')
+        if component_type_list and inventory_ids and inventory_ids - set(component_type_list):  # 存在库区分类并且修改分类不为空(比较库存备件分类)
+            raise serializers.ValidationError('修改分类需包含库存备件的分类')
+        area_components.delete()
         for component_type in component_type_list:
             EquipWarehouseAreaComponent.objects.create(equip_warehouse_area=instance, equip_component_type_id=component_type)
         return super().update(instance, validated_data)
