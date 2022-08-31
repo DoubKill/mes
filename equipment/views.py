@@ -2812,7 +2812,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
                                             'equip_spare__lower_stock')
         else:
             data = self.filter_queryset(self.queryset.filter(quantity__gt=0)).values('equip_spare', 'equip_warehouse_location').annotate(
-                quantity=Sum('quantity')).values(
+                quantity=Sum('quantity')).order_by('equip_warehouse_location').values(
                                                  'equip_warehouse_area__id',
                                                  'equip_warehouse_area__area_name',
                                                  'equip_warehouse_location__id',
@@ -2841,7 +2841,8 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
             item['unit'] = item['equip_spare__unit']
             if not self.request.query_params.get('use'):
                 item['single_price'] = round(item['equip_spare__cost'] if item['equip_spare__cost'] else 0, 2)
-                item['total_price'] = item['single_price'] * item['quantity']
+                item['total_price'] = round(item['single_price'] * item['quantity'], 2)
+                item['desc'] = None
         if self.request.query_params.get('export'):
             return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         st = (int(page) - 1) * int(page_size)
