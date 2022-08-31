@@ -2744,6 +2744,8 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
         "标准单位": "unit",
         "库存下限": "lower_stock",
         "库存上限": "upper_stock",
+        "盘库备注": "check_desc",
+        "移库备注": "move_desc"
     }
 
     def list(self, request, *args, **kwargs):
@@ -2812,7 +2814,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
                                             'equip_spare__lower_stock')
         else:
             data = self.filter_queryset(self.queryset.filter(quantity__gt=0)).values('equip_spare', 'equip_warehouse_location').annotate(
-                quantity=Sum('quantity')).values(
+                quantity=Sum('quantity')).order_by('equip_warehouse_location').values(
                                                  'equip_warehouse_area__id',
                                                  'equip_warehouse_area__area_name',
                                                  'equip_warehouse_location__id',
@@ -2841,7 +2843,8 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
             item['unit'] = item['equip_spare__unit']
             if not self.request.query_params.get('use'):
                 item['single_price'] = round(item['equip_spare__cost'] if item['equip_spare__cost'] else 0, 2)
-                item['total_price'] = item['single_price'] * item['quantity']
+                item['total_price'] = round(item['single_price'] * item['quantity'], 2)
+                item['desc'] = None
         if self.request.query_params.get('export'):
             return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         st = (int(page) - 1) * int(page_size)
@@ -2855,7 +2858,8 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
     def create(self, request, *args, **kwargs):
         handle = self.request.data.get('handle')
         data = self.request.data
-        inventory = self.queryset.filter(equip_spare_id=data['equip_spare'], equip_warehouse_location_id=data['equip_warehouse_location__id']).first()
+        all_inventory = self.queryset.filter(equip_spare_id=data['equip_spare'], equip_warehouse_location_id=data['equip_warehouse_location__id'])
+        inventory = all_inventory.first()
         if not inventory:
             return Response({"success": False, "message": '备件代码不存在', "data": None})
         if handle:
@@ -2863,7 +2867,6 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
             if handle == '盘库':
                 quantity = data.get('quantity')
                 inventory.quantity = data['quantity']
-                inventory.check_desc = data.get('desc')
             elif handle == '移库':
                 if data['move_equip_warehouse_location__id'] == data['equip_warehouse_location__id']:
                     return Response({"success": False, "message": '不能移动到当前库区', "data": None})
@@ -2871,7 +2874,6 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
                 if inventory.quantity < data['quantity']:
                     return Response({"success": False, "message": '当前库存数量不足', "data": None})
                 inventory.quantity -= data['quantity']
-                inventory.move_desc = data.get('desc')
                 new_queryset = self.queryset.filter(equip_spare_id=data['equip_spare'], equip_warehouse_area_id=data['move_equip_warehouse_area__id'],
                                                     equip_warehouse_location_id=data['move_equip_warehouse_location__id'])
                 if new_queryset.exists():
@@ -2903,6 +2905,10 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
             # 记录履历
             inventory.save()
             now_quantity = inventory.quantity
+            if handle == '盘库':
+                all_inventory.update(check_desc=data.get('desc'))
+            if handle == '移库':
+                all_inventory.update(move_desc=data.get('desc'))
             EquipWarehouseRecord.objects.create(
                 status=handle,
                 revocation_desc=data.get('desc'),
