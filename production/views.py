@@ -3503,7 +3503,7 @@ class PerformanceJobLadderViewSet(ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         if self.request.query_params.get('all'):
-            res = PerformanceJobLadder.objects.filter(delete_flag=False).values('id', 'type', 'name')
+            res = self.filter_queryset(self.get_queryset()).values('id', 'type', 'name')
             return Response({'results': res})
         return super().list(request, *args, **kwargs)
 
