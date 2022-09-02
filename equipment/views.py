@@ -4809,13 +4809,18 @@ class GetSpare(APIView):
                 continue
             if EquipSpareErp.objects.filter(spare_code=item['wlbh'], unique_id=item['wlxxid']).exists():
                 continue
-            equip_component_type = EquipComponentType.objects.filter(component_type_name=item['wllb']).first()
-            if not equip_component_type:
-                code = EquipComponentType.objects.order_by('component_type_code').last().component_type_code
-                component_type_code = code[0:4] + '%03d' % (int(code[-3:]) + 1) if code else '001'
-                equip_component_type = EquipComponentType.objects.create(component_type_code=component_type_code,
-                                                                         component_type_name=item['wllb'],
-                                                                         use_flag=True)
+            # 查询mes是否存在该备件的分类
+            s_spare = EquipSpareErp.objects.filter(spare_code=item['wlbh'], equip_component_type__isnull=False, use_flag=True).last()
+            if s_spare:
+                equip_component_type = s_spare.equip_component_type
+            else:
+                equip_component_type = EquipComponentType.objects.filter(component_type_name=item['wllb']).first()
+                if not equip_component_type:
+                    code = EquipComponentType.objects.order_by('component_type_code').last().component_type_code
+                    component_type_code = code[0:4] + '%03d' % (int(code[-3:]) + 1) if code else '001'
+                    equip_component_type = EquipComponentType.objects.create(component_type_code=component_type_code,
+                                                                             component_type_name=item['wllb'],
+                                                                             use_flag=True)
             unique_info = EquipSpareErp.objects.filter(unique_id=item['wlxxid'], spare_code__isnull=True)
             if unique_info:
                 unique_info.update(**{"spare_code": item['wlbh'], "spare_name": item['wlmc'],
