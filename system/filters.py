@@ -21,7 +21,7 @@ class GroupExtensionFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = GroupExtension
-        fields = {"group_code", "name", 'use_flag'}
+        fields = {"group_code", "name", 'use_flag', 'section_id'}
 
 
 class SectionFilter(django_filters.rest_framework.FilterSet):

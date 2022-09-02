@@ -32,7 +32,8 @@ from system.filters import UserFilter, GroupExtensionFilter, SectionFilter, User
 from system.models import GroupExtension, User, Section, Permissions, DingDingInfo, UserOperationLog
 from system.serializers import GroupExtensionSerializer, GroupExtensionUpdateSerializer, UserSerializer, \
     UserUpdateSerializer, SectionSerializer, GroupUserUpdateSerializer, PlanReceiveSerializer, \
-    MaterialReceiveSerializer, UserImportSerializer, UserLoginSerializer, UserOperationLogSerializer
+    MaterialReceiveSerializer, UserImportSerializer, UserLoginSerializer, UserOperationLogSerializer, \
+    UserRetrieveSerializer
 
 jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
 jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
@@ -75,7 +76,7 @@ class UserViewSet(ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
-        if not self.request.user.is_superuser:
+        if not self.request.user.is_superuser:  # 去掉查看超级管理员
             queryset = queryset.filter(is_superuser=False)
         export = self.request.query_params.get('export')
         if self.request.query_params.get('all'):
@@ -86,10 +87,24 @@ class UserViewSet(ModelViewSet):
                 data = queryset.values('id', 'username', 'num', 'is_active', 'section__name', 'id_card_num')
             return Response({'results': data})
         else:
+            # 不是超级管理员，则只能查看自己负责的部门人员以及子部门人员
+            if not self.request.user.is_superuser:
+                user_sections = self.request.user.permission_charge_sections.all()
+                section_ids = []
+                for i in user_sections:
+                    section_ids += i.total_children_sections()
+                queryset = queryset.filter(section_id__in=section_ids)
             if export:
                 data = self.get_serializer(queryset, many=True).data
                 return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
-            return super().list(request, *args, **kwargs)
+
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
 
     def destroy(self, request, *args, **kwargs):
         # 账号停用和启用
@@ -103,7 +118,9 @@ class UserViewSet(ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def get_serializer_class(self):
-        if self.action in ['list', 'create', 'retrieve']:
+        if self.action == 'retrieve':
+            return UserRetrieveSerializer
+        elif self.action in ['list', 'create']:
             return UserSerializer
         else:
             return UserUpdateSerializer
@@ -200,7 +217,21 @@ class GroupExtensionViewSet(ModelViewSet):
             data = queryset.filter(use_flag=True).values('id', 'name')
             return Response({'results': data})
         else:
-            return super().list(request, *args, **kwargs)
+            # 如果不是超级管理员，则只能查看当前用户负责的权限部门
+            user = self.request.user
+            user_sections = list(user.permission_charge_sections.values_list('id', flat=True))
+            factory_id = user.get_factory_id()
+            if factory_id:
+                user_sections.append(factory_id)
+            if not user.is_superuser:
+                queryset = queryset.filter(section_id__in=user_sections)
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
 
     def get_serializer_class(self):
         if self.action in ('create', 'update', 'partial_update'):
@@ -360,7 +391,8 @@ class LoginView(ObtainJSONWebToken):
                              "token": token,
                              'wms_url': WMS_URL,
                              'th_url': TH_URL,
-                             'is_superuser': user.is_superuser})
+                             'is_superuser': user.is_superuser,
+                             'permission_section': user.permission_charge_sections.values('id', 'name')})
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -388,9 +420,10 @@ class GroupPermissions(APIView):
     permission_classes = (IsAuthenticated,)
 
     def get(self, request):
-        group_id = self.request.query_params.get('group_id')
-        user_id = self.request.query_params.get('user_id')
-        permission_name = self.request.query_params.get('permission_name')
+        group_id = self.request.query_params.get('group_id')  # 查看角色下已经赋予的权限（暂时无用）
+        user_id = self.request.query_params.get('user_id')  # 查看用户已经赋予的权限（暂时无用）
+        section_id = self.request.query_params.get('section_id')  # 查看部门下管理员赋予的权限
+        view_section_permission = self.request.query_params.get('view_section_permission')
         if group_id:
             try:
                 group = GroupExtension.objects.get(id=group_id)
@@ -399,8 +432,6 @@ class GroupPermissions(APIView):
             group_permissions = list(group.permissions.values_list('id', flat=True))
             ret = []
             parent_permissions = Permissions.objects.filter(parent__isnull=True)
-            if permission_name:
-                parent_permissions = parent_permissions.filter(name__icontains=permission_name)
             for perm in parent_permissions:
                 children_list = perm.children_list
                 for child in children_list:
@@ -417,8 +448,6 @@ class GroupPermissions(APIView):
             user_permissions = list(user.permissions.values_list('id', flat=True))
             ret = []
             parent_permissions = Permissions.objects.filter(parent__isnull=True)
-            if permission_name:
-                parent_permissions = parent_permissions.filter(name__icontains=permission_name)
             for perm in parent_permissions:
                 children_list = perm.children_list
                 for child in children_list:
@@ -427,11 +456,36 @@ class GroupPermissions(APIView):
                     else:
                         child['has_permission'] = False
                 ret.append({'name': perm.name, 'permissions': children_list})
+        elif section_id:
+            try:
+                section = Section.objects.get(id=section_id)
+            except Exception:
+                raise ValidationError('参数错误')
+            if view_section_permission:  # 查看该部门下有哪些权限
+                section_permissions = section.permissions.values('id', 'code', 'name', 'parent__name')
+                data = {}
+                for i in section_permissions:
+                    menu_name = i.pop('parent__name')
+                    if menu_name not in data:
+                        data[menu_name] = {'name': menu_name, 'permissions': [i]}
+                    else:
+                        data[menu_name]['permissions'].append(i)
+                ret = data.values()
+            else:
+                ret = []
+                section_permissions = list(section.permissions.values_list('id', flat=True))
+                parent_permissions = Permissions.objects.filter(parent__isnull=True)
+                for perm in parent_permissions:
+                    children_list = perm.children_list
+                    for child in children_list:
+                        if child['id'] in section_permissions:
+                            child['has_permission'] = True
+                        else:
+                            child['has_permission'] = False
+                    ret.append({'name': perm.name, 'permissions': children_list})
         else:
             ret = []
             parent_permissions = Permissions.objects.filter(parent__isnull=True)
-            if permission_name:
-                parent_permissions = parent_permissions.filter(name__icontains=permission_name)
             for perm in parent_permissions:
                 ret.append({'name': perm.name, 'permissions': perm.children_list})
         return Response(data={'result': ret})
@@ -708,3 +762,20 @@ class UserOperationLogViewSet(ModelViewSet):
             data = self.get_serializer(queryset, many=True).data
             return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
         return super().list(request, *args, **kwargs)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class UserPermissionSectionView(APIView):
+    permission_classes = (IsAuthenticated, )
+
+    def get(self, request):
+        user = self.request.user
+        queryset = Section.objects.filter(parent_section__isnull=False)
+        # 不是超级管理员，则只能查看自己负责的部门人员以及子部门人员
+        if not user.is_superuser:
+            user_sections = user.permission_charge_sections.all()
+            section_ids = []
+            for i in user_sections:
+                section_ids += i.total_children_sections()
+            queryset = queryset.filter(id__in=section_ids)
+        return Response(queryset.values('id', 'name'))

@@ -83,6 +83,10 @@ class UserFunctions(object):
         permission_ids = []
         if self.is_superuser:
             ps = Permissions.objects.filter(parent__isnull=False).order_by('parent_id', 'id').values('parent__code', 'code')
+        elif self.permission_charge_sections.exists():
+            for s in self.permission_charge_sections.all():
+                permission_ids += list(s.permissions.values_list('id', flat=True))
+            ps = Permissions.objects.filter(id__in=set(permission_ids), parent__isnull=False).order_by('parent_id', 'id').values('parent__code', 'code')
         else:
             for group in self.group_extensions.all():
                 permission_ids += list(group.permissions.values_list('id', flat=True))

@@ -64,8 +64,8 @@ class UserSerializer(BaseModelSerializer):
     is_active = serializers.BooleanField(read_only=True)
     num = serializers.CharField(validators=[UniqueValidator(queryset=User.objects.all(), message='该员工工号已存在')])
     section_name = serializers.CharField(source="section.name", default="", read_only=True)
-    group_names = serializers.SerializerMethodField()
-    active_flag = serializers.SerializerMethodField()
+    group_names = serializers.SerializerMethodField(read_only=True)
+    active_flag = serializers.SerializerMethodField(read_only=True)
 
     def get_active_flag(self, obj):
         return 'Y' if obj.is_active else 'N'
@@ -98,6 +98,20 @@ class UserSerializer(BaseModelSerializer):
         }
 
 
+class UserRetrieveSerializer(UserSerializer):
+    factory_id = serializers.SerializerMethodField(read_only=True)
+
+    def get_factory_id(self, obj):
+        ret = []
+        section = obj.section
+        if not section:
+            return None
+        while section:
+            ret.append(section.id)
+            section = section.parent_section
+        return ret[-2]
+
+
 class GroupUserSerializer(BaseModelSerializer):
     id = serializers.IntegerField()
     username = serializers.CharField(required=False)
@@ -117,14 +131,12 @@ class GroupUserSerializer(BaseModelSerializer):
 class GroupExtensionSerializer(BaseModelSerializer):
     """角色组扩展序列化器"""
     # group_users = UserUpdateSerializer(read_only=True, many=True)
+    section_name = serializers.CharField(source='section.name', default=None, read_only=True)
 
     class Meta:
         model = GroupExtension
+        fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
-        exclude = ('permissions', )
-
-    def to_representation(self, instance):
-        return super().to_representation(instance)
 
 
 class GroupExtensionUpdateSerializer(BaseModelSerializer):
@@ -161,10 +173,14 @@ class SectionSerializer(BaseModelSerializer):
                                            ])
     users = serializers.SerializerMethodField()
     in_charge_username = serializers.CharField(source='in_charge_user.username', read_only=True)
+    permission_users = serializers.SerializerMethodField(read_only=True)
 
     def get_users(self, obj):
-        temp_set = obj.section_users.filter(is_leave=False).values_list("username", flat=True)
+        temp_set = obj.section_users.filter(is_leave=False, delete_flag=False).values_list("username", flat=True)
         return list(temp_set)
+
+    def get_permission_users(self, obj):
+        return obj.permission_user.values("id", 'username')
 
     class Meta:
         model = Section
