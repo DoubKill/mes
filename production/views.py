@@ -3648,7 +3648,7 @@ class PerformanceSummaryView(APIView):
         user_query = EmployeeAttendanceRecords.objects.filter(Q(**kwargs) & ~Q(is_use__in=['废弃', '驳回']) &
                                                              Q(Q(end_date__isnull=False, begin_date__isnull=False) |
                                                                Q(end_date__isnull=True, begin_date__isnull=True)))
-        queryset = user_query.values_list('user__username', 'section', 'factory_date__day', 'group', 'equip', 'actual_time', 'classes', 'actual_begin_date', 'actual_end_date')
+        queryset = user_query.values_list('user__username', 'section', 'factory_date__day', 'group', 'equip', 'actual_time', 'classes', 'calculate_begin_date', 'calculate_end_date')
         user_dic = {}
         equip_shut_down_dic = {}
         equip_shut_down = SchedulingEquipShutDownPlan.objects.filter(begin_time__year=year, begin_time__month=month).values(
@@ -3673,7 +3673,7 @@ class PerformanceSummaryView(APIView):
                 else:
                     user_dic[key] = {'name': item[0], 'section': item[1], 'day': item[2], 'group': item[3],
                                      'equip': equip, 'actual_time': item[5], 'classes': item[6],
-                                     'actual_begin_date': item[7], 'actual_end_date': item[8]}
+                                     'calculate_begin_date': item[7], 'calculate_end_date': item[8]}
         group = WorkSchedulePlan.objects.filter(start_time__year=year, start_time__month=month,
                                                 plan_schedule__work_schedule__work_procedure__global_name='密炼')\
             .values_list('group__global_name', 'classes__global_name', 'start_time__day').order_by('start_time')
@@ -3699,7 +3699,7 @@ class PerformanceSummaryView(APIView):
         dj_list = ProductInfoDingJi.objects.filter(is_use=True).values_list('product_name', flat=True)
         for key, detail in user_dic.items():
             day, group, section, equip, classes = key.split('_')
-            begin_date, end_date = detail.pop('actual_begin_date'), detail.pop('actual_end_date')
+            begin_date, end_date = detail.pop('calculate_begin_date'), detail.pop('calculate_end_date')
             if not all([begin_date, end_date]):
                 continue
             equip_kwargs = {'equip_no': equip, 'classes': classes, 'factory_date__day': day}
@@ -4366,18 +4366,25 @@ class AttendanceClockViewSet(ModelViewSet):
                 end_date = f"{str(last_date)} {str(standard_end_time)[11:]}"
             else:
                 end_date = f"{str(date_now)} {str(standard_end_time)[11:]}"
-            EmployeeAttendanceRecords.objects.filter(
-                user=user,
-                end_date__isnull=True,
-                factory_date=last_date
-            ).update(end_date=end_date, actual_end_date=end_date)
+            # 自动补全之前的离岗时间
+            factory_records = EmployeeAttendanceRecords.objects.filter(user=user, end_date__isnull=True, factory_date=last_date)
+            for i in factory_records:
+                calculate_end_date = end_date if i.standard_begin_date < end_date < i.standard_end_date else i.calculate_end_date
+                i.end_date = end_date
+                i.actual_end_date = end_date
+                i.calculate_end_date = calculate_end_date
+                i.save()
             for equip in equip_list:
+                calculate_begin_date = begin_date if standard_begin_time < begin_date < standard_end_time else standard_begin_time
                 obj = EmployeeAttendanceRecords.objects.create(
                     user=user,
                     equip=equip,
                     begin_date=begin_date,
                     actual_begin_date=begin_date,
                     factory_date=date_now,
+                    standard_begin_date=standard_begin_time,
+                    standard_end_date=standard_end_time,
+                    calculate_begin_date=calculate_begin_date,
                     **data
                 )
                 results['ids'].append(obj.id)
@@ -4393,25 +4400,28 @@ class AttendanceClockViewSet(ModelViewSet):
             if end_date <= standard_begin_time:
                 raise ValidationError('未到班次标准上班时间不可打下班卡')
             # 计算实际工时(打卡时间)
-            actual_begin_time = begin_date if standard_end_time > begin_date > standard_begin_time or (
-                        begin_date < standard_begin_time and end_date < standard_begin_time) else standard_begin_time
+            actual_begin_time = begin_date if standard_end_time > begin_date > standard_begin_time else standard_begin_time
             actual_end_time = end_date if end_date < standard_end_time else standard_end_time
             if extra_work:
                 actual_begin_time = actual_begin_time if actual_begin_time < extra_work.begin_date else extra_work.begin_date
                 actual_end_time = actual_end_time if actual_end_time < extra_work.end_date else extra_work.end_date
             work_time = round((actual_end_time - actual_begin_time).seconds / 3600, 2)
             EmployeeAttendanceRecords.objects.filter(id__in=ids).update(
-                end_date=end_date, actual_end_date=end_date, work_time=work_time, actual_time=work_time
+                end_date=end_date, actual_end_date=end_date, work_time=work_time, actual_time=work_time,
+                calculate_end_date=actual_end_time
             )
             results['ids'] = ids
         elif status == '调岗':
             if EmployeeAttendanceRecords.objects.filter(id__in=ids, end_date__isnull=True).exists():
-                begin_date = EmployeeAttendanceRecords.objects.filter(id__in=ids).first().begin_date
+                obj_r = EmployeeAttendanceRecords.objects.filter(id__in=ids).first()
+                begin_date, before_begin_time, before_end_time = obj_r.begin_date, obj_r.standard_begin_date, obj_r.standard_end_date
                 end_date = time_now
                 work_time = round((end_date - begin_date).seconds / 3600, 2)
                 EmployeeAttendanceRecords.objects.filter(id__in=ids).update(
-                    end_date=end_date, actual_begin_date=end_date, work_time=work_time, actual_time=work_time
+                    end_date=end_date, actual_begin_date=end_date, work_time=work_time, actual_time=work_time,
+                    calculate_end_date=end_date if before_begin_time < end_date < before_end_time else before_end_time
                 )
+            calculate_begin_date = time_now if standard_begin_time < time_now < standard_end_time else standard_begin_time
             for equip in equip_list:
                 obj = EmployeeAttendanceRecords.objects.create(
                     user=user,
@@ -4419,6 +4429,9 @@ class AttendanceClockViewSet(ModelViewSet):
                     begin_date=time_now,
                     actual_begin_date=time_now,
                     factory_date=date_now,
+                    standard_begin_date=standard_begin_time,
+                    standard_end_date=standard_end_time,
+                    calculate_begin_date=calculate_begin_date,
                     **data
                 )
                 results['ids'].append(obj.id)
@@ -4684,6 +4697,9 @@ class ReissueCardView(APIView):
             equip_list = equips.split(',')
             if status == '上岗':
                 lst = []
+                standard_begin_time, standard_end_time = get_standard_time(user.username, obj.factory_date, group=obj.group,
+                                                                           classes=obj.classes)
+                calculate_begin_date = date_time if standard_begin_time < date_time < standard_end_time else standard_begin_time
                 for equip in equip_list:
                     lst.append(
                         EmployeeAttendanceRecords(
@@ -4695,17 +4711,23 @@ class ReissueCardView(APIView):
                             classes=serializer_data.get('classes'),
                             group=serializer_data.get('group'),
                             equip=equip,
-                            status=status
+                            status=status,
+                            standard_begin_date=standard_begin_time,
+                            standard_end_date=standard_end_time,
+                            calculate_begin_date=calculate_begin_date
                         ))
                 EmployeeAttendanceRecords.objects.bulk_create(lst)
             elif status == '调岗':
-                EmployeeAttendanceRecords.objects.filter(
-                    user=user,
-                    factory_date=serializer_data.get('factory_date'),
-                    end_date__isnull=True,
-                    status__in=['上岗', '调岗']
-                ).update(end_date=serializer_data.get('bk_date'), actual_end_date=serializer_data.get('bk_date'))
+                factory_r = EmployeeAttendanceRecords.objects.filter(user=user, factory_date=obj.factory_date,
+                                                                     end_date__isnull=True, status__in=['上岗', '调岗'])
+                if factory_r:
+                    s_record = factory_r.first()
+                    calculate_end_date = date_time if s_record.standard_begin_date < date_time < s_record.standard_end_date else s_record.standard_end_date
+                    factory_r.update(end_date=date_time, actual_end_date=date_time, calculate_end_date=calculate_end_date)
                 lst = []
+                standard_begin_time, standard_end_time = get_standard_time(user.username, obj.factory_date,
+                                                                           group=obj.group, classes=obj.classes)
+                calculate_begin_date = date_time if standard_begin_time < date_time < standard_end_time else standard_begin_time
                 for equip in equip_list:
                     lst.append(
                         EmployeeAttendanceRecords(
@@ -4717,7 +4739,10 @@ class ReissueCardView(APIView):
                             classes=serializer_data.get('classes'),
                             group=serializer_data.get('group'),
                             equip=equip,
-                            status=status
+                            status=status,
+                            calculate_begin_date=calculate_begin_date,
+                            standard_begin_date=standard_begin_time,
+                            standard_end_date=standard_end_time,
                         ))
                 EmployeeAttendanceRecords.objects.bulk_create(lst)
             elif status == '离岗':
@@ -4736,10 +4761,12 @@ class ReissueCardView(APIView):
                     raise ValidationError('提交的补卡参数有误')
                 begin_date = obj.begin_date
                 work_time = round((end_date - begin_date).seconds / 3600, 2)
+                calculate_end_date = end_date if obj.standard_begin_date < end_date < obj.standard_end_date else obj.standard_end_date
                 EmployeeAttendanceRecords.objects.filter(**dic).update(end_date=end_date,
                                                                        actual_end_date=end_date,
                                                                        work_time=work_time,
-                                                                       actual_time=work_time)
+                                                                       actual_time=work_time,
+                                                                       calculate_end_date=calculate_end_date)
         return Response({'results': serializer_data})
 
 
@@ -5060,7 +5087,8 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
                 id_param = [ids] if isinstance(ids, int) else ids
                 EmployeeAttendanceRecords.objects.filter(pk__in=id_param)\
                     .update(actual_time=item.get('actual_time', 0), is_use=is_use, record_status='#141414', opera_flag=1,
-                            actual_begin_date=item.get('actual_begin_date'), actual_end_date=item.get('actual_end_date'))
+                            actual_begin_date=item.get('actual_begin_date'), actual_end_date=item.get('actual_end_date'),
+                            calculate_begin_date=item.get('actual_begin_date'), calculate_end_date=item.get('actual_end_date'))
         elif reject_list:  # 审批驳回某一天的数据 #DA1F27 红色
             opera_type = '单天驳回'
             id_list = []
