@@ -3126,10 +3126,17 @@ class EquipAutoPlanView(APIView):
             return Response({"success": True, "message": "获取设备科成员信息成功", "data": res})
         if get_code:
             if get_code == "1":
-                order_list = EquipWarehouseOrder.objects.filter(status__in=[1, 2], order_detail__delete_flag=False,
+                order_list = []
+                order_info = EquipWarehouseOrder.objects.filter(status__in=[1, 2], order_detail__delete_flag=False,
                                                                 delete_flag=False,
-                                                                order_detail__equip_spare__spare_code=spare_code) \
-                    .values('id', 'order_id', 'state')
+                                                                order_detail__equip_spare__spare_code=spare_code)
+                not_in_orders = order_info.filter(order_detail__in_quantity__lt=F('order_detail__plan_in_quantity'), order_detail__equip_spare__spare_code=spare_code)
+                if not_in_orders:
+                    order_list = not_in_orders.values('id', 'order_id', 'state')
+                else:
+                    in_orders = order_info.filter(order_detail__in_quantity__gte=F('order_detail__plan_in_quantity'), order_detail__equip_spare__spare_code=spare_code)
+                    if in_orders:
+                        order_list = in_orders.order_by('-id').values('id', 'order_id', 'state')[0]
             else:
                 order_list = EquipWarehouseOrder.objects.filter(status__in=[4, 5], order_detail__delete_flag=False,
                                                                 delete_flag=False,
