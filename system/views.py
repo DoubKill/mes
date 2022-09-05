@@ -89,7 +89,13 @@ class UserViewSet(ModelViewSet):
         else:
             # 不是超级管理员，则只能查看自己负责的部门人员以及子部门人员
             if not self.request.user.is_superuser:
-                user_sections = self.request.user.permission_charge_sections.all()
+                user_sections = []
+                if self.request.user.permission_charge_sections.exists():
+                    user_sections = self.request.user.permission_charge_sections.all()
+                else:
+                    user_factory_id = self.request.user.get_factory_id()
+                    if user_factory_id:
+                        user_sections = Section.objects.filter(id=user_factory_id)
                 section_ids = []
                 for i in user_sections:
                     section_ids += i.total_children_sections()
@@ -184,6 +190,22 @@ class UserGroupsViewSet(mixins.ListModelMixin,
     filter_backends = (DjangoFilterBackend,)
     pagination_class = SinglePageNumberPagination
     filter_class = UserFilter
+
+    def list(self, request, *args, **kwargs):
+        factory_id = self.request.query_params.get('factory_id', 2)
+        queryset = self.filter_queryset(self.get_queryset())
+        if factory_id:
+            s = Section.objects.get(id=int(factory_id))
+            section_ids = s.total_children_sections()
+            queryset = queryset.filter(section_id__in=section_ids)
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -382,6 +404,14 @@ class LoginView(ObtainJSONWebToken):
         if serializer.is_valid():
             user = serializer.object.get('user') or request.user
             token = serializer.object.get('token')
+            permission_section = []
+            if user.permission_charge_sections.exists():
+                permission_section = user.permission_charge_sections.values('id', 'name')
+            else:
+                user_factory_id = user.get_factory_id()
+                if user_factory_id:
+                    s = Section.objects.get(id=user_factory_id)
+                    permission_section.append({'id': s.id, 'name': s.name})
             return Response({"permissions": user.permissions_list,
                              'section': user.section.name if user.section else None,
                              'id_card_num': user.id_card_num,
@@ -392,7 +422,7 @@ class LoginView(ObtainJSONWebToken):
                              'wms_url': WMS_URL,
                              'th_url': TH_URL,
                              'is_superuser': user.is_superuser,
-                             'permission_section': user.permission_charge_sections.values('id', 'name')})
+                             'permission_section': permission_section})
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
