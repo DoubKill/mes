@@ -5284,13 +5284,6 @@ class ShiftTimeSummaryView(APIView):
         st = self.request.query_params.get('st', None)
         et = self.request.query_params.get('et', None)
         classes = self.request.query_params.get('classes', None)
-        page = self.request.query_params.get("page", 1)
-        page_size = self.request.query_params.get("page_size", 10)
-        try:
-            sc = (int(page) - 1) * int(page_size)
-            ec = int(page) * int(page_size)
-        except:
-            raise ValidationError("page/page_size异常，请修正后重试")
         if not st or not et:
             raise ValidationError('缺少查询起止时间参数')
         filter_kwargs = {
@@ -5334,7 +5327,8 @@ class ShiftTimeSummaryView(APIView):
             equip_count = (len(item) - 5) // 2
             item['consuming'] = round(item['consuming'] / equip_count, 2)
             item['abnormal'] = round(item['abnormal'] / equip_count, 2)
-        return Response({'results': res[sc:ec], 'count': len(res)})
+        return Response({'results': res})
+
 
 @method_decorator([api_recorder], name="dispatch")
 class ShiftTimeSummaryDetailView(APIView):
