@@ -192,7 +192,7 @@ class UserGroupsViewSet(mixins.ListModelMixin,
     filter_class = UserFilter
 
     def list(self, request, *args, **kwargs):
-        factory_id = self.request.query_params.get('factory_id', 2)
+        factory_id = self.request.query_params.get('factory_id')
         queryset = self.filter_queryset(self.get_queryset())
         if factory_id:
             s = Section.objects.get(id=int(factory_id))
