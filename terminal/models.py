@@ -298,6 +298,30 @@ class LoadTankMaterialLog(AbstractEntity):
         verbose_name_plural = verbose_name = '料框物料信息'
 
 
+class BatchScanLog(AbstractEntity):
+    factory_date = models.DateField(help_text='工厂日期', null=True, blank=True)
+    plan_classes_uid = models.CharField(max_length=64, help_text='计划号', null=True, blank=True)
+    equip_no = models.CharField(max_length=64, help_text='机台', null=True, blank=True)
+    mix_group = models.CharField(max_length=8, help_text='班组', null=True, blank=True)
+    mix_classes = models.CharField(max_length=8, help_text='班次', null=True, blank=True)
+    product_no = models.CharField(max_length=64, help_text='胶料编码', null=True, blank=True)
+    mixing_finished = models.CharField(max_length=8, help_text='终炼/混炼', null=True, blank=True)
+    scan_material_type = models.CharField(max_length=8, help_text='扫码物料类别: 胶皮、胶块、人工配、机配等', null=True, blank=True)
+    scan_material = models.CharField(max_length=64, help_text='扫码物料名', null=True, blank=True)
+    bar_code = models.CharField(max_length=64, help_text='条码', null=True, blank=True)
+    scan_train = models.IntegerField(help_text='扫码车次', null=True, blank=True)
+    unit = models.CharField(max_length=64, help_text='单位', null=True, blank=True)
+    scan_username = models.CharField(max_length=64, help_text='扫码人', null=True, blank=True)
+    scan_time = models.DateTimeField(max_length=64, help_text='扫码时间', null=True, blank=True)
+    init_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='初始重量/包数', null=True, blank=True)
+    scan_result = models.CharField(max_length=8, help_text='扫码结果', default='失败')
+    scan_message = models.CharField(max_length=128, help_text='扫码返回信息', null=True, blank=True)
+
+    class Meta:
+        db_table = 'batch_scan_log'
+        verbose_name_plural = verbose_name = '密炼投料扫码履历'
+
+
 class ReplaceMaterial(AbstractEntity):
     reason_type = models.CharField(max_length=64, help_text='原因类别: 物料名不一致、重量不匹配、超过有效期、未到放置期', default='物料名不一致')
     expire_datetime = models.DateTimeField(help_text='有效期', null=True, blank=True)

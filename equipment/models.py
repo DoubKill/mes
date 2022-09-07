@@ -731,6 +731,7 @@ class EquipWarehouseOrder(AbstractEntity):
     barcode = models.CharField(max_length=64, help_text='领料单据', null=True, blank=True)
     processing_time = models.DateTimeField(help_text='处理时间', null=True, blank=True)
     lluser = models.CharField(max_length=64, help_text='领料人', null=True, blank=True)
+    state = models.BooleanField(help_text='单据创建标志[是否为自动新建单据]', default=False)
 
     class Meta:
         db_table = 'equip_warehouse_order'
@@ -785,6 +786,9 @@ class EquipWarehouseInventory(AbstractEntity):
                                              blank=True)
     equip_warehouse_location = models.ForeignKey(EquipWarehouseLocation, help_text='库位', on_delete=models.CASCADE,
                                                  null=True, blank=True)
+    check_desc = models.CharField(max_length=512, help_text='盘库备注', null=True, blank=True)
+    move_desc = models.CharField(max_length=512, help_text='移库备注', null=True, blank=True)
+
 
     class Meta:
         db_table = 'equip_warehouse_inventory'
@@ -801,11 +805,12 @@ class EquipWarehouseRecord(AbstractEntity):
     now_quantity = models.IntegerField(help_text='现存数量', default=0)
     quantity = models.CharField(max_length=64, help_text='变更数量', default='0')
     revocation = models.CharField(max_length=64, help_text='是否撤销(Y/N)', default='N')
-    revocation_desc = models.TextField(help_text='操作描述', null=True, blank=True)
     equip_warehouse_order_detail = models.ForeignKey(EquipWarehouseOrderDetail, help_text='出入库单据明细',
                                                      on_delete=models.CASCADE, null=True, blank=True)
     status = models.CharField(max_length=64, help_text='入库/出库/盘库/撤销/移库', default='入库')
     real_time = models.DateTimeField(help_text='出库时间', null=True, blank=True)
+    purpose = models.CharField(max_length=128, help_text='领用用途', null=True, blank=True)
+    revocation_desc = models.TextField(help_text='操作描述', null=True, blank=True)
 
     class Meta:
         db_table = 'equip_warehouse_record'
