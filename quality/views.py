@@ -2850,11 +2850,17 @@ class ProductTestStaticsView(APIView):
         }
         where_str = """ mtr."LEVEL" = 2 AND to_char(mto."PRODUCTION_FACTORY_DATE", 'yyyy-mm-dd') >= '{}' 
                       AND to_char(mto."PRODUCTION_FACTORY_DATE", 'yyyy-mm-dd') <= '{}'""".format(st, et)
+        product_filter_str = ""
         if stage:
-            filter_kwargs['product_no__icontains'] = '-{}-'.format(stage)
+            product_filter_str += '-{}-'.format(stage)
+            filter_kwargs['product_no__icontains'] = product_filter_str
             where_str += " AND mto.PRODUCT_NO like '%-{}-%'".format(stage)
         if product_standard:
-            filter_kwargs['product_no__icontains'] = '-{}-'.format(product_standard)
+            if product_filter_str:
+                product_filter_str += '{}-'.format(product_standard)
+            else:
+                product_filter_str += '-{}-'.format(product_standard)
+            filter_kwargs['product_no__icontains'] = product_filter_str
             where_str += " AND mto.PRODUCT_NO like '%-{}-%'".format(product_standard)
         if production_equip_no:
             filter_kwargs['production_equip_no'] = production_equip_no
