@@ -469,7 +469,7 @@ class GroupPermissions(APIView):
                         child['has_permission'] = True
                     else:
                         child['has_permission'] = False
-                ret.append({'name': perm.name, 'permissions': children_list})
+                ret.append({'name': perm.name, 'permissions': children_list, 'category_name': perm.category_name})
         elif user_id:
             try:
                 user = User.objects.get(id=user_id)
@@ -485,19 +485,20 @@ class GroupPermissions(APIView):
                         child['has_permission'] = True
                     else:
                         child['has_permission'] = False
-                ret.append({'name': perm.name, 'permissions': children_list})
+                ret.append({'name': perm.name, 'permissions': children_list, 'category_name': perm.category_name})
         elif section_id:
             try:
                 section = Section.objects.get(id=section_id)
             except Exception:
                 raise ValidationError('参数错误')
             if view_section_permission:  # 查看该部门下有哪些权限
-                section_permissions = section.permissions.values('id', 'code', 'name', 'parent__name')
+                section_permissions = section.permissions.values('id', 'code', 'name', 'parent__name', 'parent__category_name')
                 data = {}
                 for i in section_permissions:
                     menu_name = i.pop('parent__name')
+                    parent__category_name = i.pop('parent__category_name')
                     if menu_name not in data:
-                        data[menu_name] = {'name': menu_name, 'permissions': [i]}
+                        data[menu_name] = {'name': menu_name, 'permissions': [i], 'category_name': parent__category_name}
                     else:
                         data[menu_name]['permissions'].append(i)
                 ret = data.values()
@@ -512,12 +513,12 @@ class GroupPermissions(APIView):
                             child['has_permission'] = True
                         else:
                             child['has_permission'] = False
-                    ret.append({'name': perm.name, 'permissions': children_list})
+                    ret.append({'name': perm.name, 'permissions': children_list, 'category_name': perm.category_name})
         else:
             ret = []
             parent_permissions = Permissions.objects.filter(parent__isnull=True)
             for perm in parent_permissions:
-                ret.append({'name': perm.name, 'permissions': perm.children_list})
+                ret.append({'name': perm.name, 'permissions': perm.children_list, 'category_name': perm.category_name})
         return Response(data={'result': ret})
 
 

@@ -115,6 +115,7 @@ class Permissions(models.Model):
     name = models.CharField(max_length=64, help_text='权限名称')
     parent = models.ForeignKey('self', help_text='父节点', related_name='children_permissions',
                                blank=True, null=True, on_delete=models.CASCADE)
+    category_name = models.CharField(max_length=16, help_text='所属模块', blank=True, null=True)
 
     @property
     def children_list(self):
