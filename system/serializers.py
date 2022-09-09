@@ -355,14 +355,18 @@ class UserImportSerializer(BaseModelSerializer):
         if user:
             user = super().update(instance=user, validated_data=validated_data)
         else:
-            user = super().create(validated_data)
+            try:
+                user = super().create(validated_data)
+            except Exception:
+                raise serializers.ValidationError('该用户名已存在：{}'.format(validated_data['username']))
         user.set_password(password)
         user.save()
         return user
 
     class Meta:
         model = User
-        fields = ('username', 'password', 'num', 'phone_number', 'id_card_num', 'section', 'group_extensions')
+        fields = ('username', 'password', 'num', 'phone_number', 'id_card_num',
+                  'section', 'group_extensions', 'is_active', 'delete_flag')
 
 
 class UserLoginSerializer(JSONWebTokenSerializer):
