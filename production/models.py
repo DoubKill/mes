@@ -420,6 +420,7 @@ class EmployeeAttendanceRecords(models.Model):
     record_status = models.CharField(max_length=12, help_text='考勤记录颜色: 蓝色[#1010FF]-未确认,绿色[#51A651]-已确认,'
                                                               '红色[#DA1F27]-驳回,黑色[#141414]-整体提交', default='#1010FF')
     opera_flag = models.PositiveIntegerField(help_text='0:未操作 1:已确认 2:已审批 3:已审核', default=0)
+    clock_type = models.CharField(max_length=16, help_text='打卡类别', default='密炼')
 
     class Meta:
         db_table = 'employee_attendance_records'
@@ -432,6 +433,7 @@ class EmployeeAttendanceRecordsLog(models.Model):
     opera_type = models.CharField(help_text='操作类别: 审批、审核、驳回、确认、废弃、整体提交', max_length=8)
     record_date = models.DateField(help_text='操作数据的日期', null=True, blank=True)
     delete_id = models.IntegerField(help_text='废弃的考勤数据id', null=True, blank=True)
+    clock_type = models.CharField(max_length=16, help_text='打卡类别', default='密炼')
 
     class Meta:
         db_table = 'employee_attendance_records_log'
@@ -452,6 +454,7 @@ class FillCardApply(models.Model):
     handling_result = models.NullBooleanField(help_text='处理结果', default=None)
     apply_date = models.DateTimeField(auto_now_add=True, help_text='申请时间')
     status = models.CharField(max_length=12, help_text='上岗/调岗/离岗', null=True, blank=True)
+    clock_type = models.CharField(max_length=8, default='密炼')
 
     class Meta:
         db_table = 'fill_card_apply'
@@ -472,6 +475,7 @@ class ApplyForExtraWork(models.Model):
     handling_suggestion = models.TextField(help_text='处理意见', null=True, blank=True)
     apply_date = models.DateTimeField(auto_now_add=True, help_text='申请时间')
     handling_result = models.NullBooleanField(help_text='处理结果', default=None)
+    clock_type = models.CharField(max_length=8, default='密炼')
 
     class Meta:
         db_table = 'apply_for_extra_work'
@@ -654,6 +658,7 @@ class AttendanceClockDetail(models.Model):
     classes = models.CharField(max_length=64, help_text='班次')
     section = models.CharField(max_length=64, help_text='岗位')
     work_type = models.CharField(max_length=64, help_text='打卡类别')
+    clock_type = models.CharField(max_length=64, help_text='密炼/细料称量/硫磺称量', default='密炼')
 
     class Meta:
         db_table = 'attendance_clock_detail'
@@ -682,6 +687,7 @@ class AttendanceResultAudit(AbstractEntity):
     date = models.CharField(max_length=64, help_text='日期：2022-12')
     result = models.BooleanField(default=False, help_text='处理结果')
     result_desc = models.TextField(help_text='处理说明', null=True, blank=True)
+    clock_type = models.CharField(max_length=16, help_text='打卡类别', default='密炼')
 
     class Meta:
         db_table = 'attendance_result_audit'
