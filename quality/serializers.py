@@ -415,10 +415,9 @@ class UnqualifiedDealOrderUpdateSerializer(BaseModelSerializer):
 
         # 检查科处理
         if c_agreed is not None:
-            instance.state = 2
-            instance.c_deal_user = self.context['request'].user.username
-            instance.c_deal_date = datetime.now()
-            instance.save()
+            UnqualifiedDealOrder.objects.filter(id=instance.id).update(state=2,
+                                                                       c_deal_user=self.context['request'].user.username,
+                                                                       c_deal_date=datetime.now())
             if c_agreed:
                 # 同意
                 for detail in instance.deal_details.all():
