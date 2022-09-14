@@ -11,6 +11,7 @@ from basics.models import WorkSchedulePlan, GlobalCode
 from production.models import OperationLog, EmployeeAttendanceRecords, AttendanceGroupSetup, WeightClassPlan, \
     WeightClassPlanDetail
 from production.serializers import OperationLogSerializer
+from system.models import User
 from terminal.utils import get_current_factory_date
 
 
@@ -62,10 +63,16 @@ def get_work_time(class_code, factory_date):
                 pare = i.description.split('-')
                 if len(pare) in [3, 6]:
                     for j in range(len(pare) // 3):
+                        index = j * 3
                         begin_date, end_date = factory_date, factory_date
-                        if pare[j] == '夜班':
-                            begin_date, end_date = factory_date, (datetime.strptime(factory_date, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
-                        res.update({pare[j]: [f'{begin_date} {pare[j + 1]}', f'{end_date} {pare[j + 2]}']})
+                        if pare[index] == '夜班':
+                            next_day = (datetime.strptime(factory_date, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
+                            begin_date, end_date = next_day if pare[index + 1] == '00:00:00' else factory_date, next_day
+                        res.update({pare[index]: [f'{begin_date} {pare[index + 1]}', f'{end_date} {pare[index + 2]}']})
+    if len(res) >= 2:
+        h = datetime.now().time().hour
+        if 24 >= h >= 22 or 0 <= h <= 2:
+            res = dict(sorted(res.items(), key=lambda x: x[0]))
     return res
 
 
@@ -92,12 +99,16 @@ def get_classes_plan(select_date=None, work_procedure=None, username=None):
 def get_user_group(user_name, choice_type='密炼'):
     """获取考勤组负责人对应班组数据"""
     user_groups = []
+    u_flag = User.objects.filter(is_superuser=True, username=user_name)
     att_set = AttendanceGroupSetup.objects.filter(group__isnull=False, type=choice_type)
-    for i in att_set:
-        if not i.principal:
-            continue
-        if user_name in i.principal.split(',') and i.group not in user_groups:
-            user_groups.append(i.group)
+    if u_flag:
+        user_groups = list(att_set.values_list('group', flat=True).distinct())
+    else:
+        for i in att_set:
+            if not i.principal:
+                continue
+            if user_name in i.principal.split(',') and i.group not in user_groups:
+                user_groups.append(i.group)
     return user_groups
 
 
