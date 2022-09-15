@@ -406,6 +406,10 @@ class EmployeeAttendanceRecords(models.Model):
     end_date = models.DateTimeField(help_text='离岗时间', null=True, blank=True)
     actual_begin_date = models.DateTimeField(help_text='修改上岗时间[默认等于上岗时间]', null=True, blank=True)
     actual_end_date = models.DateTimeField(help_text='修改离岗时间[默认等于离岗时间]', null=True, blank=True)
+    standard_begin_date = models.DateTimeField(help_text='标准上班时间', null=True, blank=True)
+    standard_end_date = models.DateTimeField(help_text='标准下班时间', null=True, blank=True)
+    calculate_begin_date = models.DateTimeField(help_text='绩效计算上岗时间[默认等于上岗时间]', null=True, blank=True)
+    calculate_end_date = models.DateTimeField(help_text='绩效计算离岗时间[默认等于离岗时间]', null=True, blank=True)
     work_time = models.FloatField(help_text='计算工作时间', null=True, blank=True, default=12)
     actual_time = models.FloatField(help_text='承认工作时间', null=True, blank=True, default=12)
     classes = models.CharField(help_text='班次', max_length=12, null=True, blank=True)
@@ -416,6 +420,7 @@ class EmployeeAttendanceRecords(models.Model):
     record_status = models.CharField(max_length=12, help_text='考勤记录颜色: 蓝色[#1010FF]-未确认,绿色[#51A651]-已确认,'
                                                               '红色[#DA1F27]-驳回,黑色[#141414]-整体提交', default='#1010FF')
     opera_flag = models.PositiveIntegerField(help_text='0:未操作 1:已确认 2:已审批 3:已审核', default=0)
+    clock_type = models.CharField(max_length=16, help_text='打卡类别', default='密炼')
 
     class Meta:
         db_table = 'employee_attendance_records'
@@ -428,6 +433,7 @@ class EmployeeAttendanceRecordsLog(models.Model):
     opera_type = models.CharField(help_text='操作类别: 审批、审核、驳回、确认、废弃、整体提交', max_length=8)
     record_date = models.DateField(help_text='操作数据的日期', null=True, blank=True)
     delete_id = models.IntegerField(help_text='废弃的考勤数据id', null=True, blank=True)
+    clock_type = models.CharField(max_length=16, help_text='打卡类别', default='密炼')
 
     class Meta:
         db_table = 'employee_attendance_records_log'
@@ -448,6 +454,7 @@ class FillCardApply(models.Model):
     handling_result = models.NullBooleanField(help_text='处理结果', default=None)
     apply_date = models.DateTimeField(auto_now_add=True, help_text='申请时间')
     status = models.CharField(max_length=12, help_text='上岗/调岗/离岗', null=True, blank=True)
+    clock_type = models.CharField(max_length=8, default='密炼')
 
     class Meta:
         db_table = 'fill_card_apply'
@@ -468,6 +475,7 @@ class ApplyForExtraWork(models.Model):
     handling_suggestion = models.TextField(help_text='处理意见', null=True, blank=True)
     apply_date = models.DateTimeField(auto_now_add=True, help_text='申请时间')
     handling_result = models.NullBooleanField(help_text='处理结果', default=None)
+    clock_type = models.CharField(max_length=8, default='密炼')
 
     class Meta:
         db_table = 'apply_for_extra_work'
@@ -563,6 +571,7 @@ class AttendanceGroupSetup(models.Model):
     principal = models.CharField(max_length=1024, help_text='考勤负责人')
     range_time = models.IntegerField(help_text='上班多久后可打下班卡', null=True, blank=True)
     lead_time = models.IntegerField(help_text='提前几分钟可打工卡', null=True, blank=True)
+    leave_time = models.IntegerField(help_text='下班多久内可打卡', default=30)
     type = models.CharField(help_text='类别', max_length=64, null=True, blank=True)
     work_schedule = models.ForeignKey(WorkSchedule, help_text='倒班规则', on_delete=models.CASCADE, null=True, blank=True)
 
@@ -649,6 +658,7 @@ class AttendanceClockDetail(models.Model):
     classes = models.CharField(max_length=64, help_text='班次')
     section = models.CharField(max_length=64, help_text='岗位')
     work_type = models.CharField(max_length=64, help_text='打卡类别')
+    clock_type = models.CharField(max_length=64, help_text='密炼/细料称量/硫磺称量', default='密炼')
 
     class Meta:
         db_table = 'attendance_clock_detail'
@@ -677,6 +687,7 @@ class AttendanceResultAudit(AbstractEntity):
     date = models.CharField(max_length=64, help_text='日期：2022-12')
     result = models.BooleanField(default=False, help_text='处理结果')
     result_desc = models.TextField(help_text='处理说明', null=True, blank=True)
+    clock_type = models.CharField(max_length=16, help_text='打卡类别', default='密炼')
 
     class Meta:
         db_table = 'attendance_result_audit'
@@ -705,4 +716,27 @@ class ToolManageAccount(models.Model):
     class Meta:
         db_table = 'tool_manage_account'
         verbose_name_plural = verbose_name = '工装管理台帐'
+
+
+class WeightClassPlan(AbstractEntity):
+    target_month = models.CharField(max_length=8, help_text='工厂月份')
+    classes = models.CharField(max_length=64, help_text='组别')
+    station = models.CharField(max_length=64, help_text='岗位')
+    user = models.ForeignKey(User, help_text='人员', on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = 'weight_class_plan'
+        verbose_name_plural = verbose_name = '称量排班'
+
+
+class WeightClassPlanDetail(models.Model):
+    weight_class_plan = models.ForeignKey(WeightClassPlan, help_text='排班', on_delete=models.CASCADE,
+                                          related_name='weight_class_details')
+    factory_date = models.CharField(max_length=10, help_text='工厂日期')
+    class_code = models.CharField(max_length=8, help_text='班次类别: Y1/Y3/1/2/3/1-8/常', null=True, blank=True)
+
+    class Meta:
+        db_table = 'weight_class_plan_detail'
+        verbose_name_plural = verbose_name = '称量排班明细'
+
 
