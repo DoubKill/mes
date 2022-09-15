@@ -109,10 +109,11 @@ class SubsidyInfoFilter(django_filters.rest_framework.FilterSet):
 
 class PerformanceJobLadderFilter(django_filters.rest_framework.FilterSet):
     name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
+    type = django_filters.CharFilter(field_name='type', lookup_expr='icontains')
 
     class Meta:
         model = PerformanceJobLadder
-        fields = ('name', )
+        fields = ('name', 'type')
 
 
 class AttendanceGroupSetupFilter(django_filters.rest_framework.FilterSet):

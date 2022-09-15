@@ -275,8 +275,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                     OtherMaterialLog.objects.create(**{'plan_classes_uid': plan_classes_uid, 'other_type': '原材料小料',
                                                        'product_no': plan_product_no, 'material_name': material_name,
                                                        'bra_code': bra_code, 'status': 1})
-                    save_scan_log(scan_data, scan_result='成功', scan_material_type='原材料小料', scan_material=material_name, unit='KG',
-                                  init_weight=wms_xl_material.plan_weight)
+                    save_scan_log(scan_data, scan_result='成功', scan_material_type='原材料小料', scan_material=material_name, unit='KG')
                     raise serializers.ValidationError('原材料小料扫码成功')
                 comm_material = list(material_name_set & materials)
                 if comm_material:

@@ -3276,8 +3276,8 @@ class ReturnRubberViewSet(ModelViewSet):
     """
     queryset = ReturnRubber.objects.all().order_by('-id')
     serializer_class = ReturnRubberSerializer
-    # pagination_class = None
-    # permission_classes = ()
+    pagination_class = None
+    permission_classes = ()
     filter_backends = (DjangoFilterBackend,)
     filter_class = ReturnRubberFilter
 
