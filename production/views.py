@@ -4919,7 +4919,9 @@ class AttendanceClockViewSet(ModelViewSet):
             new_begin_times = [i.strftime('%Y-%m-%d %H:%M:%S') for i in begin_times]
             return Response(new_begin_times)
         if select_begin_date:
-            s_info = query_set.filter(begin_date=select_begin_date, end_date__isnull=True).last()
+            s_info = query_set.filter(begin_date__startswith=select_begin_date, end_date__isnull=True).last()
+            if not s_info:
+                raise ValidationError('所选上岗时间未匹配到考勤记录')
             group_list = [{'group': s_info.group, 'classes': s_info.classes}]
             equip_list = []
             section_list = [s_info.section]
