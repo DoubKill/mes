@@ -23,6 +23,8 @@ from mes.paginations import SinglePageNumberPagination
 from rest_framework.decorators import action
 from rest_framework import status
 
+from production.models import WeightClassPlanDetail
+from production.utils import get_work_time
 from spareparts.models import SpareLocationBinding
 from system.models import GroupExtension
 from terminal.utils import get_current_factory_date
@@ -74,6 +76,7 @@ class GlobalCodeViewSet(CommonDeleteMixin, ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
+        clock_type = self.request.query_params.get('clock_type', '密炼')  # 增加标志[获取称量、密炼当天排班信息]
         if self.request.query_params.get('all'):
             data = queryset.filter(use_flag=1, global_type__use_flag=1).values('id', 'global_no', 'global_name',
                                                                                'global_type__type_name')
@@ -82,8 +85,21 @@ class GlobalCodeViewSet(CommonDeleteMixin, ModelViewSet):
             # 获取当天的班组
             factory_date = self.request.query_params.get('factory_date')
             if factory_date:
-                work_day = WorkSchedulePlan.objects.filter(plan_schedule__day_time=factory_date,
-                                                           plan_schedule__work_schedule__work_procedure__global_name='密炼').values('group__global_name', 'classes__global_name')
+                if clock_type == '密炼':
+                    work_day = WorkSchedulePlan.objects.filter(plan_schedule__day_time=factory_date,
+                                                               plan_schedule__work_schedule__work_procedure__global_name='密炼').values('group__global_name', 'classes__global_name')
+                else:
+                    name = self.request.query_params.get('name')
+                    queryset = WeightClassPlanDetail.objects.filter(factory_date=factory_date,
+                                                                    weight_class_plan__user__username=name,
+                                                                    weight_class_plan__delete_flag=False,
+                                                                    weight_class_plan__classes__icontains=clock_type[:2]).last()
+                    work_day = []
+                    if queryset and queryset.class_code != '休':
+                        u_group = queryset.weight_class_plan.classes.split('/')[0] if queryset.weight_class_plan.classes.split('/') else None
+                        u_class = get_work_time(queryset.class_code, factory_date).keys()
+                        if all([u_group, u_class]):
+                            work_day = [{'group__global_name': u_group, 'classes__global_name': i} for i in u_class]
                 return Response({"results": list(work_day)})
             else:
                 return super().list(request, *args, **kwargs)
