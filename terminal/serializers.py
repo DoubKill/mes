@@ -1990,7 +1990,7 @@ class JZPlanUpdateSerializer(serializers.ModelSerializer):
                 elif action == 2:
                     raise serializers.ValidationError('不支持称量计划重传')
                 elif action == 3:
-                    recipe = RecipePre.objects.using(equip_no).filter(name=instance.recipe).first()
+                    recipe = JZRecipePre.objects.using(equip_no).filter(name=instance.recipe).first()
                     split_count = 1 if not recipe else recipe.split_count
                     setno = validated_data['setno'] * split_count
                     actno = instance.actno if instance.actno else 0
