@@ -851,6 +851,14 @@ class IntervalOutputStatisticsView(APIView):
 
         if not TrainsFeedbacks.objects.filter(factory_date=factory_date).exists():
             return Response({})
+
+        ws = WorkSchedulePlan.objects.filter(
+            plan_schedule__work_schedule__work_procedure__global_name='密炼',
+            plan_schedule__day_time=factory_date
+        ).values('classes__global_name', 'start_time', 'end_time')
+        if not ws:
+            raise ValidationError('未找到当日排班信息！')
+        ws_dict = {i['classes__global_name']: i for i in ws}
         day_start_time = datetime.datetime.strptime(factory_date + ' 08:00:00', "%Y-%m-%d %H:%M:%S")
         factory_end_time = day_start_time + datetime.timedelta(days=1)
 
@@ -872,12 +880,10 @@ class IntervalOutputStatisticsView(APIView):
                 category__equip_type__global_name='密炼设备'
             ).order_by('equip_no').values_list('equip_no', flat=True))
         }
-
         for class_ in classes:
             data[class_] = []
             for i in range(len(time_spans) - 1):
                 time_span_data = {}
-                data[class_].append(time_span_data)
                 interval_trains_feed_backs = None
                 total_trains_feed_backs = None
                 if class_ == '整日':
@@ -895,6 +901,13 @@ class IntervalOutputStatisticsView(APIView):
                         .values('equip_no') \
                         .annotate(total_finished_train_count=Count('id', distinct=True))
                 else:
+                    ws_data = ws_dict.get(class_)
+                    if not ws_data:
+                        continue
+                    c_st = ws_data['start_time']
+                    c_et = ws_data['end_time']
+                    if not c_st <= time_spans[i] < c_et:
+                        continue
                     interval_trains_feed_backs = TrainsFeedbacks.objects \
                         .filter(classes=class_,
                                 factory_date=factory_date,
@@ -928,6 +941,8 @@ class IntervalOutputStatisticsView(APIView):
                                                 same_equip_no_interval_trains_feed_back
                                                 .get('interval_finished_train_count')
                                                 if same_equip_no_interval_trains_feed_back else 0)
+                if time_span_data:
+                    data[class_].append(time_span_data)
         return Response(data)
 
 

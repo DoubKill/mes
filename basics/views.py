@@ -69,7 +69,7 @@ class GlobalCodeViewSet(CommonDeleteMixin, ModelViewSet):
     filter_class = GlobalCodeFilter
 
     def get_permissions(self):
-        if self.request.query_params.get('all'):
+        if self.action == 'list':
             return ()
         else:
             return (IsAuthenticated(),)
