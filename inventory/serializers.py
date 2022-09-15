@@ -18,7 +18,8 @@ from basics.models import GlobalCode
 from mes import settings
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import STATION_LOCATION_MAP, COMMON_READ_ONLY_FIELDS
-from quality.models import WMSMooneyLevel, MaterialSingleTypeExamineResult, UnqualifiedDealOrderDetail
+from quality.models import WMSMooneyLevel, MaterialSingleTypeExamineResult, UnqualifiedDealOrderDetail, \
+    MaterialDealResult
 from quality.utils import update_wms_quality_result
 from recipe.models import MaterialAttribute
 from .conf import wms_ip, wms_port, cb_ip, cb_port
@@ -731,13 +732,14 @@ class BzMixingRubberInventorySearchSerializer(BzFinalMixingRubberInventorySerial
 
     def get_deal_suggestion(self, obj):
         if obj.lot_no:
-            instance = UnqualifiedDealOrderDetail.objects.filter(lot_no=obj.lot_no).order_by('id').last()
-            if instance:
-                if instance.unqualified_deal_order.c_agreed:
-                    return instance.suggestion
+            deal_result = MaterialDealResult.objects.filter(
+                lot_no=obj.lot_no).first()
+            if deal_result:
+                if deal_result.deal_user:
+                    return deal_result.deal_suggestion
                 else:
-                    return ""
-            return ""
+                    return 'PASS' if deal_result.test_result == 'PASS' else None
+            return ''
         return ''
 
     def get_yx_state(self, obj):
@@ -853,13 +855,14 @@ class BzFinalRubberInventorySearchSerializer(BzFinalMixingRubberLBInventorySeria
 
     def get_deal_suggestion(self, obj):
         if obj.lot_no:
-            instance = UnqualifiedDealOrderDetail.objects.filter(lot_no=obj.lot_no).order_by('id').last()
-            if instance:
-                if instance.unqualified_deal_order.c_agreed:
-                    return instance.suggestion
+            deal_result = MaterialDealResult.objects.filter(
+                lot_no=obj.lot_no).first()
+            if deal_result:
+                if deal_result.deal_user:
+                    return deal_result.deal_suggestion
                 else:
-                    return ""
-            return ""
+                    return 'PASS' if deal_result.test_result == 'PASS' else None
+            return ''
         return ''
 
     def get_yx_state(self, obj):
