@@ -272,7 +272,7 @@ class MaterialDealResult(AbstractEntity):
     warehouse_out_time = models.DateTimeField(help_text="计划出库时间", blank=True, null=True)
     deal_time = models.DateTimeField(help_text="处理时间", blank=True, null=True)
     confirm_time = models.DateTimeField(help_text="确认时间", blank=True, null=True)
-    deal_suggestion = models.CharField(max_length=256, help_text="综合处理意见，合格/不合格/pass章处理意见")
+    deal_suggestion = models.CharField(max_length=256, help_text="综合处理意见，pass章处理意见", blank=True, null=True)
     production_factory_date = models.DateTimeField(help_text='生产时间')
     print_time = models.DateTimeField(help_text='第一次打印时间', null=True)
     valid_time = models.IntegerField(help_text='有效时间', null=True)
