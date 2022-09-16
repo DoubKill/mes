@@ -1,6 +1,7 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
+from production.models import WeightClassPlan
 from production.summary_views import ClassesBanBurySummaryView, EquipBanBurySummaryView, CollectTrainsFeedbacksList, \
     CutTimeCollect, SumCollectTrains, CutTimeCollectSummary
 from production.views import *
@@ -68,6 +69,8 @@ router.register('attendance-time-statistics', AttendanceTimeStatisticsViewSet)
 router.register('equip-190e', Equip190EViewSet)
 # 考勤操作记录
 router.register('employee-attendance-records-log', EmployeeAttendanceRecordsLogViewSet)
+# 称量排班
+router.register('weight-class-plan', WeightClassPlanViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),

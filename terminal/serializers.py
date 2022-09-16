@@ -275,8 +275,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                     OtherMaterialLog.objects.create(**{'plan_classes_uid': plan_classes_uid, 'other_type': '原材料小料',
                                                        'product_no': plan_product_no, 'material_name': material_name,
                                                        'bra_code': bra_code, 'status': 1})
-                    save_scan_log(scan_data, scan_result='成功', scan_material_type='原材料小料', scan_material=material_name, unit='KG',
-                                  init_weight=wms_xl_material.plan_weight)
+                    save_scan_log(scan_data, scan_result='成功', scan_material_type='原材料小料', scan_material=material_name, unit='KG')
                     raise serializers.ValidationError('原材料小料扫码成功')
                 comm_material = list(material_name_set & materials)
                 if comm_material:
@@ -1991,7 +1990,7 @@ class JZPlanUpdateSerializer(serializers.ModelSerializer):
                 elif action == 2:
                     raise serializers.ValidationError('不支持称量计划重传')
                 elif action == 3:
-                    recipe = RecipePre.objects.using(equip_no).filter(name=instance.recipe).first()
+                    recipe = JZRecipePre.objects.using(equip_no).filter(name=instance.recipe).first()
                     split_count = 1 if not recipe else recipe.split_count
                     setno = validated_data['setno'] * split_count
                     actno = instance.actno if instance.actno else 0

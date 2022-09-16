@@ -2744,6 +2744,8 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
         "标准单位": "unit",
         "库存下限": "lower_stock",
         "库存上限": "upper_stock",
+        "盘库备注": "check_desc",
+        "移库备注": "move_desc"
     }
 
     def list(self, request, *args, **kwargs):
@@ -2812,7 +2814,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
                                             'equip_spare__lower_stock')
         else:
             data = self.filter_queryset(self.queryset.filter(quantity__gt=0)).values('equip_spare', 'equip_warehouse_location').annotate(
-                quantity=Sum('quantity')).values(
+                quantity=Sum('quantity')).order_by('equip_warehouse_location').values(
                                                  'equip_warehouse_area__id',
                                                  'equip_warehouse_area__area_name',
                                                  'equip_warehouse_location__id',
@@ -2825,6 +2827,8 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
                                                  'equip_spare__technical_params',
                                                  'quantity',
                                                  'equip_spare',
+                                                 'check_desc',
+                                                 'move_desc',
                                                  'equip_spare__unit',
                                                  'equip_spare__upper_stock',
                                                  'equip_spare__lower_stock').distinct()
@@ -2839,7 +2843,8 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
             item['unit'] = item['equip_spare__unit']
             if not self.request.query_params.get('use'):
                 item['single_price'] = round(item['equip_spare__cost'] if item['equip_spare__cost'] else 0, 2)
-                item['total_price'] = item['single_price'] * item['quantity']
+                item['total_price'] = round(item['single_price'] * item['quantity'], 2)
+                item['desc'] = None
         if self.request.query_params.get('export'):
             return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         st = (int(page) - 1) * int(page_size)
@@ -2853,7 +2858,8 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
     def create(self, request, *args, **kwargs):
         handle = self.request.data.get('handle')
         data = self.request.data
-        inventory = self.queryset.filter(equip_spare_id=data['equip_spare'], equip_warehouse_location_id=data['equip_warehouse_location__id']).first()
+        all_inventory = self.queryset.filter(equip_spare_id=data['equip_spare'], equip_warehouse_location_id=data['equip_warehouse_location__id'])
+        inventory = all_inventory.first()
         if not inventory:
             return Response({"success": False, "message": '备件代码不存在', "data": None})
         if handle:
@@ -2899,6 +2905,10 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
             # 记录履历
             inventory.save()
             now_quantity = inventory.quantity
+            if handle == '盘库':
+                all_inventory.update(check_desc=data.get('desc'))
+            if handle == '移库':
+                all_inventory.update(move_desc=data.get('desc'))
             EquipWarehouseRecord.objects.create(
                 status=handle,
                 revocation_desc=data.get('desc'),
@@ -2977,8 +2987,8 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
         if instance:
             check_move = EquipWarehouseRecord.objects.filter(status__in=['盘库', '移库'], equip_spare=instance.equip_spare,
                                                              equip_warehouse_area=instance.equip_warehouse_area,
-                                                             equip_warehouse_location=instance.equip_warehouse_location,
-                                                             created_date__lte=instance.created_date).order_by('-created_date')
+                                                             equip_warehouse_location=instance.equip_warehouse_location)\
+                .order_by('-created_date')
             data = self.get_serializer(check_move, many=True).data
         return Response(data)
 
@@ -3116,10 +3126,17 @@ class EquipAutoPlanView(APIView):
             return Response({"success": True, "message": "获取设备科成员信息成功", "data": res})
         if get_code:
             if get_code == "1":
-                order_list = EquipWarehouseOrder.objects.filter(status__in=[1, 2], order_detail__delete_flag=False,
+                order_list = []
+                order_info = EquipWarehouseOrder.objects.filter(status__in=[1, 2], order_detail__delete_flag=False,
                                                                 delete_flag=False,
-                                                                order_detail__equip_spare__spare_code=spare_code) \
-                    .values('id', 'order_id', 'state')
+                                                                order_detail__equip_spare__spare_code=spare_code)
+                not_in_orders = order_info.filter(order_detail__in_quantity__lt=F('order_detail__plan_in_quantity'), order_detail__equip_spare__spare_code=spare_code)
+                if not_in_orders:
+                    order_list = not_in_orders.values('id', 'order_id', 'state')
+                else:
+                    in_orders = order_info.filter(order_detail__in_quantity__gte=F('order_detail__plan_in_quantity'), order_detail__equip_spare__spare_code=spare_code)
+                    if in_orders:
+                        order_list = in_orders.order_by('-id').values('id', 'order_id', 'state')[0]
             else:
                 order_list = EquipWarehouseOrder.objects.filter(status__in=[4, 5], order_detail__delete_flag=False,
                                                                 delete_flag=False,
@@ -4799,13 +4816,18 @@ class GetSpare(APIView):
                 continue
             if EquipSpareErp.objects.filter(spare_code=item['wlbh'], unique_id=item['wlxxid']).exists():
                 continue
-            equip_component_type = EquipComponentType.objects.filter(component_type_name=item['wllb']).first()
-            if not equip_component_type:
-                code = EquipComponentType.objects.order_by('component_type_code').last().component_type_code
-                component_type_code = code[0:4] + '%03d' % (int(code[-3:]) + 1) if code else '001'
-                equip_component_type = EquipComponentType.objects.create(component_type_code=component_type_code,
-                                                                         component_type_name=item['wllb'],
-                                                                         use_flag=True)
+            # 查询mes是否存在该备件的分类
+            s_spare = EquipSpareErp.objects.filter(spare_code=item['wlbh'], equip_component_type__isnull=False, use_flag=True).last()
+            if s_spare:
+                equip_component_type = s_spare.equip_component_type
+            else:
+                equip_component_type = EquipComponentType.objects.filter(component_type_name=item['wllb']).first()
+                if not equip_component_type:
+                    code = EquipComponentType.objects.order_by('component_type_code').last().component_type_code
+                    component_type_code = code[0:4] + '%03d' % (int(code[-3:]) + 1) if code else '001'
+                    equip_component_type = EquipComponentType.objects.create(component_type_code=component_type_code,
+                                                                             component_type_name=item['wllb'],
+                                                                             use_flag=True)
             unique_info = EquipSpareErp.objects.filter(unique_id=item['wlxxid'], spare_code__isnull=True)
             if unique_info:
                 unique_info.update(**{"spare_code": item['wlbh'], "spare_name": item['wlmc'],

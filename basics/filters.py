@@ -8,13 +8,14 @@ class EquipFilter(django_filters.rest_framework.FilterSet):
     equip_level = django_filters.CharFilter(field_name='equip_level__global_name', lookup_expr='icontains',
                                             help_text='设备层级')
     equip_name = django_filters.CharFilter(field_name='equip_name', lookup_expr='icontains', help_text='设备名')
+    equip_no = django_filters.CharFilter(field_name='equip_no', lookup_expr='icontains', help_text='设备名')
     equip_process = django_filters.CharFilter(field_name="category__process__global_name", lookup_expr='icontains',
                                               help_text='工序')
     category_name = django_filters.CharFilter(field_name='category__equip_type__global_name', help_text='设备类型名称')
 
     class Meta:
         model = Equip
-        fields = ('equip_level', 'equip_name', 'equip_process', 'category_name', 'category')
+        fields = ('equip_level', 'equip_name', 'equip_process', 'category_name', 'category', 'equip_no')
 
 
 class GlobalCodeTypeFilter(django_filters.rest_framework.FilterSet):

@@ -150,7 +150,9 @@ class UserViewSet(ModelViewSet):
                 "phone_number": str(item[4]).split('.')[0] if item[4] else item[4],
                 "id_card_num": str(item[3]).split('.')[0] if item[3] else item[3],
                 "section": item[5],
-                "group_extensions": item[6]
+                "group_extensions": item[6],
+                "is_active": True,
+                "delete_flag": False
             }
             user_list.append(user_data)
         s = UserImportSerializer(data=user_list, many=True, context={'request': self.request})
