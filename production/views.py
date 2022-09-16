@@ -509,7 +509,8 @@ class ProductionRecordViewSet(mixins.ListModelMixin,
             if is_instock == 'Y':
                 queryset = queryset.filter(lot_no__in=stock_lot_nos)
             else:
-                queryset = queryset.exclude(lot_no__in=stock_lot_nos)
+                stock_ids = queryset.filter(lot_no__in=stock_lot_nos).values_list('id', flat=True)
+                queryset = queryset.exclude(id__in=list(stock_ids))
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
@@ -4246,12 +4247,14 @@ class AttendanceClockViewSet(ModelViewSet):
                 results['equips'] = sorted(list(set(equips))) if last_obj.section in (s_choice + m_choice) else []
 
                 if str(last_obj.factory_date) == date_now:
-                    begin_time, end_time = get_standard_time(username, date_now)
+                    # begin_time, end_time = get_standard_time(username, date_now)
+                    begin_time, end_time = last_obj.standard_begin_date, last_obj.standard_end_date
                     if not begin_time:
                         raise ValidationError('未找到排班信息')
                     p_date_now = datetime.datetime.strptime(date_now, '%Y-%m-%d')
                     if end_time.hour > 12:  # 白班
-                        if time_now < p_date_now + datetime.timedelta(days=1, hours=2):  # 直到明天凌晨两点，显示当前的打卡记录
+                        # if time_now < p_date_now + datetime.timedelta(days=1, hours=2):  # 直到明天凌晨两点，显示当前的打卡记录
+                        if time_now < end_time + datetime.timedelta(minutes=attendance_group_obj.leave_time):
                             results['state'] = 3  # 进行中的
                             results['ids'] = ids
                             results['begin_date'] = datetime.datetime.strftime(last_obj.begin_date, '%H:%M:%S') if last_obj.begin_date else None
@@ -4266,7 +4269,8 @@ class AttendanceClockViewSet(ModelViewSet):
                         else:
                             flat = True
                     else:  # 夜班
-                        if time_now < p_date_now + datetime.timedelta(days=1, hours=14):
+                        # if time_now < p_date_now + datetime.timedelta(days=1, hours=14):
+                        if time_now < end_time + datetime.timedelta(minutes=attendance_group_obj.leave_time):
                             results['state'] = 3
                             results['ids'] = ids
                             results['begin_date'] = datetime.datetime.strftime(last_obj.begin_date, '%H:%M:%S') if last_obj.begin_date else None
@@ -4287,12 +4291,16 @@ class AttendanceClockViewSet(ModelViewSet):
                             or (last_obj.end_date and (time_now - last_obj.end_date).total_seconds() > attendance_group_obj.leave_time * 60):
                         flat = True
                     else:
-                        begin_time, end_time = get_standard_time(username, date_now)
+                        if datetime.datetime.strptime(date_now, '%Y-%m-%d').date() == last_obj.factory_date + timedelta(days=1) and not last_obj.end_date:
+                            begin_time, end_time, date_now = last_obj.standard_begin_date, last_obj.standard_end_date, str(last_obj.factory_date)
+                        else:
+                            begin_time, end_time = get_standard_time(username, date_now)
                         if not begin_time:
                             raise ValidationError('未找到排班信息')
                         p_date_now = datetime.datetime.strptime(date_now, '%Y-%m-%d')
                         if end_time.hour > 12:  # 白班
-                            if time_now < p_date_now + datetime.timedelta(days=1, hours=2):  # 直到明天凌晨两点，显示当前的打卡记录
+                            # if time_now < p_date_now + datetime.timedelta(days=1, hours=2):  # 直到明天凌晨两点，显示当前的打卡记录
+                            if time_now < end_time + datetime.timedelta(minutes=attendance_group_obj.leave_time):
                                 results['state'] = 3  # 进行中的
                                 results['ids'] = ids
                                 results['begin_date'] = datetime.datetime.strftime(last_obj.begin_date,
@@ -4309,7 +4317,8 @@ class AttendanceClockViewSet(ModelViewSet):
                             else:
                                 flat = True
                         else:  # 夜班
-                            if time_now < p_date_now + datetime.timedelta(days=1, hours=14):
+                            # if time_now < p_date_now + datetime.timedelta(days=1, hours=14):
+                            if time_now < end_time + datetime.timedelta(minutes=attendance_group_obj.leave_time):
                                 results['state'] = 3
                                 results['ids'] = ids
                                 results['begin_date'] = datetime.datetime.strftime(last_obj.begin_date,
@@ -4517,7 +4526,7 @@ class AttendanceClockViewSet(ModelViewSet):
         last_record = EmployeeAttendanceRecords.objects.filter(user=user, end_date__isnull=True, clock_type=clock_type).last()
         if last_record:
             key_second = (last_record.standard_end_date - last_record.standard_begin_date).total_seconds()
-            if last_record.factory_date != date_now and not (last_record.begin_date and (time_now - last_record.begin_date).total_seconds() > key_second + (attendance_group_obj.lead_time + attendance_group_obj.leave_time) * 60):
+            if status == '离岗' and last_record.factory_date != datetime.datetime.strptime(date_now, '%Y-%m-%d').date() and not (last_record.begin_date and (time_now - last_record.begin_date).total_seconds() > key_second + (attendance_group_obj.lead_time + attendance_group_obj.leave_time) * 60):
                 date_now, group, classes = [str(last_record.factory_date), last_record.group, last_record.classes]
         if clock_type == '密炼':
             if status in ['上岗', '调岗']:
@@ -4545,9 +4554,9 @@ class AttendanceClockViewSet(ModelViewSet):
                 # 自动补全之前的离岗时间
                 factory_records = EmployeeAttendanceRecords.objects.filter(user=user, end_date__isnull=True, factory_date=last_date, clock_type=clock_type)
                 for i in factory_records:
-                    calculate_end_date = end_date if i.standard_begin_date < datetime.datetime.strptime(end_date, '%Y-%m-%d %H:%M:%S') < i.standard_end_date else i.calculate_end_date
-                    i.end_date = end_date
-                    i.actual_end_date = end_date
+                    calculate_end_date = time_now if i.standard_begin_date < time_now < i.standard_end_date else i.standard_end_date
+                    i.end_date = time_now
+                    i.actual_end_date = time_now
                     i.calculate_end_date = calculate_end_date
                     i.save()
                 for equip in equip_list:
@@ -4749,7 +4758,7 @@ class AttendanceClockViewSet(ModelViewSet):
         if status == '离岗':
             select_begin_date = data.pop('select_begin_date')
             p_select_begin_date = datetime.datetime.strptime(select_begin_date, '%Y-%m-%d %H:%M:%S')
-            if bk_date <= select_begin_date or (now - p_select_begin_date).total_seconds() > 12 * 3600:
+            if bk_date <= select_begin_date or (now - p_select_begin_date).total_seconds() > 13 * 3600:
                 raise ValidationError('补卡时间选择有误')
             check_date = datetime.datetime.strptime(select_begin_date, '%Y-%m-%d %H:%M:%S').date()
         else:
