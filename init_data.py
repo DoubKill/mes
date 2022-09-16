@@ -1103,7 +1103,7 @@ permission_data = [
     {'id': 1093, 'code': 'delete_scorch_time', 'name': '删除', 'parent_id': 1089},
     {'id': 1094, 'code': 'export_scorch_time', 'name': '导出', 'parent_id': 1089},
 
-    {'id': 1097, 'code': 'weight_class_plan', 'name': '月度配料间排班表', 'parent_id': None},
+    {'id': 1097, 'code': 'weight_class_plan', 'name': '月度配料间排班表', 'parent_id': None, 'category_name': '生产管理'},
     {'id': 1098, 'code': 'view_weight_class_plan', 'name': '查看', 'parent_id': 1097},
     {'id': 1099, 'code': 'add_weight_class_plan', 'name': '新增', 'parent_id': 1097},
     {'id': 1100, 'code': 'edit_weight_class_plan', 'name': '编辑', 'parent_id': 1097},
