@@ -509,7 +509,8 @@ class ProductionRecordViewSet(mixins.ListModelMixin,
             if is_instock == 'Y':
                 queryset = queryset.filter(lot_no__in=stock_lot_nos)
             else:
-                queryset = queryset.exclude(lot_no__in=stock_lot_nos)
+                stock_ids = queryset.filter(lot_no__in=stock_lot_nos).values_list('id', flat=True)
+                queryset = queryset.exclude(id__in=list(stock_ids))
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
