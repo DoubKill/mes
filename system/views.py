@@ -521,6 +521,8 @@ class GroupPermissions(APIView):
             parent_permissions = Permissions.objects.filter(parent__isnull=True)
             for perm in parent_permissions:
                 ret.append({'name': perm.name, 'permissions': perm.children_list, 'category_name': perm.category_name})
+        sort_rules = {'基础信息管理': 1, '工艺管理': 2, '生产计划管理': 3, '生产管理': 4, '库存管理': 5, '质量管理': 6, '设备管理': 7, '钉钉小程序': 8}
+        ret = sorted(ret, key=lambda d: sort_rules.get(d['category_name'], 9))
         return Response(data={'result': ret})
 
 
