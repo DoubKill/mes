@@ -5463,12 +5463,13 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
         elif confirm_list:  # 确认某一天的考勤数据
             opera_type = '确认'
             for item in confirm_list:  # #141414黑色
-                ids, is_use, factory_date = item['id'], item.get('is_use'), item.get('factory_date')
+                ids, is_use, factory_date, is_check = item['id'], item.get('is_use'), item.get('factory_date'), item.get('is_check', False)
                 id_param = [ids] if isinstance(ids, int) else ids
                 EmployeeAttendanceRecords.objects.filter(pk__in=id_param)\
                     .update(actual_time=item.get('actual_time', 0), is_use=is_use, record_status='#141414', opera_flag=1,
                             actual_begin_date=item.get('actual_begin_date'), actual_end_date=item.get('actual_end_date'),
-                            calculate_begin_date=item.get('actual_begin_date'), calculate_end_date=item.get('actual_end_date'))
+                            calculate_begin_date=item.get('actual_begin_date'), calculate_end_date=item.get('actual_end_date'),
+                            is_check=is_check)
         elif reject_list:  # 审批驳回某一天的数据 #DA1F27 红色
             opera_type = '单天驳回'
             id_list = []

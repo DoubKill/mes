@@ -406,6 +406,7 @@ class EmployeeAttendanceRecords(models.Model):
     end_date = models.DateTimeField(help_text='离岗时间', null=True, blank=True)
     actual_begin_date = models.DateTimeField(help_text='修改上岗时间[默认等于上岗时间]', null=True, blank=True)
     actual_end_date = models.DateTimeField(help_text='修改离岗时间[默认等于离岗时间]', null=True, blank=True)
+    is_check = models.BooleanField(help_text='是否使用班次标准时间确认考勤', default=False)
     standard_begin_date = models.DateTimeField(help_text='标准上班时间', null=True, blank=True)
     standard_end_date = models.DateTimeField(help_text='标准下班时间', null=True, blank=True)
     calculate_begin_date = models.DateTimeField(help_text='绩效计算上岗时间[默认等于上岗时间]', null=True, blank=True)
