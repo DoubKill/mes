@@ -12,7 +12,7 @@ class UserFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = User
-        fields = ('num', 'username', 'is_leave', 'groups', 'is_active', 'section_id', 'section_name')
+        fields = ('num', 'username', 'is_leave', 'groups', 'is_active', 'section_id', 'section_name', 'is_superuser')
 
 
 class GroupExtensionFilter(django_filters.rest_framework.FilterSet):
@@ -21,7 +21,7 @@ class GroupExtensionFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = GroupExtension
-        fields = {"group_code", "name", 'use_flag'}
+        fields = {"group_code", "name", 'use_flag', 'section_id'}
 
 
 class SectionFilter(django_filters.rest_framework.FilterSet):
