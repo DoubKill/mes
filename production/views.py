@@ -4545,7 +4545,7 @@ class AttendanceClockViewSet(ModelViewSet):
                 # 自动补全之前的离岗时间
                 factory_records = EmployeeAttendanceRecords.objects.filter(user=user, end_date__isnull=True, factory_date=last_date, clock_type=clock_type)
                 for i in factory_records:
-                    calculate_end_date = end_date if i.standard_begin_date < end_date < i.standard_end_date else i.calculate_end_date
+                    calculate_end_date = end_date if i.standard_begin_date < datetime.datetime.strptime(end_date, '%Y-%m-%d %H:%M:%S') < i.standard_end_date else i.calculate_end_date
                     i.end_date = end_date
                     i.actual_end_date = end_date
                     i.calculate_end_date = calculate_end_date
@@ -4919,7 +4919,9 @@ class AttendanceClockViewSet(ModelViewSet):
             new_begin_times = [i.strftime('%Y-%m-%d %H:%M:%S') for i in begin_times]
             return Response(new_begin_times)
         if select_begin_date:
-            s_info = query_set.filter(begin_date=select_begin_date, end_date__isnull=True).last()
+            s_info = query_set.filter(begin_date__startswith=select_begin_date, end_date__isnull=True).last()
+            if not s_info:
+                raise ValidationError('所选上岗时间未匹配到考勤记录')
             group_list = [{'group': s_info.group, 'classes': s_info.classes}]
             equip_list = []
             section_list = [s_info.section]

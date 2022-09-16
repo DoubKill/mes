@@ -29,9 +29,20 @@ class User(AbstractUser):
     technology = models.CharField(max_length=32, help_text='技术资格', verbose_name='技术资格', blank=True, null=True)
     repair_group = models.CharField(max_length=32, help_text='维修班组', verbose_name='维修班组', blank=True, null=True)
     id_card_num = models.CharField(max_length=18, help_text='身份证号码', blank=True, null=True)
+    permissions = models.ManyToManyField('Permissions', help_text='角色权限', blank=True)
 
     def __str__(self):
         return "{}".format(self.username)
+
+    def get_factory_id(self):
+        ret = []
+        section = self.section
+        if not section:
+            return None
+        while section:
+            ret.append(section.id)
+            section = section.parent_section
+        return ret[-2]
 
     class Meta:
         db_table = "user"
@@ -78,6 +89,18 @@ class Section(AbstractEntity):
     in_charge_user = models.ForeignKey(User, help_text='负责人', blank=True, null=True, on_delete=models.CASCADE,
                                        related_name='in_charge_sections')
     repair_areas = models.CharField(max_length=128, help_text='班组负责区域', null=True, blank=True)
+    permission_user = models.ManyToManyField('User', help_text='部门权限管理员', blank=True,
+                                             related_name='permission_charge_sections')
+    permissions = models.ManyToManyField('Permissions', help_text='角色权限', blank=True)
+
+    def total_children_sections(self):
+        section_ids = []
+        s_id = [self.id]
+        section_ids += s_id
+        while s_id:
+            s_id = Section.objects.filter(parent_section_id__in=s_id).values_list('id', flat=True)
+            section_ids += s_id
+        return section_ids
 
     def __str__(self):
         return self.name
@@ -92,6 +115,7 @@ class Permissions(models.Model):
     name = models.CharField(max_length=64, help_text='权限名称')
     parent = models.ForeignKey('self', help_text='父节点', related_name='children_permissions',
                                blank=True, null=True, on_delete=models.CASCADE)
+    category_name = models.CharField(max_length=16, help_text='所属模块', blank=True, null=True)
 
     @property
     def children_list(self):
@@ -108,6 +132,8 @@ class GroupExtension(AbstractEntity):
     name = models.CharField('角色名称', max_length=150, unique=True)
     use_flag = models.BooleanField(help_text='是否使用', verbose_name='是否使用', default=True)
     permissions = models.ManyToManyField(Permissions, help_text='角色权限', blank=True)
+    section = models.ForeignKey("Section", blank=True, null=True, help_text='部门', verbose_name='部门',
+                                on_delete=models.SET_NULL, related_name="section_groups")
 
     def __str__(self):
         return "{}".format(self.name)
