@@ -4545,7 +4545,7 @@ class AttendanceClockViewSet(ModelViewSet):
                 # 自动补全之前的离岗时间
                 factory_records = EmployeeAttendanceRecords.objects.filter(user=user, end_date__isnull=True, factory_date=last_date, clock_type=clock_type)
                 for i in factory_records:
-                    calculate_end_date = end_date if i.standard_begin_date < end_date < i.standard_end_date else i.calculate_end_date
+                    calculate_end_date = end_date if i.standard_begin_date < datetime.datetime.strptime(end_date, '%Y-%m-%d %H:%M:%S') < i.standard_end_date else i.calculate_end_date
                     i.end_date = end_date
                     i.actual_end_date = end_date
                     i.calculate_end_date = calculate_end_date
