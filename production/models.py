@@ -120,6 +120,7 @@ class EquipStatus(AbstractEntity):
     current_trains = models.IntegerField(help_text='当前车次', verbose_name='当前车次')
     product_time = models.DateTimeField(help_text='工作站生产报表时间/存盘时间',
                                         verbose_name='工作站生产报表时间/存盘时间', null=True)
+    flag = models.IntegerField(help_text='防错是否开启 0:未开启 1:开启', verbose_name='防错是否开启', default=0)
 
     def __str__(self):
         return f"{self.plan_classes_uid}|{self.equip_no}"
