@@ -4801,6 +4801,7 @@ class EquipOldRateView(APIView):
 
 @method_decorator([api_recorder], name='dispatch')
 class GetSpare(APIView):
+
     @atomic
     def get(self, request, *args, **kwargs):
         days = self.request.query_params.get('days')
@@ -4813,6 +4814,8 @@ class GetSpare(APIView):
             if not all([item['wlxxid'], item['wlbh']]):
                 continue
             if item['state'] != '启用':
+                continue
+            if 'TH' in item['wlbh']:  # 09-19 屏蔽泰国备件
                 continue
             if EquipSpareErp.objects.filter(spare_code=item['wlbh'], unique_id=item['wlxxid']).exists():
                 continue
