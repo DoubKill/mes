@@ -2944,32 +2944,33 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
         handle_data, rules = [], alarm_type.split(",")
         for item in data:
             # alarm_type 1 正常库存 2 低库存预警 3 高库存预警 1,2,3 1,2 1,3 2,3 1,2,3
-            if alarm_type:  # 根据规则过滤
-                get_flag = False  # 是否需要的数据
-                for rule in rules:
-                    if get_flag:
-                        break
-                    if rule == '1':
-                        if item['quantity'] > item['equip_spare__upper_stock'] or item['quantity'] < item['equip_spare__lower_stock']:
-                            continue
-                    elif rule == '2':
-                        if item['quantity'] >= item['equip_spare__lower_stock']:
-                            continue
-                    elif rule == '3':
-                        if item['quantity'] <= item['equip_spare__upper_stock']:
-                            continue
-                    else:
-                        raise ValidationError('未知筛选选项')
-                    get_flag = True
-                if not get_flag:
-                    continue
+            get_flag = False  # 是否需要的数据
+            upper_stock = item['equip_spare__upper_stock'] if item['equip_spare__upper_stock'] else item['quantity']
+            lower_stock = item['equip_spare__lower_stock'] if item['equip_spare__lower_stock'] else item['quantity']
+            for rule in rules:
+                if get_flag:
+                    break
+                if rule == '1':
+                    if item['quantity'] > upper_stock or item['quantity'] < lower_stock:
+                        continue
+                elif rule == '2':
+                    if item['quantity'] >= lower_stock:
+                        continue
+                elif rule == '3':
+                    if item['quantity'] <= upper_stock:
+                        continue
+                else:
+                    raise ValidationError('未知筛选选项')
+                get_flag = True
+            if not get_flag:
+                continue
             item['component_type_name'] = item['equip_spare__equip_component_type__component_type_name']
             item['spare_name'] = item['equip_spare__spare_name']
             item['spare__code'] = item['equip_spare__spare_code']
             item['specification'] = item['equip_spare__specification']
             item['technical_params'] = item['equip_spare__technical_params']
-            item['upper_stock'] = item['equip_spare__upper_stock']
-            item['lower_stock'] = item['equip_spare__lower_stock']
+            item['upper_stock'] = upper_stock
+            item['lower_stock'] = lower_stock
             item['unit'] = item['equip_spare__unit']
             item['single_price'] = round(item['equip_spare__cost'] if item['equip_spare__cost'] else 0, 2)
             item['total_price'] = round(item['single_price'] * item['quantity'], 2)
