@@ -233,7 +233,7 @@ def gen_pallet_test_result(lot_nos):
         if test_product_flat:
             level = 1
             test_result = '试验'
-            deal_suggestion = '试验'
+            deal_suggestion = None
         else:
             # 1、不合格车数以及pass章车数相等且大于0，则判定为PASS章
             if 0 < passed_order_count == unqualified_order_count > 0:
@@ -244,12 +244,12 @@ def gen_pallet_test_result(lot_nos):
             elif unqualified_order_count == 0:
                 level = 1
                 test_result = '一等品'
-                deal_suggestion = '合格'
+                deal_suggestion = None
             # 3、不合格
             else:
                 level = 3
                 test_result = '三等品'
-                deal_suggestion = '不合格'
+                deal_suggestion = None
         mdr = MaterialDealResult.objects.filter(lot_no=lot_no).first()
         if mdr:
             mdr.level = level

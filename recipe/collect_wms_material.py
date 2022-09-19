@@ -28,11 +28,12 @@ def main():
         json_data = {"bgsj": str(max_create_date)}
         data = client.service.FindWlxxInfo(json.dumps(json_data))
         data = json.loads(data)
+        material_data = data.get('Table')
     except Exception as e:
         logger.error('connect zc erp system error: {}'.format(e))
         return
-    if isinstance(data, list):
-        for item in data:
+    if isinstance(material_data, list):
+        for item in material_data:
             kwargs = {'wlxxid': item.pop('wlxxid', None)}
             default = {
                 'material_no': item['wlbh'],
