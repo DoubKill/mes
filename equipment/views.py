@@ -2923,6 +2923,79 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
         else:
             return super().update(request, *args, **kwargs)
 
+    @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated], url_path='inventory-alarm', url_name='inventory_alarm')
+    def inventory_alarm(self, request):
+        params = self.request.query_params
+        page, page_size = params.get('page', 1), params.get('page_size', 10)
+        alarm_type = params.get('alarm_type', '1,2,3')
+        data = self.filter_queryset(self.get_queryset()).values('equip_spare').annotate(
+            quantity=Sum('quantity')).values(
+            'equip_spare__equip_component_type__component_type_name',
+            'equip_spare__spare_code',
+            'equip_spare__cost',
+            'equip_spare__spare_name',
+            'equip_spare__specification',
+            'equip_spare__technical_params',
+            'quantity',
+            'equip_spare',
+            'equip_spare__unit',
+            'equip_spare__upper_stock',
+            'equip_spare__lower_stock')
+        handle_data, rules = [], alarm_type.split(",")
+        for item in data:
+            # alarm_type 1 正常库存 2 低库存预警 3 高库存预警 1,2,3 1,2 1,3 2,3 1,2,3
+            if alarm_type:  # 根据规则过滤
+                get_flag = False  # 是否需要的数据
+                for rule in rules:
+                    if get_flag:
+                        break
+                    if rule == '1':
+                        if item['quantity'] > item['equip_spare__upper_stock'] or item['quantity'] < item['equip_spare__lower_stock']:
+                            continue
+                    elif rule == '2':
+                        if item['quantity'] >= item['equip_spare__lower_stock']:
+                            continue
+                    elif rule == '3':
+                        if item['quantity'] <= item['equip_spare__upper_stock']:
+                            continue
+                    else:
+                        raise ValidationError('未知筛选选项')
+                    get_flag = True
+                if not get_flag:
+                    continue
+            item['component_type_name'] = item['equip_spare__equip_component_type__component_type_name']
+            item['spare_name'] = item['equip_spare__spare_name']
+            item['spare__code'] = item['equip_spare__spare_code']
+            item['specification'] = item['equip_spare__specification']
+            item['technical_params'] = item['equip_spare__technical_params']
+            item['upper_stock'] = item['equip_spare__upper_stock']
+            item['lower_stock'] = item['equip_spare__lower_stock']
+            item['unit'] = item['equip_spare__unit']
+            item['single_price'] = round(item['equip_spare__cost'] if item['equip_spare__cost'] else 0, 2)
+            item['total_price'] = round(item['single_price'] * item['quantity'], 2)
+            item['desc'] = None
+            handle_data.append(item)
+        if self.request.query_params.get('export'):
+            alarm_file_name = '备件库存预警'
+            export_fields = {
+                "备件分类": "component_type_name",
+                "备件代码": "spare__code",
+                "备件名称": "spare_name",
+                "规格型号": "specification",
+                "用途": "technical_params",
+                "单价": "single_price",
+                "在库数量": "quantity",
+                "总金额": "total_price",
+                "标准单位": "unit",
+                "库存下限": "lower_stock",
+                "库存上限": "upper_stock"
+            }
+            return gen_template_response(export_fields, handle_data, alarm_file_name, handle_str=True)
+        st = (int(page) - 1) * int(page_size)
+        et = int(page) * int(page_size)
+        count = len(handle_data)
+        return Response({'results': handle_data[st:et], 'count': count})
+
 
 @method_decorator([api_recorder], name='dispatch')
 class EquipWarehouseRecordViewSet(ModelViewSet):
