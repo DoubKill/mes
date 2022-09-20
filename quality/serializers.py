@@ -469,7 +469,7 @@ class MaterialTestResultListSerializer(BaseModelSerializer):
     class Meta:
         model = MaterialTestResult
         fields = ('value', 'data_point_name', 'test_indicator_name', 'machine_name', 'level',
-                  'judged_lower_limit', 'judged_upper_limit')
+                  'judged_lower_limit', 'judged_upper_limit', 'value0', 'judged_lower_limit0', 'judged_upper_limit0')
         extra_kwargs = {
             'value': {'coerce_to_string': False},
             # 'judged_lower_limit': {'coerce_to_string': False},

@@ -186,8 +186,8 @@ def main():
                                 except Exception:
                                     pass
                             value0 = None
-                            judged_upper_limit0 = 0
-                            judged_lower_limit0 = 0
+                            judged_upper_limit0 = None
+                            judged_lower_limit0 = None
                             if not created:
                                 dp_instances = test_order.order_results.filter(data_point_name=data_point_name)
                                 if dp_instances:
