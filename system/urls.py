@@ -4,7 +4,8 @@ from rest_framework_jwt.views import obtain_jwt_token, refresh_jwt_token
 
 from system.views import UserViewSet, UserGroupsViewSet, GroupExtensionViewSet, SectionViewSet, \
     GroupAddUserViewSet, LoginView, Synchronization, GroupPermissions, PlanReceive, MaterialReceive, ResetPassword, \
-    DelUser, IdentityCard, DingDingLoginView, DingDingBind, QRLoginView, DingDingUnBind, UserOperationLogViewSet
+    DelUser, IdentityCard, DingDingLoginView, DingDingBind, QRLoginView, DingDingUnBind, UserOperationLogViewSet, \
+    UserPermissionSectionView
 
 # app_name = 'system'
 router = DefaultRouter()
@@ -35,5 +36,6 @@ urlpatterns = [
     path('reset-password/', ResetPassword.as_view()),
     path('del-user/<pk>/', DelUser.as_view()),
     path('identity-card/', IdentityCard.as_view()),
-    path('qr-login/', QRLoginView.as_view())
+    path('qr-login/', QRLoginView.as_view()),
+    path('permission-section/', UserPermissionSectionView.as_view())
 ]
