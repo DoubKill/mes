@@ -3171,11 +3171,11 @@ class EquipAutoPlanView(APIView):
                 .order_by('-equip_warehouse_order__order_id').first()
             if not order:
                 return Response({"success": False, "message": '条码扫描有误', "data": None})
-            obj = EquipSpareErp.objects.filter(spare_code=spare_code).first()
+            obj = order.equip_spare
             if order.status in [1, 2, 3]:  # 入库单据
                 # quantity = order.plan_in_quantity - order.in_quantity
                 quantity = 1
-                queryset = EquipWarehouseInventory.objects.filter(equip_spare__spare_code=spare_code, quantity__gt=0)
+                queryset = EquipWarehouseInventory.objects.filter(equip_spare=obj, quantity__gt=0)
                 default = queryset.first()
                 area = EquipWarehouseArea.objects.filter(
                     Q(warehouse_area__equip_component_type=obj.equip_component_type) | Q(
@@ -3214,7 +3214,7 @@ class EquipAutoPlanView(APIView):
                     if inventory:
                         quantity = inventory
                     return Response({"success": True, "message": None, "data": {"quantity": quantity}})
-                queryset = EquipWarehouseInventory.objects.filter(equip_spare__spare_code=spare_code, quantity__gt=0, delete_flag=False)
+                queryset = EquipWarehouseInventory.objects.filter(equip_spare=obj, quantity__gt=0, delete_flag=False)
                 default = queryset.first()
                 if not default:
                     return Response({"success": False, "message": '库存中不存在该备件', "data": None})
