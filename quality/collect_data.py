@@ -10,6 +10,7 @@ import uuid
 from decimal import Decimal
 
 import django
+import func_timeout
 from django.db.transaction import atomic
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -77,7 +78,7 @@ def main():
                                 sub_machine.nj_machine_no,
                                 sub_machine.max_rid,
                                 equip_test_plan.created_date.strftime('%Y-%m-%d %H:%M:%S'))
-            except Exception:
+            except func_timeout.exceptions.FunctionTimedOut:
                 logger.error('connect database:{} error !'.format(server))
                 continue
 
@@ -98,7 +99,7 @@ def main():
                     continue
                 try:
                     data = get_result_info(server, user, password, name, rid)
-                except Exception:
+                except func_timeout.exceptions.FunctionTimedOut:
                     logger.error('connect database:{} error !'.format(server))
                     continue
 
