@@ -5230,7 +5230,7 @@ class LIBRARYINVENTORYView(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class OutBoundDeliveryOrderViewSet(ModelViewSet):
-    queryset = OutBoundDeliveryOrder.objects.all().order_by("-created_date")
+    queryset = OutBoundDeliveryOrder.objects.exclude(status=4).order_by("-id")
     filter_backends = (DjangoFilterBackend,)
     filter_class = OutBoundDeliveryOrderFilter
     permission_classes = (IsAuthenticated, )
@@ -5519,12 +5519,13 @@ class OutBoundHistory(APIView):
 
     def get(self, request):
         last_out_bound_order = OutBoundDeliveryOrder.objects.filter(
-            created_user=self.request.user).order_by('created_date').last()
+            created_user=self.request.user).order_by('id').last()
         if last_out_bound_order:
             data = {
                 'warehouse': last_out_bound_order.warehouse,
                 'station': last_out_bound_order.station,
-                'order_qty': last_out_bound_order.order_qty
+                'order_qty': last_out_bound_order.order_qty,
+                'quality_status': last_out_bound_order.quality_status
             }
         else:
             data = {}
@@ -6813,6 +6814,15 @@ class ProductExpireDetailView(APIView):
             return gen_template_response(self.EXPORT_FIELDS_DICT, temp, self.FILE_NAME)
         count = len(temp)
         data = temp[st:et]
+        for i in data:
+            if i['lot_no']:
+                deal_result = MaterialDealResult.objects.filter(
+                    lot_no=i['lot_no']).first()
+                if deal_result:
+                    if deal_result.deal_user:
+                        i['deal_suggestion'] = deal_result.deal_suggestion
+                    else:
+                        i['deal_suggestion'] = 'PASS' if deal_result.test_result == 'PASS' else None
         total_weight = sum([i['total_weight'] for i in temp])
         total_quantity = sum([i['qty'] for i in temp])
         return Response(

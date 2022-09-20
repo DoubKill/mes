@@ -209,45 +209,29 @@ class MaterialTestIndicatorMethods(APIView):
 
     def get(self, request):
         material_no = self.request.query_params.get('material_no')
-        try:
-            material = Material.objects.get(material_no=material_no)
-        except Exception:
-            raise ValidationError('该胶料不存在')
         ret = {}
-        test_indicator_names = TestIndicator.objects.values_list('name', flat=True)
-        test_methods = TestMethod.objects.all()
-        for test_method in test_methods:
-            indicator_name = test_method.test_type.test_indicator.name
-            allowed = True
-            data_points = None
-            mat_test_method = MaterialTestMethod.objects.filter(
-                material=material,
-                test_method=test_method).first()
-            if not mat_test_method:
-                allowed = False
-            else:
-                if not MaterialDataPointIndicator.objects.filter(material_test_method=mat_test_method).exists():
-                    allowed = False
-                else:
-                    data_points = mat_test_method.data_point.values('id', 'name', 'unit')
+        for method in MaterialTestMethod.objects.filter(material__material_no=material_no):
+            indicator_name = method.test_method.test_type.test_indicator.name
+            data_points = method.mat_indicators.filter(
+                level=1, delete_flag=False).values(name=F('data_point__name'),
+                                                   judge_upper_limit=F('upper_limit'),
+                                                   judge_lower_limit=F('lower_limit'))
+            if not data_points:
+                continue
             if indicator_name not in ret:
                 data = {
                     'test_indicator': indicator_name,
                     'methods': [
-                        {'id': test_method.id,
-                         'name': test_method.name,
-                         'allowed': allowed,
+                        {'id': method.test_method.id,
+                         'name': method.test_method.name,
+                         'allowed': True,
                          'data_points': data_points}
                     ]
                 }
                 ret[indicator_name] = data
             else:
                 ret[indicator_name]['methods'].append(
-                    {'id': test_method.id, 'name': test_method.name, 'allowed': allowed, 'data_points': data_points})
-
-        for item in test_indicator_names:
-            if item not in ret:
-                ret[item] = {'test_indicator': item, 'methods': []}
+                    {'id': method.test_method.id, 'name': method.test_method.name, 'allowed': True, 'data_points': data_points})
         return Response(ret.values())
 
 
@@ -4656,3 +4640,16 @@ class ScorchTimeView(ModelViewSet):
             return Response({'data': ret.values(), 'dates': dates})
         else:
             return super().list(self, request, *args, **kwargs)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductTestPlanInterval(APIView):
+
+    def get(self, request):
+        product_no = self.request.query_params.get('product_no')
+        details = ProductTestPlanDetail.objects.filter(product_no=product_no).order_by('id').last()
+        if details:
+            interval = details.test_plan.test_interval
+        else:
+            interval = None
+        return Response({'interval': interval})

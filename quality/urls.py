@@ -24,7 +24,7 @@ from quality.views import TestIndicatorViewSet, TestTypeViewSet, DataPointViewSe
     ProductTestStaticsView, ClassTestStaticsView, UnqialifiedEquipView, LabelPrintLogView, \
     MaterialDataPointIndicatorHistoryView, ProductSynthesisRate, ProductSynthesisEquipRate, ProductSynthesisGroupRate, \
     ProductSynthesisProductRate, ProductSynthesisMonthRate, ProductTestValueHistoryView, ProductIndicatorStandard, \
-    ProductMaterials, TestedMaterials, ProductTestedTrains, ScorchTimeView
+    ProductMaterials, TestedMaterials, ProductTestedTrains, ScorchTimeView, ProductTestPlanInterval
 
 router = DefaultRouter()
 
@@ -168,4 +168,5 @@ urlpatterns = [
 
     path('tested-materials/', TestedMaterials.as_view()),  # 胶料快检详情列表下拉框，区分启用配方
     path('product-tested-trains/', ProductTestedTrains.as_view()),  # 快检检测计划，查询已经检测过的车次
+    path('product-test-plan-interval/', ProductTestPlanInterval.as_view()),  # 获取胶料上次检测间隔
 ]
