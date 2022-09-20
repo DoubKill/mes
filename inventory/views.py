@@ -61,7 +61,7 @@ from inventory.serializers import PutPlanManagementSerializer, \
     OutBoundTasksSerializer, WmsInventoryMaterialSerializer, WmsNucleinManagementSerializer, \
     MaterialOutHistoryOtherSerializer, MaterialOutHistorySerializer, WMSExceptHandleSerializer, \
     BzMixingRubberInventorySearchSerializer, BzFinalRubberInventorySearchSerializer, \
-    OutBoundDeliveryOrderUpdateSerializer, ProductInOutHistorySerializer
+    OutBoundDeliveryOrderUpdateSerializer, ProductInOutHistorySerializer, OutBoundDeliveryOrderDetailListSerializer
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
@@ -5401,11 +5401,16 @@ class OutboundStock(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class OutBoundDeliveryOrderDetailViewSet(ModelViewSet):
-    queryset = OutBoundDeliveryOrderDetail.objects.all().order_by('-created_date')
+    queryset = OutBoundDeliveryOrderDetail.objects.all().order_by('-id')
     serializer_class = OutBoundDeliveryOrderDetailSerializer
     filter_backends = (DjangoFilterBackend,)
     filter_class = OutBoundDeliveryOrderDetailFilter
     permission_classes = (IsAuthenticated, )
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return OutBoundDeliveryOrderDetailSerializer
+        return OutBoundDeliveryOrderDetailListSerializer
 
     def get_queryset(self):
         queryset = self.queryset
@@ -5450,7 +5455,7 @@ class OutBoundDeliveryOrderDetailViewSet(ModelViewSet):
             detail = s.save()
             detail_ids.append(detail.id)
             dict1 = {'WORKID': detail.order_no,
-                     'MID': instance.product_no,
+                     'MID': instance.product_no if instance.order_type in (1, 2) else item.get('product_no'),
                      'PICI': "1",
                      'RFID': detail.pallet_no,
                      'STATIONID': instance.station,
