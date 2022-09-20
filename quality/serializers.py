@@ -488,7 +488,7 @@ class MaterialTestOrderListSerializer(BaseModelSerializer):
 
     class Meta:
         model = MaterialTestOrder
-        fields = ('lot_no', 'product_no', 'production_factory_date', 'production_class', 'production_group',
+        fields = ('id', 'lot_no', 'product_no', 'production_factory_date', 'production_class', 'production_group',
                   'production_equip_no', 'actual_trains', 'is_recheck', 'state', 'order_results')
 
 
