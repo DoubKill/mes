@@ -711,8 +711,9 @@ class ToolManageAccount(models.Model):
     save_date = models.DateTimeField(auto_now_add=True)
     date_time = models.CharField(max_length=10, help_text='记录时间', null=True, blank=True)
     times = models.IntegerField(help_text='保存次数', null=True, blank=True)
-    content = models.TextField(help_text='维修胶架内容', null=True, blank=True)
     save_user = models.CharField(max_length=64, help_text='保存人', null=True, blank=True)
+    day = models.TextField(help_text='工装管理台帐日期表头', null=True, blank=True)
+    content = models.TextField(help_text='维修胶架内容', null=True, blank=True)
 
     class Meta:
         db_table = 'tool_manage_account'

@@ -5855,15 +5855,16 @@ class ToolManageAccountView(APIView):
         if query_set:
             max_times = query_set.aggregate(max_times=Max('times'))['max_times']
             instance = query_set.filter(times=max_times).last()
-            results['details'] = json.loads(instance.content)
+            results.update({'day': json.loads(instance.day), 'details': json.loads(instance.content)})
         else:  # 返回空格式
-            results['details'] = []
+            results.update({'day': [], 'details': []})
         results['date_time'] = date_time
         return Response({'results': results})
 
     @atomic
     def post(self, request):
         date_time = self.request.data.get('date_time')
+        day = self.request.data.get('day')
         details = self.request.data.get('details')
         save_user = self.request.user.username
         if not all([date_time, details]):
@@ -5871,7 +5872,7 @@ class ToolManageAccountView(APIView):
         # 获取最新保存次数
         max_times = ToolManageAccount.objects.filter(date_time=date_time).aggregate(max_times=Max('times'))['max_times']
         times = 1 if not max_times else max_times + 1
-        ToolManageAccount.objects.create(date_time=date_time, content=json.dumps(details), times=times, save_user=save_user)
+        ToolManageAccount.objects.create(date_time=date_time, day=json.dumps(day), content=json.dumps(details), times=times, save_user=save_user)
         return Response('保存成功')
 
 
