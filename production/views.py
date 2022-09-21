@@ -40,7 +40,7 @@ from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
 from mes.permissions import PermissionClass
 from plan.filters import ProductClassesPlanFilter
-from plan.models import ProductClassesPlan, SchedulingEquipShutDownPlan
+from plan.models import ProductClassesPlan, SchedulingEquipShutDownPlan, SchedulingResult
 from basics.models import Equip
 from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, QualityControlFilter, EquipStatusFilter, \
     PlanStatusFilter, ExpendMaterialFilter, UnReachedCapacityCause, \
@@ -433,6 +433,15 @@ class ProductActualViewSet(mixins.ListModelMixin,
         ).values('equip_no', 'product_no', 'classes', 'actual_trains', 'actual_weight', 'plan_weight')
         actual_data_dict = {item['equip_no']+item['product_no']+item['classes']: item for item in tf_set}
         ret = {}
+        aps_result = SchedulingResult.objects.filter(factory_date=day_time).order_by('id').last()
+        if aps_result:
+            aps_data = SchedulingResult.objects.filter(
+                factory_date=day_time,
+                schedule_no=aps_result.schedule_no
+            ).values('equip_no', 'recipe_name').annotate(plan_trains=Sum('plan_trains'))
+            aps_data_dict = {item['equip_no']+item['recipe_name']: item['plan_trains'] for item in aps_data}
+        else:
+            aps_data_dict = {}
 
         for key, value in plan_data_dict.items():
             if key in actual_data_dict:
@@ -454,14 +463,14 @@ class ProductActualViewSet(mixins.ListModelMixin,
                 ret[equip_product_key] = {
                                'equip_no': value['equip_no'],
                                'product_no': value['product_no'],
-                               'plan_trains': value['plan_trains'],
+                               'plan_trains': aps_data_dict.get(equip_product_key),
                                'actual_trains': value['actual_trains'],
                                'plan_weight': value['plan_weight'],
                                'actual_weight': value['actual_weight'],
                                'classes_data': classes_data,
                            }
             else:
-                ret[equip_product_key]['plan_trains'] += value['plan_trains']
+                # ret[equip_product_key]['plan_trains'] += value['plan_trains']
                 ret[equip_product_key]['actual_trains'] += value['actual_trains']
                 ret[equip_product_key]['classes_data'][value['classes']] = {
                     'plan_trains': value['plan_trains'],
