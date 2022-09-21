@@ -2543,12 +2543,15 @@ class ReportWeightViewStaticsView(APIView):
             except:
                 raise ValidationError("page/page_size异常，请修正后重试")
             else:
-                if begin not in range(0, 99999):
-                    raise ValidationError("page/page_size值异常")
-                if end not in range(0, 99999):
-                    raise ValidationError("page/page_size值异常")
-            return Response({'total_data': len(results), 'total_page': math.ceil(len(results) / int(page_size)),
-                             'page_result': results[begin: end]})
+                if end >= 10000:
+                    page_result, total_page = results[begin:], 1
+                else:
+                    if begin not in range(0, 99999):
+                        raise ValidationError("page/page_size值异常")
+                    if end not in range(0, 99999):
+                        raise ValidationError("page/page_size值异常")
+                    page_result, total_page = results[begin: end], math.ceil(len(results) / int(page_size))
+            return Response({'total_data': len(results), 'total_page': total_page, 'page_result': page_result})
 
 
 @method_decorator([api_recorder], name="dispatch")
