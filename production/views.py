@@ -2434,10 +2434,13 @@ class MonthlyOutputStatisticsReportDetail(APIView):
             raise ValidationError('请选择段次！')
         filter_kwargs = {'factory_date__gte': st, 'factory_date__lte': et, 'product_no__icontains': '-{}-'.format(stage)}
         query_set = TrainsFeedbacks.objects.exclude(
-            operation_user='Mixer1'
+            Q(product_no__icontains='XCJ') |
+            Q(product_no__icontains='洗车胶') |
+            Q(operation_user='Mixer2') |
+            Q(product_no__icontains='WUMING')
         ).filter(**filter_kwargs)
 
-        total_weight = query_set.aggregate(tw=Sum('actual_weight')/100000)['tw']
+        total_weight = query_set.aggregate(tw=Sum('plan_weight')/1000)['tw']
 
         if equip_no:
             query_set = query_set.filter(equip_no=equip_no)
@@ -2445,7 +2448,7 @@ class MonthlyOutputStatisticsReportDetail(APIView):
             query_set = query_set.filter(product_no__icontains='-{}-'.format(product_no))
 
         equip_group_data = query_set.values('product_no', 'equip_no', 'factory_date').annotate(
-            total_weight=Sum('actual_weight')/100000, total_trains=Count('id')).order_by('factory_date')
+            total_weight=Sum('plan_weight')/1000, total_trains=Count('id')).order_by('factory_date')
         ret = {}
         for item in equip_group_data:
             try:
