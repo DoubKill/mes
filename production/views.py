@@ -2256,7 +2256,9 @@ on temp2.EQUIP_NO=temp3.EQUIP_NO and temp2.w2=temp3.w3;"""
         query_data = cursor.fetchall()
         equip_history_max_classes_dict = {}
         for item in query_data:
-            equip_history_max_classes_dict[item[0]] = {'factory_date': item[2], 'weight': item[1], 'classes': item[3]}
+            equip_history_max_classes_dict[item[0]] = {'factory_date': item[2],
+                                                       'weight': item[1]/2 if item[0]=='Z04' else item[1],
+                                                       'classes': item[3]}
 
         # 机台产量
         queryset = TrainsFeedbacks.objects.exclude(
