@@ -11,6 +11,7 @@ from operator import itemgetter
 
 import requests
 import xlwt
+from django.db import connection
 from django.http import HttpResponse, FileResponse
 from django.views.generic import detail
 from django_pandas.io import read_frame
@@ -2216,7 +2217,7 @@ class MonthlyOutputStatisticsReport(APIView):
                     et_v = et_month_equip_target.get(equip_no, 0)
                     equip_target[equip_no] = st_v * st_month_days * 2 + et_v * et_month_days * 2
 
-        # 机台每日、每班次最大生产数据
+        # 区间时间范围内机台每日、每班次最大生产数据
         equip_max_output_data = TrainsFeedbacks.objects.exclude(
             Q(product_no__icontains='XCJ') |
             Q(product_no__icontains='洗车胶') |
@@ -2234,6 +2235,29 @@ class MonthlyOutputStatisticsReport(APIView):
             w = item['w']
             equip_max_classes_dict[equip_no] = {'factory_date': factory_date, 'weight': w, 'classes': classes}
 
+        sql = """
+        select temp2.EQUIP_NO, w2/1000, FACTORY_DATE, CLASSES from(
+select
+       EQUIP_NO,
+       max(w) as w2
+from (
+select EQUIP_NO,
+       sum(PLAN_WEIGHT) as w
+from TRAINS_FEEDBACKS group by FACTORY_DATE, EQUIP_NO, CLASSES) temp
+group by EQUIP_NO) temp2
+inner join (select FACTORY_DATE,
+       EQUIP_NO,
+       CLASSES,
+       sum(PLAN_WEIGHT) as w3
+from TRAINS_FEEDBACKS group by FACTORY_DATE, EQUIP_NO, CLASSES) temp3
+on temp2.EQUIP_NO=temp3.EQUIP_NO and temp2.w2=temp3.w3;"""
+        cursor = connection.cursor()
+        cursor.execute(sql)
+        query_data = cursor.fetchall()
+        equip_history_max_classes_dict = {}
+        for item in query_data:
+            equip_history_max_classes_dict[item[0]] = {'factory_date': item[2], 'weight': item[1], 'classes': item[3]}
+
         # 机台产量
         queryset = TrainsFeedbacks.objects.exclude(
             Q(product_no__icontains='XCJ') |
@@ -2250,6 +2274,8 @@ class MonthlyOutputStatisticsReport(APIView):
         for item in queryset:
             group = ""
             max_weight = ""
+            history_group = ""
+            history_max_weight = ""
             equip_max_classes_data = equip_max_classes_dict.get(item['equip_no'])
             if equip_max_classes_data:
                 max_weight = round(equip_max_classes_data['weight'], 2)
@@ -2260,9 +2286,21 @@ class MonthlyOutputStatisticsReport(APIView):
                 ).first()
                 if work_schedule_plan:
                     group = work_schedule_plan.group.global_name
+            equip_history_max_classes_data = equip_history_max_classes_dict.get(item['equip_no'])
+            if equip_history_max_classes_data:
+                history_max_weight = round(equip_history_max_classes_data['weight'], 2)
+                work_schedule_plan = WorkSchedulePlan.objects.filter(
+                    plan_schedule__work_schedule__work_procedure__global_name='密炼',
+                    plan_schedule__day_time=equip_history_max_classes_data['factory_date'],
+                    classes__global_name=equip_history_max_classes_data['classes']
+                ).first()
+                if work_schedule_plan:
+                    history_group = work_schedule_plan.group.global_name
             item['target'] = equip_target.get(item['equip_no'], 0)
             item['group'] = group
             item['max_weight'] = max_weight
+            item['history_group'] = history_group
+            item['history_max_weight'] = history_max_weight
             item['total_weight'] = round(item['total_weight'], 2)
 
         wl_stage_output = {'wl': {'name': "wl", 'value': 0}}
