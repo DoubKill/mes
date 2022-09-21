@@ -2173,6 +2173,7 @@ class MonthlyOutputStatisticsReport(APIView):
     permission_classes = (IsAuthenticated,)
 
     def get(self, request, *args, **kwargs):
+
         st = self.request.query_params.get('st')
         et = self.request.query_params.get('et')
         if not all([st, et]):
@@ -2217,12 +2218,14 @@ class MonthlyOutputStatisticsReport(APIView):
 
         # 机台每日、每班次最大生产数据
         equip_max_output_data = TrainsFeedbacks.objects.exclude(
-            operation_user='Mixer1'
-        ).filter(
+            Q(product_no__icontains='XCJ') |
+            Q(product_no__icontains='洗车胶') |
+            Q(operation_user='Mixer2') |
+            Q(product_no__icontains='WUMING')).filter(
             factory_date__gte=st,
             factory_date__lte=et
         ).values('equip_no', 'factory_date', 'classes'
-                 ).annotate(w=Sum('actual_weight')/100000).order_by('equip_no', 'w')
+                 ).annotate(w=Sum('plan_weight')/1000).order_by('equip_no', 'w')
         equip_max_classes_dict = {}
         for item in equip_max_output_data:
             equip_no = item['equip_no']
@@ -2233,11 +2236,14 @@ class MonthlyOutputStatisticsReport(APIView):
 
         # 机台产量
         queryset = TrainsFeedbacks.objects.exclude(
-            Q(operation_user='Mixer1') | Q(product_no__icontains='XCJ')
+            Q(product_no__icontains='XCJ') |
+            Q(product_no__icontains='洗车胶') |
+            Q(operation_user='Mixer2') |
+            Q(product_no__icontains='WUMING')
         ).filter(
             factory_date__gte=st,
             factory_date__lte=et
-        ).values('equip_no').annotate(total_weight=Sum('actual_weight')/100000,
+        ).values('equip_no').annotate(total_weight=Sum('plan_weight')/1000,
                                       total_trains=Count('id')).order_by('equip_no')
 
         # 补充机台所选时间内的产量最大值
@@ -2262,12 +2268,16 @@ class MonthlyOutputStatisticsReport(APIView):
         wl_stage_output = {'wl': {'name': "wl", 'value': 0}}
         jl_stage_output = {'jl': {'name': "jl", 'value': 0}}
         # 各段次产量
-        stage_production_queryset = TrainsFeedbacks.objects.exclude(
-            Q(operation_user='Mixer1') | Q(product_no__icontains='XCJ')
+        qs = TrainsFeedbacks.objects.exclude(
+            Q(product_no__icontains='XCJ') |
+            Q(product_no__icontains='洗车胶') |
+            Q(operation_user='Mixer2') |
+            Q(product_no__icontains='WUMING')
         ).filter(
             factory_date__gte=st,
             factory_date__lte=et
-        ).values('product_no').annotate(total_weight=Sum('actual_weight')/100000).order_by('product_no')
+        )
+        stage_production_queryset = qs.values('product_no').annotate(total_weight=Sum('plan_weight')/1000).order_by('product_no')
         for item in stage_production_queryset:
             try:
                 stage = item['product_no'].split('-')[1]
@@ -2292,7 +2302,72 @@ class MonthlyOutputStatisticsReport(APIView):
         jl_sort_rules = {'RE': 1, 'FM': 2, 'RFM': 3, 'jl': 99999}
         wl_data = sorted(wl_data, key=lambda d: wl_sort_rules.get(d['name'], 999))
         jl_data = sorted(jl_data, key=lambda d: jl_sort_rules.get(d['name'], 999))
-        return Response({'result': queryset, 'wl': wl_data, 'jl': jl_data})
+
+        # 计算段数
+        month_total_dict = dict(qs.values(
+            'factory_date__day'
+        ).annotate(weight=Sum(
+            'plan_weight', output_field=DecimalField()) / 1000
+                   ).values_list('factory_date__day', 'weight'))
+        fm_total_dict = dict(qs.filter(product_no__icontains='-FM-').values('factory_date__day').annotate(
+            weight=Sum('plan_weight', output_field=DecimalField()) / 1000).values_list('factory_date__day', 'weight'))
+
+        queryset_190e = Equip190EWeight.objects.exclude(
+            setup__specification__in=('洗车胶', 'XCJ', 'WUMING')).filter(
+            factory_date__gte=st,
+            factory_date__lte=et)
+        total_queryset_190e_dict = dict(queryset_190e.values(
+            'factory_date__day').annotate(
+            sum_weight=Sum(F('setup__weight') * F('qty') / 1000, output_field=DecimalField())).values_list(
+            'factory_date__day', 'sum_weight'))
+        total_manual_input_trains = ManualInputTrains.objects.exclude(
+            Q(product_no__icontains='XCJ') |
+            Q(product_no__icontains='洗车胶') |
+            Q(product_no__icontains='-WUMING-')
+        ).filter(factory_date__gte=st, factory_date__lte=et)
+        total_manual_input_trains_dict = dict(total_manual_input_trains.values(
+            'factory_date__day'
+        ).annotate(
+            weight=Sum(F('weight') * F('actual_trains') / 1000, output_field=DecimalField())
+        ).values_list('factory_date__day', 'weight'))
+
+        queryset_190e = Equip190EWeight.objects.exclude(
+            setup__specification__in=('洗车胶', 'XCJ', 'WUMING')).filter(
+            factory_date__gte=st, factory_date__lte=et)
+        equip_190e_weight = queryset_190e.filter(setup__state='FM').values('factory_date__day').annotate(
+            sum_weight=Sum(F('setup__weight') * F('qty') / 1000, output_field=DecimalField()))
+        fm_queryset_190e_dict = dict(equip_190e_weight.values_list('factory_date__day', 'sum_weight'))
+
+        out_queryset = OuterMaterial.objects.filter(
+            factory_date__gte=st,
+            factory_date__lte=et).values('factory_date__day').annotate(
+            weight=Sum('weight', output_field=DecimalField()))
+        out_queryset_dict = dict(out_queryset.values_list('factory_date__day', 'weight'))
+
+        total_manual_input_trains = ManualInputTrains.objects.exclude(
+            Q(product_no__icontains='XCJ') |
+            Q(product_no__icontains='洗车胶') |
+            Q(product_no__icontains='-WUMING-')
+        ).filter(factory_date__gte=st, factory_date__lte=et)
+
+        total_manual_input_trains_final_dict = dict(
+            total_manual_input_trains.filter(
+                product_no__icontains='-FM-'
+            ).values('factory_date__day').annotate(
+                weight=Sum(F('weight') * F('actual_trains')/1000, output_field=DecimalField())
+            ).values_list('factory_date__day', 'weight'))
+
+        total_weight = sum(list(month_total_dict.values())) \
+                       + sum(list(total_queryset_190e_dict.values())) \
+                       + sum(list(total_manual_input_trains_dict.values()))
+        total_fm_weight = sum(list(fm_total_dict.values())) \
+                          + sum(list(fm_queryset_190e_dict.values())) \
+                          + sum(list(out_queryset_dict.values())) \
+                          + sum(list(total_manual_input_trains_final_dict.values()))
+
+        ds = "" if not total_fm_weight or not total_weight else round(total_weight / total_fm_weight, 2)
+
+        return Response({'result': queryset, 'wl': wl_data, 'jl': jl_data, 'ds': ds})
 
 
 @method_decorator([api_recorder], name="dispatch")
