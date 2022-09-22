@@ -2228,14 +2228,13 @@ class ReportBasicView(ListAPIView):
     def list(self, request, *args, **kwargs):
         equip_no = self.request.query_params.get('equip_no')
         planid = self.request.query_params.get('planid')
-        s_st = self.request.query_params.get('s_st', datetime.datetime.now().strftime('%Y-%m-%d'))
+        s_st = self.request.query_params.get('s_st')
+        if not s_st:
+            s_st = datetime.datetime.now().strftime('%Y-%m-%d')
         s_et = self.request.query_params.get('s_et')
         c_st = self.request.query_params.get('c_st')
         c_et = self.request.query_params.get('c_et')
         recipe = self.request.query_params.get('recipe')
-
-        if not equip_no:
-            raise ValidationError('参数缺失')
 
         filter_kwargs = {}
         if not equip_no:
