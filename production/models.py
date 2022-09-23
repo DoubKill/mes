@@ -120,7 +120,6 @@ class EquipStatus(AbstractEntity):
     current_trains = models.IntegerField(help_text='当前车次', verbose_name='当前车次')
     product_time = models.DateTimeField(help_text='工作站生产报表时间/存盘时间',
                                         verbose_name='工作站生产报表时间/存盘时间', null=True)
-    flag = models.IntegerField(help_text='防错是否开启 0:未开启 1:开启', verbose_name='防错是否开启', default=0)
 
     def __str__(self):
         return f"{self.plan_classes_uid}|{self.equip_no}"
@@ -407,6 +406,7 @@ class EmployeeAttendanceRecords(models.Model):
     end_date = models.DateTimeField(help_text='离岗时间', null=True, blank=True)
     actual_begin_date = models.DateTimeField(help_text='修改上岗时间[默认等于上岗时间]', null=True, blank=True)
     actual_end_date = models.DateTimeField(help_text='修改离岗时间[默认等于离岗时间]', null=True, blank=True)
+    is_check = models.BooleanField(help_text='是否使用班次标准时间确认考勤', default=False)
     standard_begin_date = models.DateTimeField(help_text='标准上班时间', null=True, blank=True)
     standard_end_date = models.DateTimeField(help_text='标准下班时间', null=True, blank=True)
     calculate_begin_date = models.DateTimeField(help_text='绩效计算上岗时间[默认等于上岗时间]', null=True, blank=True)
@@ -711,8 +711,9 @@ class ToolManageAccount(models.Model):
     save_date = models.DateTimeField(auto_now_add=True)
     date_time = models.CharField(max_length=10, help_text='记录时间', null=True, blank=True)
     times = models.IntegerField(help_text='保存次数', null=True, blank=True)
-    content = models.TextField(help_text='维修胶架内容', null=True, blank=True)
     save_user = models.CharField(max_length=64, help_text='保存人', null=True, blank=True)
+    day = models.TextField(help_text='工装管理台帐日期表头', null=True, blank=True)
+    content = models.TextField(help_text='维修胶架内容', null=True, blank=True)
 
     class Meta:
         db_table = 'tool_manage_account'

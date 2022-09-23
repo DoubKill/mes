@@ -10,6 +10,7 @@ import uuid
 from decimal import Decimal
 
 import django
+import func_timeout
 from django.db.transaction import atomic
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -77,7 +78,7 @@ def main():
                                 sub_machine.nj_machine_no,
                                 sub_machine.max_rid,
                                 equip_test_plan.created_date.strftime('%Y-%m-%d %H:%M:%S'))
-            except Exception:
+            except func_timeout.exceptions.FunctionTimedOut:
                 logger.error('connect database:{} error !'.format(server))
                 continue
 
@@ -98,7 +99,7 @@ def main():
                     continue
                 try:
                     data = get_result_info(server, user, password, name, rid)
-                except Exception:
+                except func_timeout.exceptions.FunctionTimedOut:
                     logger.error('connect database:{} error !'.format(server))
                     continue
 
@@ -184,14 +185,19 @@ def main():
                                     break
                                 except Exception:
                                     pass
+                            value0 = None
+                            judged_upper_limit0 = None
+                            judged_lower_limit0 = None
                             if not created:
-                                a = test_order.order_results.filter(data_point_name=data_point_name).delete()
-                                # try:
-                                #     if a[0]:
-                                #         test_order.is_recheck = True
-                                #         test_order.save()
-                                # except Exception:
-                                #     pass
+                                dp_instances = test_order.order_results.filter(data_point_name=data_point_name)
+                                if dp_instances:
+                                    v = dp_instances.first()
+                                    value0 = v.value
+                                    judged_upper_limit0 = v.judged_upper_limit
+                                    judged_lower_limit0 = v.judged_lower_limit
+                                    dp_instances.delete()
+                                    test_order.is_recheck = True
+                                    test_order.save()
                             # 创建数据点检测结果
                             MaterialTestResult.objects.create(
                                 material_test_order=test_order,
@@ -210,7 +216,10 @@ def main():
                                 is_judged=material_test_method.is_judged,
                                 created_user=equip_test_plan.created_user,
                                 judged_upper_limit=indicator.upper_limit,
-                                judged_lower_limit=indicator.lower_limit
+                                judged_lower_limit=indicator.lower_limit,
+                                value0=value0,
+                                judged_upper_limit0=judged_upper_limit0,
+                                judged_lower_limit0=judged_lower_limit0
                             )
 
                 current_test_detail.value = json.dumps(list(test_results.values()))

@@ -223,6 +223,9 @@ class MaterialTestResult(AbstractEntity):
     is_judged = models.BooleanField(help_text='是否做为判定', default=True)
     judged_upper_limit = models.DecimalField(help_text='判定基准上限', decimal_places=3, max_digits=8, default=0)
     judged_lower_limit = models.DecimalField(help_text='判定基准下限', decimal_places=3, max_digits=8, default=0)
+    value0 = models.DecimalField(help_text='检测值', decimal_places=3, max_digits=8, blank=True, null=True)
+    judged_upper_limit0 = models.DecimalField(help_text='判定基准上限', decimal_places=3, max_digits=8, blank=True, null=True)
+    judged_lower_limit0 = models.DecimalField(help_text='判定基准下限', decimal_places=3, max_digits=8, blank=True, null=True)
 
     class Meta:
         db_table = 'material_test_result'
