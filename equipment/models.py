@@ -1096,6 +1096,7 @@ class CheckPointTable(AbstractEntity):
     confirm_time = models.DateTimeField(help_text='确认时间', null=True, blank=True)
     confirm_user = models.CharField(max_length=64, help_text='确认人', null=True, blank=True)
     status = models.CharField(max_length=16, help_text='状态: 新建、已点检、已确认', default='新建')
+    finish_flag = models.BooleanField(help_text='是否为提交状态', default=False)
     check_result = models.CharField(max_length=16, help_text='点检结果: 点检正常、点检异常、已修复', null=True, blank=True)
     sign_name = models.CharField(max_length=512, help_text='手写签名', null=True, blank=True)
     check_image_urls = models.TextField(help_text='点检图片', null=True, blank=True)

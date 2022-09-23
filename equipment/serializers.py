@@ -1890,7 +1890,9 @@ class CheckPointTableUpdateSerializer(BaseModelSerializer):
 
     @atomic
     def update(self, instance, validated_data):
-        table_details = validated_data.pop('table_details')
+        table_details, status = validated_data.pop('table_details'), validated_data.get('status')
+        if status != '已确认' and instance.finish_flag:
+            raise serializers.ValidationError('单据已经提交, 不可编辑')
         if not table_details:
             raise serializers.ValidationError('没有需要点检的内容')
         content, table_check_result, normal, abnormal, repaired = [], None, [], [], []
@@ -1920,13 +1922,17 @@ class CheckPointTableUpdateSerializer(BaseModelSerializer):
             else:
                 if normal:
                     table_check_result = '点检正常'
-        validated_data.update(check_result=table_check_result, status='已点检', point_time=datetime.now(),
-                              point_user=self.context['request'].user.username)
+        if status == '已确认':
+            validated_data.update(check_result=table_check_result)
+        else:
+            validated_data.update(check_result=table_check_result, status='已点检', point_time=datetime.now(),
+                                  point_user=self.context['request'].user.username)
         return super().update(instance, validated_data)
 
     class Meta:
         model = CheckPointTable
-        fields = ('desc', 'table_details', 'check_image_urls', 'sign_name')
+        fields = ('desc', 'table_details', 'check_image_urls', 'sign_name', 'finish_flag', 'status', 'confirm_time',
+                  'confirm_user', 'confirm_desc')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
