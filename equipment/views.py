@@ -3000,7 +3000,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
 
 @method_decorator([api_recorder], name='dispatch')
 class EquipWarehouseRecordViewSet(ModelViewSet):
-    queryset = EquipWarehouseRecord.objects.filter(status__in=['入库', '出库']).order_by('-created_date')
+    queryset = EquipWarehouseRecord.objects.all().order_by('-created_date')
     serializer_class = EquipWarehouseRecordSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
