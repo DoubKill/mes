@@ -3980,7 +3980,8 @@ class ProductSynthesisRate(APIView):
         year = int(date.split('-')[0])
         month = int(date.split('-')[1])
         filter_kwargs = {'production_factory_date__year': year,
-                         'production_factory_date__month': month}
+                         'production_factory_date__month': month,
+                         'product_no__icontains': '-FM-'}
         if sy_flag == 'N':
             filter_kwargs['is_experiment'] = False
         # 每日检查量
@@ -4058,7 +4059,7 @@ class ProductSynthesisMonthRate(APIView):
         if not year:
             raise ValidationError('请选择年份！')
         year = int(year)
-        filter_kwargs = {'production_factory_date__year': year}
+        filter_kwargs = {'production_factory_date__year': year, 'product_no__icontains': '-FM-'}
         if sy_flag == 'N':
             filter_kwargs['is_experiment'] = False
         # 每月检查量
@@ -4202,7 +4203,8 @@ class ProductSynthesisGroupRate(APIView):
         month = int(date.split('-')[1])
         days = calendar.monthrange(year, month)[1]
         filter_kwargs = {'production_factory_date__year': year,
-                         'production_factory_date__month': month}
+                         'production_factory_date__month': month,
+                         'product_no__icontains': '-FM-'}
         if sy_flag == 'N':
             filter_kwargs['is_experiment'] = False
         # 班组每日总检查量
@@ -4263,7 +4265,8 @@ class ProductSynthesisProductRate(APIView):
         month = int(date.split('-')[1])
         days = calendar.monthrange(year, month)[1]
         filter_kwargs = {'production_factory_date__year': year,
-                         'production_factory_date__month': month}
+                         'production_factory_date__month': month,
+                         'product_no__icontains': '-FM-'}
         if sy_flag == 'N':
             filter_kwargs['is_experiment'] = False
         pt_dict = {}
