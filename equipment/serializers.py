@@ -1869,6 +1869,9 @@ class CheckPointTableSerializer(BaseModelSerializer):
             else:
                 if normal:
                     table_check_result = '点检正常'
+        # 填写过项目则变为已点检
+        if table_check_result:
+            instance.status = '已点检'
         instance.check_result = table_check_result
         instance.save()
         return instance
@@ -1961,6 +1964,7 @@ class CheckTemperatureTableSerializer(BaseModelSerializer):
                 instance.is_exceed = False
             else:
                 instance.is_exceed = True
+            instance.status = '已点检'
         instance.save()
         CheckTemperatureTableDetail.objects.bulk_create(content)
         return instance

@@ -5483,6 +5483,7 @@ class CheckPointTableViewSet(ModelViewSet):
                     raise ValidationError('异常: 新建单据不可确认')
                 if records.filter(status='已确认'):
                     raise ValidationError('异常: 存在已经确认过的数据,请重新选择后再确认')
+                # 检查是否全部填写
                 records.update(confirm_desc=self.request.data.get('confirm_desc'), status='已确认',
                                sign_name=self.request.data.get('sign_name'),
                                confirm_time=datetime.now(), confirm_user=self.request.user.username)
