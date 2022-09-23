@@ -14,7 +14,7 @@ sys.path.append(BASE_DIR)
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'mes.settings')
 django.setup()
 
-from django.db.models import Count, Max
+from django.db.models import Count, Max, Q
 from django.db.transaction import atomic
 from equipment.models import EquipMaintenanceStandard, EquipPlan, Equip, EquipApplyOrder, EquipInspectionOrder, \
     EquipMaintenanceStandardWork
@@ -178,6 +178,11 @@ class ApplyOrder:
                                                        )
                     plan.status = '已生成工单'
                     plan.save()
+                    # 关闭之前同标准旧的工单
+                    EquipInspectionOrder.objects.filter(~Q(plan_id=plan.plan_id), status__in=['已生成', '已指派', '已接单'],
+                                                        equip_repair_standard=plan.equip_manintenance_standard,
+                                                        ).update(status='已关闭')
+
             else:
                 if not EquipApplyOrder.objects.filter(plan_id=plan.plan_id).exists() and (plan.planned_maintenance_date - datetime.datetime.now()) < datetime.timedelta(days=1):
                     for equip in equip_list:

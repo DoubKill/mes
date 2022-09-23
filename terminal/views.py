@@ -3,8 +3,10 @@ import math
 import re
 import time
 import logging
+import pandas as pd
 from datetime import timedelta
 from decimal import Decimal
+from io import BytesIO
 
 from django.contrib.auth.models import Permission
 from django.db.models import Max, Sum, Q, Prefetch, Count, F, Value, CharField
@@ -2226,14 +2228,13 @@ class ReportBasicView(ListAPIView):
     def list(self, request, *args, **kwargs):
         equip_no = self.request.query_params.get('equip_no')
         planid = self.request.query_params.get('planid')
-        s_st = self.request.query_params.get('s_st', datetime.datetime.now().strftime('%Y-%m-%d'))
+        s_st = self.request.query_params.get('s_st')
+        if not s_st:
+            s_st = datetime.datetime.now().strftime('%Y-%m-%d')
         s_et = self.request.query_params.get('s_et')
         c_st = self.request.query_params.get('c_st')
         c_et = self.request.query_params.get('c_et')
         recipe = self.request.query_params.get('recipe')
-
-        if not equip_no:
-            raise ValidationError('参数缺失')
 
         filter_kwargs = {}
         if not equip_no:
@@ -2457,9 +2458,10 @@ class ReportWeightViewStaticsView(APIView):
     permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_xl_report_weight_statics'}))
     FILE_NAME = '称量物料消耗汇总表'
     EXPORT_FIELDS_DICT = {"机台": "s_equip_no",
-                          "配方": "recipe",
                           "物料名称": "material",
-                          "实际重量(kg)": "material_total_weight"
+                          "物料总重量(kg)": "material_total_weight",
+                          "配方": "recipe",
+                          "实际重量(kg)": "recipe_weight"
                           }
 
     def get(self, request):
@@ -2497,13 +2499,40 @@ class ReportWeightViewStaticsView(APIView):
                 filter_kwargs['material__icontains'] = material_name
             # 获取机台
             equip_no_list = [s_equip_no] if s_equip_no else [k for k, v in DATABASES.items() if 'YK_XL' in v.get('NAME') or 'MWDS' in v.get('NAME')]
+            # for i in equip_no_list:
+            #     weight_model = JZReportWeight if i in JZ_EQUIP_NO else ReportWeight
+            #     s_data = weight_model.objects.using(i).filter(~Q(material='总重量'), **filter_kwargs).order_by('material')
+            #     s_res = s_data.values('recipe', 'material').annotate(material_total_weight=Sum('act_weight'), s_equip_no=Value(i, output_field=CharField())).values('s_equip_no', 'recipe', 'material', 'material_total_weight')
+            #     results.extend(list(s_res))
+            # 使用pandas
+            df = pd.DataFrame()
             for i in equip_no_list:
                 weight_model = JZReportWeight if i in JZ_EQUIP_NO else ReportWeight
-                s_data = weight_model.objects.using(i).filter(~Q(material='总重量'), **filter_kwargs).order_by('recipe')
-                s_res = s_data.values('recipe', 'material').annotate(material_total_weight=Sum('act_weight'), s_equip_no=Value(i, output_field=CharField())).values('s_equip_no', 'recipe', 'material', 'material_total_weight')
-                results.extend(list(s_res))
+                s_data = weight_model.objects.using(i).filter(~Q(material='总重量'), **filter_kwargs).values('material', 'recipe', 'act_weight').order_by('material', 'recipe')
+                if not s_data:
+                    continue
+                init_df = pd.DataFrame(s_data)
+                df_res = init_df.groupby(['material', 'recipe']).agg({'act_weight': sum}).reset_index().assign(s_equip_no=i)
+                df = pd.concat([df, df_res], axis=0)
+            if not df.empty:
+                df['material_total_weight'] = df.groupby(['s_equip_no', 'material'])['act_weight'].transform('sum')
+                results = df.rename(columns={'act_weight': 'recipe_weight'}).to_dict('records')
             if export:  # 导出
-                return gen_template_response(self.EXPORT_FIELDS_DICT, results, self.FILE_NAME)
+                if not results:
+                    raise ValidationError('无数据可导出')
+                bio = BytesIO()
+                writer = pd.ExcelWriter(bio, engine='xlsxwriter')  # 注意安装这个包 pip install xlsxwriter
+                new_df = df.rename(columns={'s_equip_no': '机台', 'material': '物料名称', 'material_total_weight': '合计(kg)', 'recipe': '配方', 'act_weight': '实际重量(kg)'})\
+                    .groupby(['机台', '物料名称', '合计(kg)', '配方']).agg({'实际重量(kg)': sum})
+                new_df.to_excel(writer, sheet_name='物料消耗', index=True, encoding='SIMPLIFIED CHINESE_CHINA.UTF8')
+                writer.save()
+                bio.seek(0)
+                from django.http import FileResponse
+                response = FileResponse(bio)
+                response['Content-Type'] = 'application/octet-stream'
+                response['Content-Disposition'] = 'attachment;filename="mm.xlsx"'
+                return response
+                # return gen_template_response(self.EXPORT_FIELDS_DICT, results, self.FILE_NAME)
             # 分页
             page = self.request.query_params.get('page', 1)
             page_size = self.request.query_params.get('page_size', 10)
@@ -2513,12 +2542,15 @@ class ReportWeightViewStaticsView(APIView):
             except:
                 raise ValidationError("page/page_size异常，请修正后重试")
             else:
-                if begin not in range(0, 99999):
-                    raise ValidationError("page/page_size值异常")
-                if end not in range(0, 99999):
-                    raise ValidationError("page/page_size值异常")
-            return Response({'total_data': len(results), 'total_page': math.ceil(len(results) / int(page_size)),
-                             'page_result': results[begin: end]})
+                if end >= 10000:
+                    page_result, total_page = results[begin:], 1
+                else:
+                    if begin not in range(0, 99999):
+                        raise ValidationError("page/page_size值异常")
+                    if end not in range(0, 99999):
+                        raise ValidationError("page/page_size值异常")
+                    page_result, total_page = results[begin: end], math.ceil(len(results) / int(page_size))
+            return Response({'total_data': len(results), 'total_page': total_page, 'page_result': page_result})
 
 
 @method_decorator([api_recorder], name="dispatch")

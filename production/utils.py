@@ -63,11 +63,13 @@ def get_work_time(class_code, factory_date):
                 pare = i.description.split('-')
                 if len(pare) in [3, 6]:
                     for j in range(len(pare) // 3):
-                        index = j * 3
-                        begin_date, end_date = factory_date, factory_date
+                        index, begin_date, end_date = j * 3, factory_date, factory_date
                         if pare[index] == '夜班':
                             next_day = (datetime.strptime(factory_date, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
                             begin_date, end_date = next_day if pare[index + 1] == '00:00:00' else factory_date, next_day
+                        if pare[index] == '中班':
+                            next_day = (datetime.strptime(factory_date, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
+                            begin_date, end_date = factory_date, next_day if pare[index + 2] == '00:00:00' else factory_date
                         res.update({pare[index]: [f'{begin_date} {pare[index + 1]}', f'{end_date} {pare[index + 2]}']})
     if len(res) >= 2:
         h = datetime.now().time().hour
