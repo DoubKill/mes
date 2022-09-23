@@ -560,21 +560,23 @@ class ReplaceRecipeMaterialViewSet(ModelViewSet):
                 created_data.update({'failed_reason': '配方中已经存在被替换物料'})
                 multi_created_list.append(MultiReplaceMaterial(**created_data))
                 continue
-            # 查询群控配方
-            sfj_recipe = ProductBatching.objects.using('SFJ').filter(stage_product_batch_no=mes_recipe.stage_product_batch_no,
-                                                                     equip__category__category_no=mes_recipe.dev_type.category_name,
-                                                                     batching_type=1)
+            # 查询群控配方 9-17:不操作群控废弃配方
+            sfj_recipe = ProductBatching.objects.using('SFJ').filter(~Q(used_type=6), batching_type=1,
+                                                                     stage_product_batch_no=mes_recipe.stage_product_batch_no,
+                                                                     equip__category__category_no=mes_recipe.dev_type.category_name)
             if not sfj_recipe:
                 created_data.update({'failed_reason': '未找到群控配方'})
                 multi_created_list.append(MultiReplaceMaterial(**created_data))
                 continue
             # 查看配方是否都在密炼(默认全部失败, 否则影响防错)
             limit_date = datetime.datetime.now().date() - datetime.timedelta(days=1)
-            processing_plan = ProductClassesPlan.objects.using('SFJ').filter(created_date__date__gte=limit_date, product_batching__in=sfj_recipe, status__in=['等待', '运行中'])
+            processing_plan = ProductClassesPlan.objects.using('SFJ').filter(delete_flag=False, created_date__date__gte=limit_date, product_batching__in=sfj_recipe, status__in=['等待', '运行中'])
             processing_recipe = set(processing_plan.values_list('equip__equip_no', flat=True))
             if processing_recipe:
                 for j in processing_recipe:
-                    created_data.update({'failed_reason': '存在机台正在密炼的群控配方', 'equip_no': j})
+                    s_recipe = sfj_recipe.filter(equip__equip_no=j).last()
+                    sfj_product_batching = None if not s_recipe else s_recipe.id
+                    created_data.update({'failed_reason': '存在机台正在密炼的群控配方', 'equip_no': j, 'sfj_product_batching': sfj_product_batching})
                     multi_created_list.append(MultiReplaceMaterial(**created_data))
                 continue
             with atomic(using='SFJ'):
@@ -584,7 +586,9 @@ class ReplaceRecipeMaterialViewSet(ModelViewSet):
                                                                               material=sfj_replace_instance)
                 if sfj_exist:
                     for s_exist in sfj_exist:
-                        created_data.update({'failed_reason': '群控配方中已经存在被替换物料', 'equip_no': s_exist.product_batching.equip.equip_no})
+                        created_data.update({'failed_reason': '群控配方中已经存在被替换物料',
+                                             'equip_no': s_exist.product_batching.equip.equip_no,
+                                             'sfj_product_batching': s_exist.product_batching.id})
                         multi_created_list.append(MultiReplaceMaterial(**created_data))
                     continue
                 # 如果替换的是炭黑或者油料物质, 需要判断是否存在日料罐中
@@ -602,7 +606,9 @@ class ReplaceRecipeMaterialViewSet(ModelViewSet):
                 if both_not_found:
                     for k in both_not_found:
                         not_found_equip_no = k.equip.equip_no
-                        created_data.update({'failed_reason': f'{not_found_equip_no}配方两种物料均不存在', 'equip_no': not_found_equip_no})
+                        created_data.update({'failed_reason': f'{not_found_equip_no}配方两种物料均不存在',
+                                             'equip_no': not_found_equip_no,
+                                             'sfj_product_batching': k.id})
                         multi_created_list.append(MultiReplaceMaterial(**created_data))
                 success_equips = []
                 for s_detail in sfj_detail:
@@ -611,20 +617,22 @@ class ReplaceRecipeMaterialViewSet(ModelViewSet):
                         check_type = s_detail.type - 1
                         tank = MaterialTankStatus.objects.filter(equip_no=s_equip_no, tank_type=check_type, material_no=replace_material).first()
                         if not tank:
-                            created_data.update({'failed_reason': f'{s_equip_no}日料罐不存在替换物料', 'equip_no': s_equip_no})
+                            created_data.update({'failed_reason': f'{s_equip_no}日料罐不存在替换物料',
+                                                 'equip_no': s_equip_no, 'sfj_product_batching': s_detail.product_batching.id})
                             multi_created_list.append(MultiReplaceMaterial(**created_data))
                             continue
                     success_equips.append(s_equip_no)
                 if not success_equips:
                     break
                 wait_update = sfj_detail.filter(product_batching__equip__equip_no__in=success_equips)
-                sfj_recipe.filter(id__in=wait_update.values_list('product_batching_id', flat=True)).update(used_type=1)
+                # 09-17: 不修改停用配方的状态
+                sfj_recipe.filter(id__in=wait_update.exclude(product_batching__used_type=7).values_list('product_batching_id', flat=True)).update(used_type=1)
                 wait_update.update(**{'material': sfj_replace_instance})
             for s_instance in sfj_recipe:
                 equip_no = s_instance.equip.equip_no
                 created_data['equip_no'] = equip_no
                 if equip_no in success_equips:
-                    created_data.update({'status': '成功'})
+                    created_data.update({'status': '成功', 'sfj_product_batching': s_instance.id})
                 multi_created_list.append(MultiReplaceMaterial(**created_data))
             with atomic():
                 # 替换mes
