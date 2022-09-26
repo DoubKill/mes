@@ -457,6 +457,7 @@ class ProductBatchingMixed(models.Model):
 class MultiReplaceMaterial(AbstractEntity):
     """批量替换原材料履历表"""
     product_batching = models.ForeignKey(ProductBatching, help_text='配方记录', on_delete=models.CASCADE)
+    sfj_product_batching = models.IntegerField(help_text='上辅机配方id', null=True, blank=True)
     equip_no = models.CharField(max_length=64, help_text='机台', null=True, blank=True)
     origin_material = models.CharField(max_length=64, help_text='被替换原材料名称')
     replace_material = models.CharField(max_length=64, help_text='替换原材料名称')

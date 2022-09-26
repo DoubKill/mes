@@ -1510,21 +1510,21 @@ class EquipWarehouseOrderSerializer(BaseModelSerializer):
         validated_data.update({'desc': desc, 'created_user_id': u.id, 'state': state})
         order = super().create(validated_data)
         status = validated_data['status']
-        for equip_sapre in equip_spare_list:
-            if not isinstance(equip_sapre['quantity'], int):
+        for equip_spare in equip_spare_list:
+            if not isinstance(equip_spare['quantity'], int):
                 raise serializers.ValidationError('入库数量必须为整数')
             if status == 1:  # 入库单据
                 kwargs = {
-                    'equip_spare_id': equip_sapre['id'],
-                    'plan_in_quantity': equip_sapre['quantity'],
+                    'equip_spare_id': equip_spare['id'],
+                    'plan_in_quantity': equip_spare['quantity'],
                     'status': status,
                     'created_user': self.context["request"].user,
                     'equip_warehouse_order': order
                 }
             else:  # status == 4:  出库单据
                 kwargs = {
-                    'equip_spare_id': equip_sapre['id'],
-                    'plan_out_quantity': equip_sapre['quantity'],
+                    'equip_spare_id': equip_spare['id'],
+                    'plan_out_quantity': equip_spare['quantity'],
                     'status': status,
                     'created_user': self.context["request"].user,
                     'equip_warehouse_order': order

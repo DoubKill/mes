@@ -32,20 +32,20 @@ class OpreationLogRecorder(object):
 def get_standard_time(user_name, factory_date, global_name='密炼', group=None, classes=None):
     """根据参数获取当天的上下班时间"""
     begin_time, end_time, now_time = None, None, f'{factory_date} {datetime.now().time()}'
-    last_obj = EmployeeAttendanceRecords.objects.filter(user__username=user_name, factory_date=factory_date).last()
-    if last_obj:  # 有打卡记录
-        filter_kwargs = {'classes__global_name': last_obj.classes, 'group__global_name': last_obj.group,
+    # last_obj = EmployeeAttendanceRecords.objects.filter(user__username=user_name, factory_date=factory_date).last()
+    # if last_obj:  # 有打卡记录
+    #     filter_kwargs = {'classes__global_name': last_obj.classes, 'group__global_name': last_obj.group,
+    #                      'plan_schedule__day_time': factory_date,
+    #                      'plan_schedule__work_schedule__work_procedure__global_name': global_name}
+    # else:  # 没有打卡记录[有班组(打卡)、无班组]
+    if group and classes:
+        filter_kwargs = {'classes__global_name': classes, 'group__global_name': group,
                          'plan_schedule__day_time': factory_date,
                          'plan_schedule__work_schedule__work_procedure__global_name': global_name}
-    else:  # 没有打卡记录[有班组(打卡)、无班组]
-        if group and classes:
-            filter_kwargs = {'classes__global_name': classes, 'group__global_name': group,
-                             'plan_schedule__day_time': factory_date,
-                             'plan_schedule__work_schedule__work_procedure__global_name': global_name}
-        else:
-            filter_kwargs = {'start_time__lte': now_time, 'end_time__gte': now_time,
-                             'plan_schedule__day_time': factory_date,
-                             'plan_schedule__work_schedule__work_procedure__global_name': global_name}
+    else:
+        filter_kwargs = {'start_time__lte': now_time, 'end_time__gte': now_time,
+                         'plan_schedule__day_time': factory_date,
+                         'plan_schedule__work_schedule__work_procedure__global_name': global_name}
     w = WorkSchedulePlan.objects.filter(**filter_kwargs).last()
     if w:
         begin_time, end_time = w.start_time, w.end_time
@@ -63,11 +63,13 @@ def get_work_time(class_code, factory_date):
                 pare = i.description.split('-')
                 if len(pare) in [3, 6]:
                     for j in range(len(pare) // 3):
-                        index = j * 3
-                        begin_date, end_date = factory_date, factory_date
+                        index, begin_date, end_date = j * 3, factory_date, factory_date
                         if pare[index] == '夜班':
                             next_day = (datetime.strptime(factory_date, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
                             begin_date, end_date = next_day if pare[index + 1] == '00:00:00' else factory_date, next_day
+                        if pare[index] == '中班':
+                            next_day = (datetime.strptime(factory_date, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
+                            begin_date, end_date = factory_date, next_day if pare[index + 2] == '00:00:00' else factory_date
                         res.update({pare[index]: [f'{begin_date} {pare[index + 1]}', f'{end_date} {pare[index + 2]}']})
     if len(res) >= 2:
         h = datetime.now().time().hour

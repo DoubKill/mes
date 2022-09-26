@@ -582,12 +582,15 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
                         else:
                             raise ValidationError('该胶料实验方法不存在！')
                     if not created:
-                        a = instance.order_results.filter(data_point_name=item['data_point_name']).delete()
-                        # try:
-                        #     if a[0]:
-                        #         is_recheck = True
-                        # except Exception:
-                        #     pass
+                        dp_instances = instance.order_results.filter(data_point_name=item['data_point_name'])
+                        if dp_instances:
+                            v = dp_instances.first()
+                            item['value0'] = v.value
+                            item['judged_upper_limit0'] = v.judged_upper_limit
+                            item['judged_lower_limit0'] = v.judged_lower_limit
+                            dp_instances.delete()
+                            instance.is_recheck = True
+                            instance.save()
                     MaterialTestResult.objects.create(**item)
                 # if is_recheck:
                 #     instance.is_recheck = True
@@ -1638,16 +1641,16 @@ class ImportAndExportView(APIView):
                     else:
                         continue
                     if not created:
-                        a = instance.order_results.filter(data_point_name=data_point_name).delete()
-                        # try:
-                        #     if a[0]:
-                        #         is_recheck = True
-                        # except Exception:
-                        #     pass
+                        dp_instances = instance.order_results.filter(data_point_name=data_point_name)
+                        if dp_instances:
+                            v = dp_instances.first()
+                            result_data['value0'] = v.value
+                            result_data['judged_upper_limit0'] = v.judged_upper_limit
+                            result_data['judged_lower_limit0'] = v.judged_lower_limit
+                            dp_instances.delete()
+                            instance.is_recheck = True
+                            instance.save()
                     MaterialTestResult.objects.create(**result_data)
-                # if is_recheck:
-                #     instance.is_recheck = True
-                #     instance.save()
         gen_pallet_test_result(lot_nos)
         return Response('导入成功')
 
@@ -2373,6 +2376,7 @@ class ReportValueView(APIView):
     "raw_value": ""}
     """
 
+    @atomic()
     def post(self, request):
         # 原材料：{"report_type": 1, "ip": "IP地址", "value": {"l_4": 12}, "raw_value": "机台检测完整数据"}
         # 胶料门尼：{"report_type": 2, "ip": "IP地址", "value": {"l_4: 12"}, "raw_value": "机台检测完整数据"}
@@ -2639,8 +2643,19 @@ class ReportValueView(APIView):
                         # mes_result = '三等品'
                         # level = 2
                         continue
+                    value0 = None
+                    judged_upper_limit0 = None
+                    judged_lower_limit0 = None
                     if not created:
-                        a = test_order.order_results.filter(data_point_name=data_point_name).delete()
+                        dp_instances = test_order.order_results.filter(data_point_name=data_point_name)
+                        if dp_instances:
+                            v = dp_instances.first()
+                            value0 = v.value
+                            judged_upper_limit0 = v.judged_upper_limit
+                            judged_lower_limit0 = v.judged_lower_limit
+                            dp_instances.delete()
+                            test_order.is_recheck = True
+                            test_order.save()
                         # try:
                         #     if a[0]:
                         #         is_recheck = True
@@ -2663,7 +2678,10 @@ class ReportValueView(APIView):
                         is_judged=material_test_method.is_judged,
                         created_user=equip_test_plan.created_user,
                         judged_upper_limit=indicator.upper_limit,
-                        judged_lower_limit=indicator.lower_limit
+                        judged_lower_limit=indicator.lower_limit,
+                        value0=value0,
+                        judged_upper_limit0=judged_upper_limit0,
+                        judged_lower_limit0=judged_lower_limit0
                     )
 
                 # if is_recheck:
