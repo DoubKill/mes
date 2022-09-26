@@ -1999,12 +1999,7 @@ class OutBoundDeliveryOrderDetailSerializer(BaseModelSerializer):
 class OutBoundDeliveryOrderDetailListSerializer(BaseModelSerializer):
     warehouse = serializers.CharField(source='outbound_delivery_order.warehouse', help_text='库区', read_only=True)
     station = serializers.CharField(source='outbound_delivery_order.station', help_text='出库口', read_only=True)
-    product_no = serializers.SerializerMethodField(help_text='胶料名称', read_only=True)
-
-    def get_product_no(self, obj):
-        if obj.outbound_delivery_order.order_type in (1, 2):
-            return obj.outbound_delivery_order.product_no
-        return obj.product_no
+    product_no = serializers.CharField(source='outbound_delivery_order.product_no', help_text='胶料名称', read_only=True)
 
     class Meta:
         model = OutBoundDeliveryOrderDetail

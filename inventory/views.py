@@ -5455,7 +5455,7 @@ class OutBoundDeliveryOrderDetailViewSet(ModelViewSet):
             detail = s.save()
             detail_ids.append(detail.id)
             dict1 = {'WORKID': detail.order_no,
-                     'MID': instance.product_no if instance.order_type in (1, 2) else item.get('product_no'),
+                     'MID': instance.product_no,
                      'PICI': "1",
                      'RFID': detail.pallet_no,
                      'STATIONID': instance.station,
