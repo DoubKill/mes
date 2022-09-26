@@ -2243,13 +2243,13 @@ select
 from (
 select EQUIP_NO,
        sum(PLAN_WEIGHT) as w
-from TRAINS_FEEDBACKS group by FACTORY_DATE, EQUIP_NO, CLASSES) temp
+from TRAINS_FEEDBACKS where FACTORY_DATE is not null group by FACTORY_DATE, EQUIP_NO, CLASSES) temp
 group by EQUIP_NO) temp2
 inner join (select FACTORY_DATE,
        EQUIP_NO,
        CLASSES,
        sum(PLAN_WEIGHT) as w3
-from TRAINS_FEEDBACKS group by FACTORY_DATE, EQUIP_NO, CLASSES) temp3
+from TRAINS_FEEDBACKS where FACTORY_DATE is not null group by FACTORY_DATE, EQUIP_NO, CLASSES) temp3
 on temp2.EQUIP_NO=temp3.EQUIP_NO and temp2.w2=temp3.w3;"""
         cursor = connection.cursor()
         cursor.execute(sql)
