@@ -5813,9 +5813,11 @@ class MaterialExpendSummaryView(APIView):
         diff = e_time - s_time
         if diff.days > 30:
             raise ValidationError('搜索日期跨度不得超过一个月！')
-        plan_uids = list(ProductClassesPlan.objects.filter(
+        qs = ProductClassesPlan.objects.filter(
             work_schedule_plan__plan_schedule__day_time__gte=s_time,
-            work_schedule_plan__plan_schedule__day_time__lte=e_time).values_list(
+            work_schedule_plan__plan_schedule__day_time__lte=e_time)
+        class_uid_date_dict = dict(qs.values_list('plan_classes_uid', 'work_schedule_plan__plan_schedule__day_time'))
+        plan_uids = list(qs.values_list(
             'plan_classes_uid', flat=True))
         queryset = ExpendMaterial.objects.filter(plan_classes_uid__in=plan_uids)
         if equip_no:
@@ -5824,10 +5826,11 @@ class MaterialExpendSummaryView(APIView):
             queryset = queryset.filter(product_no__icontains=product_no)
         if material_name:
             queryset = queryset.filter(material_name__icontains=material_name)
-        data = queryset.values('equip_no', 'product_no', 'material_no', 'material_name', 'product_time__date').annotate(actual_weight=Sum('actual_weight')/100).order_by('product_no', 'equip_no', 'material_name')
+        data = queryset.values('equip_no', 'product_no', 'material_name', 'plan_classes_uid').annotate(actual_weight=Sum('actual_weight')/100).order_by('product_no', 'equip_no', 'material_name')
         material_type_dict = dict(Material.objects.values_list('material_name', 'material_type__global_name'))
         days = date_range(s_time, e_time)
         ret = {}
+        material_weight_dict = {}
         for item in data:
             material_name = item['material_name'].rstrip('-C').rstrip('-X')
             equip_no = item['equip_no']
@@ -5835,7 +5838,7 @@ class MaterialExpendSummaryView(APIView):
             key = '{}-{}-{}'.format(equip_no, material_name, product_no)
             weight = item['actual_weight']
             material_type = material_type_dict.get(item['material_name'], 'UN_KNOW')
-            factory_date = item['product_time__date'].strftime("%Y-%m-%d")
+            factory_date = class_uid_date_dict[item['plan_classes_uid']].strftime("%Y-%m-%d")
             if key not in ret:
                 ret[key] = {
                     'material_type': material_type,
@@ -5851,11 +5854,12 @@ class MaterialExpendSummaryView(APIView):
                 else:
                     ret[key][factory_date] = weight
                 ret[key]['total_weight'] += weight
+            material_weight_dict[material_name] = material_weight_dict.get(material_name, 0) + weight
         result = ret.values()
         if filter_material_type:
             result = list(filter(lambda x: x['material_type'] == filter_material_type, result))
         result = sorted(result, key=itemgetter('material_type', 'material_name', 'equip_no'))  #  按多个字段排序
-        return Response({'days': days, 'data': result})
+        return Response({'days': days, 'data': result, 'material_weight_dict': material_weight_dict})
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -5908,7 +5912,7 @@ class ShiftTimeSummaryView(APIView):
             results[key][f'{equip_no}_time_abnormal'] = time_consuming if abs(time_consuming) > 20 else None
             results[key]['consuming'] += time_consuming if abs(time_consuming) <= 20 else 0
             results[key]['abnormal'] += time_consuming if abs(time_consuming) > 20 else 0
-            results[key][f'{equip_no}_rate'] = None if not standard_time else round(((time_consuming - standard_time) / standard_time + 1) * 100, 2)
+            results[key][f'{equip_no}_rate'] = None if not standard_time else round((time_consuming / standard_time) * 100, 2)
         res = list(results.values())
         for item in res:
             equip_count = (len(item) - 5) // 2
