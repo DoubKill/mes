@@ -5880,9 +5880,13 @@ class ShiftTimeSummaryView(APIView):
         group_dic = {f'{item[2]}_{item[1]}': item[0] for item in group}
         queryset = TrainsFeedbacks.objects.filter(**filter_kwargs).values('classes', 'factory_date', 'equip_no').\
             annotate(begin=Min('begin_time'), end=Max('end_time')).order_by('begin')
+        gcs = dict(GlobalCode.objects.filter(
+            global_type__type_name='交接班时间标准').values_list('global_name', 'description'))
+
         for item in queryset:
             factory_date = item['factory_date']
             equip_no = item['equip_no']
+            standard_time = int(gcs.get(equip_no, 0))
             if item['classes'] == '早班':
                 s = datetime.datetime.strptime(f'{str(factory_date)} 08:00:00', '%Y-%m-%d %H:%M:%S')
                 e = datetime.datetime.strptime(f'{str(factory_date)} 20:00:00', '%Y-%m-%d %H:%M:%S')
@@ -5904,12 +5908,13 @@ class ShiftTimeSummaryView(APIView):
             results[key][f'{equip_no}_time_abnormal'] = time_consuming if abs(time_consuming) > 20 else None
             results[key]['consuming'] += time_consuming if abs(time_consuming) <= 20 else 0
             results[key]['abnormal'] += time_consuming if abs(time_consuming) > 20 else 0
+            results[key][f'{equip_no}_rate'] = None if not standard_time else round(((time_consuming - standard_time) / standard_time + 1) * 100, 2)
         res = list(results.values())
         for item in res:
             equip_count = (len(item) - 5) // 2
             item['consuming'] = round(item['consuming'] / equip_count, 2)
             item['abnormal'] = round(item['abnormal'] / equip_count, 2)
-        return Response({'results': res})
+        return Response({'results': res, 'equip_sts_time': gcs})
 
 
 @method_decorator([api_recorder], name="dispatch")
