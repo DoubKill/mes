@@ -3769,12 +3769,13 @@ class PerformanceSummaryView(APIView):
         independent_lst = IndependentPostTemplate.objects.filter(date_time=date).values('name', 'status', 'work_type')
         for item in independent_lst:
             independent[item['name']] = {'status': item['status'], 'work_type': item['work_type']}
-        # 取机台历史最大值
-        max_value = self.get_equip_max_value()
+        # # 取机台历史最大值
+        # max_value = self.get_equip_max_value()
         # 取每个机台设定的目标值
-        settings_value = MachineTargetYieldSettings.objects.filter(target_month=date).last()
-        if not settings_value:
+        max_setting_id = MachineTargetYieldSettings.objects.filter(target_month=date).aggregate(m_id=Max('id'))['m_id']
+        if not max_setting_id:
             raise ValidationError('请先完成当月的机台目标值设定')
+        target_setting = MachineTargetYieldSettings.objects.filter(id=max_setting_id).values()[0]
         # 计算薪资
         for k, v in user_dic.items():
             name, day, group, section = v['name'], v['day'], v['group'], v['section']
@@ -3823,10 +3824,13 @@ class PerformanceSummaryView(APIView):
 
             for i in sorted(results):
                 results_sort[i] = results.pop(i)
-            # 是否定岗
-            a = float(coefficient_dic.get('是'))
-            if not independent.get(name_d) or independent.get(name_d).get('status') != 1:
-                a = float(coefficient_dic.get('否'))
+            a = float(coefficient_dic.get('是'))  # 是否独立上岗
+            w_coefficient = 1  # 员工类别系数
+            if independent.get(name_d):
+                if independent.get(name_d).get('status') != 1:
+                    a = float(coefficient_dic.get('否'))
+                work_type = independent.get(name_d).get('work_type')
+                w_coefficient = float(employee_type_dic.get(work_type))
 
             # 计算超产奖励
             for section, equip_dic in equip_qty.items():
@@ -3837,20 +3841,19 @@ class PerformanceSummaryView(APIView):
 
                 price = 0
                 for equip, qty in equip_dic.items():
-                    if max_value.get(equip) and settings_value.__dict__.get(equip):
-                        m = max_value.get(equip)
-                        s = settings_value.__dict__.get(equip)
-                        if qty < s:
+                    m, s = target_setting.get(equip + '_max'), target_setting.get(equip)
+                    if m and s:
+                        if qty <= s:
                             price = 0
                         elif qty > m:
-                            price = round((m - s) * float(coefficient1_dic.get('超过目标产量部分')) + (qty - m) * float(
-                                coefficient1_dic.get('超过最高值部分')), 2)
-                        elif qty < m and qty > s:
-                            price = round((qty - s) * float(coefficient1_dic.get('超过目标产量部分')), 2)
-                        ccjl_dic[equip] = ccjl_dic.get(equip, 0) + price
+                            price = (m - s) * float(coefficient1_dic.get('超过目标产量部分')) + (qty - m) * float(
+                                coefficient1_dic.get('超过最高值部分'))
+                        elif s < qty <= m:
+                            price = (qty - s) * float(coefficient1_dic.get('超过目标产量部分'))
+                        ccjl_dic[equip] = round(ccjl_dic.get(equip, 0) + price * a * w_coefficient * coefficient, 2)
                 # 岗位不同，计算超产奖励的方式不同
                 if section in ['班长', '机动']:
-                    hj['ccjl'] += round(sum(ccjl_dic.values()) * 0.15, 2) if ccjl_dic.values() else 0
+                    hj['ccjl'] += round(sum(ccjl_dic.values()) * 0.2, 2) if ccjl_dic.values() else 0
                 elif section in ['三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库']:
                     hj['ccjl'] += round(sum(ccjl_dic.values()) * 0.2 * coefficient, 2) if ccjl_dic.values() else 0
                 else:
@@ -3864,9 +3867,9 @@ class PerformanceSummaryView(APIView):
                         hj['ccjl'] = round(max(ccjl_dic.values()), 2) if ccjl_dic.values() else 0
                 k = equip_price[section].values()
                 if post_standard == 1:
-                    hj['price'] += round(max(k) * post_coefficient * coefficient * a, 2) if k else 0
+                    hj['price'] += round(max(k) * post_coefficient * coefficient * a * w_coefficient, 2) if k else 0
                 else:
-                    hj['price'] += round(sum(k) / len(k) * post_coefficient * coefficient * a, 2) if k else 0
+                    hj['price'] += round(sum(k) / len(k) * post_coefficient * coefficient * a * w_coefficient, 2) if k else 0
                 hj['price'] = round(hj['price'], 2)
             return Response({'results': results_sort.values(), 'hj': hj, 'all_price': hj['price'], '超产奖励': hj['ccjl'], 'group_list': group_list})
 
@@ -3878,11 +3881,16 @@ class PerformanceSummaryView(APIView):
         for item in list(results1.values()):
             section, name, day, group = item[0].get('section'), item[0].get('name'), item[0].get('day'), item[0].get('group')
             key = f"{name}_{day}_{section}"
-            a = float(coefficient_dic.get('是'))
-            aa = '是'
-            if not independent.get(name) or independent.get(name).get('status') != 1:
-                a = float(coefficient_dic.get('否'))
-                aa = '否'
+            a = float(coefficient_dic.get('是'))  # 是否独立上岗系数
+            aa = '是'  # 是否独立上岗
+            work_type = '正常'  # 员工类别
+            w_coefficient = 1  # 员工类别系数
+            if independent.get(name):
+                if independent.get(name).get('status') != 1:
+                    a = float(coefficient_dic.get('否'))
+                    aa = '否'
+                work_type = independent.get(name).get('work_type')
+                w_coefficient = float(employee_type_dic.get(work_type))
             coefficient = section_info[section]['coefficient'] / 100
             post_coefficient = section_info[section]['post_coefficient'] / 100
             post_standard = section_info[section]['post_standard']  # 1最大值 2 平均值
@@ -3916,7 +3924,7 @@ class PerformanceSummaryView(APIView):
                 else:  # 平均值
                     price = round(
                         sum(equip_price.get(key).values()) / len(equip_price.get(key)), 2)
-                price = round(price * coefficient * a * post_coefficient, 2)
+                price = round(price * coefficient * a * post_coefficient * w_coefficient, 2)
             if results.get(name):
                 results[name][f"{day}_{group}"] = round(results[name].get(f"{day}_{group}", 0) + price, 2)
                 results[name]['hj'] += price
@@ -3929,20 +3937,19 @@ class PerformanceSummaryView(APIView):
             if not equip_qty.get(key):
                 continue
             for equip, qty in equip_qty[key].items():
-                if max_value.get(equip) and settings_value.__dict__.get(equip):
-                    m = max_value.get(equip)
-                    s = settings_value.__dict__.get(equip)
-                    if qty < s:
+                m, s = target_setting.get(equip + '_max'), target_setting.get(equip)
+                if m and s:
+                    if qty <= s:
                         price = 0
                     elif qty > m:
-                        price = round((m - s) * float(coefficient1_dic.get('超过目标产量部分')) + (qty - m) * float(
-                            coefficient1_dic.get('超过最高值部分')), 2)
-                    elif qty < m and qty > s:
-                        price = round((qty - s) * float(coefficient1_dic.get('超过目标产量部分')), 2)
-                    p_dic[equip] = price
+                        price = (m - s) * float(coefficient1_dic.get('超过目标产量部分')) + (qty - m) * float(
+                            coefficient1_dic.get('超过最高值部分'))
+                    elif s < qty <= m:
+                        price = (qty - s) * float(coefficient1_dic.get('超过目标产量部分'))
+                    p_dic[equip] = round(price * a * w_coefficient * coefficient, 2)  # 绩效需要乘绩效系数、员工类别系数、是否独立上岗系数
 
             if section in ['班长', '机动']:
-                p = round(sum(p_dic.values()) * 0.15, 2) if p_dic.values() else 0
+                p = round(sum(p_dic.values()) * 0.2, 2) if p_dic.values() else 0
             elif section in ['三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库']:
                 p = round(sum(p_dic.values()) * 0.2 * coefficient, 2) if p_dic.values() else 0
             else:
@@ -3975,7 +3982,8 @@ class PerformanceSummaryView(APIView):
                 work_type = independent[item['name']].get('work_type')
             else:
                 work_type = '正常'
-            v = float(employee_type_dic.get(work_type, 1))
+            # v = float(employee_type_dic.get(work_type, 1)) 其他奖惩和生产补贴直接累加
+            v = 1
             item['work_type'] = work_type
             item['all'] = round(item['all'] * v, 2)
             item['hj'] = round(item['hj'], 2)
