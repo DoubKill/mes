@@ -3167,7 +3167,12 @@ class EquipWarehouseStatisticalViewSet(ListModelMixin, GenericViewSet):
             st = (int(page) - 1) * int(page_size)
             et = int(page) * int(page_size)
             if self.request.query_params.get('export'):
-                return gen_template_response(self.EXPORT_FIELDS_DICT, results, self.FILE_NAME, handle_str=True)
+                try:
+                    response = gen_template_response(self.EXPORT_FIELDS_DICT, results, self.FILE_NAME)
+                except Exception as e:
+                    logger.error(e.args[0])
+                    raise ValidationError(f'导出失败: 数据异常')
+                return response
             count = len(results)
             return Response({'results': results[st:et], 'count': count})
 
