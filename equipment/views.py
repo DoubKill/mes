@@ -3167,7 +3167,7 @@ class EquipWarehouseStatisticalViewSet(ListModelMixin, GenericViewSet):
             st = (int(page) - 1) * int(page_size)
             et = int(page) * int(page_size)
             if self.request.query_params.get('export'):
-                return gen_template_response(self.EXPORT_FIELDS_DICT, results, self.FILE_NAME)
+                return gen_template_response(self.EXPORT_FIELDS_DICT, results, self.FILE_NAME, handle_str=True)
             count = len(results)
             return Response({'results': results[st:et], 'count': count})
 
