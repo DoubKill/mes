@@ -3784,6 +3784,7 @@ class PerformanceSummaryView(APIView):
                 results1[key].append(v)
             else:
                 results1[key] = [v]
+        ccjl_detail = {}  # 按月统计超产奖励
         # 绩效详情
         if day_d and group_d:
             start_with = f"{name_d}_{day_d}_{group_d}"
@@ -3947,7 +3948,15 @@ class PerformanceSummaryView(APIView):
                     elif s < qty <= m:
                         price = (qty - s) * float(coefficient1_dic.get('超过目标产量部分'))
                     p_dic[equip] = round(price * a * w_coefficient * coefficient, 2)  # 绩效需要乘绩效系数、员工类别系数、是否独立上岗系数
-
+                    # 记录超产奖励明细
+                    s_ccjl = ccjl_detail.get(name)
+                    if s_ccjl:
+                        if equip in s_ccjl:
+                            s_ccjl[equip] = s_ccjl[equip] + p_dic[equip]
+                        else:
+                            s_ccjl[equip] = p_dic[equip]
+                    else:
+                        ccjl_detail[name] = {equip: p_dic[equip]}
             if section in ['班长', '机动']:
                 p = round(sum(p_dic.values()) * 0.2, 2) if p_dic.values() else 0
             elif section in ['三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库']:
@@ -3960,8 +3969,8 @@ class PerformanceSummaryView(APIView):
                         p = round(sum(p_dic.values()) / len(equip_qty[key].values()), 2) if p_dic.values() else 0
                 else:
                     p = round(max(p_dic.values()), 2) if p_dic.values() else 0
-            results[name]['超产奖励'] = round(results[name]['超产奖励'] + p, 2)
-            results[name]['all'] = round(results[name]['all'] + p, 2)
+            # results[name]['超产奖励'] = round(results[name]['超产奖励'] + p, 2)
+            # results[name]['all'] = round(results[name]['all'] + p, 2)
             if p > 0:
                 if ccjl_dic.get(name):
                     ccjl_dic[name].append({'date': f"{year}-{month}-{day}", 'price': p})
@@ -3987,6 +3996,11 @@ class PerformanceSummaryView(APIView):
             item['work_type'] = work_type
             item['all'] = round(item['all'] * v, 2)
             item['hj'] = round(item['hj'], 2)
+            # 并入月超产奖励
+            s_ccjl = ccjl_detail.get(item['name'])
+            p = round(max(s_ccjl.values()), 2) if s_ccjl else 0
+            item['超产奖励'] = round(p, 2)
+            item['all'] = round(item['all'] + p, 2)
         return Response({'results': results.values(), 'group_list': group_list})
 
 
