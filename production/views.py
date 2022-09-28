@@ -6023,7 +6023,7 @@ class WeightClassPlanViewSet(ModelViewSet):
             check = datetime.datetime.strptime(target_month, '%Y-%m')
             if target_month < now_date[:7]:
                 raise ValidationError(f'导入异常: 只能导入当月及以后的数据')
-            date_index = date_list.index(now_date) + 1 if now_date in date_list else 0
+            date_index = date_list.index(now_date) if now_date in date_list else 0
             for index, item in enumerate(data):
                 if len(item[3:]) != len(date_list):
                     raise ValidationError(f'导入异常: 导入天数与月份不符')
