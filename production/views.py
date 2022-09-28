@@ -5821,11 +5821,11 @@ class MaterialExpendSummaryView(APIView):
             'plan_classes_uid', flat=True))
         queryset = ExpendMaterial.objects.filter(plan_classes_uid__in=plan_uids)
         if equip_no:
-            queryset = queryset.filter(equip_no=equip_no)
+            queryset = queryset.filter(equip_no=equip_no.strip())
         if product_no:
-            queryset = queryset.filter(product_no__icontains=product_no)
+            queryset = queryset.filter(product_no__icontains=product_no.strip())
         if material_name:
-            queryset = queryset.filter(material_name__icontains=material_name)
+            queryset = queryset.filter(material_name__icontains=material_name.strip())
         data = queryset.values('equip_no', 'product_no', 'material_name', 'plan_classes_uid').annotate(actual_weight=Sum('actual_weight')/100).order_by('product_no', 'equip_no', 'material_name')
         material_type_dict = dict(Material.objects.values_list('material_name', 'material_type__global_name'))
         days = date_range(s_time, e_time)
@@ -5857,7 +5857,7 @@ class MaterialExpendSummaryView(APIView):
             material_weight_dict[material_name] = material_weight_dict.get(material_name, 0) + weight
         result = ret.values()
         if filter_material_type:
-            result = list(filter(lambda x: x['material_type'] == filter_material_type, result))
+            result = list(filter(lambda x: x['material_type'] == filter_material_type.strip(), result))
         result = sorted(result, key=itemgetter('material_type', 'material_name', 'equip_no'))  #  按多个字段排序
         return Response({'days': days, 'data': result, 'material_weight_dict': material_weight_dict})
 

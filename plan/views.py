@@ -1235,13 +1235,13 @@ class MaterialPlanConsumeView(APIView):
         filter_kwargs = {}
         filter_kwargs2 = {}
         if equip_no:
-            filter_kwargs['equip__equip_no'] = equip_no
+            filter_kwargs['equip__equip_no'] = equip_no.strip()
         if product_no:
-            filter_kwargs['product_batching__stage_product_batch_no'] = product_no
+            filter_kwargs['product_batching__stage_product_batch_no'] = product_no.strip()
         if material_name:
-            filter_kwargs2['material__material_name'] = material_name
+            filter_kwargs2['material__material_name'] = material_name.strip()
         if filter_material_type:
-            filter_kwargs2['material__material_type__global_name'] = filter_material_type
+            filter_kwargs2['material__material_type__global_name'] = filter_material_type.strip()
         plan_date = ProductClassesPlan.objects.filter(**filter_kwargs).filter(
             work_schedule_plan__plan_schedule__day_time=factory_date
         ).values('equip__equip_no',
