@@ -50,7 +50,7 @@ from plan.utils import calculate_product_plan_trains, extend_last_aps_result, AP
     calculate_equip_recipe_avg_mixin_time, plan_sort
 from production.models import PlanStatus, TrainsFeedbacks, MaterialTankStatus
 from quality.utils import get_cur_sheet, get_sheet_data
-from recipe.models import ProductBatching, ProductBatchingDetail, Material, MaterialAttribute
+from recipe.models import ProductBatching, ProductBatchingDetail, Material, MaterialAttribute, WeighBatchingDetail
 from system.serializers import PlanReceiveSerializer
 from terminal.utils import get_current_factory_date
 
@@ -1221,3 +1221,59 @@ class RecipeStages(APIView):
         idx_keys = {'HMB': 1, 'CMB': 2, '1MB': 3, '2MB': 4, '3MB': 5, 'FM': 6}
         pbs = sorted(list(set(pbs)), key=lambda d: idx_keys[d])
         return Response(pbs)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class MaterialPlanConsumeView(APIView):
+
+    def get(self, request):
+        filter_material_type = self.request.query_params.get('material_type')
+        material_name = self.request.query_params.get('material_name')
+        equip_no = self.request.query_params.get('equip_no')
+        product_no = self.request.query_params.get('product_no')
+        factory_date = get_current_factory_date().get('factory_date', datetime.datetime.now().date())
+        filter_kwargs = {}
+        filter_kwargs2 = {}
+        if equip_no:
+            filter_kwargs['equip__equip_no'] = equip_no
+        if product_no:
+            filter_kwargs['product_batching__stage_product_batch_no'] = product_no
+        if material_name:
+            filter_kwargs2['material__material_name'] = material_name
+        if filter_material_type:
+            filter_kwargs2['material__material_type__global_name'] = filter_material_type
+        plan_date = ProductClassesPlan.objects.filter(**filter_kwargs).filter(
+            work_schedule_plan__plan_schedule__day_time=factory_date
+        ).values('equip__equip_no',
+                 'product_batching__stage_product_batch_no',
+                 'equip__category_id').annotate(s=Sum('plan_trains'))
+
+        ret = []
+        material_weight_dict = {}
+        for item in plan_date:
+            equip_no = item['equip__equip_no']
+            recipe_no = item['product_batching__stage_product_batch_no']
+            dev_type_id = item['equip__category_id']
+            trains = item['s']
+            mes_pb = ProductBatching.objects.exclude(used_type=6).filter(batching_type=2,
+                                                                         stage_product_batch_no=recipe_no,
+                                                                         dev_type_id=dev_type_id).first()
+            if mes_pb:
+                weight_details = WeighBatchingDetail.objects.filter(**filter_kwargs2).filter(
+                    weigh_cnt_type__product_batching=mes_pb,
+                    delete_flag=False).values('material__material_name',
+                                              'material__material_type__global_name',
+                                              'standard_weight')
+                for detail in weight_details:
+                    m_name = detail['material__material_name']
+                    weight = detail['standard_weight']*trains
+                    ret.append(
+                        {'material_type': detail['material__material_type__global_name'],
+                         'material_name': m_name,
+                         'equip_no': equip_no,
+                         'product_no': recipe_no,
+                         'total_weight': weight}
+                    )
+                    material_weight_dict[m_name] = material_weight_dict.get(m_name, 0) + weight
+        result = sorted(ret, key=itemgetter('material_type', 'material_name', 'equip_no'))  #  按多个字段排序
+        return Response({'result': result, 'material_weight_dict': material_weight_dict})
