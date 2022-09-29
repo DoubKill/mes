@@ -3851,10 +3851,15 @@ class PerformanceSummaryView(APIView):
                                 coefficient1_dic.get('超过最高值部分'))
                         elif s < qty <= m:
                             price = (qty - s) * float(coefficient1_dic.get('超过目标产量部分'))
-                        ccjl_dic[equip] = round(ccjl_dic.get(equip, 0) + price * a * w_coefficient * coefficient, 2)
+                        if price == 0:
+                            continue
+                        if section in ['班长', '机动']:
+                            ccjl_dic[equip] = round(ccjl_dic.get(equip, 0) + price * a * w_coefficient * 0.15, 2)
+                        else:
+                            ccjl_dic[equip] = round(ccjl_dic.get(equip, 0) + price * a * w_coefficient * coefficient, 2)
                 # 岗位不同，计算超产奖励的方式不同
                 if section in ['班长', '机动']:
-                    hj['ccjl'] += round(sum(ccjl_dic.values()) * 0.2, 2) if ccjl_dic.values() else 0
+                    hj['ccjl'] += round(sum(ccjl_dic.values()) / len(ccjl_dic), 2) if ccjl_dic.values() else 0
                 elif section in ['三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库']:
                     hj['ccjl'] += round(sum(ccjl_dic.values()) * 0.2 * coefficient, 2) if ccjl_dic.values() else 0
                 else:
@@ -3947,7 +3952,12 @@ class PerformanceSummaryView(APIView):
                             coefficient1_dic.get('超过最高值部分'))
                     elif s < qty <= m:
                         price = (qty - s) * float(coefficient1_dic.get('超过目标产量部分'))
-                    p_dic[equip] = round(price * a * w_coefficient * coefficient, 2)  # 绩效需要乘绩效系数、员工类别系数、是否独立上岗系数
+                    if price == 0:
+                        continue
+                    if section in ['班长', '机动']:
+                        p_dic[equip] = round(price * a * w_coefficient, 2)  # 员工类别系数、是否独立上岗系数
+                    else:
+                        p_dic[equip] = round(price * a * w_coefficient * coefficient, 2)  # 绩效需要乘绩效系数、员工类别系数、是否独立上岗系数
                     # 记录超产奖励明细
                     s_ccjl = ccjl_detail.get(name)
                     if s_ccjl:
@@ -3958,7 +3968,14 @@ class PerformanceSummaryView(APIView):
                     else:
                         ccjl_detail[name] = {equip: p_dic[equip]}
             if section in ['班长', '机动']:
-                p = round(sum(p_dic.values()) * 0.2, 2) if p_dic.values() else 0
+                p = round(sum(p_dic.values()) / len(p_dic) * 0.15, 2) if p_dic.values() else 0
+                s_ccjl = ccjl_detail.get(name)
+                if s_ccjl:
+                    if ccjl_detail[name].get('all'):
+                        ccjl_detail[name]['all'] = round(ccjl_detail[name]['all'] + p, 2)
+                    else:
+                        ccjl_detail[name]['all'] = p
+
             elif section in ['三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库']:
                 p = round(sum(p_dic.values()) * 0.2 * coefficient, 2) if p_dic.values() else 0
             else:
@@ -3998,7 +4015,7 @@ class PerformanceSummaryView(APIView):
             item['hj'] = round(item['hj'], 2)
             # 并入月超产奖励
             s_ccjl = ccjl_detail.get(item['name'])
-            p = round(max(s_ccjl.values()), 2) if s_ccjl else 0
+            p = 0 if not s_ccjl else (round(max(s_ccjl.values()), 2) if 'all' not in s_ccjl else s_ccjl.get('all'))
             item['超产奖励'] = round(p, 2)
             item['all'] = round(item['all'] + p, 2)
         return Response({'results': results.values(), 'group_list': group_list})
