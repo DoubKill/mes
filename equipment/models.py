@@ -1062,6 +1062,7 @@ class CheckPointStandard(AbstractEntity):
     doc_code = models.CharField(max_length=64, help_text='文档编号', null=True, blank=True)
     equip_no = models.CharField(max_length=64, help_text='适用机台')
     station = models.CharField(max_length=64, help_text='岗位')
+    standard_type = models.CharField(max_length=64, help_text='标准类型: 日清扫、点检', default='点检')
 
     class Meta:
         db_table = 'check_point_standard'
@@ -1100,6 +1101,7 @@ class CheckPointTable(AbstractEntity):
     check_result = models.CharField(max_length=16, help_text='点检结果: 点检正常、点检异常、已修复', null=True, blank=True)
     sign_name = models.CharField(max_length=512, help_text='手写签名', null=True, blank=True)
     check_image_urls = models.TextField(help_text='点检图片', null=True, blank=True)
+    standard_type = models.CharField(max_length=64, help_text='标准类型: 日清扫、点检', default='点检')
 
     class Meta:
         db_table = 'check_point_table'

@@ -465,7 +465,7 @@ class CheckPointStandardFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = CheckPointStandard
-        fields = ('point_standard_name', 'equip_no', 'station')
+        fields = ('point_standard_name', 'equip_no', 'station', 'standard_type')
 
 
 class CheckPointTableFilter(django_filters.rest_framework.FilterSet):
@@ -477,7 +477,7 @@ class CheckPointTableFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = CheckPointTable
-        fields = ('select_date', 'classes', 'status', 'equip_no', 'station', 'point_standard_name')
+        fields = ('select_date', 'classes', 'status', 'equip_no', 'station', 'point_standard_name', 'standard_type')
 
 
 class CheckTemperatureStandardFilter(django_filters.rest_framework.FilterSet):
