@@ -1736,7 +1736,7 @@ class CheckPointStandardSerializer(BaseModelSerializer):
     @atomic
     def create(self, validated_data):
         check_details = validated_data.pop('check_details', None)
-        equip_no, station, standard_type = validated_data.get('equip_no'), validated_data.get('station'), validated_data.get('standard_type')
+        equip_no, station, standard_type = validated_data.get('equip_no'), validated_data.get('station'), validated_data.get('standard_type', '点检')
         # 同岗位机台不能重叠
         equip_record = list(CheckPointStandard.objects.filter(station=station, standard_type=standard_type, delete_flag=False).values_list('equip_no', flat=True))
         if equip_record:

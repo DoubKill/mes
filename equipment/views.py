@@ -5328,9 +5328,8 @@ class DailyCleanStandardViewSet(ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         all_station = self.request.query_params.get('all_station')  # 获取所有岗位
-        standard_type = self.request.query_params.get('standard_type')
         if all_station:
-            station_list = list(set(self.get_queryset().filter(standard_type=standard_type, equip_no__icontains=all_station).values_list('station', flat=True)))
+            station_list = list(set(self.get_queryset().filter(standard_type='日清扫', equip_no__icontains=all_station).values_list('station', flat=True)))
             return Response({'results': station_list})
 
         queryset = self.filter_queryset(self.get_queryset())
@@ -5427,11 +5426,11 @@ class DailyCleanTableViewSet(ModelViewSet):
         params = self.request.query_params
         all_detail = params.get('all_detail')
         if all_detail:  # 查询所有温度检查项目
-            equip_no, station, res, check_point_standard, point_standard_code, point_standard_name, standard_type = \
-                params.get('equip_no'), params.get('station'), [], None, '', '', params.get('standard_type')
+            equip_no, station, res, check_point_standard, point_standard_code, point_standard_name = \
+                params.get('equip_no'), params.get('station'), [], None, '', ''
             if all([equip_no, station]):
                 point_standard = CheckPointStandard.objects.filter(delete_flag=False, equip_no__icontains=equip_no,
-                                                                   standard_type=standard_type, station=station).last()
+                                                                   standard_type='日清扫', station=station).last()
                 if point_standard:
                     res = list(point_standard.check_details.all().values('sn', 'check_content', 'check_style'))
                     check_point_standard = point_standard.id
@@ -5623,11 +5622,11 @@ class CheckPointTableViewSet(ModelViewSet):
         params = self.request.query_params
         all_detail = params.get('all_detail')
         if all_detail:  # 查询所有温度检查项目
-            equip_no, station, res, check_point_standard, point_standard_code, point_standard_name, standard_type = \
-                params.get('equip_no'), params.get('station'), [], None, '', '', params.get('standard_type')
+            equip_no, station, res, check_point_standard, point_standard_code, point_standard_name = \
+                params.get('equip_no'), params.get('station'), [], None, '', ''
             if all([equip_no, station]):
                 point_standard = CheckPointStandard.objects.filter(delete_flag=False, equip_no__icontains=equip_no,
-                                                                   standard_type=standard_type, station=station).last()
+                                                                   standard_type='点检', station=station).last()
                 if point_standard:
                     res = list(point_standard.check_details.all().values('sn', 'check_content', 'check_style'))
                     check_point_standard = point_standard.id
