@@ -1871,7 +1871,7 @@ class CheckPointTableSerializer(BaseModelSerializer):
                     table_check_result = '点检正常' if standard_type == '点检' else '检查正常'
         # 填写过项目则变为已点检
         if table_check_result:
-            instance.status = '已点检' if standard_type == '点检' else '检查'
+            instance.status = '已点检' if standard_type == '点检' else '已检查'
         instance.check_result = table_check_result
         instance.save()
         return instance
