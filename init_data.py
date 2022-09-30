@@ -1024,7 +1024,7 @@ permission_data = [
     {'id': 1076, 'code': 'execute2_d_equip_apply_order', 'name': '除尘袋滤器确认实施', 'parent_id': 1004},
     {'id': 1077, 'code': 'confirm2_d_equip_apply_order', 'name': '除尘袋滤器确认', 'parent_id': 1004},
     {'id': 1080, 'code': 'view3_d_equip_apply_order', 'name': '细料胶块放行处理', 'parent_id': 1004},
-    {'id': 1117, 'code': 'view3_d_equip_apply_order', 'name': '日清扫检查查询', 'parent_id': 1004},
+    {'id': 1117, 'code': 'view4_d_equip_apply_order', 'name': '日清扫检查查询', 'parent_id': 1004},
     {'id': 1118, 'code': 'execute3_d_equip_apply_order', 'name': '日清扫检查实施', 'parent_id': 1004},
     {'id': 1119, 'code': 'confirm3_d_equip_apply_order', 'name': '日清扫检查确定', 'parent_id': 1004},
 
