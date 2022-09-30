@@ -20,31 +20,6 @@ logger = logging.getLogger('send_log')
 
 
 def send_bz():
-    bz_objs = BzFinalMixingRubberInventory.objects.using('bz').all()
-    for bz_obj in bz_objs:
-        lot_no = bz_obj.lot_no
-        if lot_no:
-            if lot_no.startswith('AAJ1Z'):
-                mdr = MaterialDealResult.objects.filter(lot_no=lot_no).first()
-                if mdr:
-                    test_result = mdr.test_result
-                    if test_result == '三等品':
-                        zjzt = '三等品'
-                    else:
-                        zjzt = '一等品'
-                    msg_ids = ''.join(str(time.time()).split('.'))
-                    item = []
-                    item_dict = {"WORKID": str(int(msg_ids) + 1),
-                                 "MID": mdr.product_no,
-                                 "PICI": str(bz_obj.bill_id),
-                                 "RFID": bz_obj.container_no,
-                                 "DJJG": zjzt,
-                                 "SENDDATE": datetime.datetime.now().strftime('%Y%m%d %H:%M:%S')}
-                    item.append(item_dict)
-                    # 向北自发送数据
-                    res = update_wms_kjjg('混炼', items=item)
-                    if not res:  # res为空代表成功
-                        logger.info("条码：{},更新北自立库品质状态成功！".format(lot_no))
 
     lb_objs = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(store_name='炼胶库')
     for lb_obj in lb_objs:
@@ -58,6 +33,8 @@ def send_bz():
                         zjzt = '三等品'
                     else:
                         zjzt = '一等品'
+                    if lb_obj.quality_level == zjzt:
+                        continue
                     msg_ids = ''.join(str(time.time()).split('.'))
                     item = []
                     item_dict = {"WORKID": str(int(msg_ids) + 1),
@@ -69,6 +46,34 @@ def send_bz():
                     item.append(item_dict)
                     # 向北自发送数据
                     res = update_wms_kjjg('终炼', items=item)
+                    if not res:  # res为空代表成功
+                        logger.info("条码：{},更新北自立库品质状态成功！".format(lot_no))
+
+    bz_objs = BzFinalMixingRubberInventory.objects.using('bz').all()
+    for bz_obj in bz_objs:
+        lot_no = bz_obj.lot_no
+        if lot_no:
+            if lot_no.startswith('AAJ1Z'):
+                mdr = MaterialDealResult.objects.filter(lot_no=lot_no).first()
+                if mdr:
+                    test_result = mdr.test_result
+                    if test_result == '三等品':
+                        zjzt = '三等品'
+                    else:
+                        zjzt = '一等品'
+                    if bz_obj.quality_level == zjzt:
+                        continue
+                    msg_ids = ''.join(str(time.time()).split('.'))
+                    item = []
+                    item_dict = {"WORKID": str(int(msg_ids) + 1),
+                                 "MID": mdr.product_no,
+                                 "PICI": str(bz_obj.bill_id),
+                                 "RFID": bz_obj.container_no,
+                                 "DJJG": zjzt,
+                                 "SENDDATE": datetime.datetime.now().strftime('%Y%m%d %H:%M:%S')}
+                    item.append(item_dict)
+                    # 向北自发送数据
+                    res = update_wms_kjjg('混炼', items=item)
                     if not res:  # res为空代表成功
                         logger.info("条码：{},更新北自立库品质状态成功！".format(lot_no))
 
