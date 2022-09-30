@@ -11,7 +11,7 @@ from plan.views import ProductDayPlanViewSet, \
     SchedulingWashPlaceKeywordViewSet, SchedulingWashPlaceOperaKeywordViewSet, RecipeMachineWeight, \
     SchedulingProductDemandedDeclareViewSet, ProductDeclareSummaryViewSet, SchedulingProductSafetyParamsViewSet, \
     SchedulingResultViewSet, SchedulingEquipShutDownPlanViewSet, SchedulingProceduresView, SchedulingStockSummary, \
-    SchedulingMaterialDemanded, RecipeStages
+    SchedulingMaterialDemanded, RecipeStages, MaterialPlanConsumeView
 
 router = DefaultRouter()
 
@@ -63,4 +63,5 @@ urlpatterns = [
     path('scheduling-procedures/', SchedulingProceduresView.as_view()),
     path('scheduling-material-demanded/', SchedulingMaterialDemanded.as_view()),
     path('scheduling-recipe-stages/', RecipeStages.as_view()),
+    path('xl-plan-consume/', MaterialPlanConsumeView.as_view())
 ]

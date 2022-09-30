@@ -57,7 +57,7 @@ def get_work_time(class_code, factory_date):
     res = {}
     if class_code:
         s_global = GlobalCode.objects.filter(global_type__type_name='配料间排班详细分类', global_type__use_flag=True,
-                                             use_flag=True, global_name__startswith=class_code)
+                                             use_flag=True, global_name=class_code)
         if s_global:
             for i in s_global:
                 pare = i.description.split('-')
@@ -67,7 +67,7 @@ def get_work_time(class_code, factory_date):
                         if pare[index] == '夜班':
                             next_day = (datetime.strptime(factory_date, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
                             begin_date, end_date = next_day if pare[index + 1] == '00:00:00' else factory_date, next_day
-                        if pare[index] == '中班':
+                        if pare[index] in ['中班', '2']:
                             next_day = (datetime.strptime(factory_date, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
                             begin_date, end_date = factory_date, next_day if pare[index + 2] == '00:00:00' else factory_date
                         res.update({pare[index]: [f'{begin_date} {pare[index + 1]}', f'{end_date} {pare[index + 2]}']})

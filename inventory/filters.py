@@ -329,10 +329,15 @@ class OutBoundDeliveryOrderDetailFilter(django_filters.rest_framework.FilterSet)
     sub_no = django_filters.CharFilter(field_name='sub_no', lookup_expr='icontains', help_text='订单子编号')
     pallet_no = django_filters.CharFilter(field_name='pallet_no', lookup_expr='icontains', help_text='托盘号')
     lot_no = django_filters.CharFilter(field_name='lot_no', lookup_expr='icontains', help_text='收皮条码')
+    warehouse = django_filters.CharFilter(field_name='outbound_delivery_order__warehouse', help_text='库区')
+    station = django_filters.CharFilter(field_name='outbound_delivery_order__station', help_text='出库口')
+    product_no = django_filters.CharFilter(field_name='outbound_delivery_order__product_no', help_text='胶料编码')
+    tunnel = django_filters.CharFilter(field_name='location', help_text='巷道', lookup_expr='startswith')
 
     class Meta:
         model = OutBoundDeliveryOrderDetail
-        fields = ['outbound_delivery_order_id', 'order_no', 'pallet_no', 'lot_no']
+        fields = ['outbound_delivery_order_id', 'order_no', 'pallet_no', 'lot_no',
+                  'warehouse', 'station', 'product_no', 'tunnel']
 
 
 class WmsNucleinManagementFilter(django_filters.rest_framework.FilterSet):

@@ -7,7 +7,7 @@ from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated
 from rest_framework.views import APIView
 
-from basics.models import WorkSchedulePlan, Equip
+from basics.models import WorkSchedulePlan, Equip, GlobalCode
 from equipment.utils import gen_template_response
 from inventory.models import InventoryLog, DispatchLog, FinalGumInInventoryLog, MixGumInInventoryLog, \
     FinalGumOutInventoryLog, MixGumOutInventoryLog
@@ -372,7 +372,15 @@ class SumCollectTrains(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class CutTimeCollect(APIView):
     """规格切换时间汇总"""
-    EXPORT_FIELDS_DICT = {'时间': "time", '设备编码': "equip_no", '切换前计划号': "plan_classes_uid_age", '切换后计划号': "plan_classes_uid_later", '切换前胶料编码': "cut_ago_product_no", '切换后胶料编码': "cut_later_product_no", '切换规格耗时（秒）': "normal_cut_time_consumer", '异常时间(秒）': 'err_cut_time_consumer'}
+    EXPORT_FIELDS_DICT = {'时间': "time", '设备编码': "equip_no",
+                          '切换前计划号': "plan_classes_uid_age",
+                          '切换后计划号': "plan_classes_uid_later",
+                          '切换前胶料编码': "cut_ago_product_no",
+                          '切换后胶料编码': "cut_later_product_no",
+                          '切换规格时间标准': 'standard_time',
+                          '切换规格耗时（秒）': "normal_cut_time_consumer",
+                          '异常时间(秒）': 'err_cut_time_consumer',
+                          '切换规格时间完成率%': 'rate'}
     FILE_NAME = '规格切换时间汇总'
     permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_product_exchange_consume'}))
 
@@ -403,6 +411,11 @@ class CutTimeCollect(APIView):
                    ).values(
             'plan_classes_uid', 'factory_date', 'classes', 'equip_no', 'st_time', 'et_time', 'product_no'
         ).order_by('factory_date', 'equip_no', 'st_time'))
+        gc = GlobalCode.objects.filter(global_type__type_name='规格切换时间标准', global_name=equip_no).first()
+        if gc:
+            standard_time = int(gc.description)
+        else:
+            standard_time = None
 
         factory_classes_group_map = WorkSchedulePlan.objects.filter(
             plan_schedule__day_time__gte=s_time,
@@ -413,6 +426,11 @@ class CutTimeCollect(APIView):
             i['plan_schedule__day_time'].strftime('%Y-%m-%d') + '-' + i['classes__global_name']: i for i in
             factory_classes_group_map}
         return_list = []
+        sum_normal = 0
+        sum_error = 0
+        cnt_normal = 0
+        cnt_error = 0
+        sum_rate = 0
         for idx, item in enumerate(query_set[:-1]):
             key = item['factory_date'].strftime('%Y-%m-%d') + '-' + item['classes']
             next_st_time = query_set[idx + 1]['st_time']
@@ -424,9 +442,13 @@ class CutTimeCollect(APIView):
             if abs(time_consuming) >= 1000 or time_consuming <= 0:
                 data['err_cut_time_consumer'] = time_consuming
                 data['normal_cut_time_consumer'] = None
+                sum_error += time_consuming
+                cnt_error += 1
             else:
                 data['err_cut_time_consumer'] = None
                 data['normal_cut_time_consumer'] = time_consuming
+                sum_normal += time_consuming
+                cnt_normal += 1
             data['classes'] = item['classes']
             data['time'] = item['factory_date'].strftime('%Y-%m-%d')
             data['cut_ago_product_no'] = item['product_no']
@@ -434,6 +456,10 @@ class CutTimeCollect(APIView):
             data['cut_later_product_no'] = query_set[idx + 1]['product_no']
             data['plan_classes_uid_age'] = item['plan_classes_uid']
             data['plan_classes_uid_later'] = query_set[idx + 1]['plan_classes_uid']
+            data['standard_time'] = standard_time
+            rate = None if not standard_time else round((time_consuming / standard_time) * 100, 2)
+            data['rate'] = None if not standard_time else '{}%'.format(rate)
+            sum_rate += 0 if not rate else rate
             return_list.append(data)
         if group:
             return_list = list(filter(lambda x: x['group'] == group, return_list))
@@ -441,12 +467,16 @@ class CutTimeCollect(APIView):
             return_list = list(filter(lambda x: x['classes'] == classes, return_list))
         if self.request.query_params.get('export'):
             return gen_template_response(self.EXPORT_FIELDS_DICT, return_list, self.FILE_NAME)
+        avg_normal = None if not cnt_normal else round(sum_normal / cnt_normal)
+        avg_error = None if not cnt_error else round(sum_error / cnt_error)
+        avg_rate = None if cnt_normal + cnt_error == 0 else round(sum_rate / (cnt_normal + cnt_error), 2)
         # 分页
         counts = len(return_list)
         return_list = return_list[(page - 1) * page_size:page_size * page]
         # return_list.append(
         #     {'sum_time': sum_time, 'max_time': max_time, 'min_time': min_time, 'avg_time': avg_time})
-        return Response({'count': counts, 'results': return_list})
+        return Response({'count': counts, 'results': return_list,
+                         'avg_normal': avg_normal, 'avg_error': avg_error, 'avg_rate': avg_rate})
 
 
 @method_decorator([api_recorder], name="dispatch")
