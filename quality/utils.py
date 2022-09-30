@@ -260,6 +260,7 @@ def gen_pallet_test_result(lot_nos):
             mdr.update_store_test_flag = 4
             mdr.deal_suggestion = deal_suggestion
             mdr.deal_suggestion = deal_suggestion
+            mdr.is_deal = False
             mdr.save()
         else:
             if continue_flag:
