@@ -1996,6 +1996,16 @@ class OutBoundDeliveryOrderDetailSerializer(BaseModelSerializer):
                             'delete_user', 'order_no', 'equip', 'dispatch', 'finish_time')
 
 
+class OutBoundDeliveryOrderDetailListSerializer(BaseModelSerializer):
+    warehouse = serializers.CharField(source='outbound_delivery_order.warehouse', help_text='库区', read_only=True)
+    station = serializers.CharField(source='outbound_delivery_order.station', help_text='出库口', read_only=True)
+    product_no = serializers.CharField(source='outbound_delivery_order.product_no', help_text='胶料名称', read_only=True)
+
+    class Meta:
+        model = OutBoundDeliveryOrderDetail
+        fields = '__all__'
+
+
 class OutBoundTasksSerializer(BaseModelSerializer):
     created_user = serializers.CharField(source='created_user.username')
     material_no = serializers.CharField(source='outbound_delivery_order.product_no')
