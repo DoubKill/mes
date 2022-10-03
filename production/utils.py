@@ -8,6 +8,7 @@ import json
 from datetime import datetime, timedelta
 
 from basics.models import WorkSchedulePlan, GlobalCode
+from mes.common_code import get_virtual_time
 from production.models import OperationLog, EmployeeAttendanceRecords, AttendanceGroupSetup, WeightClassPlan, \
     WeightClassPlanDetail
 from production.serializers import OperationLogSerializer
@@ -72,7 +73,8 @@ def get_work_time(class_code, factory_date):
                             begin_date, end_date = factory_date, next_day if pare[index + 2] == '00:00:00' else factory_date
                         res.update({pare[index]: [f'{begin_date} {pare[index + 1]}', f'{end_date} {pare[index + 2]}']})
     if len(res) >= 2:
-        h = datetime.now().time().hour
+        now_time = get_virtual_time()
+        h = now_time.time().hour
         if 24 >= h >= 22 or 0 <= h <= 2:
             res = dict(sorted(res.items(), key=lambda x: x[0]))
     return res

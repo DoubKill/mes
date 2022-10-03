@@ -35,7 +35,7 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet, ViewSet
 from basics.models import GlobalCode, WorkSchedulePlan
 from equipment.models import EquipMaintenanceOrder
 from inventory.models import ProductInventoryLocked, BzFinalMixingRubberInventory, BzFinalMixingRubberInventoryLB
-from mes.common_code import OSum, date_range, days_cur_month_dates
+from mes.common_code import OSum, date_range, days_cur_month_dates, get_virtual_time
 from mes.conf import EQUIP_LIST, JZ_EQUIP_NO
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
@@ -4327,7 +4327,7 @@ class AttendanceClockViewSet(ModelViewSet):
         section_list = PerformanceJobLadder.objects.filter(delete_flag=False, type=group_type).values_list('name', flat=True)
 
         # 获取当前时间的工厂日期
-        now = now if now else (datetime.datetime.now() + timedelta(minutes=attendance_group_obj.lead_time))
+        now = now if now else (get_virtual_time() + timedelta(minutes=attendance_group_obj.lead_time))
         current_work_schedule_plan = WorkSchedulePlan.objects.filter(
             start_time__lte=now,
             end_time__gte=now,
@@ -4367,7 +4367,7 @@ class AttendanceClockViewSet(ModelViewSet):
         id_card_num = self.request.user.id_card_num
         apply = self.request.query_params.get('apply', None)
         select_time = self.request.query_params.get('select_time')
-        time_now = datetime.datetime.now()
+        time_now = get_virtual_time()
         date_now = None
         try:
             attendance_group_obj, section_list, equip_list, date_now, group_list = self.get_user_group(self.request.user, select_time, apply)
@@ -4506,7 +4506,7 @@ class AttendanceClockViewSet(ModelViewSet):
                     if last_obj.section in results['section_list']:
                         results['section_list'].remove(last_obj.section)
                     results['section_list'].insert(0, last_obj.section)  # 放到第一位显示
-                    now = datetime.datetime.now() + timedelta(minutes=attendance_group_obj.lead_time)
+                    now = get_virtual_time() + timedelta(minutes=attendance_group_obj.lead_time)
                     current_work_schedule_plan = WorkSchedulePlan.objects.filter(
                         start_time__lte=now,
                         end_time__gte=now,
@@ -4526,7 +4526,7 @@ class AttendanceClockViewSet(ModelViewSet):
                     results['group_list'] = group_list
             else:
                 results['state'] = 1  # 没有打卡记录 显示当前时间的班次班组
-                now = datetime.datetime.now() + timedelta(minutes=attendance_group_obj.lead_time)
+                now = get_virtual_time() + timedelta(minutes=attendance_group_obj.lead_time)
                 current_work_schedule_plan = WorkSchedulePlan.objects.filter(
                     start_time__lte=now,
                     end_time__gte=now,
@@ -4686,7 +4686,7 @@ class AttendanceClockViewSet(ModelViewSet):
         user = self.request.user
         data = self.request.data  # {classes group equip_list ids section status}
         attendance_group_obj, section_list, equip_list, date_now, group_list = self.get_user_group(user)
-        time_now = datetime.datetime.now()
+        time_now = get_virtual_time()
         ids = data.pop('ids', None)
         equip_list = data.pop('equip_list', None)
         status = data.get('status')
@@ -4925,7 +4925,7 @@ class AttendanceClockViewSet(ModelViewSet):
         user = self.request.user
         username = user.username
         status = data.get('status')
-        now_time = datetime.datetime.now()
+        now_time = get_virtual_time()
         bk_date = data.get('bk_date', None)
         now = datetime.datetime.strptime(f'{bk_date}:00', '%Y-%m-%d %H:%M:%S')
         if status == '离岗':
@@ -5101,7 +5101,7 @@ class AttendanceClockViewSet(ModelViewSet):
         select_time = self.request.query_params.get('select_time')
         begin_flag = self.request.query_params.get('begin_flag')
         select_begin_date = self.request.query_params.get('select_begin_date')
-        limit_time = datetime.datetime.now() - datetime.timedelta(hours=24)
+        limit_time = get_virtual_time() - datetime.timedelta(hours=24)
         flag, clock_type = get_user_weight_flag(user)
         query_set = EmployeeAttendanceRecords.objects.filter(Q(user=user) & ~Q(is_use='废弃'), clock_type=clock_type)
         if begin_flag and state == '离岗':
