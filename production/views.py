@@ -3284,7 +3284,7 @@ class SummaryOfWeighingOutput(APIView):
 
         # 岗位系数
         section_dic = {}
-        section_info = PerformanceJobLadder.objects.filter(delete_flag=False, type__in=['细料称量', '硫磺称量']).values('type', 'name', 'coefficient', 'post_standard', 'post_coefficient')
+        section_info = PerformanceJobLadder.objects.filter(delete_flag=False, type='生产配料').values('type', 'name', 'coefficient', 'post_standard', 'post_coefficient')
         for item in section_info:
             section_dic[f"{item['name']}_{item['type']}"] = [item['coefficient'], item['post_standard'], item['post_coefficient']]
 
@@ -3334,7 +3334,7 @@ class SummaryOfWeighingOutput(APIView):
             """
             name, day, classes, section = key.split('_')
             equip = list(value.keys())[0]
-            type = '细料称量' if equip in ['F01', 'F02', 'F03'] else '硫磺称量'
+            type = '生产配料'
             if section_dic[f"{section}_{type}"][1] == 1:  # 最大值
                 equip, count_ = sorted(value.items(), key=lambda kv: (kv[1], kv[0]))[-1]
                 # 细料/硫磺单价'
@@ -3385,8 +3385,7 @@ class EmployeeAttendanceRecordsView(APIView):
                                                     plan_schedule__work_schedule__work_procedure__global_name='密炼')\
                 .values('group__global_name', 'start_time__date').order_by('start_time')
         else:
-            keyword = '细料' if '细料' in clock_type else '硫磺'
-            basic_info = WeightClassPlan.objects.filter(target_month=date, classes__icontains=keyword, delete_flag=False)
+            basic_info = WeightClassPlan.objects.filter(target_month=date, delete_flag=False)
             if not basic_info:
                 raise ValidationError(f'未找到当月{clock_type}排班信息')
             groups = basic_info.values_list('classes', flat=True).distinct()
@@ -3651,7 +3650,7 @@ class PerformanceJobLadderViewSet(ModelViewSet):
     def list(self, request, *args, **kwargs):
         if self.request.query_params.get('all'):
             if self.request.query_params.get('weight'):
-                res = self.filter_queryset(PerformanceJobLadder.objects.filter(delete_flag=False)).values('name').annotate(c=Count('id')).values('name')
+                res = PerformanceJobLadder.objects.filter(delete_flag=False, type='生产配料').values('name').annotate(c=Count('id')).values('name')
             else:
                 res = self.filter_queryset(self.get_queryset()).values('id', 'type', 'name')
             return Response({'results': res})
@@ -4318,12 +4317,7 @@ class AttendanceClockViewSet(ModelViewSet):
             equip_list = Equip.objects.filter(category__equip_type__global_name=equip_type).values_list('equip_no', flat=True)
         else:
             equip_type = '称量设备'
-            if group_type == '细料称量':
-                startswith = 'F'
-            else:
-                startswith = 'S'
-            equip_list = Equip.objects.filter(category__equip_type__global_name=equip_type,
-                                              equip_no__startswith=startswith).values_list('equip_no',  flat=True)
+            equip_list = Equip.objects.filter(category__equip_type__global_name=equip_type).values_list('equip_no',  flat=True)
         section_list = PerformanceJobLadder.objects.filter(delete_flag=False, type=group_type).values_list('name', flat=True)
 
         # 获取当前时间的工厂日期
@@ -4345,8 +4339,7 @@ class AttendanceClockViewSet(ModelViewSet):
             group_list = [{'group': item['group__global_name'], 'classes': item['classes__global_name']} for item in queryset]
         else:
             r_queryset = WeightClassPlanDetail.objects.filter(weight_class_plan__user=user_obj,
-                                                              weight_class_plan__delete_flag=False,
-                                                              weight_class_plan__classes__icontains=clock_type[:2])
+                                                              weight_class_plan__delete_flag=False)
             queryset = r_queryset.filter(factory_date=date_now).last()
             if queryset.class_code == '休' and not apply:  # 进入考勤页面时异常记录日志,补卡时忽略
                 b_date = (datetime.datetime.strptime(date_now, '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
@@ -4384,7 +4377,7 @@ class AttendanceClockViewSet(ModelViewSet):
         s_choice, m_choice = [], []
         if equip_list:
             keyword = equip_list[0][0]
-            equip_type = '密炼' if keyword == 'Z' else ('细料称量' if keyword == 'F' else '硫磺称量')
+            equip_type = '密炼' if keyword == 'Z' else '生产配料'
             s_choice = list(PerformanceJobLadder.objects.filter(type=equip_type, relation=1).values_list('name', flat=True).distinct())
             m_choice = list(PerformanceJobLadder.objects.filter(type=equip_type, relation=2).values_list('name', flat=True).distinct())
         results = {
@@ -4604,8 +4597,7 @@ class AttendanceClockViewSet(ModelViewSet):
                         else:
                             u_info = WeightClassPlanDetail.objects.filter(weight_class_plan__user__username=username,
                                                                           factory_date=date_now,
-                                                                          weight_class_plan__delete_flag=False,
-                                                                          weight_class_plan__classes__icontains=attendance_group_obj.type[:2]).last()
+                                                                          weight_class_plan__delete_flag=False).last()
                             if not u_info or (u_info and u_info.class_code == '休'):
                                 raise ValidationError('未找到排班信息')
                             res = get_work_time(u_info.class_code, date_now)
@@ -4660,9 +4652,7 @@ class AttendanceClockViewSet(ModelViewSet):
                     results['section_list'].insert(0, last_obj.section)  # 放到第一位显示
                     queryset = WeightClassPlanDetail.objects.filter(factory_date=date_now,
                                                                     weight_class_plan__delete_flag=False,
-                                                                    weight_class_plan__user=self.request.user,
-                                                                    weight_class_plan__classes__icontains=attendance_group_obj.type[
-                                                                                                          :2]).last()
+                                                                    weight_class_plan__user=self.request.user).last()
                     u_group = queryset.weight_class_plan.classes.split('/')[
                         0] if queryset.weight_class_plan.classes.split('/') else None
                     u_class = get_work_time(queryset.class_code, date_now).keys()
@@ -4672,9 +4662,7 @@ class AttendanceClockViewSet(ModelViewSet):
                 results['state'] = 1  # 没有打卡记录 显示当前时间的班次班组
                 queryset = WeightClassPlanDetail.objects.filter(factory_date=date_now,
                                                                 weight_class_plan__delete_flag=False,
-                                                                weight_class_plan__user=self.request.user,
-                                                                weight_class_plan__classes__icontains=attendance_group_obj.type[
-                                                                                                      :2]).last()
+                                                                weight_class_plan__user=self.request.user).last()
                 u_group = queryset.weight_class_plan.classes.split('/')[0] if queryset.weight_class_plan.classes.split('/') else None
                 u_class = get_work_time(queryset.class_code, date_now).keys()
                 group_list = [] if not all([u_group, u_class]) else [{'group': u_group, 'classes': i} for i in u_class]
@@ -4803,9 +4791,7 @@ class AttendanceClockViewSet(ModelViewSet):
         else:
             if status in ['上岗', '调岗']:
                 u_info = WeightClassPlanDetail.objects.filter(weight_class_plan__user=user, factory_date=date_now,
-                                                              weight_class_plan__delete_flag=False,
-                                                              weight_class_plan__classes__icontains=attendance_group_obj.type[
-                                                                                                    :2]).last()
+                                                              weight_class_plan__delete_flag=False).last()
                 if not u_info or (u_info and u_info.class_code == '休'):
                     raise ValidationError('未找到排班信息')
                 res = get_work_time(u_info.class_code, date_now)
@@ -4967,8 +4953,7 @@ class AttendanceClockViewSet(ModelViewSet):
                 if not standard_begin_time:
                     raise ValidationError('未找到排班信息')
             else:
-                u_info = WeightClassPlanDetail.objects.filter(weight_class_plan__user=user, factory_date=date_now, weight_class_plan__delete_flag=False,
-                                                             weight_class_plan__classes__icontains=attendance_group_obj.type[:2]).last()
+                u_info = WeightClassPlanDetail.objects.filter(weight_class_plan__user=user, factory_date=date_now, weight_class_plan__delete_flag=False).last()
                 if not u_info or (u_info and u_info.class_code == '休'):
                     raise ValidationError('未找到排班信息')
                 res = get_work_time(u_info.class_code, date_now)
@@ -5123,8 +5108,7 @@ class AttendanceClockViewSet(ModelViewSet):
             else:
                 group_list, equip_list, section_list, principal = group_list, equip_list, section_list, attendance_group_obj.principal
         if clock_type != '密炼' and state != '离岗':
-            startswith = 'F' if clock_type == '细料称量' else 'S'
-            equip_list = Equip.objects.filter(category__equip_type__global_name='称量设备', equip_no__startswith=startswith).values_list('equip_no', flat=True)
+            equip_list = Equip.objects.filter(category__equip_type__global_name='称量设备').values_list('equip_no', flat=True)
             section_list = PerformanceJobLadder.objects.filter(delete_flag=False, type=clock_type).values_list('name', flat=True)
             # 获取班次班组
             if not state:  # 加班取密炼班组
@@ -5243,8 +5227,7 @@ class ReissueCardView(APIView):
                                                                                classes=obj.classes)
                 else:
                     u_info = WeightClassPlanDetail.objects.filter(weight_class_plan__user=user, factory_date=obj.factory_date,
-                                                                  weight_class_plan__delete_flag=False,
-                                                                  weight_class_plan__classes__icontains=clock_type[:2]).last()
+                                                                  weight_class_plan__delete_flag=False).last()
                     if not u_info or (u_info and u_info.class_code == '休'):
                         raise ValidationError('未找到排班信息')
                     res = get_work_time(u_info.class_code, str(obj.factory_date))
@@ -5284,8 +5267,7 @@ class ReissueCardView(APIView):
                                                                                group=obj.group, classes=obj.classes)
                 else:
                     u_info = WeightClassPlanDetail.objects.filter(weight_class_plan__user=user, factory_date=obj.factory_date,
-                                                                  weight_class_plan__delete_flag=False,
-                                                                  weight_class_plan__classes__icontains=clock_type[:2]).last()
+                                                                  weight_class_plan__delete_flag=False).last()
                     if not u_info or (u_info and u_info.class_code == '休'):
                         raise ValidationError('未找到排班信息')
                     res = get_work_time(u_info.class_code, str(obj.factory_date))
@@ -5470,8 +5452,7 @@ class AttendanceRecordSearch(APIView):
                 else:
                     u_info = WeightClassPlanDetail.objects.filter(weight_class_plan__user__username=username,
                                                                   factory_date=s_fac_tory_date,
-                                                                  weight_class_plan__delete_flag=False,
-                                                                  weight_class_plan__classes__icontains=group_setup.type[:2]).last()
+                                                                  weight_class_plan__delete_flag=False).last()
                     if not u_info or (u_info and u_info.class_code == '休'):
                         raise ValidationError('未找到排班信息')
                     res = get_work_time(u_info.class_code, s_fac_tory_date)
@@ -5610,9 +5591,8 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
             if equip:
                 filter_kwargs['equip__in'] = equip.split(',')
             else:  # 所有机台
-                equip_type, startswith = ['密炼设备', 'Z'] if clock_type == '密炼' else ['称量设备', 'F' if clock_type == '细料称量' else 'S']
-                equip_info = list(Equip.objects.filter(category__equip_type__global_name=equip_type, use_flag=True,
-                                                       equip_no__startswith=startswith).values_list('equip_no', flat=True))
+                equip_type = '密炼设备' if clock_type == '密炼' else '生产配料'
+                equip_info = list(Equip.objects.filter(category__equip_type__global_name=equip_type, use_flag=True).values_list('equip_no', flat=True))
                 filter_kwargs['equip__in'] = equip_info
             if section:
                 filter_kwargs['section__in'] = section.split(',')

@@ -124,6 +124,6 @@ def get_user_weight_flag(user):
                                                         weight_class_plan__delete_flag=False).last()
     if classes_plan:
         if classes_plan.class_code:
-            flag, clock_type = True, '细料称量' if '细料' in classes_plan.weight_class_plan.classes else '硫磺称量'
+            flag, clock_type = True, '生产配料'
     return flag, clock_type
 
