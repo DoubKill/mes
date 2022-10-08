@@ -4824,7 +4824,7 @@ class AttendanceClockViewSet(ModelViewSet):
                                                                            factory_date=last_date,
                                                                            clock_type=clock_type)
                 for i in factory_records:
-                    calculate_end_date = end_date if i.standard_begin_date < end_date < i.standard_end_date else i.calculate_end_date
+                    calculate_end_date = time_now if i.standard_begin_date < time_now < i.standard_end_date else i.standard_end_date
                     i.end_date = end_date
                     i.actual_end_date = end_date
                     i.calculate_end_date = calculate_end_date
