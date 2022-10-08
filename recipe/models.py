@@ -170,6 +170,18 @@ class ProductBatching(AbstractEntity):
             material_names.add(weight_cnt_type.name)
         return material_names
 
+    @property
+    def batching_details_info(self):
+        # 配方物料详情（料包）
+        res = {}
+        batching_names = self.batching_details.filter(delete_flag=False).values('material__material_name', 'actual_weight', 'type', 'standard_error').order_by('type', 'id')
+        for i in batching_names:
+            res[i['material__material_name']] = i
+        weighting_names = WeighBatchingDetail.objects.filter(delete_flag=False, weigh_cnt_type__delete_flag=False, weigh_cnt_type__product_batching=self).annotate(actual_weight=F('standard_weight')).values('material__material_name', 'actual_weight', 'standard_error').order_by('id')
+        for i in weighting_names:
+            res[i['material__material_name']] = i
+        return res
+
     def get_product_batch(self, classes_plan):
         equip_no, dev_type, plan_classes_uid = classes_plan.equip.equip_no, classes_plan.equip.category.category_no, classes_plan.plan_classes_uid
         material_name_weight, cnt_type_details = [], []
@@ -470,3 +482,37 @@ class MultiReplaceMaterial(AbstractEntity):
         verbose_name_plural = verbose_name = '批量替换原材料履历表'
 
 
+class RecipeChangeHistory(models.Model):
+    recipe_no = models.CharField(max_length=64, help_text='配方名称')
+    dev_type = models.CharField(max_length=64, help_text='机型')
+    used_type = models.PositiveSmallIntegerField(help_text='使用状态')
+    created_time = models.DateTimeField(help_text='创建时间')
+    created_username = models.CharField(max_length=64, help_text='创建人')
+    updated_time = models.DateTimeField(verbose_name='修改时间', auto_now=True)
+    updated_username = models.CharField(max_length=64, help_text='修改人')
+
+    class Meta:
+        db_table = 'recipe_change_history'
+        verbose_name_plural = verbose_name = '配方变更履历'
+
+
+class RecipeChangeDetail(models.Model):
+    change_history = models.ForeignKey(RecipeChangeHistory, help_text='修改履历', on_delete=models.CASCADE,
+                                       related_name='change_details')
+    desc = models.CharField(max_length=256, help_text='描述信息', blank=True, null=True)
+    changed_time = models.DateTimeField(verbose_name='修改时间', auto_now_add=True)
+    changed_username = models.CharField(max_length=64, help_text='修改人', null=True, blank=True)
+    submit_username = models.CharField(max_length=64, help_text='提交人', null=True, blank=True)
+    submit_time = models.DateTimeField(help_text='提交时间', null=True, blank=True)
+    confirm_username = models.CharField(max_length=64, help_text='确认人', null=True, blank=True)
+    confirm_time = models.DateTimeField(help_text='确认时间', null=True, blank=True)
+    sfj_down_username = models.CharField(max_length=64, help_text='群控下传人', null=True, blank=True)
+    sfj_down_time = models.DateTimeField(help_text='群控下传时间', null=True, blank=True)
+    weight_down_username = models.CharField(max_length=64, help_text='称量下传人', null=True, blank=True)
+    weight_down_time = models.DateTimeField(help_text='称量下传时间', null=True, blank=True)
+    details = models.TextField(help_text='变更详情', blank=True, null=True)
+    # {1(配料): [{'type': 1(1：胶料 2：炭黑 3：油料 4: 料包), 'material_no': "aaa", 'flag': 'add', 'pv(修改前的值)': '12', 'cv(修改后的值)': '13'}], 2（投料方式）: "", 3（称量误差）: ""}
+
+    class Meta:
+        db_table = 'recipe_change_detail'
+        verbose_name_plural = verbose_name = '配方变更履历详情'
