@@ -1287,7 +1287,7 @@ class RecipeChangeDetailRetrieveSerializer(serializers.ModelSerializer):
     class Meta:
         model = RecipeChangeDetail
         fields = ('details', 'changed_time', 'changed_username', 'submit_username', 'submit_time', 'confirm_username', 'confirm_time',
-                  'sfj_down_username', 'sfj_down_time', 'weight_down_username', 'weight_down_time')
+                  'sfj_down_username', 'sfj_down_time', 'weight_down_username', 'weight_down_time', 'id')
 
 
 class RecipeChangeHistoryRetrieveSerializer(RecipeChangeHistorySerializer):

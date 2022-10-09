@@ -515,4 +515,5 @@ class RecipeChangeDetail(models.Model):
 
     class Meta:
         db_table = 'recipe_change_detail'
+        ordering = ('id', )
         verbose_name_plural = verbose_name = '配方变更履历详情'
