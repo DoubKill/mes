@@ -132,6 +132,12 @@ router.register('upload-images', UploadImageViewSet)
 # 设备维护维修计划
 router.register('equip-plan', EquipPlanViewSet)
 
+# 日清扫标准
+router.register('daily-clean-standard', DailyCleanStandardViewSet)
+
+# 日清扫表
+router.register('daily-clean-table', DailyCleanTableViewSet)
+
 # 岗位安全装置点检标准
 router.register('check-point-standard', CheckPointStandardViewSet)
 
