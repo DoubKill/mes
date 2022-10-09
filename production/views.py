@@ -6231,6 +6231,7 @@ class TimeEnergyConsuming(APIView):
         wb = load_workbook('xlsx_template/energy_consume.xlsx')
         ws = wb.worksheets[0]
         sheet = wb.copy_worksheet(ws)
+        sheet.title = '吨耗时(吨耗能)'
         data_row = 4
         stage_idx = {'CMB': {7: 'equip_no', 8: 'plan_weight', 9: 'actual_weight', 10: 'evacuation_energy', 11: 'consum_time'},
                      'HMB': {14: 'equip_no', 15: 'plan_weight', 16: 'actual_weight', 17: 'evacuation_energy', 18: 'consum_time'},
@@ -6276,7 +6277,7 @@ class TimeEnergyConsuming(APIView):
         # 重新定位到开始
         output.seek(0)
         response = HttpResponse(content_type='application/vnd.ms-excel')
-        filename = '快检详细信息'
+        filename = '吨耗时吨耗能'
         response['Content-Disposition'] = u'attachment;filename= ' + filename.encode('gbk').decode(
             'ISO-8859-1') + '.xls'
         response.write(output.getvalue())
