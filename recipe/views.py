@@ -792,7 +792,7 @@ class RecipeNoticeAPiView(APIView):
                 change_history, _ = RecipeChangeHistory.objects.update_or_create(defaults=change_data,
                                                                                  **{'recipe_no': real_product_no,
                                                                                     'dev_type': product_batching.dev_type.category_name})
-                record = change_history.change_details.last()
+                record = change_history.change_details.order_by('id').last()
                 if not record:
                     RecipeChangeDetail.objects.create(change_history=change_history, desc='MES配方新增',
                                                       changed_username=_username, submit_username=product_batching.submit_user.username,
