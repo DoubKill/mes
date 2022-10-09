@@ -821,7 +821,7 @@ class RecipeNoticeAPiView(APIView):
                             for i in added_material:
                                 material_type = now_recipe_dict[i].get('type') if now_recipe_dict[i].get('type') else 4
                                 change_detail_data[1].append({'type': material_type, 'key': i, 'flag': '新增', 'cv': float(now_recipe_dict[i]['actual_weight'])})
-                            f_equip = product_batching.product_batching_equip.filter(material__material_name__in=added_material, is_used=True, equip_no__in=send_equip).values('material__material_name', 'equip_no', 'feeding_mode', 'type')
+                            f_equip = product_batching.product_batching_equip.filter(material__material_name__in=added_material, is_used=True).values('material__material_name', 'equip_no', 'feeding_mode', 'type')
                             if f_equip:
                                 _temp = {}
                                 for j in f_equip:
@@ -865,7 +865,7 @@ class RecipeNoticeAPiView(APIView):
                                 if pv2 != cv2:
                                     desc.append('称量误差')
                                     change_detail_data[3].append({'type': material_type, 'key': i, 'flag': '修改', 'cv': float(cv2), 'pv': float(pv2)})
-                            c_equip = product_batching.product_batching_equip.filter(material__material_name__in=common_material, is_used=True, equip_no__in=send_equip).values(
+                            c_equip = product_batching.product_batching_equip.filter(material__material_name__in=common_material, is_used=True).values(
                                 'material__material_name', 'equip_no', 'feeding_mode', 'type')
                             c_equips = set(c_equip.values_list('equip_no', flat=True))
                             v_equip = old_mes_recipe.product_batching_equip.filter(material__material_name__in=common_material, is_used=True).values(
