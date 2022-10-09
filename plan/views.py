@@ -517,8 +517,8 @@ class SchedulingRecipeMachineSettingView(ModelViewSet):
         if not excel_file:
             raise ValidationError('文件不可为空！')
         cur_sheet = get_cur_sheet(excel_file)
-        if cur_sheet.ncols != 16:
-            raise ValidationError('导入文件数据错误！')
+        # if cur_sheet.ncols != 18:
+        #     raise ValidationError('导入文件数据错误！')
         data = get_sheet_data(cur_sheet, start_row=2)
         for item in data:
             if not all([item[0], item[1], item[2], item[3]]):
