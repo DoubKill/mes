@@ -3000,7 +3000,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
 
 @method_decorator([api_recorder], name='dispatch')
 class EquipWarehouseRecordViewSet(ModelViewSet):
-    queryset = EquipWarehouseRecord.objects.filter(status__in=['入库', '出库']).order_by('-created_date')
+    queryset = EquipWarehouseRecord.objects.all().order_by('-created_date')
     serializer_class = EquipWarehouseRecordSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -3167,7 +3167,12 @@ class EquipWarehouseStatisticalViewSet(ListModelMixin, GenericViewSet):
             st = (int(page) - 1) * int(page_size)
             et = int(page) * int(page_size)
             if self.request.query_params.get('export'):
-                return gen_template_response(self.EXPORT_FIELDS_DICT, results, self.FILE_NAME)
+                try:
+                    response = gen_template_response(self.EXPORT_FIELDS_DICT, results, self.FILE_NAME)
+                except Exception as e:
+                    logger.error(e.args[0])
+                    raise ValidationError(f'导出失败: 数据异常')
+                return response
             count = len(results)
             return Response({'results': results[st:et], 'count': count})
 
@@ -5307,8 +5312,204 @@ class XLCommonCodeView(APIView):
 
 
 @method_decorator([api_recorder], name='dispatch')
+class DailyCleanStandardViewSet(ModelViewSet):
+    queryset = CheckPointStandard.objects.filter(delete_flag=False, standard_type='日清扫').order_by('-id')
+    serializer_class = CheckPointStandardSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = CheckPointStandardFilter
+    FILE_NAME = '日清扫检查标准'
+    EXPORT_FIELDS_DICT = {
+        "日清扫检查表编号(新增不填)": "point_standard_code",
+        "日清扫检查表名称": "point_standard_name",
+        "文档编号": "doc_code",
+        "通用机台": "equip_no",
+        "岗位": "station",
+        "日清扫检查内容": "check_contents",
+        "日清扫检查方法": "check_styles",
+        "录入人(新增不填)": "created_username",
+        "录入时间(新增不填)": "created_date",
+    }
+
+    def list(self, request, *args, **kwargs):
+        all_station = self.request.query_params.get('all_station')  # 获取所有岗位
+        if all_station:
+            station_list = list(set(self.get_queryset().filter(standard_type='日清扫', equip_no__icontains=all_station).values_list('station', flat=True)))
+            return Response({'results': station_list})
+
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        link_tables = instance.check_tables.filter(delete_flag=False)
+        if link_tables:
+            raise ValidationError('标准已经关联点检表, 无法删除')
+        instance.delete_flag = True
+        instance.delete_user = self.request.user
+        instance.delete_date = datetime.now()
+        instance.save()
+        return Response('删除成功')
+
+    @atomic
+    @action(methods=['post'], detail=False, url_path='excel-handle', url_name='excel_handle')
+    def excel_handle(self, request):
+        excel_flag = self.request.data.get('excel_flag')
+        if excel_flag == 'export':  # 导出
+            export_ids = self.request.data.get('export_ids')
+            if not export_ids:
+                raise ValidationError('请选择需要导出的标准')
+            records = self.get_queryset().filter(id__in=export_ids).order_by('id')
+            if not records:
+                raise ValidationError('未找到所选便准, 请刷新页面后重试')
+            data = self.get_serializer(records, many=True).data
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+        elif excel_flag == 'import':  # 导入
+            excel_file = request.FILES.get('file', None)
+            if not excel_file:
+                raise ValidationError('文件不可为空！')
+            cur_sheet = get_cur_sheet(excel_file)
+            if cur_sheet.ncols != len(self.EXPORT_FIELDS_DICT):
+                raise ValidationError('导入文件数据错误！')
+            data = get_sheet_data(cur_sheet)
+            create_data = []
+            try:
+                for item in data:
+                    if self.get_queryset().filter(point_standard_code=item[0]):  # 存在的编码过滤掉
+                        continue
+                    if not all([item[1], item[3], item[4]]):
+                        raise ValidationError('日清扫标准名称、通用机台、岗位为必填')
+                    if self.get_queryset().filter(equip_no=item[3], station=item[4]):
+                        raise ValidationError('导入标准存在冲突[通用机台+岗位需要不相同]')
+                    contents, styles = item[5].split('；')[:-1], item[6].split('；')[:-1]
+                    if len(set(contents)) != len(contents):
+                        raise ValidationError('同一标准中日清扫内容不可存在重复项')
+                    if len(contents) != len(styles):
+                        raise ValidationError('日清扫内容与日清扫方法条目数不相同')
+                    equip_no = ','.join(sorted([i.strip() for i in re.split(',', item[3])]))
+                    check_details = [{'check_content': contents[i].split('、')[-1], 'check_style': styles[i].split('、')[-1]} for i in range(len(contents))]
+                    create_data.append({
+                        'point_standard_name': item[1], 'doc_code': item[2], 'equip_no': equip_no, 'station': item[4],
+                        'check_details': check_details, 'standard_type': '日清扫'
+                    })
+                if not create_data:
+                    raise ValidationError('规则校验完后无可导入数据')
+                serializer = self.get_serializer(data=create_data, many=True)
+                if not serializer.is_valid(raise_exception=False):
+                    raise ValidationError(f'导入数据异常: {serializer.error_messages}')
+                serializer.save()
+            except Exception as e:
+                raise ValidationError(e.args[0])
+        else:
+            raise ValidationError('未知操作[仅支持导入、导出]')
+        return Response(f"{'导出' if excel_flag == 'export' else '导入'}成功")
+
+
+@method_decorator([api_recorder], name='dispatch')
+class DailyCleanTableViewSet(ModelViewSet):
+    queryset = CheckPointTable.objects.filter(delete_flag=False, standard_type='日清扫').order_by('-id')
+    serializer_class = CheckPointTableSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = CheckPointTableFilter
+    FILE_NAME = '日清扫检查表'
+    EXPORT_FIELDS_DICT = {
+        "日清扫检查内容": "check_content",
+        "日清扫检查方式": "check_style",
+        "日清扫检查结果": "check_result",
+        "是否整改": "is_repaired",
+    }
+
+    def list(self, request, *args, **kwargs):
+        params = self.request.query_params
+        all_detail = params.get('all_detail')
+        if all_detail:  # 查询所有温度检查项目
+            equip_no, station, res, check_point_standard, point_standard_code, point_standard_name = \
+                params.get('equip_no'), params.get('station'), [], None, '', ''
+            if all([equip_no, station]):
+                point_standard = CheckPointStandard.objects.filter(delete_flag=False, equip_no__icontains=equip_no,
+                                                                   standard_type='日清扫', station=station).last()
+                if point_standard:
+                    res = list(point_standard.check_details.all().values('sn', 'check_content', 'check_style'))
+                    check_point_standard = point_standard.id
+                    point_standard_code = point_standard.point_standard_code
+                    point_standard_name = point_standard.point_standard_name
+            return Response({"check_point_standard": check_point_standard, "point_standard_code": point_standard_code,
+                             "point_standard_name": point_standard_name, "table_details": res})
+
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.delete_flag = True
+        instance.delete_user = self.request.user
+        instance.delete_date = datetime.now()
+        instance.save()
+        return Response('删除成功')
+
+    @atomic
+    @action(methods=['post'], detail=False, url_path='handle-table', url_name='handle_table')
+    def handle_table(self, request):
+        opera_type = self.request.data.pop('opera_type')
+        ids = self.request.data.pop('ids')
+        if not all([opera_type, ids]):
+            raise ValidationError('参数异常')
+        records = self.get_queryset().filter(id__in=ids)
+        if not records:
+            raise ValidationError('未找到数据行,刷新后重试')
+        key_word = '检查' if opera_type == 1 else ('确认' if opera_type == 2 else '导出')
+        try:
+            if opera_type == 1:  # 编辑日清扫检查
+                instance = records.last()
+                if not instance:
+                    raise ValidationError('异常: 数据行异常, 请刷新页面后重试')
+                if instance.status == '已确认':
+                    raise ValidationError('异常: 已确认的表不可再操作')
+                serializer = CheckPointTableUpdateSerializer(instance, self.request.data, context={'request': request})
+                serializer.is_valid(raise_exception=True)
+                serializer.save()
+            elif opera_type == 2:  # 确认日清扫检查
+                if records.filter(status='新建'):
+                    raise ValidationError('异常: 新建单据不可确认')
+                if records.filter(status='已确认'):
+                    raise ValidationError('异常: 存在已经确认过的数据,请重新选择后再确认')
+                # 检查是否全部填写
+                self.request.data.update({'status': '已确认', 'confirm_time': datetime.now(), 'confirm_user': self.request.user.username})
+                for r in records:
+                    serializer = CheckPointTableUpdateSerializer(r, self.request.data, context={'request': request})
+                    serializer.is_valid(raise_exception=True)
+                    serializer.save()
+            elif opera_type == 3:  # 导出
+                data = self.get_serializer(records, many=True).data
+                return gen_excels_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME,
+                                           sheet_keyword=['select_date', 'classes', 'equip_no', 'station'],
+                                           handle_str=True)
+            else:
+                raise ValidationError('异常: 未知操作类型')
+        except Exception as e:
+            logger.error(f'日清扫检查表{key_word}操作异常: {e.args[0]}')
+            raise ValidationError(f'{key_word}操作异常' if '异常' not in e.args[0] else e.args[0])
+        return Response(f"日清扫检查表{key_word}操作成功")
+
+
+@method_decorator([api_recorder], name='dispatch')
 class CheckPointStandardViewSet(ModelViewSet):
-    queryset = CheckPointStandard.objects.filter(delete_flag=False).order_by('-id')
+    queryset = CheckPointStandard.objects.filter(delete_flag=False, standard_type='点检').order_by('-id')
     serializer_class = CheckPointStandardSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -5329,7 +5530,7 @@ class CheckPointStandardViewSet(ModelViewSet):
     def list(self, request, *args, **kwargs):
         all_station = self.request.query_params.get('all_station')  # 获取所有岗位
         if all_station:
-            station_list = list(set(self.get_queryset().filter(equip_no__icontains=all_station).values_list('station', flat=True)))
+            station_list = list(set(self.get_queryset().filter(standard_type='点检', equip_no__icontains=all_station).values_list('station', flat=True)))
             return Response({'results': station_list})
 
         queryset = self.filter_queryset(self.get_queryset())
@@ -5392,7 +5593,7 @@ class CheckPointStandardViewSet(ModelViewSet):
                     check_details = [{'check_content': contents[i].split('、')[-1], 'check_style': styles[i].split('、')[-1]} for i in range(len(contents))]
                     create_data.append({
                         'point_standard_name': item[1], 'doc_code': item[2], 'equip_no': equip_no, 'station': item[4],
-                        'check_details': check_details
+                        'check_details': check_details, 'standard_type': '点检'
                     })
                 if not create_data:
                     raise ValidationError('规则校验完后无可导入数据')
@@ -5409,7 +5610,7 @@ class CheckPointStandardViewSet(ModelViewSet):
 
 @method_decorator([api_recorder], name='dispatch')
 class CheckPointTableViewSet(ModelViewSet):
-    queryset = CheckPointTable.objects.filter(delete_flag=False).order_by('-id')
+    queryset = CheckPointTable.objects.filter(delete_flag=False, standard_type='点检').order_by('-id')
     serializer_class = CheckPointTableSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -5430,7 +5631,7 @@ class CheckPointTableViewSet(ModelViewSet):
                 params.get('equip_no'), params.get('station'), [], None, '', ''
             if all([equip_no, station]):
                 point_standard = CheckPointStandard.objects.filter(delete_flag=False, equip_no__icontains=equip_no,
-                                                                   station=station).last()
+                                                                   standard_type='点检', station=station).last()
                 if point_standard:
                     res = list(point_standard.check_details.all().values('sn', 'check_content', 'check_style'))
                     check_point_standard = point_standard.id
@@ -5483,9 +5684,12 @@ class CheckPointTableViewSet(ModelViewSet):
                     raise ValidationError('异常: 新建单据不可确认')
                 if records.filter(status='已确认'):
                     raise ValidationError('异常: 存在已经确认过的数据,请重新选择后再确认')
-                records.update(confirm_desc=self.request.data.get('confirm_desc'), status='已确认',
-                               sign_name=self.request.data.get('sign_name'),
-                               confirm_time=datetime.now(), confirm_user=self.request.user.username)
+                # 检查是否全部填写
+                self.request.data.update({'status': '已确认', 'confirm_time': datetime.now(), 'confirm_user': self.request.user.username})
+                for r in records:
+                    serializer = CheckPointTableUpdateSerializer(r, self.request.data, context={'request': request})
+                    serializer.is_valid(raise_exception=True)
+                    serializer.save()
             elif opera_type == 3:  # 导出
                 data = self.get_serializer(records, many=True).data
                 return gen_excels_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME,

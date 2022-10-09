@@ -1,3 +1,4 @@
+import copy
 import datetime
 import math
 import re
@@ -1493,7 +1494,7 @@ class BatchChargeLogListViewSet(ListAPIView):
         if bra_code:
             queryset = queryset.filter(bra_code__icontains=bra_code)
         if trains:
-            queryset = queryset.filter(feed_log__trains__icontains=trains)
+            queryset = queryset.filter(feed_log__trains=trains)
         if created_username:
             queryset = queryset.filter(created_username__icontains=created_username)
         if product_no:
@@ -1514,17 +1515,35 @@ class BatchChargeLogListViewSet(ListAPIView):
             standard_data = {i['material__material_name']: i for i in material_name_weight + cnt_type_details}
             split_count = 0
             for i in serializer.data:
-                single_data = standard_data.get(i['material_name'])
-                actual_weight, standard_error = [0, 0] if not single_data else [single_data.get('actual_weight', 0), single_data.get('standard_error', 0)]
-                if i['bra_code'][0] in ['F', 'S'] or i['bra_code'][:2] in ['MM', 'MC']:
-                    if split_count == 0:
-                        record = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code).last()
-                        split_count = record.single_need
-                        i['split_count'] = split_count
-                    i.update({'split_count': split_count, 'standard_weight': actual_weight, 'standard_error': standard_error})
-                else:
-                    i.update({'split_count': split_count, 'standard_weight': i['actual_weight'], 'standard_error': standard_error})
-                data.append(i)
+                flag = True
+                if len(serializer.data) == 1 and '细料...' in i['display_name'] or '硫磺...' in i['display_name']:
+                    try:
+                        s = WeightPackageLog.objects.filter(bra_code=i['bra_code']).last()
+                        w_details = s.weight_package_machine.all().values('name', 'weight', 'error')
+                        if w_details:
+                            flag, split_count = False, s.split_count
+                            for d in w_details:
+                                s_detail = copy.deepcopy(i)
+                                s_detail.update({'material_name': d.get('name'), 'material_no': d.get('name'),
+                                                 'standard_error': d.get('error'), 'standard_weight': d.get('weight'),
+                                                 'split_count': split_count})
+                                data.append(s_detail)
+                        else:
+                            pass
+                    except:
+                        pass
+                if flag:
+                    single_data = standard_data.get(i['material_name'])
+                    actual_weight, standard_error = [0, 0] if not single_data else [single_data.get('actual_weight', 0), single_data.get('standard_error', 0)]
+                    if i['bra_code'][0] in ['F', 'S'] or i['bra_code'][:2] in ['MM', 'MC']:
+                        if split_count == 0:
+                            record = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code).last()
+                            split_count = record.single_need
+                            i['split_count'] = split_count
+                        i.update({'split_count': split_count, 'standard_weight': actual_weight, 'standard_error': standard_error})
+                    else:
+                        i.update({'split_count': split_count, 'standard_weight': i['actual_weight'], 'standard_error': standard_error})
+                    data.append(i)
         elif opera_type == '2':  # 原材料信息
             if bra_code.startswith('AAJ1Z'):
                 pallet_feedback = PalletFeedbacks.objects.filter(lot_no=bra_code).first()
@@ -1559,7 +1578,8 @@ class BatchChargeLogListViewSet(ListAPIView):
             for i in serializer.data:
                 repeat_keyword = {i['plan_classes_uid'], i['bra_code'], i['trains']}
                 if repeat_keyword not in repeat_bra_code:
-                    replace_material = ReplaceMaterial.objects.filter(status='已处理', result=True, plan_classes_uid=i['plan_classes_uid'], bra_code=i['bra_code']).last()
+                    replace_material = ReplaceMaterial.objects.filter(status='已处理', result=True, plan_classes_uid=i['plan_classes_uid'],
+                                                                      bra_code=i['bra_code']).last()
                     if replace_material:
                         i['replace_material'] = replace_material.real_material
                     data.append(i)

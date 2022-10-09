@@ -599,7 +599,7 @@ class WeightClassPlanSerializer(serializers.ModelSerializer):
         if weight_class_details:
             for k, v in weight_class_details.items():
                 class_date = target_month + '-' + '%02d' % int(k.split('/')[-1])
-                if class_date <= now_factory_date.strftime('%Y-%m-%d'):  # 只能修改当天以后的排班
+                if class_date < now_factory_date.strftime('%Y-%m-%d'):  # 只能修改当天及以后的排班
                     continue
                 v = v if v else None
                 detail = {'factory_date': class_date, 'class_code': v, 'weight_class_plan': instance}
@@ -634,7 +634,7 @@ class WeightClassPlanUpdateSerializer(serializers.ModelSerializer):
                 detail = {'factory_date': class_date, 'class_code': v, 'weight_class_plan': instance}
                 WeightClassPlanDetail.objects.create(**detail)
             else:  # 更新
-                if class_date <= now_factory_date.strftime('%Y-%m-%d'):  # 只能修改当天以后的排班
+                if class_date < now_factory_date.strftime('%Y-%m-%d'):  # 只能修改当天以后的排班
                     continue
                 v = v if v else None
                 WeightClassPlanDetail.objects.filter(weight_class_plan=instance, factory_date=class_date).update(class_code=v)
