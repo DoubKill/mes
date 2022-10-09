@@ -640,7 +640,7 @@ class EquipSupplierViewSet(CommonDeleteMixin, ModelViewSet):
             return Response(queryset.filter(use_flag=True).values('id', 'supplier_name'))
         if export:
             data = self.get_serializer(queryset, many=True).data
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
@@ -746,7 +746,7 @@ class EquipPropertyViewSet(CommonDeleteMixin, ModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         if export:
             data = self.get_serializer(queryset, many=True).data
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
@@ -866,7 +866,7 @@ class EquipAreaDefineViewSet(CommonDeleteMixin, ModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         if export:
             data = self.get_serializer(queryset, many=True).data
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         if all_area:
             return Response(list(queryset.values_list('area_name', flat=True).distinct()))
         return super().list(request, *args, **kwargs)
@@ -941,7 +941,7 @@ class EquipPartNewViewSet(CommonDeleteMixin, ModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         if export:
             data = self.get_serializer(queryset, many=True).data
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         if self.request.query_params.get('all'):
             use_flag = [True] if not self.request.query_params.get('all_part') else [True, False]
             data = EquipPartNew.objects.filter(use_flag__in=use_flag).values('id', 'part_name')
@@ -969,7 +969,7 @@ class EquipComponentTypeViewSet(CommonDeleteMixin, ModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         if export:
             data = self.get_serializer(queryset, many=True).data
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         if self.request.query_params.get('all'):
             data = EquipComponentType.objects.filter(use_flag=True).values('id', 'component_type_name')
             return Response({'results': data})
@@ -1065,7 +1065,7 @@ class EquipComponentViewSet(CommonDeleteMixin, ModelViewSet):
         query_set = self.get_queryset()
         if export:
             data = self.get_serializer(query_set, many=True).data
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         if self.request.query_params.get('all'):
             data = EquipComponent.objects.filter(use_flag=True).values('id', 'component_name')
             return Response({'results': data})
@@ -1189,7 +1189,7 @@ class EquipSpareErpViewSet(CommonDeleteMixin, ModelViewSet):
         export = self.request.query_params.get('export')
         if export:
             data = self.get_serializer(self.filter_queryset(self.get_queryset()), many=True).data
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         if all == '0':
             data = self.get_queryset().values('equip_component_type__component_type_name').distinct()
             return Response({'results': data})
@@ -1304,7 +1304,7 @@ class EquipBomViewSet(ModelViewSet):
         export = self.request.query_params.get('export')
         if export:
             data = EquipBomSerializer(self.filter_queryset(self.get_queryset()), many=True).data
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         if not tree:
             if title:
                 data = self.filter_queryset(self.get_queryset()).values('id', 'factory_id')
@@ -1613,7 +1613,7 @@ class EquipFaultSignalViewSet(CommonDeleteMixin, ModelViewSet):
             return Response({'results': data})
         if self.request.query_params.get('export'):
             data = self.get_serializer(queryset, many=True).data
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         else:
             return super().list(request, *args, **kwargs)
 
@@ -1734,7 +1734,7 @@ class EquipOrderAssignRuleViewSet(CommonDeleteMixin, ModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('export'):
             data = self.get_serializer(queryset, many=True).data
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         else:
             return super().list(request, *args, **kwargs)
 
@@ -1859,7 +1859,7 @@ class EquipJobItemStandardViewSet(CommonDeleteMixin, ModelViewSet):
         export = self.request.query_params.get('export')
         if export:
             data = self.get_serializer(self.filter_queryset(self.get_queryset()), many=True).data
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         return super().list(request, *args, **kwargs)
 
     @action(methods=['post'], detail=False, permission_classes=[], url_path='import_xlsx',
@@ -3168,9 +3168,8 @@ class EquipWarehouseStatisticalViewSet(ListModelMixin, GenericViewSet):
             et = int(page) * int(page_size)
             if self.request.query_params.get('export'):
                 try:
-                    response = gen_template_response(self.EXPORT_FIELDS_DICT, results, self.FILE_NAME)
+                    response = gen_template_response(self.EXPORT_FIELDS_DICT, results, self.FILE_NAME, handle_str=True)
                 except Exception as e:
-                    logger.error(e.args[0])
                     raise ValidationError(f'导出失败: 数据异常')
                 return response
             count = len(results)
@@ -3541,7 +3540,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
         user_name = self.request.user.username
         if self.request.query_params.get('export'):
             data = EquipApplyOrderExportSerializer(self.filter_queryset(self.get_queryset()), many=True).data
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         # 小程序获取数量 带指派 带接单 进行中 已完成 已验收
         if my_order == '1':
             wait_assign = self.queryset.filter(status='已生成').count()
@@ -3930,7 +3929,7 @@ class EquipInspectionOrderViewSet(ModelViewSet):
         user_name = self.request.user.username
         if self.request.query_params.get('export'):
             data = EquipInspectionOrderSerializer(self.filter_queryset(self.get_queryset()), many=True).data
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         # 小程序获取数量 带指派 带接单 进行中 已完成 已验收
         if my_order == '1':
             user_name = self.request.user.username
@@ -4356,7 +4355,7 @@ class EquipPlanViewSet(ModelViewSet):
     def list(self, request, *args, **kwargs):
         if self.request.query_params.get('export'):
             data = self.get_serializer(self.filter_queryset(self.get_queryset()), many=True).data
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         return super().list(request, *args, **kwargs)
 
     @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated],
@@ -5368,9 +5367,9 @@ class DailyCleanStandardViewSet(ModelViewSet):
                 raise ValidationError('请选择需要导出的标准')
             records = self.get_queryset().filter(id__in=export_ids).order_by('id')
             if not records:
-                raise ValidationError('未找到所选便准, 请刷新页面后重试')
+                raise ValidationError('未找到所选标准, 请刷新页面后重试')
             data = self.get_serializer(records, many=True).data
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         elif excel_flag == 'import':  # 导入
             excel_file = request.FILES.get('file', None)
             if not excel_file:
@@ -5564,9 +5563,9 @@ class CheckPointStandardViewSet(ModelViewSet):
                 raise ValidationError('请选择需要导出的标准')
             records = self.get_queryset().filter(id__in=export_ids).order_by('id')
             if not records:
-                raise ValidationError('未找到所选便准, 请刷新页面后重试')
+                raise ValidationError('未找到所选标准, 请刷新页面后重试')
             data = self.get_serializer(records, many=True).data
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         elif excel_flag == 'import':  # 导入
             excel_file = request.FILES.get('file', None)
             if not excel_file:
@@ -5736,9 +5735,9 @@ class CheckTemperatureStandardViewSet(ModelViewSet):
                 raise ValidationError('请选择需要导出的标准')
             records = self.get_queryset().filter(id__in=export_ids).order_by('sn')
             if not records:
-                raise ValidationError('未找到所选便准, 请刷新页面后重试')
+                raise ValidationError('未找到所选标准, 请刷新页面后重试')
             data = self.get_serializer(records, many=True).data
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         elif excel_flag == 'import':  # 导入
             excel_file = request.FILES.get('file', None)
             if not excel_file:
