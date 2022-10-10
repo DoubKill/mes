@@ -3287,6 +3287,21 @@ class SummaryOfWeighingOutput(APIView):
         section_info = PerformanceJobLadder.objects.filter(delete_flag=False, type='生产配料').values('type', 'name', 'coefficient', 'post_standard', 'post_coefficient')
         for item in section_info:
             section_dic[f"{item['name']}_{item['type']}"] = [item['coefficient'], item['post_standard'], item['post_coefficient']]
+        # 员工类别
+        independent = {}
+        independent_lst = IndependentPostTemplate.objects.filter(date_time=factory_date).values('name', 'status', 'work_type')
+        for item in independent_lst:
+            independent[item['name']] = {'status': item['status'], 'work_type': item['work_type']}
+        if not independent:
+            raise ValidationError(f'请添加{factory_date}员工类别')
+        # 员工类别系数
+        employee_type = GlobalCode.objects.filter(global_type__type_name='员工类别', global_type__use_flag=True, use_flag=True).values('global_no', 'global_name')
+        employee_type_dic = {dic['global_no']: dic['global_name'] for dic in employee_type}
+        # 员工独立上岗系数
+        coefficient = GlobalCode.objects.filter(global_type__type_name='是否独立上岗系数', global_type__use_flag=True, use_flag=True).values('global_no', 'global_name')
+        coefficient_dic = {dic['global_no']: dic['global_name'] for dic in coefficient}
+        if not coefficient or not employee_type_dic:
+            raise ValidationError(f'请在公共变量中添加员工独立上岗系数或员工类别系数')
 
         for item in user_list:
             classes = group_dic.get(int(item['factory_date__day']))
@@ -3307,7 +3322,7 @@ class SummaryOfWeighingOutput(APIView):
         for equip_no in equip_list:
             dic = {'equip_no': equip_no, 'hj': 0}
             plan_model, report_basic = [JZPlan, JZReportBasic] if equip_no in JZ_EQUIP_NO else [Plan, ReportBasic]
-            data = plan_model.objects.using(equip_no).filter(actno__gt=1, state='完成', date_time__istartswith=factory_date).values('date_time', 'grouptime').annotate(count=Sum('actno'))
+            data = plan_model.objects.using(equip_no).filter(actno__gt=1, date_time__istartswith=factory_date).values('date_time', 'grouptime').annotate(count=Sum('actno'))
             for item in data:
                 date = item['date_time']
                 day = int(date.split('-')[2])    # 2  早班
@@ -3337,29 +3352,30 @@ class SummaryOfWeighingOutput(APIView):
             type = '生产配料'
             if section_dic[f"{section}_{type}"][1] == 1:  # 最大值
                 equip, count_ = sorted(value.items(), key=lambda kv: (kv[1], kv[0]))[-1]
-                # 细料/硫磺单价'
-                unit_price = price_obj.xl if equip in ['F01', 'F02', 'F03'] else price_obj.lh
-                coefficient = section_dic[f"{section}_{type}"][0] / 100
-                post_coefficient = section_dic[f"{section}_{type}"][2] / 100
-                price = round(count_ * coefficient * post_coefficient * unit_price, 2)
-                xl = price if equip in ['F01', 'F02', 'F03'] else 0
-                lh = price if equip in ['S01', 'S02'] else 0
             else:  # 平均值
-                equip = list(value.keys())[0]
-                count_ = sum(value.values()) / len(value)
-                unit_price = price_obj.xl if equip in ['F01', 'F02', 'F03'] else price_obj.lh
-                coefficient = section_dic[f"{section}_{type}"][0] / 100
-                post_coefficient = section_dic[f"{section}_{type}"][2] / 100
-                price = round(count_ * coefficient * post_coefficient * unit_price, 2)
-                xl = price if equip in ['F01', 'F02', 'F03'] else 0
-                lh = price if equip in ['S01', 'S02'] else 0
+                equip, count_ = list(value.keys())[0], sum(value.values()) / len(value)
+            # 细料/硫磺单价'
+            unit_price = price_obj.xl if equip in ['F01', 'F02', 'F03'] else price_obj.lh
+            # 员工类别系数
+            a, w_coefficient = float(coefficient_dic.get('是', 1)), 1
+            if independent.get(name):
+                if independent.get(name).get('status') != 1:
+                    a = float(coefficient_dic.get('否'))
+                work_type = independent.get(name).get('work_type')
+                w_coefficient = float(employee_type_dic.get(work_type)) if work_type else w_coefficient
+            coefficient = section_dic[f"{section}_{type}"][0] / 100
+            post_coefficient = section_dic[f"{section}_{type}"][2] / 100
+            price = round(count_ * coefficient * post_coefficient * unit_price * a * w_coefficient, 2)
+            xl = price if equip in ['F01', 'F02', 'F03'] else 0
+            lh = price if equip in ['S01', 'S02'] else 0
 
             if result1.get(name):
                 result1[name][f"{day}{classes}"] = price
+                result1[name][f"{day}{classes}_count"] = count_
                 result1[name]['xl'] += xl
                 result1[name]['lh'] += lh
             else:
-                result1[name] = {'name': name, f"{day}{classes}": price, 'xl': xl, 'lh': lh}
+                result1[name] = {'name': name, f"{day}{classes}": price, f"{day}{classes}_count": count_, 'xl': xl, 'lh': lh}
         return Response({'results': result, 'users': result1.values()})
 
 
@@ -3772,13 +3788,13 @@ class PerformanceSummaryView(APIView):
         year = int(date.split('-')[0])
         month = int(date.split('-')[1])
         # 员工独立上岗系数
-        coefficient = GlobalCode.objects.filter(global_type__type_name='是否独立上岗系数').values('global_no', 'global_name')
+        coefficient = GlobalCode.objects.filter(global_type__type_name='是否独立上岗系数', global_type__use_flag=True, use_flag=True).values('global_no', 'global_name')
         coefficient_dic = {dic['global_no']: dic['global_name'] for dic in coefficient}
         # 员工类别
-        employee_type = GlobalCode.objects.filter(global_type__type_name='员工类别').values('global_no', 'global_name')
+        employee_type = GlobalCode.objects.filter(global_type__type_name='员工类别', global_type__use_flag=True, use_flag=True).values('global_no', 'global_name')
         employee_type_dic = {dic['global_no']: dic['global_name'] for dic in employee_type}
         # 超产奖励系数
-        coefficient1 = GlobalCode.objects.filter(global_type__type_name='超产单价').values('global_no', 'global_name')
+        coefficient1 = GlobalCode.objects.filter(global_type__type_name='超产单价', global_type__use_flag=True, use_flag=True).values('global_no', 'global_name')
         coefficient1_dic = {dic['global_no']: dic['global_name'] for dic in coefficient1}
         if not coefficient or not coefficient1:
             raise ValidationError('请先去添加独立上岗或超产奖励系数')
@@ -3842,6 +3858,8 @@ class PerformanceSummaryView(APIView):
         independent_lst = IndependentPostTemplate.objects.filter(date_time=date).values('name', 'status', 'work_type')
         for item in independent_lst:
             independent[item['name']] = {'status': item['status'], 'work_type': item['work_type']}
+        if not independent:
+            raise ValidationError(f'请添加{date}员工类别')
         # 取每个机台设定的目标值
         max_setting_id = MachineTargetYieldSettings.objects.filter(target_month=date).aggregate(m_id=Max('id'))['m_id']
         if not max_setting_id:
