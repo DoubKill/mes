@@ -3236,7 +3236,7 @@ class EquipAutoPlanView(APIView):
                                            'add_username': self.request.user.username,
                                            'equip_spare': [{'spare_code': spare_code, 'id': e_spare.id,
                                                             'spare_name': e_spare.spare_name, 'quantity': 1,
-                                                            'all_qty': e_inventory.quantity, 1}]
+                                                            'all_qty': e_inventory.quantity}]
                                            }
                             serializer = EquipWarehouseOrderSerializer(data=create_data, context={'request': request, 'state': True})
                             if serializer.is_valid():
