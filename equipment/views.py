@@ -2618,8 +2618,8 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
     @atomic
     def create(self, request, *args, **kwargs):
         data = self.request.data
-        in_quantity = data.get('in_quantity', 1)
-        out_quantity = data.get('out_quantity', 1)
+        in_quantity = round(decimal.Decimal(data.get('in_quantity', 1)), 1)
+        out_quantity = round(decimal.Decimal(data.get('out_quantity', 1)), 1)
         enter_time = data.get('enter_time', None)
         outer_time = data.get('outer_time', None)
         receive_user = data.get('receive_user', None)
@@ -2643,7 +2643,7 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
             if data['in_quantity'] <= 0:
                 return Response({"success": False, "message": '入库数量需要大于0', "data": None})
             instance.status = 2
-            instance.in_quantity += data['in_quantity']
+            instance.in_quantity += in_quantity
             instance.enter_time = enter_time
             instance.save()
 
@@ -2842,7 +2842,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
             item['lower_stock'] = item['equip_spare__lower_stock']
             item['unit'] = item['equip_spare__unit']
             if not self.request.query_params.get('use'):
-                item['single_price'] = round(item['equip_spare__cost'] if item['equip_spare__cost'] else 0, 2)
+                item['single_price'] = round(decimal.Decimal(item['equip_spare__cost']) if item['equip_spare__cost'] else 0, 2)
                 item['total_price'] = round(item['single_price'] * item['quantity'], 2)
                 item['desc'] = None
         if self.request.query_params.get('export'):
@@ -2863,28 +2863,29 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
         if not inventory:
             return Response({"success": False, "message": '备件代码不存在', "data": None})
         if handle:
+            h_quantity = round(decimal.Decimal(data.get('quantity')), 1)
             # 盘库
             if handle == '盘库':
-                quantity = data.get('quantity')
-                inventory.quantity = data['quantity']
+                quantity = h_quantity
+                inventory.quantity = h_quantity
             elif handle == '移库':
                 if data['move_equip_warehouse_location__id'] == data['equip_warehouse_location__id']:
                     return Response({"success": False, "message": '不能移动到当前库区', "data": None})
-                quantity = f"-{data.get('quantity')}"
-                if inventory.quantity < data['quantity']:
+                quantity = f"-{h_quantity}"
+                if inventory.quantity < h_quantity:
                     return Response({"success": False, "message": '当前库存数量不足', "data": None})
-                inventory.quantity -= data['quantity']
+                inventory.quantity -= h_quantity
                 new_queryset = self.queryset.filter(equip_spare_id=data['equip_spare'], equip_warehouse_area_id=data['move_equip_warehouse_area__id'],
                                                     equip_warehouse_location_id=data['move_equip_warehouse_location__id'])
                 if new_queryset.exists():
                     new = new_queryset.first()
-                    new.quantity += data['quantity']
+                    new.quantity += h_quantity
                     new.save()
                     new_quantity = new.quantity
                 else:
                     obj = self.queryset.create(quantity=data['quantity'], equip_spare_id=data['equip_spare'],
-                                         equip_warehouse_area_id=data['move_equip_warehouse_area__id'],
-                                         equip_warehouse_location_id=data['move_equip_warehouse_location__id'])
+                                               equip_warehouse_area_id=data['move_equip_warehouse_area__id'],
+                                               equip_warehouse_location_id=data['move_equip_warehouse_location__id'])
                     new_quantity = obj.quantity
                 # 记录履历
                 EquipWarehouseRecord.objects.create(
@@ -2919,7 +2920,6 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
                 equip_spare_id=data.get('equip_spare'),
                 created_user=self.request.user)
             return Response({"success": True, "message": '操作成功', "data": data})
-
         else:
             return super().update(request, *args, **kwargs)
 
@@ -2972,7 +2972,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
             item['upper_stock'] = upper_stock
             item['lower_stock'] = lower_stock
             item['unit'] = item['equip_spare__unit']
-            item['single_price'] = round(item['equip_spare__cost'] if item['equip_spare__cost'] else 0, 2)
+            item['single_price'] = round(decimal.Decimal(item['equip_spare__cost']) if item['equip_spare__cost'] else 0, 2)
             item['total_price'] = round(item['single_price'] * item['quantity'], 2)
             item['desc'] = None
             handle_data.append(item)
@@ -3072,7 +3072,7 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
         equip_warehouse_location = self.request.data.get('equip_warehouse_location')
         equip_spare = self.request.data.get('equip_spare')
         instance = self.get_object()
-        quantity = int(instance.quantity)
+        quantity = decimal.Decimal(instance.quantity)
         inventory = EquipWarehouseInventory.objects.filter(equip_spare_id=equip_spare,
                                                            equip_warehouse_location_id=equip_warehouse_location).first()
         if instance.created_user == self.request.user:
