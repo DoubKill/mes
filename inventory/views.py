@@ -46,7 +46,7 @@ from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMate
     CarbonOutPlan, FinalRubberyOutBoundOrder, MixinRubberyOutBoundOrder, FinalGumInInventoryLog, OutBoundDeliveryOrder, \
     OutBoundDeliveryOrderDetail, WMSReleaseLog, WmsInventoryMaterial, WMSMaterialSafetySettings, WmsNucleinManagement, \
     WMSExceptHandle, MaterialOutHistoryOther, MaterialOutboundOrder, MaterialEntrance, HfBakeMaterialSet, HfBakeLog, \
-    WMSOutboundHistory, CancelTask, ProductInventoryLocked
+    WMSOutboundHistory, CancelTask, ProductInventoryLocked, ProductStockDailySummary
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
@@ -84,7 +84,7 @@ from quality.serializers import MaterialDealResultListSerializer
 from quality.utils import update_wms_quality_result
 from recipe.models import MaterialAttribute
 from terminal.models import LoadMaterialLog, WeightBatchingLog, WeightPackageLog
-from terminal.utils import get_real_ip
+from terminal.utils import get_real_ip, get_current_factory_date
 from .conf import IS_BZ_USING
 from .conf import wms_ip, wms_port, cb_ip, cb_port
 from .models import MaterialInventory as XBMaterialInventory
@@ -2352,117 +2352,63 @@ class InventoryStaticsView(APIView):
 class ProductDetailsView(APIView):
     permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_workshop_stock_detail'}))
 
-    def export_xls(self, result):
-        response = HttpResponse(content_type='application/vnd.ms-excel')
-        filename = '车间库存明细'
-        response['Content-Disposition'] = u'attachment;filename= ' + filename.encode('gbk').decode(
-            'ISO-8859-1') + '.xls'
-        # 创建一个文件对象
-        wb = xlwt.Workbook(encoding='utf8')
-        # 创建一个sheet对象
-        sheet = wb.add_sheet('库存信息', cell_overwrite_ok=True)
-
-        style = xlwt.XFStyle()
-        style.alignment.wrap = 1
-
-        columns = ['No', '胶料类型', '胶料编码', '胶料名称', '数量', '重量/kg', '数量/kg', '重量', '数量', '重量/kg']
-        # 写入文件标题
-        sheet.write_merge(0, 0, 0, 3, '基础信息')
-        sheet.write_merge(0, 0, 4, 5, '立库库存量')
-        sheet.write_merge(0, 0, 6, 7, '线边库库存量')
-        sheet.write_merge(0, 0, 8, 9, '总量')
-
-        for col_num in range(len(columns)):
-            sheet.write(1, col_num, columns[col_num])
-            # 写入数据
-        data_row = 2
-        for i in result:
-            sheet.write(data_row, 0, result.index(i) + 1)
-            sheet.write(data_row, 1, i['material_type'])
-            sheet.write(data_row, 2, i['material_no'])
-            sheet.write(data_row, 3, i['material_name'])
-            sheet.write(data_row, 4, i['qty'])
-            sheet.write(data_row, 5, i['weight'])
-            sheet.write(data_row, 6, i['other_qty'])
-            sheet.write(data_row, 7, i['other_weight'])
-            sheet.write(data_row, 8, i['all_qty'])
-            sheet.write(data_row, 9, i['all_weight'])
-            data_row = data_row + 1
-        # 写出到IO
-        output = BytesIO()
-        wb.save(output)
-        # 重新定位到开始
-        output.seek(0)
-        response.write(output.getvalue())
-        return response
-
-    def deal(self, datas):
-        for x in datas:
-            material_no = x.get("material_no").strip()
-            if not material_no in self.data:
-                self.data[material_no] = x
-                self.data[material_no]["material_no"] = self.data[material_no]["material_no"].strip()
-                self.data[material_no]["material_name"] = self.data[material_no]["material_no"]
-                try:
-                    self.data[material_no]["material_type"] = self.data[material_no]["material_no"].split("-")[1]
-                except:
-                    self.data[material_no]["material_type"] = self.data[material_no]["material_no"]
-                self.data[material_no]["other_qty"] = 0
-                self.data[material_no]["other_weight"] = 0.0
-                self.data[material_no]["all_qty"] = self.data[material_no]["qty"]
-                self.data[material_no]["all_weight"] = self.data[material_no]["weight"]
-            else:
-                self.data[material_no]["qty"] += x.get("qty")
-                self.data[material_no]["weight"] += x.get("weight")
-
     def get(self, request):
-        params = request.query_params
-        material_type = params.get("material_type", "")
-        material_no = params.get("material_no", "")
-        export = params.get("export")
-        filters = dict()
-        other_filters = dict()
-        filters.update(material_no__icontains=material_no, material_no__contains=material_type)
-        other_filters.update(material__material_no__icontains=material_no,
-                             material__material_no__contains=material_type)
-
-        mix_set = BzFinalMixingRubberInventory.objects.using('bz').filter(**filters)
-        final_set = BzFinalMixingRubberInventory.objects.using('lb').filter(store_name='炼胶库').filter(**filters)
-        mix_data = mix_set.values("material_no").annotate(qty=Sum('qty'), weight=Sum('total_weight')).values(
-            "material_no", 'qty', 'weight')
-        final_data = final_set.values("material_no").annotate(qty=Sum('qty'), weight=Sum('total_weight')).values(
-            "material_no", 'qty', 'weight')
-        self.data = {}
-        self.deal(mix_data)
-        self.deal(final_data)
-        other_data = MaterialInventory.objects.filter(**other_filters).values("material__material_no").annotate(
-            num=Sum('qty'), weight=Sum('total_weight')).values("material__material_no", 'num', 'weight')
-        for x in other_data:
-            material_no = x.get("material__material_no")
-            if self.data.get(material_no):
-                self.data[material_no]["other_qty"] = x.get("num")
-                self.data[material_no]["other_weight"] = x.get("weight")
+        mix_set = BzFinalMixingRubberInventory.objects.using('bz').all()
+        final_set = BzFinalMixingRubberInventory.objects.using('lb').filter(store_name='炼胶库').all()
+        mix_data = mix_set.values("material_no", 'quality_level').annotate(qty=Sum('qty'), weight=Sum('total_weight')).values(
+            "material_no", 'qty', 'weight', 'quality_level')
+        final_data = final_set.values("material_no", 'quality_level').annotate(qty=Sum('qty'), weight=Sum('total_weight')).values(
+            "material_no", 'qty', 'weight', 'quality_level')
+        total_inventory_data = list(mix_data) + list(final_data)
+        factory_date = get_current_factory_date().get('factory_date', datetime.datetime.now().date())
+        area_data = ProductStockDailySummary.objects.filter(factory_date=factory_date).values('product_no', 'area_weight', 'stage')
+        stock_data_dict = {}
+        for x in total_inventory_data:
+            m_split_data = x['material_no'].strip().split('-')
+            stage = m_split_data[1]
+            product_no = m_split_data[2]
+            weight = x['weight']
+            qty = x['qty'] / 1000
+            quality_level = x['quality_level']
+            if stage == 'FM':
+                if quality_level == '一等品':
+                    st = '合格'
+                elif quality_level == '三等品':
+                    st = '合格'
+                else:
+                    st = '待检测'
+                stage = '{}({})'.format(stage, st)
+            if product_no not in stock_data_dict:
+                stock_data_dict[product_no] = {stage: {'weight': weight, 'qty': qty}}
             else:
-                self.data[material_no] = {}
-                self.data[material_no]["other_qty"] = x.get("num")
-                self.data[material_no]["other_weight"] = x.get("weight")
-                self.data[material_no]["qty"] = 0.0
-                self.data[material_no]["weight"] = 0.0
-                self.data[material_no]["material_name"] = material_no
-                self.data[material_no]["material_no"] = material_no
-                self.data[material_no]["material_type"] = material_type
-            if self.data[material_no].get("all_qty"):
-                self.data[material_no]["all_qty"] += x.get("num")
+                if stage not in stock_data_dict[product_no]:
+                    stock_data_dict[product_no][stage] = {'weight': weight, 'qty': qty}
+                else:
+                    stock_data_dict[product_no][stage]['weight'] += weight
+                    stock_data_dict[product_no][stage]['qty'] += qty
+        area_data_dict = {}
+        for item in area_data:
+            product_no = item['product_no']
+            weight = item['area_weight'] / 1000
+            stage = item['stage']
+            if stage in ('CMB', 'HMB'):
+                stage = 'C/HMB'
+            if product_no not in area_data_dict:
+                area_data_dict[product_no] = {stage: {'weight': weight, 'qty': ''}}
             else:
-                self.data[material_no]["all_qty"] = x.get("num")
-            if self.data[material_no].get("all_weight"):
-                self.data[material_no]["all_weight"] += x.get("weight")
-            else:
-                self.data[material_no]["all_weight"] = x.get("weight")
-        data = self.data.values()
-        if export:
-            return self.export_xls(list(data))
-        return Response({"results": data})
+                area_data_dict[product_no][stage] = {'weight': weight, 'qty': ''}
+        common_product_nos = set(area_data_dict.keys()) & set(stock_data_dict.keys())
+        l_product_nos = set(area_data_dict.keys()) - set(stock_data_dict.keys())
+        r_product_nos = set(stock_data_dict.keys()) - set(area_data_dict.keys())
+        ret = []
+        for i in common_product_nos:
+            ret.append({'product_no': i, 'area_data': area_data_dict[i], 'stock_data': stock_data_dict[i]})
+        for i in l_product_nos:
+            ret.append({'product_no': i, 'area_data': area_data_dict[i], 'stock_data': {}})
+        for i in r_product_nos:
+            ret.append({'product_no': i, 'area_data': {}, 'stock_data': stock_data_dict[i]})
+        ret = sorted(ret, key=lambda x: x['product_no'])
+        return Response({"results": ret})
 
 
 """原材料库出库接口"""
