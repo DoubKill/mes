@@ -4917,6 +4917,9 @@ class GetSpare(APIView):
                                       "specification": item['gg'], "unit": item['bzdwmc'], "unique_id": item['wlxxid'],
                                       "sync_date": dt.datetime.now()})
             spare_info = EquipSpareErp.objects.filter(spare_code=item['wlbh'], unique_id__isnull=True)
+            if spare_info:
+                spare_info.update(**{"spare_name": item['wlmc'], "specification": item['gg'], "unit": item['bzdwmc'], "unique_id": item['wlxxid'],
+                                     "sync_date": dt.datetime.now()})
             if not spare_info and not unique_info:
                 EquipSpareErp.objects.create(**{"spare_code": item['wlbh'], "spare_name": item['wlmc'],
                                                 "equip_component_type": equip_component_type,
