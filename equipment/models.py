@@ -757,10 +757,10 @@ class EquipWarehouseOrderDetail(AbstractEntity):
     )
     equip_warehouse_order = models.ForeignKey(EquipWarehouseOrder, on_delete=models.CASCADE, help_text='出入库单据', related_name='order_detail')
     equip_spare = models.ForeignKey(EquipSpareErp, on_delete=models.CASCADE, help_text='备件代码')
-    in_quantity = models.DecimalField(max_digits=8, decimal_places=1, help_text='已入库数量', blank=True, default=0)
-    out_quantity = models.DecimalField(max_digits=8, decimal_places=1, help_text='已出库数量', blank=True, default=0)
-    plan_in_quantity = models.DecimalField(max_digits=8, decimal_places=1, help_text='计划入库数量', blank=True, default=0)
-    plan_out_quantity = models.DecimalField(max_digits=8, decimal_places=1, help_text='计划出库数量', blank=True, default=0)
+    in_quantity = models.FloatField(help_text='已入库数量', blank=True, default=0)
+    out_quantity = models.FloatField(help_text='已出库数量', blank=True, default=0)
+    plan_in_quantity = models.FloatField(help_text='计划入库数量', blank=True, default=0)
+    plan_out_quantity = models.FloatField(help_text='计划出库数量', blank=True, default=0)
     enter_time = models.DateTimeField(help_text='入库时间', null=True, blank=True)
     outer_time = models.DateTimeField(help_text='出库时间', null=True, blank=True)
     status = models.PositiveIntegerField(choices=ORDER_STATUS, help_text='状态', default=1)
@@ -781,7 +781,7 @@ class EquipWarehouseInventory(AbstractEntity):
     备件库存统计
     """
     equip_spare = models.ForeignKey(EquipSpareErp, help_text='备件代码', on_delete=models.CASCADE)
-    quantity = models.DecimalField(max_digits=8, decimal_places=2, help_text='数量', default=0)
+    quantity = models.FloatField(help_text='数量', default=0)
     equip_warehouse_area = models.ForeignKey(EquipWarehouseArea, help_text='库区', on_delete=models.CASCADE, null=True,
                                              blank=True)
     equip_warehouse_location = models.ForeignKey(EquipWarehouseLocation, help_text='库位', on_delete=models.CASCADE,
@@ -801,7 +801,7 @@ class EquipWarehouseRecord(AbstractEntity):
     equip_warehouse_area = models.ForeignKey(EquipWarehouseArea, help_text='库区', on_delete=models.CASCADE)
     equip_warehouse_location = models.ForeignKey(EquipWarehouseLocation, help_text='库位', on_delete=models.CASCADE)
     equip_spare = models.ForeignKey(EquipSpareErp, help_text='备件代码', on_delete=models.CASCADE)
-    now_quantity = models.DecimalField(max_digits=8, decimal_places=1, help_text='现存数量', default=0)
+    now_quantity = models.FloatField(help_text='现存数量', default=0)
     quantity = models.CharField(max_length=64, help_text='变更数量', default='0')
     revocation = models.CharField(max_length=64, help_text='是否撤销(Y/N)', default='N')
     equip_warehouse_order_detail = models.ForeignKey(EquipWarehouseOrderDetail, help_text='出入库单据明细',

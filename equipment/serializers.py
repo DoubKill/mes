@@ -1463,7 +1463,7 @@ class EquipWarehouseOrderDetailSerializer(BaseModelSerializer):
 
     def get_all_qty(self, instance):
         res = EquipWarehouseInventory.objects.filter(equip_spare=instance.equip_spare, delete_flag=False).aggregate(all_qty=Sum('quantity'))
-        return res.get('all_qty') if res.get('all_qty') else 0
+        return round(res.get('all_qty'), 1) if res.get('all_qty') else 0
 
 
 class EquipWarehouseOrderListSerializer(BaseModelSerializer):

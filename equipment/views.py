@@ -2618,8 +2618,8 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
     @atomic
     def create(self, request, *args, **kwargs):
         data = self.request.data
-        in_quantity = round(decimal.Decimal(data.get('in_quantity', 1)), 1)
-        out_quantity = round(decimal.Decimal(data.get('out_quantity', 1)), 1)
+        in_quantity = round(data.get('in_quantity', 1), 1)
+        out_quantity = round(data.get('out_quantity', 1), 1)
         enter_time = data.get('enter_time', None)
         outer_time = data.get('outer_time', None)
         receive_user = data.get('receive_user', None)
@@ -2842,7 +2842,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
             item['lower_stock'] = item['equip_spare__lower_stock']
             item['unit'] = item['equip_spare__unit']
             if not self.request.query_params.get('use'):
-                item['single_price'] = round(decimal.Decimal(item['equip_spare__cost']) if item['equip_spare__cost'] else 0, 2)
+                item['single_price'] = round(item['equip_spare__cost'] if item['equip_spare__cost'] else 0, 2)
                 item['total_price'] = round(item['single_price'] * item['quantity'], 2)
                 item['desc'] = None
         if self.request.query_params.get('export'):
@@ -2863,7 +2863,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
         if not inventory:
             return Response({"success": False, "message": '备件代码不存在', "data": None})
         if handle:
-            h_quantity = round(decimal.Decimal(data.get('quantity')), 1)
+            h_quantity = round(data.get('quantity'), 1)
             # 盘库
             if handle == '盘库':
                 quantity = h_quantity
@@ -2972,7 +2972,8 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
             item['upper_stock'] = upper_stock
             item['lower_stock'] = lower_stock
             item['unit'] = item['equip_spare__unit']
-            item['single_price'] = round(decimal.Decimal(item['equip_spare__cost']) if item['equip_spare__cost'] else 0, 2)
+            item['quantity'] = round(item['quantity'], 1)
+            item['single_price'] = round(item['equip_spare__cost'] if item['equip_spare__cost'] else 0, 2)
             item['total_price'] = round(item['single_price'] * item['quantity'], 2)
             item['desc'] = None
             handle_data.append(item)
@@ -3072,7 +3073,7 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
         equip_warehouse_location = self.request.data.get('equip_warehouse_location')
         equip_spare = self.request.data.get('equip_spare')
         instance = self.get_object()
-        quantity = decimal.Decimal(instance.quantity)
+        quantity = round(instance.quantity, 2)
         inventory = EquipWarehouseInventory.objects.filter(equip_spare_id=equip_spare,
                                                            equip_warehouse_location_id=equip_warehouse_location).first()
         if instance.created_user == self.request.user:
@@ -3235,7 +3236,7 @@ class EquipAutoPlanView(APIView):
                                            'add_username': self.request.user.username,
                                            'equip_spare': [{'spare_code': spare_code, 'id': e_spare.id,
                                                             'spare_name': e_spare.spare_name, 'quantity': 1,
-                                                            'all_qty': e_inventory.quantity}]
+                                                            'all_qty': e_inventory.quantity, 1}]
                                            }
                             serializer = EquipWarehouseOrderSerializer(data=create_data, context={'request': request, 'state': True})
                             if serializer.is_valid():
@@ -4982,7 +4983,7 @@ class GetSpareOrder(APIView):
                 if not spare_code or len(spare_code) < 2 or spare_code[:2] not in overcome:
                     kwargs = {'equip_warehouse_order': order,
                               'equip_spare': equip_spare,
-                              'plan_in_quantity': spare.get('cksl')}
+                              'plan_in_quantity': round(spare.get('cksl'), 1)}
                     EquipWarehouseOrderDetail.objects.create(**kwargs)
                 else:  # 屏蔽备件
                     overcome_list.append(spare)
