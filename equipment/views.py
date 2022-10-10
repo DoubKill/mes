@@ -2841,6 +2841,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
             item['upper_stock'] = item['equip_spare__upper_stock']
             item['lower_stock'] = item['equip_spare__lower_stock']
             item['unit'] = item['equip_spare__unit']
+            item['quantity'] = round(item['quantity'], 1)
             if not self.request.query_params.get('use'):
                 item['single_price'] = round(item['equip_spare__cost'] if item['equip_spare__cost'] else 0, 2)
                 item['total_price'] = round(item['single_price'] * item['quantity'], 2)
