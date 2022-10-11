@@ -1024,6 +1024,9 @@ permission_data = [
     {'id': 1076, 'code': 'execute2_d_equip_apply_order', 'name': '除尘袋滤器确认实施', 'parent_id': 1004},
     {'id': 1077, 'code': 'confirm2_d_equip_apply_order', 'name': '除尘袋滤器确认', 'parent_id': 1004},
     {'id': 1080, 'code': 'view3_d_equip_apply_order', 'name': '细料胶块放行处理', 'parent_id': 1004},
+    {'id': 1117, 'code': 'view4_d_equip_apply_order', 'name': '日清扫检查查询', 'parent_id': 1004},
+    {'id': 1118, 'code': 'execute3_d_equip_apply_order', 'name': '日清扫检查实施', 'parent_id': 1004},
+    {'id': 1119, 'code': 'confirm3_d_equip_apply_order', 'name': '日清扫检查确定', 'parent_id': 1004},
 
     {'id': 1014, 'code': 'wms_mooney_level', 'name': '原材料门尼值等级管理', 'parent_id': None, 'category_name': '质量管理'},
     {'id': 1015, 'code': 'view_wms_mooney_level', 'name': '查看', 'parent_id': 1014},
@@ -1111,7 +1114,22 @@ permission_data = [
     {'id': 1102, 'code': 'export_weight_class_plan', 'name': '导出', 'parent_id': 1097},
     {'id': 1103, 'code': 'import_weight_class_plan', 'name': '导入', 'parent_id': 1097},
 
-    # 下一个 1104 开始
+    {'id': 1104, 'code': 'daily_clean_standard', 'name': '日清扫检查标准', 'parent_id': None, 'category_name': '生产管理'},
+    {'id': 1105, 'code': 'view_daily_clean_standard', 'name': '查看', 'parent_id': 1104},
+    {'id': 1106, 'code': 'add_daily_clean_standard', 'name': '新增', 'parent_id': 1104},
+    {'id': 1107, 'code': 'change_daily_clean_standard', 'name': '编辑', 'parent_id': 1104},
+    {'id': 1108, 'code': 'delete_daily_clean_standard', 'name': '删除', 'parent_id': 1104},
+    {'id': 1109, 'code': 'excel_daily_clean_standard', 'name': '导入/导出', 'parent_id': 1104},
+
+    {'id': 1110, 'code': 'daily_clean_table', 'name': '日清扫检查表', 'parent_id': None, 'category_name': '生产管理'},
+    {'id': 1111, 'code': 'view_daily_clean_table', 'name': '查看', 'parent_id': 1110},
+    {'id': 1112, 'code': 'add_daily_clean_table', 'name': '新增', 'parent_id': 1110},
+    {'id': 1113, 'code': 'change_daily_clean_table', 'name': '编辑', 'parent_id': 1110},
+    {'id': 1114, 'code': 'confirm_daily_clean_table', 'name': '确认', 'parent_id': 1110},
+    {'id': 1115, 'code': 'delete_daily_clean_table', 'name': '删除', 'parent_id': 1110},
+    {'id': 1116, 'code': 'export_daily_clean_table', 'name': '导出', 'parent_id': 1110},
+
+    # 下一个 1120 开始
 ]
 
 
