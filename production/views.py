@@ -3263,6 +3263,39 @@ class SummaryOfMillOutput(APIView):
 class SummaryOfWeighingOutput(APIView):
     permission_classes = (IsAuthenticated,)
 
+    def foo(self, equip_no, result, factory_date, users, work_times, user_result):
+        dic = {'equip_no': equip_no, 'hj': 0}
+        plan_model, report_basic = [JZPlan, JZReportBasic] if equip_no in JZ_EQUIP_NO else [Plan, ReportBasic]
+        data = plan_model.objects.using(equip_no).filter(actno__gt=1, date_time__istartswith=factory_date).values('date_time', 'grouptime').annotate(count=Sum('actno'))
+        for item in data:
+            date = item['date_time']
+            day = int(date.split('-')[2])    # 2  早班
+            classes = item['grouptime']  # 早班/ 中班 / 夜班
+            dic[f'{day}{classes}'] = item['count']
+            dic['hj'] += item['count']
+            names = users.get(f'{day}-{classes}-{equip_no}')
+            if names:
+                status = names.pop('status', None)
+                key_dic = {}
+                for name, section_list in names.items():
+                    for section in section_list:
+                        key = f"{name}_{day}_{classes}_{section}"
+                        work_time = work_times.get(f'{day}-{classes}-{equip_no}').get(name + '_' + section)
+                        c_num = report_basic.objects.using(equip_no).filter(starttime__gte=work_time[0], savetime__lte=work_time[1]).aggregate(num=Count('id'))['num']
+                        num = 0 if not c_num else c_num  # 是否需要去除为0的机台再取平均
+                        # 车数计算：当天产量 / 12小时 * 实际工作时间 -> 修改为根据考勤时间计算
+                        if f"{name}_{day}_{classes}" not in key_dic:
+                            key_dic[f"{name}_{day}_{classes}"] = key
+                        else:
+                            key = key_dic[f"{name}_{day}_{classes}"]
+                        if user_result.get(key):
+                            user_result[key][equip_no] = num if not user_result[key].get(equip_no) else (user_result[key][equip_no] + num)
+                        else:
+                            user_result[key] = {equip_no: num}
+                        if status == '调岗':
+                            user_result[key]['status'] = status
+        result.append(dic)
+
     def get(self, request):
         factory_date = self.request.query_params.get('factory_date')
         year = int(factory_date.split('-')[0])
@@ -3270,17 +3303,15 @@ class SummaryOfWeighingOutput(APIView):
         equip_list = Equip.objects.filter(category__equip_type__global_name='称量设备').values_list('equip_no', flat=True)
         result = []
         result1 = {}
-        group_dic = {}
         users = {}
         work_times = {}
         user_result = {}
         days = days_cur_month_dates(date_time=factory_date)
-        group_dic.update({int(d.split('-')[-1]): ['早班', '中班', '夜班'] for d in days})
         # 查询称量分类下当前月上班的所有员工
         user_list = EmployeeAttendanceRecords.objects.filter(
             Q(factory_date__year=year, factory_date__month=month, equip__in=equip_list) &
             Q(end_date__isnull=False, begin_date__isnull=False) & ~Q(is_use='废弃'), ~Q(clock_type='密炼'))\
-            .values('user__username', 'factory_date__day', 'group', 'classes', 'section', 'equip', 'calculate_begin_date', 'calculate_end_date')
+            .values('user__username', 'factory_date__day', 'group', 'classes', 'section', 'equip', 'calculate_begin_date', 'calculate_end_date', 'status')
 
         # 岗位系数
         section_dic = {}
@@ -3304,56 +3335,42 @@ class SummaryOfWeighingOutput(APIView):
             raise ValidationError(f'请在公共变量中添加员工独立上岗系数或员工类别系数')
 
         for item in user_list:
-            classes = group_dic.get(int(item['factory_date__day']))
-            for s_class in classes:
-                if s_class == item['classes']:
-                    key = f"{item['factory_date__day']}-{s_class}-{item['equip']}"
-                    if users.get(key):
-                        work_times[key][item['user__username']] = [item['calculate_begin_date'], item['calculate_end_date']]
-                        users[key][item['user__username']] = item['section']
-                    else:
-                        work_times[key] = {item['user__username']: [item['calculate_begin_date'], item['calculate_end_date']]}
-                        users[key] = {item['user__username']: item['section']}
+            key = f"{item['factory_date__day']}-{item['classes']}-{item['equip']}"
+            if users.get(key):
+                work_times[key][item['user__username'] + '_' + item['section']] = [item['calculate_begin_date'], item['calculate_end_date']]
+                users[key][item['user__username']] = [item['section']] + users[key][item['user__username']]
+            else:
+                work_times[key] = {item['user__username'] + '_' + item['section']: [item['calculate_begin_date'], item['calculate_end_date']]}
+                users[key] = {item['user__username']: [item['section']]}
+                if item['status'] == '调岗':
+                    users[key]['status'] = '调岗'
 
         # 机台产量统计
         price_obj = SetThePrice.objects.first()
         if not price_obj:
             raise ValidationError('请先去添加细料/硫磺单价')
+        pool = ThreadPool(8)
         for equip_no in equip_list:
-            dic = {'equip_no': equip_no, 'hj': 0}
-            plan_model, report_basic = [JZPlan, JZReportBasic] if equip_no in JZ_EQUIP_NO else [Plan, ReportBasic]
-            data = plan_model.objects.using(equip_no).filter(actno__gt=1, date_time__istartswith=factory_date).values('date_time', 'grouptime').annotate(count=Sum('actno'))
-            for item in data:
-                date = item['date_time']
-                day = int(date.split('-')[2])    # 2  早班
-                classes = item['grouptime']  # 早班/ 中班 / 夜班
-                dic[f'{day}{classes}'] = item['count']
-                dic['hj'] += item['count']
-                names = users.get(f'{day}-{classes}-{equip_no}')
-                if names:
-                    for name, section in names.items():
-                        key = f"{name}_{day}_{classes}_{section}"
-                        work_time = work_times.get(f'{day}-{classes}-{equip_no}').get(name)
-                        c_num = report_basic.objects.using(equip_no).filter(starttime__gte=work_time[0], savetime__lte=work_time[1]).aggregate(num=Count('id'))['num']
-                        num = 0 if not c_num else c_num
-                        # 车数计算：当天产量 / 12小时 * 实际工作时间 -> 修改为根据考勤时间计算
-                        if user_result.get(key):
-                            user_result[key][equip_no] = num
-                        else:
-                            user_result[key] = {equip_no: num}
-            result.append(dic)
+            pool.apply_async(self.foo, args=(equip_no, result, factory_date, users, work_times, user_result))
+        pool.close()
+        pool.join()
         for key, value in user_result.items():
             """
             key: test_1_早班_主控
             value: {'F03': 109, 'F02': 100,}
             """
             name, day, classes, section = key.split('_')
+            # trans_flag = user_list.filter(status='调岗', user__username=name, classes=classes, factory_date=(factory_date + '-' + '%02d' % int(day)))
+            trans_flag = value.pop('status', None)
             equip = list(value.keys())[0]
             type = '生产配料'
-            if section_dic[f"{section}_{type}"][1] == 1:  # 最大值
-                equip, count_ = sorted(value.items(), key=lambda kv: (kv[1], kv[0]))[-1]
-            else:  # 平均值
-                equip, count_ = list(value.keys())[0], sum(value.values()) / len(value)
+            if trans_flag:
+                equip, count_ = equip, sum(value.values())
+            else:
+                if section_dic[f"{section}_{type}"][1] == 1:  # 最大值
+                    equip, count_ = sorted(value.items(), key=lambda kv: (kv[1], kv[0]))[-1]
+                else:  # 平均值  是否需要去除为0的机台再取平均
+                    equip, count_ = equip, sum(value.values()) / len(value)
             # 细料/硫磺单价'
             unit_price = price_obj.xl if equip in ['F01', 'F02', 'F03'] else price_obj.lh
             # 员工类别系数
