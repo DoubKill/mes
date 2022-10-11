@@ -3263,7 +3263,7 @@ class SummaryOfMillOutput(APIView):
 class SummaryOfWeighingOutput(APIView):
     permission_classes = (IsAuthenticated,)
 
-    def foo(self, equip_no, result, factory_date, users, work_times, user_result):
+    def concat_user_package(self, equip_no, result, factory_date, users, work_times, user_result):
         dic = {'equip_no': equip_no, 'hj': 0}
         plan_model, report_basic = [JZPlan, JZReportBasic] if equip_no in JZ_EQUIP_NO else [Plan, ReportBasic]
         data = plan_model.objects.using(equip_no).filter(actno__gt=1, date_time__istartswith=factory_date).values('date_time', 'grouptime').annotate(count=Sum('actno'))
@@ -3351,7 +3351,7 @@ class SummaryOfWeighingOutput(APIView):
             raise ValidationError('请先去添加细料/硫磺单价')
         pool = ThreadPool(8)
         for equip_no in equip_list:
-            pool.apply_async(self.foo, args=(equip_no, result, factory_date, users, work_times, user_result))
+            pool.apply_async(self.concat_user_package, args=(equip_no, result, factory_date, users, work_times, user_result))
         pool.close()
         pool.join()
         for key, value in user_result.items():
@@ -3758,14 +3758,14 @@ class SetThePriceViewSet(ModelViewSet):
 class PerformanceSummaryView(APIView):
     permission_classes = (IsAuthenticated,)
 
-    def concat_user_train(self, key, detail, equip_dic, price_dic, dj_list):
+    def concat_user_train(self, key, detail, equip_dic, price_dic, dj_list, date):
         day, group, section, equip, classes = key.split('_')
         begin_date, end_date = detail.pop('calculate_begin_date'), detail.pop('calculate_end_date')
-        equip_kwargs = {'equip_no': equip, 'classes': classes, 'factory_date__day': day}
-        add_qty = ManualInputTrains.objects.filter(**equip_kwargs).values('id', 'actual_trains', 'product_no')
+        equip_kwargs = {'equip_no': equip, 'classes': classes}
+        add_qty = ManualInputTrains.objects.filter(**equip_kwargs, factory_date=f'{date}-' + '%02d' % int(day)).values('id', 'actual_trains', 'product_no')
         if equip == 'Z04':
             equip_kwargs['operation_user'] = 'Mixer1'
-        equip_kwargs.update({'begin_time__gte': begin_date, 'end_time__lte': end_date})
+        equip_kwargs.update({'begin_time__gte': begin_date, 'end_time__lte': end_date, 'factory_date__day': day})
         query_set = TrainsFeedbacks.objects.filter(**equip_kwargs).values('product_no').annotate(actual_trains=Count('id')).values('actual_trains', 'product_no')
         ready_data = list(query_set) + list(add_qty)
         for item in ready_data:
@@ -3866,7 +3866,7 @@ class PerformanceSummaryView(APIView):
         dj_list = ProductInfoDingJi.objects.filter(is_use=True).values_list('product_name', flat=True)
         pool = ThreadPool(8)
         for key, detail in user_dic.items():
-            pool.apply_async(self.concat_user_train, args=(key, detail, equip_dic, price_dic, dj_list))
+            pool.apply_async(self.concat_user_train, args=(key, detail, equip_dic, price_dic, dj_list, date))
         pool.close()
         pool.join()
         results1 = {}
