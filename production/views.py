@@ -4321,7 +4321,7 @@ class AttendanceClockViewSet(ModelViewSet):
             if queryset.class_code == '休' and not apply:  # 进入考勤页面时异常记录日志,补卡时忽略
                 b_date = (datetime.datetime.strptime(date_now, '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
                 last_obj = EmployeeAttendanceRecords.objects.filter(user=self.request.user, factory_date=b_date, end_date__isnull=True,
-                                                                    clock_type=clock_type).last()
+                                                                    clock_type=clock_type).order_by('factory_date').last()
                 if last_obj:
                     queryset = r_queryset.filter(factory_date=b_date).last()
                     date_now = b_date
@@ -4372,7 +4372,7 @@ class AttendanceClockViewSet(ModelViewSet):
             return Response({'results': results})
 
         # 判断最后一条的工厂时间是不是当天，是的话说明是正在进行中的
-        last_obj = EmployeeAttendanceRecords.objects.filter(user=self.request.user, clock_type=attendance_group_obj.type).last()
+        last_obj = EmployeeAttendanceRecords.objects.filter(user=self.request.user, clock_type=attendance_group_obj.type).order_by('factory_date').last()
         if attendance_group_obj.type == '密炼':
             if last_obj:
                 key_second = (last_obj.standard_end_date - last_obj.standard_begin_date).total_seconds()
@@ -4661,7 +4661,7 @@ class AttendanceClockViewSet(ModelViewSet):
         flag, clock_type = get_user_weight_flag(user)
         # 标准上下班时间
         date_now, group, classes = date_now, data['group'], data['classes']
-        last_record = EmployeeAttendanceRecords.objects.filter(user=user, end_date__isnull=True, clock_type=clock_type).last()
+        last_record = EmployeeAttendanceRecords.objects.filter(user=user, end_date__isnull=True, clock_type=clock_type).order_by('factory_date').last()
         if last_record:
             key_second = (last_record.standard_end_date - last_record.standard_begin_date).total_seconds()
             if status == '离岗' and last_record.factory_date != datetime.datetime.strptime(date_now, '%Y-%m-%d').date() and not (last_record.begin_date and (time_now - last_record.begin_date).total_seconds() > key_second + (attendance_group_obj.lead_time + attendance_group_obj.leave_time) * 60):
