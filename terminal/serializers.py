@@ -168,7 +168,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                         scan_material = material_name
                     total_weight = pallet_feedback.actual_weight
                     unit = unit
-                    DepotPallt.objects.filter(pallet_data__lot_no=bra_code).update(outer_time=now_date, pallet_status=2)
+                    # DepotPallt.objects.filter(pallet_data__lot_no=bra_code).update(outer_time=now_date, pallet_status=2)
         elif len(bra_code) > 12 and bra_code[12] in ['H', 'Z']:  # 胶皮补打
             start_time = f'20{bra_code[:2]}-{bra_code[2:4]}-{bra_code[4:6]} {bra_code[6:8]}:{bra_code[8:10]}:{bra_code[10:12]}'
             end_time = str(datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S') + timedelta(seconds=1))
