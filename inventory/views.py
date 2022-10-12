@@ -2367,8 +2367,8 @@ class ProductDetailsView(APIView):
             m_split_data = x['material_no'].strip().split('-')
             stage = m_split_data[1]
             product_no = m_split_data[2]
-            weight = x['weight']
-            qty = x['qty'] / 1000
+            weight = x['weight'] / 1000
+            qty = x['qty']
             quality_level = x['quality_level']
             if stage == 'FM':
                 if quality_level == '一等品':
