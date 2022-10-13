@@ -3218,7 +3218,7 @@ class EquipAutoPlanView(APIView):
                 else:
                     in_orders = order_info.filter(order_detail__in_quantity__gte=F('order_detail__plan_in_quantity'), order_detail__equip_spare__spare_code=spare_code)
                     if in_orders:
-                        order_list = in_orders.order_by('-id').values('id', 'order_id', 'state')[0]
+                        order_list = in_orders.order_by('-id').values('id', 'order_id', 'state')
             else:
                 order_list = EquipWarehouseOrder.objects.filter(status__in=[4, 5], order_detail__delete_flag=False,
                                                                 delete_flag=False,
@@ -3261,7 +3261,7 @@ class EquipAutoPlanView(APIView):
                 default = queryset.first()
                 area = EquipWarehouseArea.objects.filter(
                     Q(warehouse_area__equip_component_type=obj.equip_component_type) | Q(
-                        warehouse_area__isnull=True))
+                        warehouse_area__isnull=True), delete_flag=False)
                 areas = area.values('id', 'area_name')
                 areas = [{'equip_warehouse_area_id': item['id'], 'area_name': item['area_name']} for item in areas]
                 if not area:
@@ -3377,7 +3377,7 @@ class EquipAutoPlanView(APIView):
                 if not all([areas, location]):
                     return Response({"success": False, "message": "未找到该备件相关库区库位信息", "data": None})
                 obj = EquipSpareErp.objects.filter(spare_code=spare_code).first()
-                s_area = EquipWarehouseArea.objects.filter(Q(warehouse_area__equip_component_type=obj.equip_component_type) | Q(warehouse_area__isnull=True))
+                s_area = EquipWarehouseArea.objects.filter(Q(warehouse_area__equip_component_type=obj.equip_component_type) | Q(warehouse_area__isnull=True), delete_flag=False)
                 if not s_area:
                     return Response({"success": False, "message": '该备件没有可存放的库区', "data": None})
                 move_area = [{'equip_warehouse_area_id': item.id, 'area_name': item.area_name} for item in s_area]
