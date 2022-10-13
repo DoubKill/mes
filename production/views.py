@@ -54,7 +54,7 @@ from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, Pla
     FillCardApply, ApplyForExtraWork, EquipMaxValueCache, Equip190EWeight, OuterMaterial, Equip190E, \
     AttendanceClockDetail, AttendanceResultAudit, ManualInputTrains, ActualWorkingDay, EmployeeAttendanceRecordsLog, \
     RubberFrameRepair, ToolManageAccount, ActualWorkingEquip, ActualWorkingDay190E, WeightClassPlan, \
-    WeightClassPlanDetail
+    WeightClassPlanDetail, EquipDownDetails
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, \
@@ -65,7 +65,8 @@ from production.serializers import QualityControlSerializer, OperationLogSeriali
     SetThePriceSerializer, SubsidyInfoSerializer, AttendanceGroupSetupSerializer, EmployeeAttendanceRecordsSerializer, \
     FillCardApplySerializer, ApplyForExtraWorkSerializer, Equip190EWeightSerializer, \
     Equip190ESerializer, EquipStatusBatchSerializer, AttendanceClockDetailSerializer, \
-    EmployeeAttendanceRecordsLogSerializer, WeightClassPlanSerializer, WeightClassPlanUpdateSerializer
+    EmployeeAttendanceRecordsLogSerializer, WeightClassPlanSerializer, WeightClassPlanUpdateSerializer, \
+    EquipDownDetailsImportSerializer
 from rest_framework.generics import ListAPIView, UpdateAPIView, \
     get_object_or_404
 from datetime import timedelta
@@ -6223,3 +6224,158 @@ class WeightClassPlanViewSet(ModelViewSet):
                     create_data = {'weight_class_plan': instance, 'factory_date': content, 'class_code': create_item[k] if create_item[k] else None}
                 WeightClassPlanDetail.objects.create(**create_data)
 
+
+@method_decorator([api_recorder], name='dispatch')
+class ShiftProductionSummaryView(APIView):
+    """班次产量统计"""
+
+    def get(self, request):
+        target_month = self.request.query_params.get('target_month')
+        if not target_month:
+            raise ValidationError('请选择月份！')
+        month_split = target_month.split('-')
+        year = month_split[0]
+        month = month_split[1]
+        schedule_data = WorkSchedulePlan.objects.filter(
+            plan_schedule__work_schedule__work_procedure__global_name='密炼',
+            plan_schedule__day_time__year=year,
+            plan_schedule__day_time__month=month,
+        ).order_by('start_time').values('plan_schedule__day_time',
+                                        'classes__global_name',
+                                        'group__global_name')
+        production_data = TrainsFeedbacks.objects.filter(
+            factory_date__year=year,
+            factory_date__month=month
+        ).values('equip_no', 'factory_date', 'classes').annotate(total_trains=Count('id')).order_by('equip_no', 'factory_date')
+        equip_target_data = MachineTargetYieldSettings.objects.filter(target_month=target_month).values()
+        target_data = {}
+        if equip_target_data:
+            target_data = equip_target_data[0]
+        schedule_dict = {}
+        for i in schedule_data:
+            k = '{}-{}'.format(i['plan_schedule__day_time'].strftime("%m/%d"), i['classes__global_name'][0])
+            schedule_dict[k] = i['group__global_name'][0]
+
+        working_days = ActualWorkingDay.objects.filter(
+            factory_date__year=year, factory_date__month=month).aggregate(days=Sum('num'))['days']
+        working_days = 0 if not working_days else working_days
+        down_days_dict = dict(EquipDownDetails.objects.filter(
+            factory_date__year=year,
+            factory_date__month=month
+        ).values('equip_no').annotate(days=Sum('times')/60/24).values_list('equip_no', 'days'))
+        equip_production_data_dict = {i: {'equip_no': i,
+                                          'total_trains': 0,
+                                          'target_trains': target_data.get(i, 0) * 2,
+                                          'days': working_days - down_days_dict.get(i, 0)} for i in
+                                      list(Equip.objects.filter(
+                                          category__equip_type__global_name="密炼设备"
+                                      ).order_by('equip_no').values_list("equip_no", flat=True))}
+        for d in production_data:
+            equip_no = d['equip_no']
+            k = '{}-{}'.format(d['factory_date'].strftime("%m/%d"), d['classes'][0])
+            key = '{}-{}'.format(k, schedule_dict[k])
+            trains = d['total_trains'] // 2 if equip_no == 'Z04' else d['total_trains']
+            equip_production_data_dict[equip_no][key] = trains
+            equip_production_data_dict[equip_no]['total_trains'] += trains
+        return Response({'table_head': schedule_dict,
+                         'data': equip_production_data_dict.values()})
+
+
+@method_decorator([api_recorder], name='dispatch')
+class EquipDownDetailView(APIView):
+    """机台停机明细"""
+
+    def post(self, request):
+        excel_file = request.FILES.get('file', None)
+        if not excel_file:
+            raise ValidationError('文件不可为空！')
+        cur_sheet = get_cur_sheet(excel_file)
+        if cur_sheet.ncols != 8:
+            raise ValidationError('导入文件数据错误！')
+        data = get_sheet_data(cur_sheet, start_row=1)
+        detail_list = []
+        for item in data:
+            try:
+                delta = datetime.timedelta(days=item[0])
+                date_1 = datetime.datetime.strptime('1899-12-30', '%Y-%m-%d') + delta
+                factory_date = datetime.datetime.strftime(date_1, '%Y-%m-%d')
+            except Exception:
+                raise ValidationError('密炼日期格式错误！')
+            user_data = {
+                "factory_date": factory_date,
+                "classes": item[1],
+                "group": item[2],
+                "equip_no": item[3],
+                "down_reason": item[4],
+                "down_type": item[5],
+                "details": item[6],
+                "times": item[7],
+            }
+            detail_list.append(user_data)
+        s = EquipDownDetailsImportSerializer(data=detail_list, many=True)
+        if not s.is_valid():
+            for i in s.errors:
+                if i:
+                    raise ValidationError(list(i.values())[0])
+        s.save()
+        return Response('ok')
+
+    def get(self, request):
+        target_month = self.request.query_params.get('target_month')
+        if not target_month:
+            raise ValidationError('请选择月份！')
+        month_split = target_month.split('-')
+        year = month_split[0]
+        month = month_split[1]
+        schedule_data = WorkSchedulePlan.objects.filter(
+            plan_schedule__work_schedule__work_procedure__global_name='密炼',
+            plan_schedule__day_time__year=year,
+            plan_schedule__day_time__month=month,
+        ).order_by('start_time').values('plan_schedule__day_time',
+                                        'classes__global_name',
+                                        'group__global_name')
+        schedule_dict = {}
+        for i in schedule_data:
+            k = '{}-{}'.format(i['plan_schedule__day_time'].strftime("%m/%d"), i['classes__global_name'][0])
+            schedule_dict[k] = i['group__global_name'][0]
+        down_data = EquipDownDetails.objects.filter(
+            factory_date__year=year,
+            factory_date__month=month
+        ).values('factory_date', 'classes', 'equip_no').annotate(t=Sum('times')).order_by('equip_no', 'factory_date')
+        production_data = TrainsFeedbacks.objects.filter(
+            factory_date__year=year,
+            factory_date__month=month
+        ).values('equip_no', 'factory_date', 'classes').annotate(total_trains=Count('id'))
+
+        max_pd_data_dict = {}
+        for i in production_data:
+            eqn = i['equip_no']
+            fd = i['factory_date']
+            cs = i['classes']
+            trs = i['total_trains']//2 if eqn == 'Z04' else i['total_trains']
+            key = '{}-{}'.format(fd.strftime("%m/%d"), cs[0])
+            if key not in max_pd_data_dict:
+                max_pd_data_dict[key] = {'equip_no': eqn, 'max_trains': trs}
+            else:
+                if trs > max_pd_data_dict[key]['max_trains']:
+                    max_pd_data_dict[key] = {'equip_no': eqn, 'max_trains': trs}
+
+        down_data_dict = {i: {'equip_no': i} for i in
+                          list(Equip.objects.filter(
+                              category__equip_type__global_name="密炼设备"
+                          ).order_by('equip_no').values_list("equip_no", flat=True))}
+        for d in down_data:
+            equip_no = d['equip_no']
+            factory_date = d['factory_date']
+            classes = d['classes']
+            times = d['t']
+            k = '{}-{}'.format(factory_date.strftime("%m/%d"), classes[0])
+            key = '{}-{}'.format(k, schedule_dict[k])
+            down_data_dict[equip_no][key] = times
+        data = list(down_data_dict.values())
+        max_data = {'equip_no': 'MAX产量机台'}
+        for k, v in max_pd_data_dict.items():
+            max_data['{}-{}'.format(k, schedule_dict[k])] = v['equip_no']
+        data.append(max_data)
+        return Response({'table_head': schedule_dict,
+                         'data': data})

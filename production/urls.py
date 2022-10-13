@@ -164,5 +164,9 @@ urlpatterns = [
     path('rubber-frame-repair—summary/', RubberFrameRepairSummaryView.as_view()),
     # 工装管理台帐
     path('tool-manage-account/', ToolManageAccountView.as_view()),
+    # 班次产量统计
+    path('shift-production-summary/', ShiftProductionSummaryView.as_view()),
+    # 机台停机明细导入及汇总
+    path('equip-down-detail/', EquipDownDetailView.as_view())
 
 ]
