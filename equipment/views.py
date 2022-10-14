@@ -3165,8 +3165,8 @@ class EquipWarehouseStatisticalViewSet(ListModelMixin, GenericViewSet):
                 item['unit'] = item['equip_spare__unit']
                 item['in_qty'] = round(float(item['in_qty']), 1) if item['in_qty'] else 0
                 item['out_qty'] = round(float(item['out_qty']), 1) if item['out_qty'] else 0
-                item['in_money'] = (item['in_qty'] * item['equip_spare__cost']) if item['equip_spare__cost'] and item['in_qty'] else 0
-                item['out_money'] = (item['out_qty'] * item['equip_spare__cost']) if item['equip_spare__cost'] and item['out_qty'] else 0
+                item['in_money'] = round((item['in_qty'] * item['equip_spare__cost']), 1) if item['equip_spare__cost'] and item['in_qty'] else 0
+                item['out_money'] = round((item['out_qty'] * item['equip_spare__cost']), 1) if item['equip_spare__cost'] and item['out_qty'] else 0
             st = (int(page) - 1) * int(page_size)
             et = int(page) * int(page_size)
             if self.request.query_params.get('export'):
