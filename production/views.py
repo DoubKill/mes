@@ -2574,7 +2574,7 @@ class DailyProductionCompletionReport(APIView):
             raise ValidationError('请输入正确的月份!')
         days = calendar.monthrange(year, month)[1]
         exclude_today_flat = False  # 总计是否去掉当日产量
-        if td_flag != 'Y' and month == datetime.datetime.now().month:
+        if td_flag != 'Y' and month == datetime.datetime.now().month and year == datetime.datetime.now().year:
             exclude_today_flat = True
         now_day = datetime.datetime.now().day
         results = {
@@ -6336,3 +6336,75 @@ class EquipDownDetailView(APIView):
         data.append(max_data)
         return Response({'table_head': schedule_dict,
                          'data': data})
+
+
+@method_decorator([api_recorder], name='dispatch')
+class GroupProductionSummary(APIView):
+
+    def get(self, request):
+        target_month = self.request.query_params.get('target_month')
+        if not target_month:
+            raise ValidationError('请选择月份！')
+        month_split = target_month.split('-')
+        year = month_split[0]
+        month = month_split[1]
+        production_data = TrainsFeedbacks.objects.filter(
+            factory_date__year=year,
+            factory_date__month=month
+        ).values('equip_no', 'factory_date', 'classes').annotate(total_trains=Count('id'))
+        if month == datetime.datetime.now().month and year == datetime.datetime.now().year:
+            now_date = get_current_factory_date()['factory_date']
+            schedule_queryset = WorkSchedulePlan.objects.filter(
+                plan_schedule__work_schedule__work_procedure__global_name='密炼',
+                plan_schedule__day_time__year=year,
+                plan_schedule__day_time__month=month,
+                plan_schedule__day_time__lte=now_date,
+            )
+        else:
+            schedule_queryset = WorkSchedulePlan.objects.filter(
+                plan_schedule__work_schedule__work_procedure__global_name='密炼',
+                plan_schedule__day_time__year=year,
+                plan_schedule__day_time__month=month,
+            )
+        group_schedule_data = schedule_queryset.values('group__global_name').annotate(cnt=Count('id'))
+        date_classes_dict = {'{}-{}'.format(i.plan_schedule.day_time.strftime("%m-%d"), i.classes.global_name): i.group.global_name for i in schedule_queryset}
+        down_data = EquipDownDetails.objects.filter(
+            factory_date__year=year,
+            factory_date__month=month
+        ).values('group', 'equip_no').annotate(s=Sum('times'))
+        equip_target_data = MachineTargetYieldSettings.objects.filter(target_month=target_month).values()
+        target_data = {}
+        if equip_target_data:
+            target_data = equip_target_data[0]
+        group_data_dict = {i: {'equip_no': i, 'target_trains': target_data.get(i, 0)} for i in
+                           list(Equip.objects.filter(
+                               category__equip_type__global_name="密炼设备"
+                           ).order_by('equip_no').values_list("equip_no", flat=True))}
+
+        for p in production_data:
+            equip_no = p['equip_no']
+            trains = p['total_trains'] if equip_no != 'Z04' else p['total_trains']//2
+            gp = date_classes_dict.get('{}-{}'.format(p['factory_date'].strftime("%m-%d"), p['classes']))
+            if not gp:
+                continue
+            gp_key = 'trains_{}'.format(gp)
+            if gp_key not in group_data_dict[equip_no]:
+                group_data_dict[equip_no][gp_key] = trains
+            else:
+                group_data_dict[equip_no][gp_key] += trains
+
+        for s in group_schedule_data:
+            s_key = 'days_{}'.format(s['group__global_name'])
+            for equip_no in group_data_dict.keys():
+                group_data_dict[equip_no][s_key] = s['cnt']
+
+        for d in down_data:
+            equip_no = d['equip_no']
+            gp = d['group']
+            times = d['s']
+            d_key = 'down_{}'.format(gp)
+            if d_key not in group_data_dict[equip_no]:
+                group_data_dict[equip_no][d_key] = times
+            else:
+                group_data_dict[equip_no][d_key] += times
+        return Response(group_data_dict.values())

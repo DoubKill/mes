@@ -167,6 +167,6 @@ urlpatterns = [
     # 班次产量统计
     path('shift-production-summary/', ShiftProductionSummaryView.as_view()),
     # 机台停机明细导入及汇总
-    path('equip-down-detail/', EquipDownDetailView.as_view())
-
+    path('equip-down-detail/', EquipDownDetailView.as_view()),
+    path('group-production-summary/', GroupProductionSummary.as_view())
 ]

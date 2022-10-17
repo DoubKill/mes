@@ -537,9 +537,9 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         elif store_name in ("原材料库", '炭黑库'):
             database = 'wms' if store_name == '原材料库' else 'cb'
             if order_type == "出库":
-                queryset = MaterialOutHistory.objects.using(database)
+                queryset = MaterialOutHistory.objects.using(database).order_by('id')
             else:
-                queryset = MaterialInHistory.objects.using(database)
+                queryset = MaterialInHistory.objects.using(database).order_by('id')
             if start_time:
                 filter_dict.update(task__start_time__gte=start_time)
             if end_time:
