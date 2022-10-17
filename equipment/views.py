@@ -5442,7 +5442,7 @@ class DailyCleanTableViewSet(ModelViewSet):
                 point_standard = CheckPointStandard.objects.filter(delete_flag=False, equip_no__icontains=equip_no,
                                                                    standard_type='日清扫', station=station).last()
                 if point_standard:
-                    res = list(point_standard.check_details.all().values('sn', 'check_content', 'check_style'))
+                    res = list(point_standard.check_details.filter(delete_flag=False).order_by('sn').values('sn', 'check_content', 'check_style'))
                     check_point_standard = point_standard.id
                     point_standard_code = point_standard.point_standard_code
                     point_standard_name = point_standard.point_standard_name
@@ -5638,7 +5638,7 @@ class CheckPointTableViewSet(ModelViewSet):
                 point_standard = CheckPointStandard.objects.filter(delete_flag=False, equip_no__icontains=equip_no,
                                                                    standard_type='点检', station=station).last()
                 if point_standard:
-                    res = list(point_standard.check_details.all().values('sn', 'check_content', 'check_style'))
+                    res = list(point_standard.check_details.filter(delete_flag=False).order_by('sn').values('sn', 'check_content', 'check_style'))
                     check_point_standard = point_standard.id
                     point_standard_code = point_standard.point_standard_code
                     point_standard_name = point_standard.point_standard_name
