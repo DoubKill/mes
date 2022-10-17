@@ -1,6 +1,6 @@
 import django_filters
 
-from recipe.models import Material, ProductInfo, ProductBatching, MaterialAttribute, ZCMaterial
+from recipe.models import Material, ProductInfo, ProductBatching, MaterialAttribute, ZCMaterial, RecipeChangeHistory
 
 
 class MaterialFilter(django_filters.rest_framework.FilterSet):
@@ -73,3 +73,13 @@ class ERPMaterialFilter(django_filters.rest_framework.FilterSet):
         model = Material
         fields = ('material_type_id', 'use_flag', 'material_no',
                   'material_name', 'material_type_name', 'for_short')
+
+
+class RecipeChangeHistoryFilter(django_filters.rest_framework.FilterSet):
+    st = django_filters.DateFilter(field_name='updated_time__date', lookup_expr='gte')
+    et = django_filters.DateFilter(field_name='updated_time__date', lookup_expr='lte')
+    recipe_no = django_filters.CharFilter(field_name='recipe_no', lookup_expr='icontains', help_text='胶料编码')
+
+    class Meta:
+        model = RecipeChangeHistory
+        fields = ('recipe_no', 'dev_type', 'st', 'et', 'used_type')
