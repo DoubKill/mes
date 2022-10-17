@@ -6,7 +6,7 @@ from recipe.views import MaterialViewSet, ProductInfoViewSet, \
     ValidateProductVersionsView, RecipeNoticeAPiView, MaterialSupplierViewSet, \
     WeighCntTypeViewSet, ProductBatchingDetailListView, ERPMaterialViewSet, ZCMaterialListView, GetERPZcMaterialAPiView, \
     ProductDevBatchingReceive, DevTypeProductBatching, ReplaceRecipeMaterialViewSet, ProductBatchingNoNew, \
-    WFProductBatchingViewSet, ProductRatioView
+    WFProductBatchingViewSet, ProductRatioView, RecipeChangeHistoryViewSet
 
 router = DefaultRouter()
 
@@ -37,6 +37,9 @@ router.register(r'replace-recipe-material', ReplaceRecipeMaterialViewSet)
 # router.register(r'weigh-batching', WeighBatchingViewSet)
 router.register(r'weigh-cnt-type', WeighCntTypeViewSet)
 router.register(r'product-batching-detail', ProductBatchingDetailListView)
+
+# mes配方变动履历
+router.register(r'recipe-change-history', RecipeChangeHistoryViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),

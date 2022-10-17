@@ -18,6 +18,7 @@ from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
 from datetime import date, timedelta, datetime
 
+from basics.models import GlobalCode
 from mes.conf import BZ_HOST, BZ_USR, BZ_PASSWORD
 from system.models import User, Permissions, ChildSystemInfo
 from rest_framework import status as rf_status
@@ -434,3 +435,16 @@ def zdy_jwt_payload_handler(user):
         payload['iss'] = api_settings.JWT_ISSUER
 
     return payload
+
+
+def get_virtual_time():
+    """获取考勤测试时间"""
+    now_time = datetime.now()
+    instance = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='虚拟考勤时间').last()
+    if instance:
+        try:
+            now_time = datetime.strptime(instance.global_name, '%Y-%m-%d %H:%M:%S')
+        except:
+            pass
+    return now_time
+
