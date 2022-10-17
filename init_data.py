@@ -1130,9 +1130,18 @@ permission_data = [
     {'id': 1116, 'code': 'export_daily_clean_table', 'name': '导出', 'parent_id': 1110},
 
     {'id': 1120, 'code': 'recipe_change_history', 'name': 'MES配方变更履历', 'parent_id': None, 'category_name': '工艺管理'},
-    {'id': 1121, 'code': 'view_recipe_change_history', 'name': '查看', 'parent_id': 1120}
+    {'id': 1121, 'code': 'view_recipe_change_history', 'name': '查看', 'parent_id': 1120},
 
-    # 下一个 1122 开始
+    {'id': 1122, 'code': 'shift_production_summary', 'name': '各班产量统计', 'parent_id': None, 'category_name': '生产管理'},
+    {'id': 1123, 'code': 'view_shift_production_summary', 'name': '查看', 'parent_id': 1122},
+
+    {'id': 1124, 'code': 'equip_down_detail', 'name': '计划停机时间', 'parent_id': None, 'category_name': '生产管理'},
+    {'id': 1125, 'code': 'view_equip_down_detail', 'name': '查看', 'parent_id': 1124},
+
+    {'id': 1126, 'code': 'group_production_summary', 'name': '班组产量明细汇总', 'parent_id': None, 'category_name': '生产管理'},
+    {'id': 1127, 'code': 'view_group_production_summary', 'name': '查看', 'parent_id': 1126},
+
+    # 下一个 1128 开始
 ]
 
 
