@@ -1129,7 +1129,10 @@ permission_data = [
     {'id': 1115, 'code': 'delete_daily_clean_table', 'name': '删除', 'parent_id': 1110},
     {'id': 1116, 'code': 'export_daily_clean_table', 'name': '导出', 'parent_id': 1110},
 
-    # 下一个 1120 开始
+    {'id': 1120, 'code': 'recipe_change_history', 'name': 'MES配方变更履历', 'parent_id': None, 'category_name': '工艺管理'},
+    {'id': 1121, 'code': 'view_recipe_change_history', 'name': '查看', 'parent_id': 1120}
+
+    # 下一个 1122 开始
 ]
 
 
