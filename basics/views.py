@@ -92,8 +92,7 @@ class GlobalCodeViewSet(CommonDeleteMixin, ModelViewSet):
                     name = self.request.query_params.get('name')
                     queryset = WeightClassPlanDetail.objects.filter(factory_date=factory_date,
                                                                     weight_class_plan__user__username=name,
-                                                                    weight_class_plan__delete_flag=False,
-                                                                    weight_class_plan__classes__icontains=clock_type[:2]).last()
+                                                                    weight_class_plan__delete_flag=False).last()
                     work_day = []
                     if queryset and queryset.class_code != '休':
                         u_group = queryset.weight_class_plan.classes.split('/')[0] if queryset.weight_class_plan.classes.split('/') else None
