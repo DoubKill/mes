@@ -1744,7 +1744,7 @@ class CheckPointStandardSerializer(BaseModelSerializer):
             if set(equip_no.split(',')) & already_equip_no:
                 raise serializers.ValidationError('同岗位机台不可重叠')
         # 生成点检标准编号
-        keyword = 'GWAQDJ' if standard_type == '点检' else 'GWRQS'
+        keyword = 'GWAQDJ' if standard_type == '点检' else '5SRQS'
         max_code = CheckPointStandard.objects.filter(standard_type=standard_type).aggregate(max_code=Max('point_standard_code'))['max_code']
         point_standard_code = keyword + ('0001' if not max_code else '%04d' % (int(max_code[-4:]) + 1))
         validated_data['point_standard_code'] = point_standard_code
