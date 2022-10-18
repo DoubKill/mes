@@ -394,7 +394,9 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
                     'updated_time': datetime.now(),
                     'updated_username': self.context['request'].user.username
                 }
-                change_history = RecipeChangeHistory.objects.create(**change_data)
+                change_history, flag = RecipeChangeHistory.objects.get_or_create(defaults=change_data,
+                                                                                 **{'recipe_no': instance.stage_product_batch_no,
+                                                                                    'dev_type': instance.dev_type.category_name})
                 desc = []
                 change_detail_data = {1: [], 2: [], 3: []}  # {1: [{'type': 1, 'material_no': "aaa", 'flag': 'add', 'pv': '12', 'cv': '13'}], 2: "", 3: ""}
                 # 比对配料、称量误差、比对投料方式
@@ -411,7 +413,7 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
                             change_detail_data[3].append({'type': i['type'], 'key': material_name, 'flag': '新增', 'cv': _cv})
                 if weight_cnt_types:
                     desc.append('新增配料')
-                    _weighting_details = weight_cnt_types[0].get('weight_details')
+                    _weighting_details = weight_cnt_types[0].get('weight_details', [])
                     for i in _weighting_details:
                         material_name = i['material'].material_name
                         change_detail_data[1].append({'type': 4, 'key': material_name, 'flag': '新增', 'cv': float(i['standard_weight'])})
@@ -421,12 +423,17 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
                             for _equip_no, _feed in i.get('master').items():
                                 _cv = f"{_feed}({_equip_no}) "
                             change_detail_data[3].append({'type': 4, 'key': material_name, 'flag': '新增', 'cv': _cv})
+                if not flag:
+                    desc = ['新增配方']
                 RecipeChangeDetail.objects.create(
                     change_history=change_history,
                     desc='/'.join(set(desc)),
                     details=json.dumps(change_detail_data, ensure_ascii=False),
                     changed_username=self.context['request'].user.username
                 )
+                if not flag:  # 查到记录
+                    change_history.used_type = 1
+                    change_history.save()
         except Exception as e:
             error_logger.error(f'记录配方履历失败: {e.args[0]}')
         return instance
@@ -957,13 +964,14 @@ class ProductBatchingPartialUpdateSerializer(BaseModelSerializer):
             record.update(used_type=instance.used_type)
             if all([record, opera_type]):
                 s_record = RecipeChangeDetail.objects.filter(change_history=record.last()).order_by('id').last()
-                if opera_type == '提交':
-                    s_record.submit_time = instance.submit_time
-                    s_record.submit_username = instance.submit_user.username
-                else:
-                    s_record.confirm_time = instance.check_time
-                    s_record.confirm_username = instance.check_user.username
-                s_record.save()
+                if s_record:
+                    if opera_type == '提交':
+                        s_record.submit_time = instance.submit_time
+                        s_record.submit_username = instance.submit_user.username
+                    else:
+                        s_record.confirm_time = instance.check_time
+                        s_record.confirm_username = instance.check_user.username
+                    s_record.save()
         except Exception as e:
             error_logger.error(f'记录修改配方状态失败:{e.args[0]}')
         instance.last_updated_user = self.context['request'].user

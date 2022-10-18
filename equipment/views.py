@@ -3254,8 +3254,9 @@ class EquipAutoPlanView(APIView):
                 return Response({"success": False, "message": '条码扫描有误', "data": None})
             obj = order.equip_spare
             if order.status in [1, 2, 3]:  # 入库单据
-                # quantity = order.plan_in_quantity - order.in_quantity
-                quantity = 1.0
+                quantity = order.plan_in_quantity - order.in_quantity
+                if quantity <= 0:
+                    quantity = 1.0
                 queryset = EquipWarehouseInventory.objects.filter(equip_spare=obj, quantity__gt=0)
                 default = queryset.first()
                 area = EquipWarehouseArea.objects.filter(
