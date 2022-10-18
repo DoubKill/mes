@@ -6188,6 +6188,7 @@ class ShiftProductionSummaryView(APIView):
 
     def get(self, request):
         target_month = self.request.query_params.get('target_month')
+        group_name = self.request.query_params.get('group_name')
         if not target_month:
             raise ValidationError('请选择月份！')
         month_split = target_month.split('-')
@@ -6220,10 +6221,33 @@ class ShiftProductionSummaryView(APIView):
             factory_date__year=year,
             factory_date__month=month
         ).values('equip_no').annotate(days=Sum('times')/60/24).values_list('equip_no', 'days'))
+        if month == datetime.datetime.now().month and year == datetime.datetime.now().year:
+            now_date = get_current_factory_date()['factory_date']
+            group_schedule_days = WorkSchedulePlan.objects.filter(
+                plan_schedule__work_schedule__work_procedure__global_name='密炼',
+                plan_schedule__day_time__year=year,
+                plan_schedule__day_time__month=month,
+                plan_schedule__day_time__lte=now_date,
+                group__global_name=group_name
+            ).count()
+        else:
+            group_schedule_days = WorkSchedulePlan.objects.filter(
+                plan_schedule__work_schedule__work_procedure__global_name='密炼',
+                plan_schedule__day_time__year=year,
+                plan_schedule__day_time__month=month,
+                group__global_name=group_name
+            ).count()
+        group_down_days_dict = dict(EquipDownDetails.objects.filter(
+            factory_date__year=year,
+            factory_date__month=month,
+            group=group_name
+        ).values('equip_no').annotate(days=Sum('times') / 60 / 24).values_list('equip_no', 'days'))
         equip_production_data_dict = {i: {'equip_no': i,
                                           'total_trains': 0,
                                           'target_trains': target_data.get(i, 0),
-                                          'days': working_days - down_days_dict.get(i, 0)} for i in
+                                          'days': working_days - down_days_dict.get(i, 0),
+                                          'group_days': group_schedule_days - group_down_days_dict.get(i, 0),
+                                          } for i in
                                       list(Equip.objects.filter(
                                           category__equip_type__global_name="密炼设备"
                                       ).order_by('equip_no').values_list("equip_no", flat=True))}
