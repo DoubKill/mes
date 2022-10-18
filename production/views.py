@@ -6222,7 +6222,7 @@ class ShiftProductionSummaryView(APIView):
         ).values('equip_no').annotate(days=Sum('times')/60/24).values_list('equip_no', 'days'))
         equip_production_data_dict = {i: {'equip_no': i,
                                           'total_trains': 0,
-                                          'target_trains': target_data.get(i, 0) * 2,
+                                          'target_trains': target_data.get(i, 0),
                                           'days': working_days - down_days_dict.get(i, 0)} for i in
                                       list(Equip.objects.filter(
                                           category__equip_type__global_name="密炼设备"
