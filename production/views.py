@@ -6193,8 +6193,8 @@ class ShiftProductionSummaryView(APIView):
         if not target_month:
             raise ValidationError('请选择月份！')
         month_split = target_month.split('-')
-        year = month_split[0]
-        month = month_split[1]
+        year = int(month_split[0])
+        month = int(month_split[1])
         schedule_data = WorkSchedulePlan.objects.filter(
             plan_schedule__work_schedule__work_procedure__global_name='密炼',
             plan_schedule__day_time__year=year,
