@@ -15,11 +15,12 @@ from django.db import connection
 from django.http import HttpResponse, FileResponse
 from django_pandas.io import read_frame
 import pandas as pd
+from openpyxl import load_workbook
 from multiprocessing.dummy import Pool as ThreadPool
 
 from equipment.utils import gen_template_response
 from django.db.models.functions import TruncMonth
-from django.db.models import Max, Sum, Count, Min, F, Q, DecimalField
+from django.db.models import Max, Sum, Count, Min, F, Q, DecimalField, Avg
 from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
@@ -41,7 +42,7 @@ from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
 from mes.permissions import PermissionClass
 from plan.filters import ProductClassesPlanFilter
-from plan.models import ProductClassesPlan, SchedulingEquipShutDownPlan, SchedulingResult
+from plan.models import ProductClassesPlan, SchedulingEquipShutDownPlan, SchedulingResult, SchedulingRecipeMachineSetting
 from basics.models import Equip
 from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, QualityControlFilter, EquipStatusFilter, \
     PlanStatusFilter, ExpendMaterialFilter, UnReachedCapacityCause, \
@@ -6432,3 +6433,101 @@ class GroupProductionSummary(APIView):
             else:
                 group_data_dict[equip_no][d_key] += times
         return Response(group_data_dict.values())
+
+
+@method_decorator([api_recorder], name='dispatch')
+class TimeEnergyConsuming(APIView):
+
+    def get(self, request):
+        st = self.request.query_params.get('st', '2022-09-01')
+        et = self.request.query_params.get('et', '2022-09-15')
+        if not all([st, et]):
+            raise ValidationError('请选择开始结束时间！')
+        production_data = TrainsFeedbacks.objects.filter(
+            factory_date__gte=st,
+            factory_date__lte=et
+        ).values('product_no', 'equip_no').annotate(cnt=Count('id'),
+                                                    plan_weight=Max('plan_weight'),
+                                                    actual_weight=Max('actual_weight')/100,
+                                                    evacuation_energy=Avg('evacuation_energy'),
+                                                    consum_time=Max('consum_time')).order_by('cnt', 'product_no')
+        recipe_machine_data = SchedulingRecipeMachineSetting.objects.order_by('rubber_type', 'product_no', 'version')
+        item_dict = {}
+        for item in production_data:
+            try:
+                pb_split = item['product_no'].split('-')
+                stage, product_no, version = pb_split[1], pb_split[2], pb_split[3]
+                recipe_no = '{}-{}'.format(product_no, version)
+            except Exception:
+                continue
+            if item['equip_no'] == 'Z04':
+                evacuation_energy = item['evacuation_energy'] * 2
+            else:
+                evacuation_energy = item['evacuation_energy']
+            if recipe_no not in item_dict:
+                item_dict[recipe_no] = {stage: {'plan_weight': item['plan_weight'],
+                                                'actual_weight': item['actual_weight'],
+                                                'evacuation_energy': evacuation_energy,
+                                                'consum_time': item['consum_time'],
+                                                'equip_no': item['equip_no'],
+                                                }}
+            else:
+                item_dict[recipe_no][stage] = {'plan_weight': item['plan_weight'],
+                                                'actual_weight': item['actual_weight'],
+                                                'evacuation_energy': evacuation_energy,
+                                                'consum_time': item['consum_time'],
+                                                'equip_no': item['equip_no']}
+        wb = load_workbook('xlsx_template/energy_consume.xlsx')
+        ws = wb.worksheets[0]
+        sheet = wb.copy_worksheet(ws)
+        sheet.title = '吨耗时(吨耗能)'
+        data_row = 4
+        stage_idx = {'CMB': {7: 'equip_no', 8: 'plan_weight', 9: 'actual_weight', 10: 'evacuation_energy', 11: 'consum_time'},
+                     'HMB': {14: 'equip_no', 15: 'plan_weight', 16: 'actual_weight', 17: 'evacuation_energy', 18: 'consum_time'},
+                     '1MB': {21: 'equip_no', 22: 'plan_weight', 23: 'actual_weight', 24: 'evacuation_energy', 25: 'consum_time'},
+                     '2MB': {28: 'equip_no', 29: 'plan_weight', 30: 'actual_weight', 31: 'evacuation_energy', 32: 'consum_time'},
+                     '3MB': {35: 'equip_no', 36: 'plan_weight', 37: 'actual_weight', 38: 'evacuation_energy', 39: 'consum_time'},
+                     'RMB': {42: 'equip_no', 43: 'plan_weight', 44: 'actual_weight', 45: 'evacuation_energy', 46: 'consum_time'},
+                     'FM': {49: 'equip_no', 50: 'plan_weight', 51: 'actual_weight', 52: 'evacuation_energy', 53: 'consum_time'},
+                     }
+        for m in recipe_machine_data:
+            recipe_no = '{}-{}'.format(m.product_no, m.version)
+            if recipe_no not in item_dict:
+                continue
+            stages = m.stages.split('/')
+            sheet.cell(data_row, 1).value = m.rubber_type
+            sheet.cell(data_row, 4).value = m.product_no
+            sheet.cell(data_row, 5).value = m.version
+            sheet.cell(data_row, 6).value = len(stages)
+            for k, v in item_dict[recipe_no].items():
+                for idx, field_name in stage_idx.get(k, {}).items():
+                    equip_no = v['equip_no']
+                    actual_weight = v['plan_weight']
+                    if field_name == 'evacuation_energy':
+                        if equip_no == 'Z01':
+                            evacuation_energy = int(v['evacuation_energy'] / 10)
+                        elif equip_no == 'Z02':
+                            evacuation_energy = int(v['evacuation_energy'] / 0.6)
+                        elif equip_no == 'Z04':
+                            evacuation_energy = int(v['evacuation_energy'] * 0.28 * float(actual_weight) / 1000)
+                        elif equip_no == 'Z12':
+                            evacuation_energy = int(v['evacuation_energy'] / 5.3)
+                        elif equip_no == 'Z13':
+                            evacuation_energy = int(v['evacuation_energy'] / 31.7)
+                        else:
+                            evacuation_energy = int(v['evacuation_energy'])
+                        sheet.cell(data_row, idx).value = evacuation_energy
+                    else:
+                        sheet.cell(data_row, idx).value = v[field_name]
+            data_row += 1
+        wb.remove_sheet(ws)
+        output = BytesIO()
+        wb.save(output)
+        # 重新定位到开始
+        output.seek(0)
+        response = HttpResponse(content_type='application/vnd.ms-excel')
+        filename = '吨耗时吨耗能'
+        response['Content-Disposition'] = u'attachment;filename= ' + filename.encode('gbk').decode(
+            'ISO-8859-1') + '.xls'
+        response.write(output.getvalue())
+        return response
