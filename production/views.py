@@ -3758,44 +3758,57 @@ class SetThePriceViewSet(ModelViewSet):
 @method_decorator([api_recorder], name="dispatch")
 class PerformanceSummaryView(APIView):
     permission_classes = (IsAuthenticated,)
+    qty_data = {}
 
     def concat_user_train(self, key, detail, equip_dic, price_dic, dj_list, date):
         day, group, section, equip, classes = key.split('_')
         begin_date, end_date = detail.pop('calculate_begin_date'), detail.pop('calculate_end_date')
-        equip_kwargs = {'equip_no': equip, 'classes': classes}
-        add_qty = ManualInputTrains.objects.filter(**equip_kwargs, factory_date=f'{date}-' + '%02d' % int(day)).values('id', 'actual_trains', 'product_no')
-        if equip == 'Z04':
-            equip_kwargs['operation_user'] = 'Mixer1'
-        equip_kwargs.update({'begin_time__gte': begin_date, 'end_time__lte': end_date, 'factory_date__day': day})
-        query_set = TrainsFeedbacks.objects.filter(**equip_kwargs).values('product_no').annotate(actual_trains=Count('id')).values('actual_trains', 'product_no')
-        ready_data = list(query_set) + list(add_qty)
-        for item in ready_data:
-            m_id, equip_type = item.get('id'), equip_dic.get(equip)
-            try:
-                state = item['product_no'].split('-')[1]
-                if state in ['XCJ', 'DJXCJ']:
-                    if item['product_no'].split('-')[0] == 'FM':
-                        state = 'RFM'
-                    elif item['product_no'].split('-')[0] == 'WL':
-                        state = 'RMB'
+        k = f"{equip}-{classes}-{begin_date.strftime('%Y-%m-%d %H:%M:%S')}-{end_date.strftime('%Y-%m-%d %H:%M:%S')}"
+        _data = self.qty_data.get(k)
+        if _data:
+            detail.update(_data)
+        else:
+            equip_kwargs = {'equip_no': equip, 'classes': classes}
+            add_qty = ManualInputTrains.objects.filter(**equip_kwargs, factory_date=f'{date}-' + '%02d' % int(day)).values('id', 'actual_trains', 'product_no')
+            if equip == 'Z04':
+                equip_kwargs['operation_user'] = 'Mixer1'
+            equip_kwargs.update({'begin_time__gte': begin_date, 'end_time__lte': end_date, 'factory_date__day': day})
+            query_set = TrainsFeedbacks.objects.filter(**equip_kwargs).values('product_no').annotate(actual_trains=Count('id')).values('actual_trains', 'product_no')
+            ready_data = list(query_set) + list(add_qty)
+            for item in ready_data:
+                m_id, equip_type = item.get('id'), equip_dic.get(equip)
+                try:
+                    state = item['product_no'].split('-')[1]
+                    if state in ['XCJ', 'DJXCJ']:
+                        if item['product_no'].split('-')[0] == 'FM':
+                            state = 'RFM'
+                        elif item['product_no'].split('-')[0] == 'WL':
+                            state = 'RMB'
+                        else:
+                            continue
+                except:
+                    continue
+                if not price_dic.get(f"{equip_type}_{state}"):
+                    PerformanceUnitPrice.objects.create(state=state, equip_type=equip_type, dj=1.2, pt=1.1)
+                    price_dic[f"{equip_type}_{state}"] = {'pt': 1.2, 'dj': 1.1}
+                # 判断是否是丁基胶
+                frame_type = 'dj' if item['product_no'] in dj_list else 'pt'
+                # 根据工作时长求机台的产量
+                work_time = detail['actual_time']
+                if '叉车' in section:
+                    unit = price_dic.get(f"fz_{state}").get(frame_type)
+                else:
+                    unit = price_dic.get(f"{equip_type}_{state}").get(frame_type)
+                now_qty = (item['actual_trains'] / 12 * work_time) if m_id else item['actual_trains']
+                if self.qty_data.get(k):
+                    if self.qty_data[k].get(f"{state}_{frame_type}_qty"):
+                        self.qty_data[k][f"{state}_{frame_type}_qty"] = round(self.qty_data[k][f"{state}_{frame_type}_qty"] + now_qty, 2)
                     else:
-                        continue
-            except:
-                continue
-            if not price_dic.get(f"{equip_type}_{state}"):
-                PerformanceUnitPrice.objects.create(state=state, equip_type=equip_type, dj=1.2, pt=1.1)
-                price_dic[f"{equip_type}_{state}"] = {'pt': 1.2, 'dj': 1.1}
-            # 判断是否是丁基胶
-            frame_type = 'dj' if item['product_no'] in dj_list else 'pt'
-            # 根据工作时长求机台的产量
-            work_time = detail['actual_time']
-            if '叉车' in section:
-                unit = price_dic.get(f"fz_{state}").get(frame_type)
-            else:
-                unit = price_dic.get(f"{equip_type}_{state}").get(frame_type)
-            now_qty = (item['actual_trains'] / 12 * work_time) if m_id else item['actual_trains']
-            detail[f"{state}_{frame_type}_qty"] = round(detail.get(f"{state}_{frame_type}_qty", 0) + now_qty, 2)
-            detail[f"{state}_{frame_type}_unit"] = unit
+                        self.qty_data[k].update({f"{state}_{frame_type}_qty": round(now_qty, 2), f"{state}_{frame_type}_unit": unit})
+                else:
+                    self.qty_data[k] = {f"{state}_{frame_type}_qty": round(now_qty, 2), f"{state}_{frame_type}_unit": unit}
+            if self.qty_data.get(k):
+                detail.update(self.qty_data[k])
 
     def get(self, request):
         date = self.request.query_params.get('date')
