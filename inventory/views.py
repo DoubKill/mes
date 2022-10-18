@@ -1,3 +1,4 @@
+import copy
 import datetime
 import decimal
 import json
@@ -9,6 +10,7 @@ import time
 from io import BytesIO
 from operator import itemgetter
 
+import pandas as pd
 import requests
 import xlwt
 from django.core.paginator import Paginator
@@ -67,7 +69,7 @@ from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
 from mes import settings
 from mes.common_code import SqlClient, response
-from mes.conf import WMS_CONF, TH_CONF, WMS_URL, TH_URL, HF_CONF
+from mes.conf import WMS_CONF, TH_CONF, WMS_URL, TH_URL, HF_CONF, JZ_EQUIP_NO
 from mes.derorators import api_recorder
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions
@@ -83,7 +85,7 @@ from quality.models import LabelPrint, MaterialDealResult, LabelPrintLog, Examin
 from quality.serializers import MaterialDealResultListSerializer
 from quality.utils import update_wms_quality_result
 from recipe.models import MaterialAttribute
-from terminal.models import LoadMaterialLog, WeightBatchingLog, WeightPackageLog
+from terminal.models import LoadMaterialLog, WeightBatchingLog, WeightPackageLog, BarCodeTraceDetail, ReportWeight, JZReportWeight
 from terminal.utils import get_real_ip
 from .conf import IS_BZ_USING
 from .conf import wms_ip, wms_port, cb_ip, cb_port
@@ -1729,6 +1731,332 @@ class ProductTraceView(APIView):
         else:
             rep["dispatch_log"] = []
         return Response(rep)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class BarcodeTraceView(APIView):
+
+    # permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        data = self.request.query_params
+        trace_flag, bra_code, trace_material, st, et = data.get('trace_flag'), data.get('bra_code'), data.get('trace_material'), data.get('st'), data.get('et')
+        filter_kwargs, results = {}, []
+        if trace_flag == '0':  # 原材料到胶料
+            supplier, batch_no, se, ee = data.get('supplier'), data.get('batch_no'), data.get('se'), data.get('ee')
+            if bra_code:
+                filter_kwargs['bra_code__icontains'] = bra_code
+            if trace_material:
+                filter_kwargs['scan_material_record__icontains'] = trace_material
+            if supplier:
+                filter_kwargs['supplier__icontains'] = supplier
+            if batch_no:
+                filter_kwargs['batch_no__icontains'] = batch_no
+            if st:
+                filter_kwargs['product_time__gte'] = st
+            if et:
+                filter_kwargs['product_time__lte'] = et
+            if se:
+                filter_kwargs['erp_in_time__gte'] = se
+            if ee:
+                filter_kwargs['erp_in_time__lte'] = ee
+            records = BarCodeTraceDetail.objects.filter(**filter_kwargs, display=True).order_by('scan_material_record').values()
+            for i in records:
+                product_time = None if not i['product_time'] else i['product_time'].strftime('%Y-%m-%d %H:%M:%S')
+                erp_in_time = None if not i['erp_in_time'] else i['erp_in_time'].strftime('%Y-%m-%d %H:%M:%S')
+                begin_time = None if not i['begin_time'] else i['begin_time'].strftime('%Y-%m-%d %H:%M:%S')
+                end_time = None if not i['end_time'] else i['end_time'].strftime('%Y-%m-%d %H:%M:%S')
+                arrange_rubber_time = None if not i['arrange_rubber_time'] else i['arrange_rubber_time'].strftime('%Y-%m-%d %H:%M:%S')
+                i.update({'product_time': product_time, 'erp_in_time': erp_in_time, 'begin_time': begin_time, 'end_time': end_time,
+                          'arrange_rubber_time': arrange_rubber_time})
+                results.append(i)
+        elif trace_flag == '1':  # 胶料到原材料
+            classes, equip_no, sc, ec = data.get('classes'), data.get('equip_no'), data.get('sc'), data.get('ec')
+            if bra_code:
+                p_infos = PalletFeedbacks.objects.filter(lot_no__icontains=bra_code).values('plan_classes_uid', 'begin_trains', 'end_trains')
+                id_list = []
+                for i in p_infos:
+                    s_ids = TrainsFeedbacks.objects.filter(~Q(operation_user='Mixer2'), plan_classes_uid=i['plan_classes_uid'], actual_trains__gte=i['begin_trains'], actual_trains__lte=i['end_trains']).values_list('id', flat=True)
+                    id_list.extend(list(s_ids))
+                filter_kwargs['id__in'] = set(id_list)
+            else:
+                if trace_material:
+                    filter_kwargs['product_no__icontains'] = trace_material
+                if st:
+                    filter_kwargs['factory_date__gte'] = st
+                if et:
+                    filter_kwargs['factory_date__lte'] = et
+                if classes:
+                    filter_kwargs['classes'] = classes
+                if equip_no:
+                    filter_kwargs['equip_no'] = equip_no
+                    if equip_no == 'Z04':
+                        filter_kwargs['operation_user'] = 'Mixer1'
+                if sc:
+                    filter_kwargs['actual_trains__gte'] = sc
+                if ec:
+                    filter_kwargs['actual_trains__lte'] = ec
+            records = TrainsFeedbacks.objects.filter(**filter_kwargs).order_by('-factory_date', 'equip_no', 'actual_trains')\
+                .values('plan_classes_uid', 'actual_trains', 'equip_no', 'product_no', 'actual_weight', 'begin_time', 'end_time', 'factory_date', 'classes')
+            for i in records:
+                plan_classes_uid, train = i['plan_classes_uid'], i['actual_trains']
+                begin_time = i['begin_time'] if not i['begin_time'] else i['begin_time'].strftime('%Y-%m-%d %H:%M:%S')
+                end_time = i['end_time'] if not i['end_time'] else i['end_time'].strftime('%Y-%m-%d %H:%M:%S')
+                p_info = PalletFeedbacks.objects.filter(plan_classes_uid=plan_classes_uid, begin_trains__lte=train, end_trains__gte=train).last()
+                lot_no, pallet_no, product_time = [None, None, None] if not p_info else [p_info.lot_no, p_info.pallet_no, None if not p_info.product_time else p_info.product_time.strftime('%Y-%m-%d %H:%M:%S')]
+                p = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid, delete_flag=False).last()
+                if bra_code and (not lot_no or bra_code not in lot_no):
+                    continue
+                group = p.work_schedule_plan.group.global_name if p else ''
+                i.update({'lot_no': lot_no, 'pallet_no': pallet_no, 'product_time': product_time, 'begin_time': begin_time, 'end_time': end_time, 'group': group})
+                results.append(i)
+        else:
+            raise ValidationError('未知操作')
+        if data.get('export'):
+            if not results:
+                raise ValidationError('无数据可导出')
+            if trace_flag == '0':
+                file_name, export_fields = '原材料追溯', {'商品名': 'scan_material_record', '厂商': 'supplier', '批次号': 'batch_no', '生产日期': 'product_time',
+                                                     'ERP入库日期': 'erp_in_time', '质检条码': 'bra_code', '托盘号': 'pallet_no', '重量(kg)': 'standard_weight'}
+            else:
+                file_name, export_fields = '胶料追溯', {'机台': 'equip_no', '生产日期': 'factory_date', '班次': 'classes', '班组': 'group', '胶料编码': 'product_no',
+                                                    '车次': 'actual_trains', '计划编号': 'plan_classes_uid', '追溯码': 'lot_no', '托盘号': 'pallet_no',
+                                                    '重量(kg)': 'actual_weight', '密炼开始时间': 'begin_time', '密炼结束时间': 'end_time', '收皮时间': 'product_time'}
+            return gen_template_response(export_fields, results, file_name, handle_str=True)
+        # 分页
+        page, page_size = data.get('page', 1), data.get('page_size', 10)
+        try:
+            begin = (int(page) - 1) * int(page_size)
+            end = int(page) * int(page_size)
+        except:
+            raise ValidationError("page/page_size异常，请修正后重试")
+        else:
+            if end >= 10000:
+                page_result, total_page = results[begin:], 1
+            else:
+                if begin not in range(0, 99999):
+                    raise ValidationError("page/page_size值异常")
+                if end not in range(0, 99999):
+                    raise ValidationError("page/page_size值异常")
+                page_result, total_page = results[begin: end], math.ceil(len(results) / int(page_size))
+        return Response({'total_data': len(results), 'total_page': total_page, 'page_result': page_result})
+
+    def post(self, request):
+        data = self.request.data
+        bra_code, trains, product_no, trace_flag, code_type = data.get('bra_code'), data.get('trains'), data.get('product_no'), data.get('trace_flag'), data.get('code_type')
+        results = {}
+        if trace_flag == 0:  # 正向追溯 1MB->2MB->FMB
+            # 需要追溯的条码信息
+            codes = self.get_xl_codes(bra_code) if code_type == '料罐' else [bra_code]
+            res = self.trace_up(codes)
+            results.update(res)
+        else:  # 反向追溯 FMB->2MB-1MB
+            p = PalletFeedbacks.objects.filter(lot_no=bra_code).last()
+            if not p:
+                raise ValidationError('未找到条码对应的收皮信息')
+            l_detail = LoadMaterialLog.objects.using('SFJ').filter(status=1, feed_log__plan_classes_uid=p.plan_classes_uid, feed_log__trains=trains).order_by(
+                '-scan_material_type', 'bra_code', '-stage', '-material_name', 'feed_log__trains')
+            if l_detail:
+                p_list = p.product_no.split('-')
+                s_stage = None if not p_list else (p_list[1] if len(p_list) > 2 else p_list[0])
+                results.update({s_stage: [{product_no: self.supplement_info(l_detail.values('scan_material_type', 'scan_material', 'bra_code', 'feed_log__trains', 'material_name')), 'behind': ''}]})
+                others = l_detail.filter(~Q(Q(bra_code__startswith='AAJZ20') | Q(bra_code__startswith='WMS')), scan_material_type='胶皮').order_by('-stage')
+                if others:
+                    res = self.trace_down(others, behind=s_stage)
+                    results.update(res)
+        if data.get('export'):
+            if not results:
+                raise ValidationError('无可导出数据')
+            try:
+                response = self.export_data(results, trace_flag)
+            except:
+                raise ValidationError('导出异常')
+            return response
+        return Response(results)
+
+    def trace_up(self, codes, add_before=False):
+        res, temp, next_barcode, rubber_index, get_record, before_info, pass_code = {}, {}, {}, {}, {}, {}, []
+        code_list = codes.keys() if isinstance(codes, dict) else codes
+        code_details = LoadMaterialLog.objects.using('SFJ').filter(status=1, bra_code__in=code_list).values_list('feed_log', flat=True)
+        l_detail = LoadMaterialLog.objects.using('SFJ').filter(status=1, feed_log__in=code_details).order_by('-scan_material_type', 'bra_code', 'stage', '-material_name', 'feed_log__trains')
+        if l_detail:
+            for index, i in enumerate(l_detail):
+                product_no, plan_classes_uid, trains, stage, bra_code, scan_material_type, scan_material = i.feed_log.product_no, i.feed_log.plan_classes_uid, \
+                                                                                                           i.feed_log.trains, i.stage, i.bra_code, \
+                                                                                                           i.scan_material_type, i.scan_material
+                before = ''
+                if add_before:
+                    stage_info = codes.get(bra_code)
+                    if stage_info:
+                        before = f"{stage_info[1]}-{stage_info[0]}"
+                        if before in before_info and before_info[before].get(plan_classes_uid) != trains:
+                            continue
+                        before_info[before] = {plan_classes_uid: trains}
+                        pass_code.append(f'{plan_classes_uid}-{trains}')
+                    else:
+                        if f'{plan_classes_uid}-{trains}' not in pass_code:
+                            continue
+                # 是否完成收皮
+                get_flag = get_record.get(f'{plan_classes_uid}-{trains}')  # 同计划、同车次是否收皮
+                if get_flag:
+                    if get_flag == '无':
+                        continue
+                    p = get_flag
+                else:
+                    p = PalletFeedbacks.objects.filter(plan_classes_uid=plan_classes_uid, begin_trains__lte=trains, end_trains__gte=trains).last()
+                    if not p:
+                        get_record[f'{plan_classes_uid}-{trains}'] = '无'
+                        continue
+                    else:  # 保留当前车, 其他车为无
+                        get_record[f'{plan_classes_uid}-{trains}'] = p
+                if p.lot_no not in next_barcode:
+                    next_barcode[p.lot_no] = [index + 1, stage]
+                # 某条数据的详情
+                _k = f"{bra_code}_{scan_material}"
+                if _k not in temp:
+                    _i = {'scan_material_type': scan_material_type, 'scan_material': scan_material, 'bra_code': bra_code, 'feed_log__trains': trains,
+                          'material_name': i.material_name}
+                    s_info = self.supplement_info([_i])[0]
+                    temp[_k] = s_info
+                else:
+                    s_info = copy.deepcopy(temp[_k])
+                    s_info['feed_log__trains'] = trains
+                if stage in res:
+                    rubber_i = rubber_index.get(f'{stage}-{product_no}-{trains}')
+                    if rubber_i is None:
+                        res[stage].append({product_no: [s_info], 'before': before})
+                        rubber_index[f'{stage}-{product_no}-{trains}'] = len(res[stage]) - 1
+                    else:
+                        res[stage][rubber_i][product_no].append(s_info)
+                else:
+                    res = {stage: [{product_no: [s_info], 'before': before}]}
+                    rubber_index[f'{stage}-{product_no}-{trains}'] = 0
+            if next_barcode:
+                s = self.trace_up(next_barcode, add_before=True)
+                res.update(s)
+        return res
+
+    def trace_down(self, others, behind):
+        res = {}
+        for index, o in enumerate(others):
+            p = PalletFeedbacks.objects.filter(lot_no=o.bra_code).last()
+            l_detail = LoadMaterialLog.objects.using('SFJ').filter(status=1, feed_log__plan_classes_uid=p.plan_classes_uid, feed_log__trains__gte=p.begin_trains,
+                                                                   feed_log__trains__lte=p.end_trains).order_by('-scan_material_type', 'bra_code', '-stage', '-material_name', 'feed_log__trains')
+            if l_detail:
+                p_list = p.product_no.split('-')
+                s_stage = None if not p_list else (p_list[1] if len(p_list) > 2 else p_list[0])
+                s_info = {p.product_no: self.supplement_info(l_detail.values('scan_material_type', 'scan_material', 'bra_code', 'feed_log__trains', 'material_name', 'stage')), 'behind': f'{behind}-{index + 1}'}
+                if s_stage in res:
+                    res[s_stage].append(s_info)
+                else:
+                    res = {s_stage: [s_info]}
+                others_before = l_detail.filter(~Q(Q(bra_code__startswith='AAJZ20') | Q(bra_code__startswith='WMS')), scan_material_type='胶皮')
+                if others_before:
+                    s = self.trace_down(others_before, behind=p.product_no.split('-')[1])
+                    res.update(s)
+        return res
+
+    def supplement_info(self, query_set):
+        """补充每条数据内容"""
+        handle_info, temp = [], {}
+        for i in query_set:
+            key = f"{i['bra_code']}-{i['material_name']}"
+            if temp.get(key):
+                i.update(temp[key])
+            else:
+                b = BarCodeTraceDetail.objects.filter(bra_code=i['bra_code']).values('scan_material_record', 'material_name_record', 'product_time', 'trains',
+                                                                                     'standard_weight', 'pallet_no', 'equip_no', 'group', 'classes',
+                                                                                     'plan_classes_uid', 'begin_time', 'end_time', 'arrange_rubber_time')
+                add_data_temp = b[0] if b else {'scan_material_record': None, 'material_name_record': None, 'product_time': None, 'standard_weight': None,
+                                                'pallet_no': None, 'equip_no': None, 'group': None, 'classes': None, 'trains': None,
+                                                'plan_classes_uid': None, 'begin_time': None, 'end_time': None, 'arrange_rubber_time': None}
+                if i['bra_code'][0] in ['S', 'F']:  # 补充小料详情
+                    res = self.get_xl_info(i['bra_code'], i['material_name'])
+                    add_data_temp.update(res)
+                i.update(add_data_temp)
+                temp[key] = add_data_temp
+            handle_info.append(i)
+        return handle_info
+
+    def get_xl_info(self, xl_code, material_name):
+        """获取料包原材料对应信息"""
+        s_data, lb_detail = [], {}
+        xl = WeightPackageLog.objects.filter(bra_code=xl_code).last()
+        w = WeightBatchingLog.objects.filter(material_name=material_name.rstrip('-C|-X'), batch_time__lte=xl.batch_time, status=1).order_by('batch_time').last()
+        if w:
+            detail = BarCodeTraceDetail.objects.filter(bra_code=w.bra_code, code_type='料罐').values('supplier', 'batch_no', 'erp_in_time', 'product_time', 'standard_weight')
+            if detail:
+                s = detail[0]
+                s['erp_in_time'] = s.get('erp_in_time') if not s.get('erp_in_time') else s.get('erp_in_time').strftime('%Y-%m-%d %H:%M:%S')
+                s['product_time'] = s.get('product_time') if not s.get('product_time') else s.get('product_time').strftime('%Y-%m-%d %H:%M:%S')
+                lb_detail.update(s)
+        if lb_detail:
+            lb_detail['material_name'] = material_name.rstrip('-C|-X')
+            s_data.append(lb_detail)
+        return {'xl_detail': s_data}
+
+    def get_xl_codes(self, code):
+        """查询条码配置了哪些料包"""
+        xl_codes = []
+        db_config = [k for k, v in DATABASES.items() if 'YK_XL' in v['NAME'] or 'MWDS' in v['NAME']]
+        for equip_no in db_config:
+            w_model = JZReportWeight if equip_no in JZ_EQUIP_NO else ReportWeight
+            f_code = WeightBatchingLog.objects.filter(bra_code=code, status=1, equip_no=equip_no).first()  # 第一次扫码
+            if not f_code:
+                continue
+            st, tank_no, f_id, name = f_code.batch_time, f_code.tank_no, f_code.id, f_code.material_name
+            # 下一次料罐不同条码扫码
+            o_code = WeightBatchingLog.objects.filter(~Q(bra_code=code), id__gt=f_id, tank_no=tank_no, status=1, equip_no=equip_no).first()
+            et = o_code.batch_time if o_code else datetime.datetime.now()
+            # 使用该物料的配方
+            res = w_model.objects.using(equip_no).filter(material=name, 时间__gte=st, 时间__lte=et).values('planid').annotate(fc=Min('车次'), lc=Max('车次'))
+            if not res:
+                continue
+            # 依照时间段查询使用到物料的料包车次
+            for i in res:
+                code_list = WeightPackageLog.objects.filter(Q(begin_trains__gte=i['fc'], begin_trains__lte=i['lc']) |
+                                                            Q(end_trains__gte=i['fc'], end_trains__lte=i['lc']),
+                                                            plan_weight_uid=i['planid'], equip_no=equip_no).values_list('bra_code', flat=True)
+                if code_list:
+                    xl_codes.extend(list(code_list))
+        return list(set(xl_codes))
+
+    def export_data(self, data, trace_flag):
+        bio = BytesIO()
+        writer = pd.ExcelWriter(bio, engine='xlsxwriter')  # 注意安装这个包 pip install xlsxwriter
+        key = 'behind' if trace_flag == 1 else 'before'
+        for stage in data:
+            # 整理数据
+            res = self.handle_data(data[stage], key)
+            df = pd.DataFrame(res)
+            df.to_excel(writer, sheet_name=stage, index=None, encoding='SIMPLIFIED CHINESE_CHINA.UTF8')
+        writer.save()
+        bio.seek(0)
+        from django.http import FileResponse
+        response = FileResponse(bio)
+        response['Content-Type'] = 'application/octet-stream'
+        response['Content-Disposition'] = 'attachment;filename="mm.xlsx"'
+        return response
+
+    def handle_data(self, s_data, key):
+        res = []
+        for i in s_data:
+            product_no, cont = list(i.keys())[0], i.pop(key)
+            for j in i[product_no]:
+                xl_detail = j.get('xl_detail')
+                if xl_detail:
+                    d = xl_detail[0]
+                    xl_detail = f"供应商: {d['supplier']}, 批次号: {d['batch_no']}, ERP入库时间: {d['erp_in_time']}, 生产日期: {d['product_time']}," \
+                                f"重量: {d['standard_weight']}, 物料名: {d['material_name']};"
+                else:
+                    xl_detail = ''
+                _data = {'物料编码': product_no, '投入物料类别': j['scan_material_type'], 'scan_material': j['scan_material'], '机台': j['equip_no'],
+                         '生产日期': j['product_time'] if not j['product_time'] else j['product_time'].strftime('%Y-%m-%d'), '班次': j['classes'],
+                         '班组': j['group'], '车次': j['trains'], '追溯码': j['bra_code'], '托盘号': j['pallet_no'], '重量': j['standard_weight'],
+                         '密炼/配料 开始时间': j['begin_time'], '密炼/配料 结束时间': j['end_time'], '收皮时间': j['arrange_rubber_time'],
+                         '料包明细': xl_detail, '行关联': cont}
+                res.append(_data)
+        return res
 
 
 @method_decorator([api_recorder], name="dispatch")

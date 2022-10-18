@@ -50,7 +50,7 @@ from terminal.models import TerminalLocation, EquipOperationLog, WeightBatchingL
     ReplaceMaterial, ReturnRubber, ToleranceDistinguish, ToleranceProject, ToleranceHandle, ToleranceRule, \
     WeightPackageManual, WeightPackageSingle, WeightPackageWms, OtherMaterialLog, EquipHaltReason, \
     WeightPackageLogManualDetails, WmsAddPrint, JZReportWeight, JZMaterialInfo, JZBin, JZReportBasic, JZPlan, \
-    JZRecipeMaterial, JZRecipePre, JZExecutePlan, BatchScanLog
+    JZRecipeMaterial, JZRecipePre, JZExecutePlan, BatchScanLog, BarCodeTraceDetail
 from terminal.serializers import LoadMaterialLogCreateSerializer, \
     EquipOperationLogSerializer, BatchingClassesEquipPlanSerializer, WeightBatchingLogSerializer, \
     WeightBatchingLogCreateSerializer, FeedingLogSerializer, WeightTankStatusSerializer, \
@@ -493,7 +493,7 @@ class WeightBatchingLogViewSet(TerminalCreateAPIView, mixins.ListModelMixin, Gen
         return response(success=True, data=serializer.data)
 
     def create(self, request, *args, **kwargs):
-        equip_no = self.request.data.get('equip_no')
+        equip_no, bra_code = self.request.data.get('equip_no'), self.request.data.get('bra_code')
         serializer = self.get_serializer(data=self.request.data, context={'request': request})
         # ERP与MES物料未绑定
         if not serializer.is_valid():
@@ -501,6 +501,8 @@ class WeightBatchingLogViewSet(TerminalCreateAPIView, mixins.ListModelMixin, Gen
         instance = serializer.save()
         if instance.status == 2:
             return response(success=False, message=instance.failed_reason)
+        else:  # 投料成功
+            BarCodeTraceDetail.objects.filter(bar_code=bra_code, code_type='料罐').update(scan_result=True)
         # 开门
         try:
             if equip_no in JZ_EQUIP_NO:

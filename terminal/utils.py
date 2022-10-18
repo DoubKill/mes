@@ -16,7 +16,7 @@ from suds.client import Client
 
 from basics.models import WorkSchedulePlan
 from inventory.conf import cb_ip, cb_port
-from inventory.models import MaterialOutHistory
+from inventory.models import MaterialOutHistory, MaterialInHistory
 from inventory.utils import wms_out
 from mes.common_code import WebService, get_virtual_time
 from mes.conf import JZ_EQUIP_NO
@@ -25,7 +25,7 @@ from plan.models import BatchingClassesPlan
 from recipe.models import ProductBatching, ProductBatchingDetail, ProductBatchingEquip
 from system.models import ChildSystemInfo
 from terminal.models import WeightTankStatus, RecipePre, RecipeMaterial, Plan, Bin, ToleranceRule, JZRecipeMaterial, \
-    JZPlan, BatchScanLog
+    JZPlan, BatchScanLog, BarCodeTraceDetail
 
 logger = logging.getLogger("send_log")
 e_logger = logging.getLogger("error_log")
@@ -335,10 +335,10 @@ def out_task_carbon(task_id, station_no, material_no, material_name, need_weight
     return rep_dict
 
 
-def material_out_barcode(bar_code):
+def material_out_barcode(bar_code, code_type='密炼'):
     """获取出库条码信息"""
     # 优先查询原材料出库信息，其次是总厂原材料信息
-    flag, ret = False, ''
+    flag, ret, pallet_no, erp_in_time = False, '', None, None
     wms_info = MaterialOutHistory.objects.using('wms').filter(lot_no=bar_code).last()
     if wms_info:
         try:
@@ -346,6 +346,7 @@ def material_out_barcode(bar_code):
             SCRQ = wms_info.batch_no[:8]
             SM_CREATE = f'{PH[:4]}-{PH[4:6]}-{PH[6:8]} {PH[8:10]}:{PH[10:12]}:00' if len(PH) > 8 else f'{PH[:4]}-{PH[4:6]}-{PH[6:8]} 00:00:00'
             DDH = f'RKD{SCRQ}001'
+            pallet_no = wms_info.pallet_no
             SYQX = (datetime.strptime(SM_CREATE, '%Y-%m-%d %H:%M:%S') + timedelta(days=364)).strftime('%Y-%m-%d')
             ret = {'WLXXID': wms_info.material_no, 'TMH': bar_code, 'BZDW': wms_info.standard_unit, 'SL': wms_info.piece_count,
                    'ZL': wms_info.weight, 'SCRQ': SCRQ, 'TOFAC': 'AJ1', 'SM_CREATE': SM_CREATE, 'WLDWMC': wms_info.supplier,
@@ -368,6 +369,20 @@ def material_out_barcode(bar_code):
             raise ValueError('未找到该条码对应物料信息！')
         if data.get('Table'):
             ret = data.get('Table')[0]
+    # 记录原材料信息到表
+    try:
+        if not BarCodeTraceDetail.objects.filter(bar_code=bar_code, code_type=code_type):
+            # 获取erp入库时间
+            in_instance = MaterialInHistory.objects.using('wms').filter(lot_no=bar_code, task__isnull=False).last()
+            if in_instance:
+                erp_in_time = in_instance.task.fin_time
+            BarCodeTraceDetail.objects.create(
+                bar_code=bar_code, code_type=code_type, scan_material=ret.get('WLMC'), product_time=ret.get('SM_CREATE'), erp_in_time=erp_in_time,
+                standard_weight=round(ret.get('ZL', 0), 2), pallet_no=pallet_no, supplier=ret.get('WLDWMC'), batch_no=ret.get('PH'), display=True,
+                scan_result=True
+            )
+    except Exception as e:
+        e_logger.error(f'扫码{bar_code}记录原材料信息异常:{e.args[0]}')
     return ret
 
 
