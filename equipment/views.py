@@ -640,7 +640,7 @@ class EquipSupplierViewSet(CommonDeleteMixin, ModelViewSet):
             return Response(queryset.filter(use_flag=True).values('id', 'supplier_name'))
         if export:
             data = self.get_serializer(queryset, many=True).data
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
@@ -746,7 +746,7 @@ class EquipPropertyViewSet(CommonDeleteMixin, ModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         if export:
             data = self.get_serializer(queryset, many=True).data
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
@@ -866,7 +866,7 @@ class EquipAreaDefineViewSet(CommonDeleteMixin, ModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         if export:
             data = self.get_serializer(queryset, many=True).data
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         if all_area:
             return Response(list(queryset.values_list('area_name', flat=True).distinct()))
         return super().list(request, *args, **kwargs)
@@ -941,7 +941,7 @@ class EquipPartNewViewSet(CommonDeleteMixin, ModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         if export:
             data = self.get_serializer(queryset, many=True).data
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         if self.request.query_params.get('all'):
             use_flag = [True] if not self.request.query_params.get('all_part') else [True, False]
             data = EquipPartNew.objects.filter(use_flag__in=use_flag).values('id', 'part_name')
@@ -969,7 +969,7 @@ class EquipComponentTypeViewSet(CommonDeleteMixin, ModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         if export:
             data = self.get_serializer(queryset, many=True).data
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         if self.request.query_params.get('all'):
             data = EquipComponentType.objects.filter(use_flag=True).values('id', 'component_type_name')
             return Response({'results': data})
@@ -1065,7 +1065,7 @@ class EquipComponentViewSet(CommonDeleteMixin, ModelViewSet):
         query_set = self.get_queryset()
         if export:
             data = self.get_serializer(query_set, many=True).data
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         if self.request.query_params.get('all'):
             data = EquipComponent.objects.filter(use_flag=True).values('id', 'component_name')
             return Response({'results': data})
@@ -1189,7 +1189,7 @@ class EquipSpareErpViewSet(CommonDeleteMixin, ModelViewSet):
         export = self.request.query_params.get('export')
         if export:
             data = self.get_serializer(self.filter_queryset(self.get_queryset()), many=True).data
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         if all == '0':
             data = self.get_queryset().values('equip_component_type__component_type_name').distinct()
             return Response({'results': data})
@@ -1304,7 +1304,7 @@ class EquipBomViewSet(ModelViewSet):
         export = self.request.query_params.get('export')
         if export:
             data = EquipBomSerializer(self.filter_queryset(self.get_queryset()), many=True).data
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         if not tree:
             if title:
                 data = self.filter_queryset(self.get_queryset()).values('id', 'factory_id')
@@ -1613,7 +1613,7 @@ class EquipFaultSignalViewSet(CommonDeleteMixin, ModelViewSet):
             return Response({'results': data})
         if self.request.query_params.get('export'):
             data = self.get_serializer(queryset, many=True).data
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         else:
             return super().list(request, *args, **kwargs)
 
@@ -1734,7 +1734,7 @@ class EquipOrderAssignRuleViewSet(CommonDeleteMixin, ModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('export'):
             data = self.get_serializer(queryset, many=True).data
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         else:
             return super().list(request, *args, **kwargs)
 
@@ -1859,7 +1859,7 @@ class EquipJobItemStandardViewSet(CommonDeleteMixin, ModelViewSet):
         export = self.request.query_params.get('export')
         if export:
             data = self.get_serializer(self.filter_queryset(self.get_queryset()), many=True).data
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         return super().list(request, *args, **kwargs)
 
     @action(methods=['post'], detail=False, permission_classes=[], url_path='import_xlsx',
@@ -2568,12 +2568,13 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
     def destroy(self, request, *args, **kwargs):
         pda = self.request.data.get('pda')
         instance = self.get_object()
+        key_word = '入库' if instance.order_id.startswith('RK') else '出库'
         if instance.status in [1, 4, 7]:
             self.perform_destroy(instance)
             return Response({"success": True, "message": '删除成功', "data": None})
         if pda:
-            return Response({"success": False, "message": '单据入库中或已入库不能删除', "data": None})
-        raise ValidationError('单据入库中或已入库不能删除')
+            return Response({"success": False, "message": f'单据{key_word}中或已{key_word}不能删除', "data": None})
+        raise ValidationError(f'单据{key_word}中或已{key_word}不能删除')
 
     @action(methods=['post'], detail=False, url_path='close-order', url_name='close-order', permission_classes=(IsAuthenticated, ))
     def close_order(self, request):
@@ -2618,8 +2619,8 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
     @atomic
     def create(self, request, *args, **kwargs):
         data = self.request.data
-        in_quantity = data.get('in_quantity', 1)
-        out_quantity = data.get('out_quantity', 1)
+        in_quantity = round(data.get('in_quantity', 1), 1)
+        out_quantity = round(data.get('out_quantity', 1), 1)
         enter_time = data.get('enter_time', None)
         outer_time = data.get('outer_time', None)
         receive_user = data.get('receive_user', None)
@@ -2643,12 +2644,12 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
             if data['in_quantity'] <= 0:
                 return Response({"success": False, "message": '入库数量需要大于0', "data": None})
             instance.status = 2
-            instance.in_quantity += data['in_quantity']
+            instance.in_quantity = round(instance.in_quantity + in_quantity, 1)
             instance.enter_time = enter_time
             instance.save()
 
             if query:
-                query.quantity += in_quantity
+                query.quantity = round(query.quantity + in_quantity, 1)
                 query.save()
             else:
                 query = EquipWarehouseInventory.objects.create(
@@ -2680,17 +2681,17 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
             if not query:
                 return Response({"success": False, "message": '当前库位不存在该备件', "data": None})
             if query.quantity < out_quantity:
-                return Response({"success": False, "message": '当前库区中的数量不足', "data": None})
+                return Response({"success": False, "message": '当前库位中的数量不足', "data": None})
             # 使用库存数量判断
             if out_quantity > query.quantity:
                 return Response({"success": False, "message": '出库数量不能大于库存出库数量', "data": None})
             if instance.plan_out_quantity <= out_quantity + instance.out_quantity:
-                instance.out_quantity += out_quantity
+                instance.out_quantity = round(instance.out_quantity + out_quantity, 1)
                 instance.status = 6  # 出库完成
             else:
-                instance.out_quantity += out_quantity
+                instance.out_quantity = round(instance.out_quantity + out_quantity, 1)
                 instance.status = 5  # 出库中
-            query.quantity -= out_quantity
+            query.quantity = round(query.quantity - out_quantity, 1)
             query.save()
             instance.outer_time = outer_time
             # 记录领用人和用途
@@ -2814,7 +2815,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
                                             'equip_spare__lower_stock')
         else:
             data = self.filter_queryset(self.queryset.filter(quantity__gt=0)).values('equip_spare', 'equip_warehouse_location').annotate(
-                quantity=Sum('quantity')).order_by('equip_warehouse_location').values(
+                qty=Sum('quantity')).order_by('equip_warehouse_location').values(
                                                  'equip_warehouse_area__id',
                                                  'equip_warehouse_area__area_name',
                                                  'equip_warehouse_location__id',
@@ -2825,7 +2826,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
                                                  'equip_spare__spare_name',
                                                  'equip_spare__specification',
                                                  'equip_spare__technical_params',
-                                                 'quantity',
+                                                 'qty',
                                                  'equip_spare',
                                                  'check_desc',
                                                  'move_desc',
@@ -2841,6 +2842,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
             item['upper_stock'] = item['equip_spare__upper_stock']
             item['lower_stock'] = item['equip_spare__lower_stock']
             item['unit'] = item['equip_spare__unit']
+            item['quantity'] = round(item.pop('qty', 0), 1)
             if not self.request.query_params.get('use'):
                 item['single_price'] = round(item['equip_spare__cost'] if item['equip_spare__cost'] else 0, 2)
                 item['total_price'] = round(item['single_price'] * item['quantity'], 2)
@@ -2863,28 +2865,29 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
         if not inventory:
             return Response({"success": False, "message": '备件代码不存在', "data": None})
         if handle:
+            h_quantity = round(data.get('quantity'), 1)
             # 盘库
             if handle == '盘库':
-                quantity = data.get('quantity')
-                inventory.quantity = data['quantity']
+                quantity = h_quantity
+                inventory.quantity = h_quantity
             elif handle == '移库':
                 if data['move_equip_warehouse_location__id'] == data['equip_warehouse_location__id']:
                     return Response({"success": False, "message": '不能移动到当前库区', "data": None})
-                quantity = f"-{data.get('quantity')}"
-                if inventory.quantity < data['quantity']:
+                quantity = f"-{h_quantity}"
+                if inventory.quantity < h_quantity:
                     return Response({"success": False, "message": '当前库存数量不足', "data": None})
-                inventory.quantity -= data['quantity']
+                inventory.quantity = round(inventory.quantity - h_quantity, 1)
                 new_queryset = self.queryset.filter(equip_spare_id=data['equip_spare'], equip_warehouse_area_id=data['move_equip_warehouse_area__id'],
                                                     equip_warehouse_location_id=data['move_equip_warehouse_location__id'])
                 if new_queryset.exists():
                     new = new_queryset.first()
-                    new.quantity += data['quantity']
+                    new.quantity = round(new.quantity + h_quantity, 1)
                     new.save()
                     new_quantity = new.quantity
                 else:
                     obj = self.queryset.create(quantity=data['quantity'], equip_spare_id=data['equip_spare'],
-                                         equip_warehouse_area_id=data['move_equip_warehouse_area__id'],
-                                         equip_warehouse_location_id=data['move_equip_warehouse_location__id'])
+                                               equip_warehouse_area_id=data['move_equip_warehouse_area__id'],
+                                               equip_warehouse_location_id=data['move_equip_warehouse_location__id'])
                     new_quantity = obj.quantity
                 # 记录履历
                 EquipWarehouseRecord.objects.create(
@@ -2919,7 +2922,6 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
                 equip_spare_id=data.get('equip_spare'),
                 created_user=self.request.user)
             return Response({"success": True, "message": '操作成功', "data": data})
-
         else:
             return super().update(request, *args, **kwargs)
 
@@ -2972,6 +2974,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
             item['upper_stock'] = upper_stock
             item['lower_stock'] = lower_stock
             item['unit'] = item['equip_spare__unit']
+            item['quantity'] = round(item['quantity'], 1)
             item['single_price'] = round(item['equip_spare__cost'] if item['equip_spare__cost'] else 0, 2)
             item['total_price'] = round(item['single_price'] * item['quantity'], 2)
             item['desc'] = None
@@ -3072,7 +3075,7 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
         equip_warehouse_location = self.request.data.get('equip_warehouse_location')
         equip_spare = self.request.data.get('equip_spare')
         instance = self.get_object()
-        quantity = int(instance.quantity)
+        quantity = round(float(instance.quantity), 1)
         inventory = EquipWarehouseInventory.objects.filter(equip_spare_id=equip_spare,
                                                            equip_warehouse_location_id=equip_warehouse_location).first()
         if instance.created_user == self.request.user:
@@ -3082,21 +3085,21 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
                     order_detail.status = 1
                 else:
                     order_detail.status = 2
-                order_detail.in_quantity -= quantity
+                order_detail.in_quantity = round(order_detail.in_quantity - quantity, 1)
                 EquipWarehouseOrder.objects.filter(order_detail=order_detail).update(status=2)
                 if inventory.quantity <= quantity:
                     inventory.quantity = 0
                 else:
-                    inventory.quantity -= quantity
+                    inventory.quantity = round(inventory.quantity - quantity, 1)
                 inventory.save()
             if instance.status == '出库':
-                order_detail.out_quantity -= quantity
+                order_detail.out_quantity = round(order_detail.out_quantity - quantity, 1)
                 if order_detail.out_quantity == quantity:
                     order_detail.status = 4
                 else:
                     order_detail.status = 5
                 EquipWarehouseOrder.objects.filter(order_detail=order_detail).update(status=5)
-                inventory.quantity += quantity
+                inventory.quantity = round(inventory.quantity + quantity, 1)
                 inventory.save()
             EquipWarehouseRecord.objects.filter(id=instance.id).update(revocation='Y', real_time=None)
             order_detail.save()
@@ -3160,17 +3163,16 @@ class EquipWarehouseStatisticalViewSet(ListModelMixin, GenericViewSet):
                 item['specification'] = item['equip_spare__specification']
                 item['technical_params'] = item['equip_spare__technical_params']
                 item['unit'] = item['equip_spare__unit']
-                item['in_qty'] = item['in_qty'] if item['in_qty'] else 0
-                item['out_qty'] = item['out_qty'] if item['out_qty'] else 0
-                item['in_money'] = (item['in_qty'] * item['equip_spare__cost']) if item['equip_spare__cost'] and item['in_qty'] else 0
-                item['out_money'] = (item['out_qty'] * item['equip_spare__cost']) if item['equip_spare__cost'] and item['out_qty'] else 0
+                item['in_qty'] = round(float(item['in_qty']), 1) if item['in_qty'] else 0
+                item['out_qty'] = round(float(item['out_qty']), 1) if item['out_qty'] else 0
+                item['in_money'] = round((item['in_qty'] * item['equip_spare__cost']), 1) if item['equip_spare__cost'] and item['in_qty'] else 0
+                item['out_money'] = round((item['out_qty'] * item['equip_spare__cost']), 1) if item['equip_spare__cost'] and item['out_qty'] else 0
             st = (int(page) - 1) * int(page_size)
             et = int(page) * int(page_size)
             if self.request.query_params.get('export'):
                 try:
-                    response = gen_template_response(self.EXPORT_FIELDS_DICT, results, self.FILE_NAME)
+                    response = gen_template_response(self.EXPORT_FIELDS_DICT, results, self.FILE_NAME, handle_str=True)
                 except Exception as e:
-                    logger.error(e.args[0])
                     raise ValidationError(f'导出失败: 数据异常')
                 return response
             count = len(results)
@@ -3215,7 +3217,7 @@ class EquipAutoPlanView(APIView):
                 else:
                     in_orders = order_info.filter(order_detail__in_quantity__gte=F('order_detail__plan_in_quantity'), order_detail__equip_spare__spare_code=spare_code)
                     if in_orders:
-                        order_list = in_orders.order_by('-id').values('id', 'order_id', 'state')[0]
+                        order_list = in_orders.order_by('-id').values('id', 'order_id', 'state')
             else:
                 order_list = EquipWarehouseOrder.objects.filter(status__in=[4, 5], order_detail__delete_flag=False,
                                                                 delete_flag=False,
@@ -3253,12 +3255,12 @@ class EquipAutoPlanView(APIView):
             obj = order.equip_spare
             if order.status in [1, 2, 3]:  # 入库单据
                 # quantity = order.plan_in_quantity - order.in_quantity
-                quantity = 1
+                quantity = 1.0
                 queryset = EquipWarehouseInventory.objects.filter(equip_spare=obj, quantity__gt=0)
                 default = queryset.first()
                 area = EquipWarehouseArea.objects.filter(
                     Q(warehouse_area__equip_component_type=obj.equip_component_type) | Q(
-                        warehouse_area__isnull=True))
+                        warehouse_area__isnull=True), delete_flag=False)
                 areas = area.values('id', 'area_name')
                 areas = [{'equip_warehouse_area_id': item['id'], 'area_name': item['area_name']} for item in areas]
                 if not area:
@@ -3372,9 +3374,9 @@ class EquipAutoPlanView(APIView):
                                          'location_name': item['equip_warehouse_location__location_name'],
                                          'quantity': item['quantity']})
                 if not all([areas, location]):
-                    return Response({"success": False, "message": "未找到改备件相关库区库位信息", "data": None})
+                    return Response({"success": False, "message": "未找到该备件相关库区库位信息", "data": None})
                 obj = EquipSpareErp.objects.filter(spare_code=spare_code).first()
-                s_area = EquipWarehouseArea.objects.filter(Q(warehouse_area__equip_component_type=obj.equip_component_type) | Q(warehouse_area__isnull=True))
+                s_area = EquipWarehouseArea.objects.filter(Q(warehouse_area__equip_component_type=obj.equip_component_type) | Q(warehouse_area__isnull=True), delete_flag=False)
                 if not s_area:
                     return Response({"success": False, "message": '该备件没有可存放的库区', "data": None})
                 move_area = [{'equip_warehouse_area_id': item.id, 'area_name': item.area_name} for item in s_area]
@@ -3541,7 +3543,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
         user_name = self.request.user.username
         if self.request.query_params.get('export'):
             data = EquipApplyOrderExportSerializer(self.filter_queryset(self.get_queryset()), many=True).data
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         # 小程序获取数量 带指派 带接单 进行中 已完成 已验收
         if my_order == '1':
             wait_assign = self.queryset.filter(status='已生成').count()
@@ -3930,7 +3932,7 @@ class EquipInspectionOrderViewSet(ModelViewSet):
         user_name = self.request.user.username
         if self.request.query_params.get('export'):
             data = EquipInspectionOrderSerializer(self.filter_queryset(self.get_queryset()), many=True).data
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         # 小程序获取数量 带指派 带接单 进行中 已完成 已验收
         if my_order == '1':
             user_name = self.request.user.username
@@ -4356,7 +4358,7 @@ class EquipPlanViewSet(ModelViewSet):
     def list(self, request, *args, **kwargs):
         if self.request.query_params.get('export'):
             data = self.get_serializer(self.filter_queryset(self.get_queryset()), many=True).data
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         return super().list(request, *args, **kwargs)
 
     @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated],
@@ -4917,6 +4919,9 @@ class GetSpare(APIView):
                                       "specification": item['gg'], "unit": item['bzdwmc'], "unique_id": item['wlxxid'],
                                       "sync_date": dt.datetime.now()})
             spare_info = EquipSpareErp.objects.filter(spare_code=item['wlbh'], unique_id__isnull=True)
+            if spare_info:
+                spare_info.update(**{"spare_name": item['wlmc'], "specification": item['gg'], "unit": item['bzdwmc'], "unique_id": item['wlxxid'],
+                                     "sync_date": dt.datetime.now()})
             if not spare_info and not unique_info:
                 EquipSpareErp.objects.create(**{"spare_code": item['wlbh'], "spare_name": item['wlmc'],
                                                 "equip_component_type": equip_component_type,
@@ -4979,7 +4984,7 @@ class GetSpareOrder(APIView):
                 if not spare_code or len(spare_code) < 2 or spare_code[:2] not in overcome:
                     kwargs = {'equip_warehouse_order': order,
                               'equip_spare': equip_spare,
-                              'plan_in_quantity': spare.get('cksl')}
+                              'plan_in_quantity': round(spare.get('cksl'), 1)}
                     EquipWarehouseOrderDetail.objects.create(**kwargs)
                 else:  # 屏蔽备件
                     overcome_list.append(spare)
@@ -5368,9 +5373,9 @@ class DailyCleanStandardViewSet(ModelViewSet):
                 raise ValidationError('请选择需要导出的标准')
             records = self.get_queryset().filter(id__in=export_ids).order_by('id')
             if not records:
-                raise ValidationError('未找到所选便准, 请刷新页面后重试')
+                raise ValidationError('未找到所选标准, 请刷新页面后重试')
             data = self.get_serializer(records, many=True).data
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         elif excel_flag == 'import':  # 导入
             excel_file = request.FILES.get('file', None)
             if not excel_file:
@@ -5564,9 +5569,9 @@ class CheckPointStandardViewSet(ModelViewSet):
                 raise ValidationError('请选择需要导出的标准')
             records = self.get_queryset().filter(id__in=export_ids).order_by('id')
             if not records:
-                raise ValidationError('未找到所选便准, 请刷新页面后重试')
+                raise ValidationError('未找到所选标准, 请刷新页面后重试')
             data = self.get_serializer(records, many=True).data
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         elif excel_flag == 'import':  # 导入
             excel_file = request.FILES.get('file', None)
             if not excel_file:
@@ -5736,9 +5741,9 @@ class CheckTemperatureStandardViewSet(ModelViewSet):
                 raise ValidationError('请选择需要导出的标准')
             records = self.get_queryset().filter(id__in=export_ids).order_by('sn')
             if not records:
-                raise ValidationError('未找到所选便准, 请刷新页面后重试')
+                raise ValidationError('未找到所选标准, 请刷新页面后重试')
             data = self.get_serializer(records, many=True).data
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, handle_str=True)
         elif excel_flag == 'import':  # 导入
             excel_file = request.FILES.get('file', None)
             if not excel_file:

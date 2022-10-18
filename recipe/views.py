@@ -1,6 +1,8 @@
 # Create your views here.
 import datetime
+import json
 import re
+import logging
 
 from django.db.models import Prefetch, Q, Max, F
 from django.db.transaction import atomic
@@ -24,7 +26,7 @@ from mes.sync import ProductBatchingSyncInterface
 from plan.models import ProductClassesPlan
 from production.models import PlanStatus, MaterialTankStatus
 from recipe.filters import MaterialFilter, ProductInfoFilter, ProductBatchingFilter, \
-    MaterialAttributeFilter, ERPMaterialFilter, ZCMaterialFilter
+    MaterialAttributeFilter, ERPMaterialFilter, ZCMaterialFilter, RecipeChangeHistoryFilter
 from recipe.serializers import MaterialSerializer, ProductInfoSerializer, \
     ProductBatchingListSerializer, ProductBatchingCreateSerializer, MaterialAttributeSerializer, \
     ProductBatchingRetrieveSerializer, ProductBatchingUpdateSerializer, \
@@ -32,11 +34,13 @@ from recipe.serializers import MaterialSerializer, ProductInfoSerializer, \
     ProductBatchingDetailMaterialSerializer, WeighCntTypeSerializer, ERPMaterialCreateSerializer, ERPMaterialSerializer, \
     ERPMaterialUpdateSerializer, ZCMaterialSerializer, ProductBatchingDetailRetrieveSerializer, \
     ReplaceRecipeMaterialSerializer, WFProductBatchingCreateSerializer, WFProductBatchingUpdateSerializer, \
-    WFProductBatchingListSerializer, WFProductBatchingRetrieveSerializer
+    WFProductBatchingListSerializer, WFProductBatchingRetrieveSerializer, RecipeChangeHistorySerializer, RecipeChangeHistoryRetrieveSerializer
 from recipe.models import Material, ProductInfo, ProductBatching, MaterialAttribute, \
     ProductBatchingDetail, MaterialSupplier, WeighCntType, WeighBatchingDetail, ZCMaterial, ERPMESMaterialRelation, \
-    ProductBatchingEquip, ProductBatchingMixed, MultiReplaceMaterial
+    ProductBatchingEquip, ProductBatchingMixed, MultiReplaceMaterial, RecipeChangeHistory, RecipeChangeDetail
 from recipe.utils import get_mixed
+
+error_logger = logging.getLogger('error_log')
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -707,8 +711,7 @@ class ProductBatchingNoNew(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class RecipeNoticeAPiView(APIView):
     """配方数据下发至上辅机（只有应用状态的配方才可下发）"""
-    permission_classes = ()
-    authentication_classes = ()
+    permission_classes = (IsAuthenticated,)
 
     @atomic()
     def post(self, request):
@@ -774,6 +777,155 @@ class RecipeNoticeAPiView(APIView):
         except Exception as e:
             receive_msg += f"{'、'.join(send_equip)}: {e.args[0]} "
         else:
+            _now_time, _username = datetime.datetime.now(), self.request.user.username
+            try:
+                # MES配方变更履历
+                change_data = {
+                    'recipe_no': real_product_no,
+                    'dev_type': product_batching.dev_type.category_name,
+                    'used_type': product_batching.used_type,
+                    'created_time': product_batching.created_date,
+                    'created_username': '' if not product_batching.created_user else product_batching.created_user.username,
+                    'updated_time': datetime.datetime.now(),
+                    'updated_username': self.request.user.username
+                }
+                change_history, _ = RecipeChangeHistory.objects.update_or_create(defaults=change_data,
+                                                                                 **{'recipe_no': real_product_no,
+                                                                                    'dev_type': product_batching.dev_type.category_name})
+                record = change_history.change_details.order_by('id').last()
+                if not record:
+                    RecipeChangeDetail.objects.create(change_history=change_history, desc='MES配方新增',
+                                                      changed_username=_username, submit_username=product_batching.submit_user.username,
+                                                      submit_time=product_batching.submit_time, confirm_username=product_batching.check_user.username,
+                                                      confirm_time=product_batching.check_time, sfj_down_username=_username,
+                                                      sfj_down_time=_now_time, details='')
+                else:
+                    if 'NEW' in product_no:
+                        old_mes_recipe = ProductBatching.objects.filter(stage_product_batch_no=real_product_no, batching_type=2,
+                                                                        dev_type=product_batching.dev_type).last()
+                        if not old_mes_recipe:
+                            raise ValueError('未找到旧配方无法比较')
+                        # 当前配方详情
+                        current_recipe_dict = old_mes_recipe.batching_details_info
+                        # 修改后配方详情
+                        now_recipe_dict = product_batching.batching_details_info
+                        added_material = set(now_recipe_dict.keys()) - set(current_recipe_dict.keys())
+                        deleted_material = set(current_recipe_dict.keys()) - set(now_recipe_dict.keys())
+                        common_material = set(current_recipe_dict.keys()) & set(now_recipe_dict.keys())
+                        # 修改后配方详情
+                        desc = []
+                        change_detail_data = {1: [], 2: [], 3: []}
+                        # 比对配料、比对投料方式、称量误差
+                        if added_material:
+                            desc.append('新增配料')
+                            for i in added_material:
+                                material_type = now_recipe_dict[i].get('type') if now_recipe_dict[i].get('type') else 4
+                                change_detail_data[1].append({'type': material_type, 'key': i, 'flag': '新增', 'cv': float(now_recipe_dict[i]['actual_weight'])})
+                            f_equip = product_batching.product_batching_equip.filter(material__material_name__in=added_material, is_used=True).values('material__material_name', 'equip_no', 'feeding_mode', 'type')
+                            if f_equip:
+                                _temp = {}
+                                for j in f_equip:
+                                    _material_name = j['material__material_name']
+                                    if _material_name not in _temp:
+                                        _temp[_material_name] = {'type': j['type'], 'key': _material_name, 'flag': '新增',
+                                                                 'cv': f"{j['feeding_mode']}({j['equip_no']})"}
+                                    else:
+                                        _temp[_material_name]['cv'] = _temp[_material_name]['cv'] + f" {j['feeding_mode']}({j['equip_no']})"
+                                desc.append('新增投料方式')
+                                change_detail_data[2].extend(list(_temp.values()))
+                        if deleted_material:
+                            desc.append('删除配料')
+                            for i in deleted_material:
+                                material_type = current_recipe_dict[i].get('type') if current_recipe_dict[i].get('type') else 4
+                                change_detail_data[1].append({'type': material_type, 'key': i, 'flag': '删除'})
+                            f_equip = old_mes_recipe.product_batching_equip.filter(material__material_name__in=deleted_material, is_used=True).values(
+                                'material__material_name', 'equip_no', 'feeding_mode', 'type')
+                            if f_equip:
+                                _temp = {}
+                                for j in f_equip:
+                                    _material_name = j['material__material_name']
+                                    if _material_name not in _temp:
+                                        _temp[_material_name] = {'type': j['type'], 'key': _material_name, 'flag': '删除',
+                                                                 'cv': f"{j['feeding_mode']}({j['equip_no']})"}
+                                    else:
+                                        _temp[_material_name]['cv'] = _temp[_material_name]['cv'] + f" {j['feeding_mode']}({j['equip_no']})"
+                                desc.append('删除投料方式')
+                                change_detail_data[2].extend(list(_temp.values()))
+                        if common_material:
+                            for i in common_material:
+                                material_type = now_recipe_dict[i].get('type') if now_recipe_dict[i].get('type') else 4
+                                cv = now_recipe_dict[i]['actual_weight']
+                                pv = current_recipe_dict[i]['actual_weight']
+
+                                cv2 = now_recipe_dict[i]['standard_error']
+                                pv2 = current_recipe_dict[i]['standard_error']
+                                if pv != cv:
+                                    desc.append('配料修改')
+                                    change_detail_data[1].append({'type': material_type, 'key': i, 'flag': '修改', 'cv': float(cv), 'pv': float(pv)})
+                                if pv2 != cv2:
+                                    desc.append('称量误差')
+                                    change_detail_data[3].append({'type': material_type, 'key': i, 'flag': '修改', 'cv': float(cv2), 'pv': float(pv2)})
+                            c_equip = product_batching.product_batching_equip.filter(material__material_name__in=common_material, is_used=True).values(
+                                'material__material_name', 'equip_no', 'feeding_mode', 'type')
+                            c_equips = set(c_equip.values_list('equip_no', flat=True))
+                            v_equip = old_mes_recipe.product_batching_equip.filter(material__material_name__in=common_material, is_used=True).values(
+                                'material__material_name', 'equip_no', 'feeding_mode', 'type')
+                            v_equips = set(v_equip.values_list('equip_no', flat=True))
+                            added_equip = c_equips - v_equips
+                            deleted_equip = v_equips - c_equips
+                            common_equip = c_equips & v_equips
+                            if added_equip:
+                                add_info = c_equip.filter(equip_no__in=added_equip)
+                                _temp = {}
+                                for j in add_info:
+                                    _material_name = j['material__material_name']
+                                    if _material_name not in _temp:
+                                        _temp[_material_name] = {'type': j['type'], 'key': _material_name, 'flag': '新增',
+                                                                 'cv': f"{j['feeding_mode']}({j['equip_no']})"}
+                                    else:
+                                        _temp[_material_name]['cv'] = _temp[_material_name]['cv'] + f" {j['feeding_mode']}({j['equip_no']})"
+                                desc.append('新增投料方式')
+                                change_detail_data[2].extend(list(_temp.values()))
+                            if deleted_equip:
+                                deleted_info = v_equip.filter(equip_no__in=deleted_equip)
+                                _temp = {}
+                                for j in deleted_info:
+                                    _material_name = j['material__material_name']
+                                    if _material_name not in _temp:
+                                        _temp[_material_name] = {'type': j['type'], 'key': _material_name, 'flag': '删除',
+                                                                 'cv': f"{j['feeding_mode']}({j['equip_no']})"}
+                                    else:
+                                        _temp[_material_name]['cv'] = _temp[_material_name]['cv'] + f" {j['feeding_mode']}({j['equip_no']})"
+                                desc.append('删除投料方式')
+                                change_detail_data[2].extend(list(_temp.values()))
+                            if common_equip:
+                                for i in common_material:
+                                    s, _cv = {}, ""
+                                    for s_equip_no in common_equip:
+                                        common_info1 = c_equip.filter(equip_no=s_equip_no, material__material_name=i).last()
+                                        common_info2 = v_equip.filter(equip_no=s_equip_no, material__material_name=i).last()
+                                        if common_info1['feeding_mode'] != common_info2['feeding_mode']:
+                                            _cv += f"{common_info2['feeding_mode']}->{common_info1['feeding_mode']}({s_equip_no}) "
+                                        else:
+                                            continue
+                                        if not s:
+                                            s.update({'type': common_info1['type'], 'key': i, 'flag': '修改'})
+                                    if _cv:
+                                        s['cv'] = _cv
+                                        desc.append('修改投料方式')
+                                        change_detail_data[2].append(s)
+                        if desc:
+                            RecipeChangeDetail.objects.create(
+                                change_history=change_history, desc='/'.join(set(desc)), details=json.dumps(change_detail_data, ensure_ascii=False),
+                                changed_username=_username, submit_username=product_batching.submit_user.username,
+                                submit_time=product_batching.submit_time, confirm_username=product_batching.check_user.username,
+                                confirm_time=product_batching.check_time, sfj_down_username=_username, sfj_down_time=_now_time)
+                    else:
+                        record.sfj_down_time = _now_time
+                        record.sfj_down_username = _username
+                        record.save()
+            except Exception as e:
+                error_logger.error(f'更新配方履历变更失败{e.args[0]}')
             for p in ProductBatching.objects.filter(batching_type=1,
                                                     stage_product_batch_no=product_batching.stage_product_batch_no,
                                                     dev_type=product_batching.dev_type):
@@ -1104,3 +1256,29 @@ class ProductRatioView(ListAPIView):
                             'weight': i['actual_weight']} for i in details]
             })
         return Response({'results': ret, 'count': queryset.count()})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class RecipeChangeHistoryViewSet(ModelViewSet):
+    queryset = RecipeChangeHistory.objects.order_by('recipe_no')
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = RecipeChangeHistoryFilter
+    permission_classes = (IsAuthenticated,)
+
+    def get_serializer_class(self):
+        if self.action == 'retrieve':
+            return RecipeChangeHistoryRetrieveSerializer
+        return RecipeChangeHistorySerializer
+
+    def list(self, request, *args, **kwargs):
+        used_types = self.request.query_params.get('used_types')
+        queryset = self.filter_queryset(self.get_queryset())
+        if used_types:
+            queryset = queryset.filter(used_type__in=used_types.split(','))
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)

@@ -1463,7 +1463,7 @@ class EquipWarehouseOrderDetailSerializer(BaseModelSerializer):
 
     def get_all_qty(self, instance):
         res = EquipWarehouseInventory.objects.filter(equip_spare=instance.equip_spare, delete_flag=False).aggregate(all_qty=Sum('quantity'))
-        return res.get('all_qty') if res.get('all_qty') else 0
+        return round(res.get('all_qty'), 1) if res.get('all_qty') else 0
 
 
 class EquipWarehouseOrderListSerializer(BaseModelSerializer):
@@ -1511,8 +1511,8 @@ class EquipWarehouseOrderSerializer(BaseModelSerializer):
         order = super().create(validated_data)
         status = validated_data['status']
         for equip_spare in equip_spare_list:
-            if not isinstance(equip_spare['quantity'], int):
-                raise serializers.ValidationError('入库数量必须为整数')
+            # if not isinstance(equip_spare['quantity'], float):
+            #     raise serializers.ValidationError('入库数量必须为整数')
             if status == 1:  # 入库单据
                 kwargs = {
                     'equip_spare_id': equip_spare['id'],
@@ -1631,7 +1631,7 @@ class EquipWarehouseRecordSerializer(BaseModelSerializer):
 
     def get_money(self, instance):
         if instance.equip_spare.cost and instance.status in ['出库', '入库']:
-            return round(instance.equip_spare.cost * int(instance.quantity), 2)
+            return round(instance.equip_spare.cost * float(instance.quantity), 2)
         return 0
 
 
@@ -1744,7 +1744,7 @@ class CheckPointStandardSerializer(BaseModelSerializer):
             if set(equip_no.split(',')) & already_equip_no:
                 raise serializers.ValidationError('同岗位机台不可重叠')
         # 生成点检标准编号
-        keyword = 'GWAQDJ' if standard_type == '点检' else 'GWRQS'
+        keyword = 'GWAQDJ' if standard_type == '点检' else '5SRQS'
         max_code = CheckPointStandard.objects.filter(standard_type=standard_type).aggregate(max_code=Max('point_standard_code'))['max_code']
         point_standard_code = keyword + ('0001' if not max_code else '%04d' % (int(max_code[-4:]) + 1))
         validated_data['point_standard_code'] = point_standard_code

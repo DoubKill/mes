@@ -18,7 +18,7 @@ from basics.models import WorkSchedulePlan
 from inventory.conf import cb_ip, cb_port
 from inventory.models import MaterialOutHistory
 from inventory.utils import wms_out
-from mes.common_code import WebService
+from mes.common_code import WebService, get_virtual_time
 from mes.conf import JZ_EQUIP_NO
 from mes.settings import DATABASES
 from plan.models import BatchingClassesPlan
@@ -878,7 +878,7 @@ def get_manual_materials(product_no, dev_type, batching_equip, equip_no=None):
 
 
 def get_current_factory_date(select_date=None, group=None):
-    now, filter_kwargs = datetime.now(), {}
+    now, filter_kwargs = get_virtual_time(), {}
     if select_date and group:  # 获取特定日期的班次
         filter_kwargs = {'plan_schedule__day_time': select_date, 'group__global_name': group, 'plan_schedule__work_schedule__work_procedure__global_name': '密炼'}
     else:
