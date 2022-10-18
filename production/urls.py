@@ -165,4 +165,6 @@ urlpatterns = [
     # 工装管理台帐
     path('tool-manage-account/', ToolManageAccountView.as_view()),
 
+    path('time-energy-consuming/', TimeEnergyConsuming.as_view())
+
 ]
