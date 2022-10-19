@@ -1130,7 +1130,7 @@ permission_data = [
     {'id': 1116, 'code': 'export_daily_clean_table', 'name': '导出', 'parent_id': 1110},
 
     {'id': 1120, 'code': 'recipe_change_history', 'name': 'MES配方变更履历', 'parent_id': None, 'category_name': '工艺管理'},
-    {'id': 1121, 'code': 'view_recipe_change_history', 'name': '查看', 'parent_id': 1120}
+    {'id': 1121, 'code': 'view_recipe_change_history', 'name': '查看', 'parent_id': 1120},
 
     {'id': 1128, 'code': 'equip_fault_statistic', 'name': '设备故障统计列表', 'parent_id': None, 'category_name': '设备管理'},
     {'id': 1129, 'code': 'view_equip_fault_statistic', 'name': '查看', 'parent_id': 1128},
