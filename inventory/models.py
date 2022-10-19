@@ -1177,7 +1177,7 @@ class Sulfur(models.Model):
 
 class WMSReleaseLog(AbstractEntity):
     tracking_num = models.CharField(max_length=128, help_text='追踪码')
-    operation_type = models.CharField(max_length=10, help_text='放行/合格')
+    operation_type = models.CharField(max_length=10, help_text='放行/不放行')
 
     class Meta:
         db_table = 'wms_release_log'

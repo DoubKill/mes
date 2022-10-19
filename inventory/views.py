@@ -2912,7 +2912,7 @@ class WMSRelease(APIView):
                 "CheckResult": check_result
             })
             release_log_list.append(WMSReleaseLog(**{'tracking_num': tracking_num,
-                                                     'operation_type': operation_type,
+                                                     'operation_type': '放行' if check_result == 1 else '不放行',
                                                      'created_user': self.request.user}))
         headers = {"Content-Type": "application/json ;charset=utf-8"}
         try:
