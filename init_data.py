@@ -1132,15 +1132,15 @@ permission_data = [
     {'id': 1120, 'code': 'recipe_change_history', 'name': 'MES配方变更履历', 'parent_id': None, 'category_name': '工艺管理'},
     {'id': 1121, 'code': 'view_recipe_change_history', 'name': '查看', 'parent_id': 1120},
 
-    {'id': 1122, 'code': 'barcode_trace', 'name': '条码追溯(原材料->终炼胶)', 'parent_id': None, 'category_name': '工艺管理'},
-    {'id': 1123, 'code': 'view_barcode_trace', 'name': '查看', 'parent_id': 1122},
-    {'id': 1124, 'code': 'add_barcode_trace', 'name': '导出', 'parent_id': 1122},
+    {'id': 1134, 'code': 'barcode_trace', 'name': '条码追溯(原材料->终炼胶)', 'parent_id': None, 'category_name': '工艺管理'},
+    {'id': 1135, 'code': 'view_barcode_trace', 'name': '查看', 'parent_id': 1134},
+    {'id': 1136, 'code': 'add_barcode_trace', 'name': '导出', 'parent_id': 1134},
 
-    {'id': 1125, 'code': 'barcode_trace1', 'name': '条码追溯(终炼胶->原材料)', 'parent_id': None, 'category_name': '工艺管理'},
-    {'id': 1126, 'code': 'view_barcode_trace1', 'name': '查看', 'parent_id': 1125},
-    {'id': 1127, 'code': 'add_barcode_trace1', 'name': '导出', 'parent_id': 1125},
+    {'id': 1137, 'code': 'barcode_trace1', 'name': '条码追溯(终炼胶->原材料)', 'parent_id': None, 'category_name': '工艺管理'},
+    {'id': 1138, 'code': 'view_barcode_trace1', 'name': '查看', 'parent_id': 1137},
+    {'id': 1139, 'code': 'add_barcode_trace1', 'name': '导出', 'parent_id': 1137},
 
-    # 下一个 1128 开始
+    # 下一个 1140 开始
 ]
 
 

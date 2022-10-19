@@ -86,7 +86,7 @@ from quality.serializers import MaterialDealResultListSerializer
 from quality.utils import update_wms_quality_result
 from recipe.models import MaterialAttribute
 from terminal.models import LoadMaterialLog, WeightBatchingLog, WeightPackageLog, BarCodeTraceDetail, ReportWeight, JZReportWeight
-from terminal.utils import get_real_ip
+from terminal.utils import get_real_ip, get_current_factory_date
 from .conf import IS_BZ_USING
 from .conf import wms_ip, wms_port, cb_ip, cb_port
 from .models import MaterialInventory as XBMaterialInventory
@@ -1736,7 +1736,7 @@ class ProductTraceView(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class BarcodeTraceView(APIView):
 
-    # permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated,)
 
     def get(self, request):
         data = self.request.query_params

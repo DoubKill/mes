@@ -14,6 +14,9 @@ from django.http import HttpResponse
 from rest_framework.exceptions import ValidationError
 from suds.client import Client
 
+from production.models import PalletFeedbacks
+from terminal.models import LoadMaterialLog
+
 
 class BaseUploader(object):
     endpoint = ""
@@ -194,3 +197,20 @@ class HFSystem(object):
         if res_json.get('Result') == '0':
             raise ValueError(res_json.get('Message'))
         return f"{data.get('OastNo')}号烘箱强制操作成功"
+
+
+def get_all_codes(bar_code):
+    """通过收皮条码获取投入该物料的所有胶皮条码"""
+    result = []
+    pallet = PalletFeedbacks.objects.filter(lot_no=bar_code).last()
+    if pallet:
+        before_material = LoadMaterialLog.objects.using('SFJ').filter(bra_code__startswith='AAJ1Z', status=1, feed_log__trains__gte=pallet.begin_trains,
+                                                                      feed_log__trains__lte=pallet.end_trains, scan_material_type='胶皮',
+                                                                      feed_log__plan_classes_uid=pallet.plan_classes_uid).values_list('bra_code', flat=True).distinct()
+        if before_material:
+            result.extend(list(before_material))
+            for i in before_material:
+                get_all_codes(i)
+    return list(set(result))
+
+
