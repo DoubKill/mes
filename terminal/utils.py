@@ -377,7 +377,7 @@ def material_out_barcode(bar_code, code_type='密炼'):
             if in_instance:
                 erp_in_time = in_instance.task.fin_time
             BarCodeTraceDetail.objects.create(
-                bar_code=bar_code, code_type=code_type, scan_material=ret.get('WLMC'), product_time=ret.get('SM_CREATE'), erp_in_time=erp_in_time,
+                bar_code=bar_code, code_type=code_type, scan_material_record=ret.get('WLMC'), product_time=ret.get('SM_CREATE'), erp_in_time=erp_in_time,
                 standard_weight=round(ret.get('ZL', 0), 2), pallet_no=pallet_no, supplier=ret.get('WLDWMC'), batch_no=ret.get('PH'), display=True,
                 scan_result=True
             )
