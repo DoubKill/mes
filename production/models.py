@@ -742,3 +742,16 @@ class WeightClassPlanDetail(models.Model):
         verbose_name_plural = verbose_name = '称量排班明细'
 
 
+class EquipDownDetails(models.Model):
+    factory_date = models.DateField(help_text='工厂日期')
+    classes = models.CharField(max_length=10, help_text='班次')
+    group = models.CharField(max_length=10, help_text='班次')
+    equip_no = models.CharField(max_length=10, help_text='机台')
+    down_reason = models.CharField(max_length=128, help_text='停机原因', blank=True, null=True)
+    down_type = models.CharField(max_length=128, help_text='停机类型', blank=True, null=True)
+    details = models.CharField(max_length=128, help_text='明细', blank=True, null=True)
+    times = models.FloatField(help_text='停机时间（分钟）')
+
+    class Meta:
+        db_table = 'equip_down_details'
+        verbose_name_plural = verbose_name = '停机明细'

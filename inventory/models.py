@@ -868,6 +868,7 @@ class MaterialInHistory(models.Model):
                              db_column="StockInTaskEntityId")
     sl = models.DecimalField(max_digits=18, decimal_places=4, db_column='SL')
     zl = models.DecimalField(max_digits=18, decimal_places=4, db_column='ZL')
+    task_status = models.IntegerField(db_column='TaskState', help_text='入库状态')
 
     class Meta:
         db_table = 't_stock_in_task_upper'
@@ -1176,7 +1177,7 @@ class Sulfur(models.Model):
 
 class WMSReleaseLog(AbstractEntity):
     tracking_num = models.CharField(max_length=128, help_text='追踪码')
-    operation_type = models.CharField(max_length=10, help_text='放行/合格')
+    operation_type = models.CharField(max_length=10, help_text='放行/不放行')
 
     class Meta:
         db_table = 'wms_release_log'
