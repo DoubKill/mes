@@ -2684,6 +2684,8 @@ class WmsInventoryStockView(APIView):
         page = self.request.query_params.get('page', 1)
         page_size = self.request.query_params.get('page_size', 15)
         mooney_level = self.request.query_params.get('mooney_level')
+        pallet_no = self.request.query_params.get('pallet_no')
+        tunnel = self.request.query_params.get('tunnel')
         st = (int(page) - 1) * int(page_size)
         et = int(page) * int(page_size)
         extra_where_str = ""
@@ -2697,6 +2699,11 @@ class WmsInventoryStockView(APIView):
             extra_where_str += " and a.StockDetailState={}".format(quality_status)
         if batch_no:
             extra_where_str += " and a.BatchNo like '%{}%'".format(batch_no)
+        if pallet_no:
+            extra_where_str += " and a.LadenToolNumber ='{}'".format(pallet_no)
+        if tunnel:
+            extra_where_str += " and a.SpaceId like 'ZCM-{}%'".format(tunnel)
+
         sql = """SELECT
                  a.StockDetailState,
                  c.MaterialCode,
