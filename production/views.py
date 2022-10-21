@@ -3685,7 +3685,8 @@ class PerformanceJobLadderViewSet(ModelViewSet):
     def list(self, request, *args, **kwargs):
         if self.request.query_params.get('all'):
             if self.request.query_params.get('weight'):
-                res = PerformanceJobLadder.objects.filter(delete_flag=False, type='生产配料').values('name').annotate(c=Count('id')).values('name')
+                check_type = self.request.query_params.get('type', '')
+                res = PerformanceJobLadder.objects.filter(delete_flag=False, type=check_type).values('name').annotate(c=Count('id')).values('name')
             else:
                 res = self.filter_queryset(self.get_queryset()).values('id', 'type', 'name')
             return Response({'results': res})
