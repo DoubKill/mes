@@ -6384,8 +6384,8 @@ class GroupProductionSummary(APIView):
         if not target_month:
             raise ValidationError('请选择月份！')
         month_split = target_month.split('-')
-        year = month_split[0]
-        month = month_split[1]
+        year = int(month_split[0])
+        month = int(month_split[1])
         production_data = TrainsFeedbacks.objects.filter(
             factory_date__year=year,
             factory_date__month=month
