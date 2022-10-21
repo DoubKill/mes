@@ -15,11 +15,12 @@ from django.db import connection
 from django.http import HttpResponse, FileResponse
 from django_pandas.io import read_frame
 import pandas as pd
+from openpyxl import load_workbook
 from multiprocessing.dummy import Pool as ThreadPool
 
 from equipment.utils import gen_template_response
 from django.db.models.functions import TruncMonth
-from django.db.models import Max, Sum, Count, Min, F, Q, DecimalField
+from django.db.models import Max, Sum, Count, Min, F, Q, DecimalField, Avg
 from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
@@ -41,7 +42,7 @@ from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
 from mes.permissions import PermissionClass
 from plan.filters import ProductClassesPlanFilter
-from plan.models import ProductClassesPlan, SchedulingEquipShutDownPlan, SchedulingResult
+from plan.models import ProductClassesPlan, SchedulingEquipShutDownPlan, SchedulingResult, SchedulingRecipeMachineSetting
 from basics.models import Equip
 from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, QualityControlFilter, EquipStatusFilter, \
     PlanStatusFilter, ExpendMaterialFilter, UnReachedCapacityCause, \
@@ -54,7 +55,7 @@ from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, Pla
     FillCardApply, ApplyForExtraWork, EquipMaxValueCache, Equip190EWeight, OuterMaterial, Equip190E, \
     AttendanceClockDetail, AttendanceResultAudit, ManualInputTrains, ActualWorkingDay, EmployeeAttendanceRecordsLog, \
     RubberFrameRepair, ToolManageAccount, ActualWorkingEquip, ActualWorkingDay190E, WeightClassPlan, \
-    WeightClassPlanDetail
+    WeightClassPlanDetail, EquipDownDetails
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, \
@@ -65,7 +66,8 @@ from production.serializers import QualityControlSerializer, OperationLogSeriali
     SetThePriceSerializer, SubsidyInfoSerializer, AttendanceGroupSetupSerializer, EmployeeAttendanceRecordsSerializer, \
     FillCardApplySerializer, ApplyForExtraWorkSerializer, Equip190EWeightSerializer, \
     Equip190ESerializer, EquipStatusBatchSerializer, AttendanceClockDetailSerializer, \
-    EmployeeAttendanceRecordsLogSerializer, WeightClassPlanSerializer, WeightClassPlanUpdateSerializer
+    EmployeeAttendanceRecordsLogSerializer, WeightClassPlanSerializer, WeightClassPlanUpdateSerializer, \
+    EquipDownDetailsImportSerializer
 from rest_framework.generics import ListAPIView, UpdateAPIView, \
     get_object_or_404
 from datetime import timedelta
@@ -2573,7 +2575,7 @@ class DailyProductionCompletionReport(APIView):
             raise ValidationError('请输入正确的月份!')
         days = calendar.monthrange(year, month)[1]
         exclude_today_flat = False  # 总计是否去掉当日产量
-        if td_flag != 'Y' and month == datetime.datetime.now().month:
+        if td_flag != 'Y' and month == datetime.datetime.now().month and year == datetime.datetime.now().year:
             exclude_today_flat = True
         now_day = datetime.datetime.now().day
         results = {
@@ -5908,7 +5910,7 @@ class ShiftTimeSummaryView(APIView):
             results[key][f'{equip_no}_time_abnormal'] = time_consuming if abs(time_consuming) > 20 else None
             results[key]['consuming'] += time_consuming if abs(time_consuming) <= 20 else 0
             results[key]['abnormal'] += time_consuming if abs(time_consuming) > 20 else 0
-            results[key][f'{equip_no}_rate'] = None if not standard_time else round((time_consuming / standard_time) * 100, 2)
+            results[key][f'{equip_no}_rate'] = None if not standard_time else round((standard_time / time_consuming) * 100, 2)
         res = list(results.values())
         for item in res:
             equip_count = (len(item) - 5) // 2
@@ -6180,3 +6182,352 @@ class WeightClassPlanViewSet(ModelViewSet):
                     create_data = {'weight_class_plan': instance, 'factory_date': content, 'class_code': create_item[k] if create_item[k] else None}
                 WeightClassPlanDetail.objects.create(**create_data)
 
+
+@method_decorator([api_recorder], name='dispatch')
+class ShiftProductionSummaryView(APIView):
+    """班次产量统计"""
+
+    def get(self, request):
+        target_month = self.request.query_params.get('target_month')
+        group_name = self.request.query_params.get('group_name')
+        if not target_month:
+            raise ValidationError('请选择月份！')
+        month_split = target_month.split('-')
+        year = int(month_split[0])
+        month = int(month_split[1])
+        schedule_data = WorkSchedulePlan.objects.filter(
+            plan_schedule__work_schedule__work_procedure__global_name='密炼',
+            plan_schedule__day_time__year=year,
+            plan_schedule__day_time__month=month,
+        ).order_by('start_time').values('plan_schedule__day_time',
+                                        'classes__global_name',
+                                        'group__global_name')
+        production_data = TrainsFeedbacks.objects.filter(
+            factory_date__year=year,
+            factory_date__month=month
+        ).values('equip_no', 'factory_date', 'classes').annotate(total_trains=Count('id')).order_by('equip_no', 'factory_date')
+        equip_target_data = MachineTargetYieldSettings.objects.filter(target_month=target_month).values()
+        target_data = {}
+        if equip_target_data:
+            target_data = equip_target_data[0]
+        schedule_dict = {}
+        for i in schedule_data:
+            k = '{}-{}'.format(i['plan_schedule__day_time'].strftime("%m/%d"), i['classes__global_name'][0])
+            schedule_dict[k] = i['group__global_name'][0]
+
+        working_days = ActualWorkingDay.objects.filter(
+            factory_date__year=year, factory_date__month=month).aggregate(days=Sum('num'))['days']
+        working_days = 0 if not working_days else working_days
+        down_days_dict = dict(EquipDownDetails.objects.filter(
+            factory_date__year=year,
+            factory_date__month=month
+        ).values('equip_no').annotate(days=Sum('times')/60/24).values_list('equip_no', 'days'))
+        if month == datetime.datetime.now().month and year == datetime.datetime.now().year:
+            now_date = get_current_factory_date()['factory_date']
+            group_schedule_days = WorkSchedulePlan.objects.filter(
+                plan_schedule__work_schedule__work_procedure__global_name='密炼',
+                plan_schedule__day_time__year=year,
+                plan_schedule__day_time__month=month,
+                plan_schedule__day_time__lte=now_date,
+                group__global_name=group_name
+            ).count()
+        else:
+            group_schedule_days = WorkSchedulePlan.objects.filter(
+                plan_schedule__work_schedule__work_procedure__global_name='密炼',
+                plan_schedule__day_time__year=year,
+                plan_schedule__day_time__month=month,
+                group__global_name=group_name
+            ).count()
+        group_down_days_dict = dict(EquipDownDetails.objects.filter(
+            factory_date__year=year,
+            factory_date__month=month,
+            group=group_name
+        ).values('equip_no').annotate(days=Sum('times') / 60 / 24).values_list('equip_no', 'days'))
+        equip_production_data_dict = {i: {'equip_no': i,
+                                          'total_trains': 0,
+                                          'target_trains': target_data.get(i, 0),
+                                          'days': working_days - down_days_dict.get(i, 0),
+                                          'group_days': group_schedule_days - group_down_days_dict.get(i, 0),
+                                          } for i in
+                                      list(Equip.objects.filter(
+                                          category__equip_type__global_name="密炼设备"
+                                      ).order_by('equip_no').values_list("equip_no", flat=True))}
+        for d in production_data:
+            equip_no = d['equip_no']
+            k = '{}-{}'.format(d['factory_date'].strftime("%m/%d"), d['classes'][0])
+            key = '{}-{}'.format(k, schedule_dict[k])
+            trains = d['total_trains'] // 2 if equip_no == 'Z04' else d['total_trains']
+            equip_production_data_dict[equip_no][key] = trains
+            equip_production_data_dict[equip_no]['total_trains'] += trains
+        return Response({'table_head': schedule_dict,
+                         'data': equip_production_data_dict.values()})
+
+
+@method_decorator([api_recorder], name='dispatch')
+class EquipDownDetailView(APIView):
+    """机台停机明细"""
+
+    def post(self, request):
+        excel_file = request.FILES.get('file', None)
+        if not excel_file:
+            raise ValidationError('文件不可为空！')
+        cur_sheet = get_cur_sheet(excel_file)
+        if cur_sheet.ncols != 8:
+            raise ValidationError('导入文件数据错误！')
+        data = get_sheet_data(cur_sheet, start_row=1)
+        detail_list = []
+        for item in data:
+            try:
+                delta = datetime.timedelta(days=item[0])
+                date_1 = datetime.datetime.strptime('1899-12-30', '%Y-%m-%d') + delta
+                factory_date = datetime.datetime.strftime(date_1, '%Y-%m-%d')
+            except Exception:
+                raise ValidationError('密炼日期格式错误！')
+            user_data = {
+                "factory_date": factory_date,
+                "classes": item[1],
+                "group": item[2],
+                "equip_no": item[3],
+                "down_reason": item[4],
+                "down_type": item[5],
+                "details": item[6],
+                "times": item[7],
+            }
+            detail_list.append(user_data)
+        s = EquipDownDetailsImportSerializer(data=detail_list, many=True)
+        if not s.is_valid():
+            for i in s.errors:
+                if i:
+                    raise ValidationError(list(i.values())[0])
+        s.save()
+        return Response('ok')
+
+    def get(self, request):
+        target_month = self.request.query_params.get('target_month')
+        if not target_month:
+            raise ValidationError('请选择月份！')
+        month_split = target_month.split('-')
+        year = month_split[0]
+        month = month_split[1]
+        schedule_data = WorkSchedulePlan.objects.filter(
+            plan_schedule__work_schedule__work_procedure__global_name='密炼',
+            plan_schedule__day_time__year=year,
+            plan_schedule__day_time__month=month,
+        ).order_by('start_time').values('plan_schedule__day_time',
+                                        'classes__global_name',
+                                        'group__global_name')
+        schedule_dict = {}
+        for i in schedule_data:
+            k = '{}-{}'.format(i['plan_schedule__day_time'].strftime("%m/%d"), i['classes__global_name'][0])
+            schedule_dict[k] = i['group__global_name'][0]
+        down_data = EquipDownDetails.objects.filter(
+            factory_date__year=year,
+            factory_date__month=month
+        ).values('factory_date', 'classes', 'equip_no').annotate(t=Sum('times')).order_by('equip_no', 'factory_date')
+        production_data = TrainsFeedbacks.objects.filter(
+            factory_date__year=year,
+            factory_date__month=month
+        ).values('equip_no', 'factory_date', 'classes').annotate(total_trains=Count('id'))
+
+        max_pd_data_dict = {}
+        for i in production_data:
+            eqn = i['equip_no']
+            fd = i['factory_date']
+            cs = i['classes']
+            trs = i['total_trains']//2 if eqn == 'Z04' else i['total_trains']
+            key = '{}-{}'.format(fd.strftime("%m/%d"), cs[0])
+            if key not in max_pd_data_dict:
+                max_pd_data_dict[key] = {'equip_no': eqn, 'max_trains': trs}
+            else:
+                if trs > max_pd_data_dict[key]['max_trains']:
+                    max_pd_data_dict[key] = {'equip_no': eqn, 'max_trains': trs}
+
+        down_data_dict = {i: {'equip_no': i} for i in
+                          list(Equip.objects.filter(
+                              category__equip_type__global_name="密炼设备"
+                          ).order_by('equip_no').values_list("equip_no", flat=True))}
+        for d in down_data:
+            equip_no = d['equip_no']
+            factory_date = d['factory_date']
+            classes = d['classes']
+            times = d['t']
+            k = '{}-{}'.format(factory_date.strftime("%m/%d"), classes[0])
+            key = '{}-{}'.format(k, schedule_dict[k])
+            down_data_dict[equip_no][key] = times
+        data = list(down_data_dict.values())
+        max_data = {'equip_no': 'MAX产量机台'}
+        for k, v in max_pd_data_dict.items():
+            max_data['{}-{}'.format(k, schedule_dict[k])] = v['equip_no']
+        data.append(max_data)
+        return Response({'table_head': schedule_dict,
+                         'data': data})
+
+
+@method_decorator([api_recorder], name='dispatch')
+class GroupProductionSummary(APIView):
+
+    def get(self, request):
+        target_month = self.request.query_params.get('target_month')
+        if not target_month:
+            raise ValidationError('请选择月份！')
+        month_split = target_month.split('-')
+        year = month_split[0]
+        month = month_split[1]
+        production_data = TrainsFeedbacks.objects.filter(
+            factory_date__year=year,
+            factory_date__month=month
+        ).values('equip_no', 'factory_date', 'classes').annotate(total_trains=Count('id'))
+        if month == datetime.datetime.now().month and year == datetime.datetime.now().year:
+            now_date = get_current_factory_date()['factory_date']
+            schedule_queryset = WorkSchedulePlan.objects.filter(
+                plan_schedule__work_schedule__work_procedure__global_name='密炼',
+                plan_schedule__day_time__year=year,
+                plan_schedule__day_time__month=month,
+                plan_schedule__day_time__lte=now_date,
+            )
+        else:
+            schedule_queryset = WorkSchedulePlan.objects.filter(
+                plan_schedule__work_schedule__work_procedure__global_name='密炼',
+                plan_schedule__day_time__year=year,
+                plan_schedule__day_time__month=month,
+            )
+        group_schedule_data = schedule_queryset.values('group__global_name').annotate(cnt=Count('id'))
+        date_classes_dict = {'{}-{}'.format(i.plan_schedule.day_time.strftime("%m-%d"), i.classes.global_name): i.group.global_name for i in schedule_queryset}
+        down_data = EquipDownDetails.objects.filter(
+            factory_date__year=year,
+            factory_date__month=month
+        ).values('group', 'equip_no').annotate(s=Sum('times'))
+        equip_target_data = MachineTargetYieldSettings.objects.filter(target_month=target_month).values()
+        target_data = {}
+        if equip_target_data:
+            target_data = equip_target_data[0]
+        group_data_dict = {i: {'equip_no': i, 'target_trains': target_data.get(i, 0)} for i in
+                           list(Equip.objects.filter(
+                               category__equip_type__global_name="密炼设备"
+                           ).order_by('equip_no').values_list("equip_no", flat=True))}
+
+        for p in production_data:
+            equip_no = p['equip_no']
+            trains = p['total_trains'] if equip_no != 'Z04' else p['total_trains']//2
+            gp = date_classes_dict.get('{}-{}'.format(p['factory_date'].strftime("%m-%d"), p['classes']))
+            if not gp:
+                continue
+            gp_key = 'trains_{}'.format(gp)
+            if gp_key not in group_data_dict[equip_no]:
+                group_data_dict[equip_no][gp_key] = trains
+            else:
+                group_data_dict[equip_no][gp_key] += trains
+
+        for s in group_schedule_data:
+            s_key = 'days_{}'.format(s['group__global_name'])
+            for equip_no in group_data_dict.keys():
+                group_data_dict[equip_no][s_key] = s['cnt']
+
+        for d in down_data:
+            equip_no = d['equip_no']
+            gp = d['group']
+            times = d['s']
+            d_key = 'down_{}'.format(gp)
+            if d_key not in group_data_dict[equip_no]:
+                group_data_dict[equip_no][d_key] = times
+            else:
+                group_data_dict[equip_no][d_key] += times
+        return Response(group_data_dict.values())
+
+
+@method_decorator([api_recorder], name='dispatch')
+class TimeEnergyConsuming(APIView):
+
+    def get(self, request):
+        st = self.request.query_params.get('st', '2022-09-01')
+        et = self.request.query_params.get('et', '2022-09-15')
+        if not all([st, et]):
+            raise ValidationError('请选择开始结束时间！')
+        production_data = TrainsFeedbacks.objects.filter(
+            factory_date__gte=st,
+            factory_date__lte=et
+        ).values('product_no', 'equip_no').annotate(cnt=Count('id'),
+                                                    plan_weight=Max('plan_weight'),
+                                                    actual_weight=Max('actual_weight')/100,
+                                                    evacuation_energy=Avg('evacuation_energy'),
+                                                    consum_time=Max('consum_time')).order_by('cnt', 'product_no')
+        recipe_machine_data = SchedulingRecipeMachineSetting.objects.order_by('rubber_type', 'product_no', 'version')
+        item_dict = {}
+        for item in production_data:
+            try:
+                pb_split = item['product_no'].split('-')
+                stage, product_no, version = pb_split[1], pb_split[2], pb_split[3]
+                recipe_no = '{}-{}'.format(product_no, version)
+            except Exception:
+                continue
+            if item['equip_no'] == 'Z04':
+                evacuation_energy = item['evacuation_energy'] * 2
+            else:
+                evacuation_energy = item['evacuation_energy']
+            if recipe_no not in item_dict:
+                item_dict[recipe_no] = {stage: {'plan_weight': item['plan_weight'],
+                                                'actual_weight': item['actual_weight'],
+                                                'evacuation_energy': evacuation_energy,
+                                                'consum_time': item['consum_time'],
+                                                'equip_no': item['equip_no'],
+                                                }}
+            else:
+                item_dict[recipe_no][stage] = {'plan_weight': item['plan_weight'],
+                                                'actual_weight': item['actual_weight'],
+                                                'evacuation_energy': evacuation_energy,
+                                                'consum_time': item['consum_time'],
+                                                'equip_no': item['equip_no']}
+        wb = load_workbook('xlsx_template/energy_consume.xlsx')
+        ws = wb.worksheets[0]
+        sheet = wb.copy_worksheet(ws)
+        sheet.title = '吨耗时(吨耗能)'
+        data_row = 4
+        stage_idx = {'CMB': {7: 'equip_no', 8: 'plan_weight', 9: 'actual_weight', 10: 'evacuation_energy', 11: 'consum_time'},
+                     'HMB': {14: 'equip_no', 15: 'plan_weight', 16: 'actual_weight', 17: 'evacuation_energy', 18: 'consum_time'},
+                     '1MB': {21: 'equip_no', 22: 'plan_weight', 23: 'actual_weight', 24: 'evacuation_energy', 25: 'consum_time'},
+                     '2MB': {28: 'equip_no', 29: 'plan_weight', 30: 'actual_weight', 31: 'evacuation_energy', 32: 'consum_time'},
+                     '3MB': {35: 'equip_no', 36: 'plan_weight', 37: 'actual_weight', 38: 'evacuation_energy', 39: 'consum_time'},
+                     'RMB': {42: 'equip_no', 43: 'plan_weight', 44: 'actual_weight', 45: 'evacuation_energy', 46: 'consum_time'},
+                     'FM': {49: 'equip_no', 50: 'plan_weight', 51: 'actual_weight', 52: 'evacuation_energy', 53: 'consum_time'},
+                     }
+        for m in recipe_machine_data:
+            recipe_no = '{}-{}'.format(m.product_no, m.version)
+            if recipe_no not in item_dict:
+                continue
+            stages = m.stages.split('/')
+            sheet.cell(data_row, 1).value = m.rubber_type
+            sheet.cell(data_row, 4).value = m.product_no
+            sheet.cell(data_row, 5).value = m.version
+            sheet.cell(data_row, 6).value = len(stages)
+            for k, v in item_dict[recipe_no].items():
+                for idx, field_name in stage_idx.get(k, {}).items():
+                    equip_no = v['equip_no']
+                    actual_weight = v['plan_weight']
+                    if field_name == 'evacuation_energy':
+                        if equip_no == 'Z01':
+                            evacuation_energy = int(v['evacuation_energy'] / 10)
+                        elif equip_no == 'Z02':
+                            evacuation_energy = int(v['evacuation_energy'] / 0.6)
+                        elif equip_no == 'Z04':
+                            evacuation_energy = int(v['evacuation_energy'] * 0.28 * float(actual_weight) / 1000)
+                        elif equip_no == 'Z12':
+                            evacuation_energy = int(v['evacuation_energy'] / 5.3)
+                        elif equip_no == 'Z13':
+                            evacuation_energy = int(v['evacuation_energy'] / 31.7)
+                        else:
+                            evacuation_energy = int(v['evacuation_energy'])
+                        sheet.cell(data_row, idx).value = evacuation_energy
+                    else:
+                        sheet.cell(data_row, idx).value = v[field_name]
+            data_row += 1
+        wb.remove_sheet(ws)
+        output = BytesIO()
+        wb.save(output)
+        # 重新定位到开始
+        output.seek(0)
+        response = HttpResponse(content_type='application/vnd.ms-excel')
+        filename = '吨耗时吨耗能'
+        response['Content-Disposition'] = u'attachment;filename= ' + filename.encode('gbk').decode(
+            'ISO-8859-1') + '.xls'
+        response.write(output.getvalue())
+        return response

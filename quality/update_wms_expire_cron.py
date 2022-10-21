@@ -13,16 +13,13 @@ sys.path.append(BASE_DIR)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()
 
-from inventory.models import WmsInventoryStock, WmsInventoryMaterial
+from inventory.models import WmsInventoryStock, WmsInventoryMaterial, WMSExceptHandle
 from django.db.models import Min
-
-import logging
-logger = logging.getLogger('quality_log')
 
 
 def main():
     now_time = datetime.now()
-    for m in WmsInventoryMaterial.objects.using('wms').filter(is_validity=1):
+    for m in WmsInventoryMaterial.objects.using('wms').filter(is_validity=1, material_no='3C25B2A7-84B9-40D9-BA8C-02100EA3D5AD'):
         period_of_validity = m.period_of_validity
         min_storage_time = WmsInventoryStock.objects.using('wms').filter(
             material_no=m.material_no).aggregate(min_time=Min('in_storage_time'))['min_time']
@@ -31,10 +28,18 @@ def main():
             if min_storage_time >= min_expire_inventory_time:
                 continue
             else:
-                WmsInventoryStock.objects.using('wms').filter(
+                expired_batch_data = set(WmsInventoryStock.objects.using('wms').filter(
                     material_no=m.material_no,
                     in_storage_time__lt=min_expire_inventory_time
-                ).update(quality_status=4)
+                ).values_list('batch_no', flat=True))
+                for batch in expired_batch_data:
+                    if WMSExceptHandle.objects.filter(batch_no=batch, material_code=m.material_no).exists():
+                        min_expire_inventory_time -= timedelta(days=period_of_validity)
+                    WmsInventoryStock.objects.using('wms').filter(
+                        material_no=m.material_no,
+                        batch_no=batch,
+                        in_storage_time__lt=min_expire_inventory_time
+                    ).update(quality_status=4)
 
 
 if __name__ == '__main__':
