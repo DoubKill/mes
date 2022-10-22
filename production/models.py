@@ -755,3 +755,15 @@ class EquipDownDetails(models.Model):
     class Meta:
         db_table = 'equip_down_details'
         verbose_name_plural = verbose_name = '停机明细'
+
+
+class FinishRatio(models.Model):
+    target_month = models.CharField(max_length=8, help_text='年-月')
+    username = models.CharField(max_length=8, help_text='人员')
+    ratio = models.FloatField(help_text='完成率: 45.55')
+    equip_list = models.CharField(max_length=128, help_text='机台', null=True, blank=True)
+    actual_time = models.FloatField(help_text='工作时长', null=True, blank=True)
+
+    class Meta:
+        db_table = 'finish_ratio'
+        verbose_name_plural = verbose_name = '人员炼胶完成率'
