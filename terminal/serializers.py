@@ -264,7 +264,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 if not b_instance:
                     BarCodeTraceDetail.objects.create(
                         bra_code=bra_code, scan_material_record=scan_material, product_time=manual.created_date,
-                        material_name_reocrd=manual.product_no, standard_weight=total_weight
+                        material_name_record=manual.product_no, standard_weight=total_weight
                     )
         elif bra_code.startswith('MC'):  # 人工配(油料、CTP、配方物料)[隶属原材料胶块]
             single = WeightPackageSingle.objects.filter(bra_code=bra_code).first()
