@@ -55,7 +55,7 @@ from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, Pla
     FillCardApply, ApplyForExtraWork, EquipMaxValueCache, Equip190EWeight, OuterMaterial, Equip190E, \
     AttendanceClockDetail, AttendanceResultAudit, ManualInputTrains, ActualWorkingDay, EmployeeAttendanceRecordsLog, \
     RubberFrameRepair, ToolManageAccount, ActualWorkingEquip, ActualWorkingDay190E, WeightClassPlan, \
-    WeightClassPlanDetail, EquipDownDetails
+    WeightClassPlanDetail, EquipDownDetails, FinishRatio
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, \
@@ -3897,6 +3897,9 @@ class PerformanceSummaryView(APIView):
         if not max_setting_id:
             raise ValidationError('请先完成当月的机台目标值设定')
         target_setting = MachineTargetYieldSettings.objects.filter(id=max_setting_id).values()[0]
+        # 获取该月人员密炼完成率
+        ratio_info = FinishRatio.objects.filter(target_month=date).values('username', 'ratio')
+        ratio = {i['username']: i['ratio'] for i in ratio_info}
         # 计算薪资
         for k, v in user_dic.items():
             name, day, group, section = v['name'], v['day'], v['group'], v['section']
@@ -3915,6 +3918,8 @@ class PerformanceSummaryView(APIView):
             results_sort = {}
             equip_qty = {}
             equip_price = {}
+            # 完成率
+            s_ratio = round(ratio.get(name_d, 0) / 100, 2)
             hj = {'name': '产量工资合计', 'price': 0, 'ccjl': 0}
             for item in results1.values():
                 for dic in item:
@@ -3953,7 +3958,6 @@ class PerformanceSummaryView(APIView):
                     a = float(coefficient_dic.get('否'))
                 work_type = independent.get(name_d).get('work_type')
                 w_coefficient = float(employee_type_dic.get(work_type))
-
             # 计算超产奖励
             for section, equip_dic in equip_qty.items():
                 coefficient = section_info[section]['coefficient'] / 100
@@ -3975,11 +3979,13 @@ class PerformanceSummaryView(APIView):
                         if price == 0:
                             continue
                         if section in ['班长', '机动']:
-                            ccjl_dic[equip] = round(ccjl_dic.get(equip, 0) + price * a * w_coefficient * 0.15, 2)
+                            _s = 0.2 if section == '班长' else 0.15
+                            ccjl_dic[equip] = round(ccjl_dic.get(equip, 0) + price * a * w_coefficient * _s, 2)
                         else:
                             ccjl_dic[equip] = round(ccjl_dic.get(equip, 0) + price * a * w_coefficient * coefficient, 2)
                 # 岗位不同，计算超产奖励的方式不同
                 if section in ['班长', '机动']:
+                    s_ratio = 1
                     hj['ccjl'] += round(sum(ccjl_dic.values()) / len(ccjl_dic), 2) if ccjl_dic.values() else 0
                 elif section in ['三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库']:
                     hj['ccjl'] += round(sum(ccjl_dic.values()) * 0.2 * coefficient, 2) if ccjl_dic.values() else 0
@@ -3997,7 +4003,7 @@ class PerformanceSummaryView(APIView):
                     hj['price'] += round(max(k) * post_coefficient * coefficient * a * w_coefficient, 2) if k else 0
                 else:
                     hj['price'] += round(sum(k) / len(k) * post_coefficient * coefficient * a * w_coefficient, 2) if k else 0
-                hj['price'] = round(hj['price'], 2)
+                hj['price'] = round(hj['price'] * s_ratio, 2)
             return Response({'results': results_sort.values(), 'hj': hj, 'all_price': hj['price'], '超产奖励': hj['ccjl'], 'group_list': group_list})
 
         results = {}
@@ -4007,6 +4013,7 @@ class PerformanceSummaryView(APIView):
 
         for item in list(results1.values()):
             section, name, day, group = item[0].get('section'), item[0].get('name'), item[0].get('day'), item[0].get('group')
+            s_ratio = round(ratio.get(name, 0) / 100, 2) if section not in ['班长', '机动'] else 1
             key = f"{name}_{day}_{section}"
             a = float(coefficient_dic.get('是'))  # 是否独立上岗系数
             aa = '是'  # 是否独立上岗
@@ -4048,7 +4055,7 @@ class PerformanceSummaryView(APIView):
                 else:  # 平均值
                     price = round(
                         sum(equip_price.get(key).values()) / len(equip_price.get(key)), 2)
-                price = round(price * coefficient * a * post_coefficient * w_coefficient, 2)
+                price = round(price * coefficient * a * post_coefficient * w_coefficient * s_ratio, 2)
             if results.get(name):
                 results[name][f"{day}_{group}"] = round(results[name].get(f"{day}_{group}", 0) + price, 2)
                 results[name]['hj'] += price
@@ -4086,7 +4093,8 @@ class PerformanceSummaryView(APIView):
                     else:
                         ccjl_detail[name] = {equip: p_dic[equip]}
             if section in ['班长', '机动']:
-                p = round(sum(p_dic.values()) / len(p_dic) * 0.15, 2) if p_dic.values() else 0
+                _s = 0.2 if section == '班长' else 0.15
+                p = round(sum(p_dic.values()) / len(p_dic) * _s, 2) if p_dic.values() else 0
                 s_ccjl = ccjl_detail.get(name)
                 if s_ccjl:
                     if ccjl_detail[name].get('all'):
