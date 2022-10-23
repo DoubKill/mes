@@ -3852,7 +3852,7 @@ class PerformanceSummaryView(APIView):
             kwargs2['factory_date__day'] = day_d
         user_query = EmployeeAttendanceRecords.objects.filter(Q(**kwargs) & ~Q(is_use__in=['废弃', '驳回']),
                                                               end_date__isnull=False, begin_date__isnull=False,
-                                                              clock_type='密炼')\
+                                                              clock_type='密炼').order_by('user', 'factory_date', 'equip')\
             .values_list('user__username', 'section', 'factory_date__day', 'group', 'equip', 'actual_time', 'classes', 'calculate_begin_date', 'calculate_end_date')
         user_dic = {}
         equip_dic = {}
@@ -3909,6 +3909,7 @@ class PerformanceSummaryView(APIView):
             else:
                 results1[key] = [v]
         ccjl_detail = {}  # 按月统计超产奖励
+        ccjl_flag = {}  # 超产次数
         # 绩效详情
         if day_d and group_d:
             start_with = f"{name_d}_{day_d}_{group_d}"
@@ -3984,20 +3985,27 @@ class PerformanceSummaryView(APIView):
                         else:
                             ccjl_dic[equip] = round(ccjl_dic.get(equip, 0) + price * a * w_coefficient * coefficient, 2)
                 # 岗位不同，计算超产奖励的方式不同
+                # if section in ['班长', '机动']:
+                #     s_ratio = 1
+                #     hj['ccjl'] += round(sum(ccjl_dic.values()) / len(ccjl_dic), 2) if ccjl_dic.values() else 0
+                # elif section in ['三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库']:
+                #     hj['ccjl'] += round(sum(ccjl_dic.values()) * 0.2 * coefficient, 2) if ccjl_dic.values() else 0
+                # else:
+                #     if len(equip_dic.values()) > 1:
+                #         if post_standard == 1:  # 最大值
+                #             hj['ccjl'] += round(max(ccjl_dic.values()), 2) if ccjl_dic.values() else 0
+                #         else:
+                #             hj['ccjl'] += round(sum(ccjl_dic.values()) / (len(results_sort) // 3),
+                #                                2) if ccjl_dic.values() else 0
+                #     else:
+                #         hj['ccjl'] = round(max(ccjl_dic.values()), 2) if ccjl_dic.values() else 0
                 if section in ['班长', '机动']:
                     s_ratio = 1
-                    hj['ccjl'] += round(sum(ccjl_dic.values()) / len(ccjl_dic), 2) if ccjl_dic.values() else 0
+                    hj['ccjl'] = str(round(sum(ccjl_dic.values()) / len(ccjl_dic), 2) if ccjl_dic.values() else 0)
                 elif section in ['三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库']:
-                    hj['ccjl'] += round(sum(ccjl_dic.values()) * 0.2 * coefficient, 2) if ccjl_dic.values() else 0
+                    hj['ccjl'] = str(round(sum(ccjl_dic.values()) * 0.2 * coefficient, 2) if ccjl_dic.values() else 0)
                 else:
-                    if len(equip_dic.values()) > 1:
-                        if post_standard == 1:  # 最大值
-                            hj['ccjl'] += round(max(ccjl_dic.values()), 2) if ccjl_dic.values() else 0
-                        else:
-                            hj['ccjl'] += round(sum(ccjl_dic.values()) / (len(results_sort) // 3),
-                                               2) if ccjl_dic.values() else 0
-                    else:
-                        hj['ccjl'] = round(max(ccjl_dic.values()), 2) if ccjl_dic.values() else 0
+                    hj['ccjl'] = '、'.join([str(i) for i in ccjl_dic.values()])
                 k = equip_price[section].values()
                 if post_standard == 1:
                     hj['price'] += round(max(k) * post_coefficient * coefficient * a * w_coefficient, 2) if k else 0
@@ -4079,19 +4087,29 @@ class PerformanceSummaryView(APIView):
                         price = (qty - s) * float(coefficient1_dic.get('超过目标产量部分'))
                     if price == 0:
                         continue
+                    # 记录超产奖励明细[班长和机动一类计算方式、其他人一类]
+                    s_ccjl = ccjl_detail.get(name)
                     if section in ['班长', '机动']:
                         p_dic[equip] = round(price * a * w_coefficient, 2)  # 员工类别系数、是否独立上岗系数
+                        if s_ccjl:
+                            if equip in s_ccjl:
+                                s_ccjl[equip] = s_ccjl[equip] + p_dic[equip]
+                            else:
+                                s_ccjl[equip] = p_dic[equip]
+                        else:
+                            ccjl_detail[name] = {equip: p_dic[equip]}
                     else:
                         p_dic[equip] = round(price * a * w_coefficient * coefficient, 2)  # 绩效需要乘绩效系数、员工类别系数、是否独立上岗系数
-                    # 记录超产奖励明细
-                    s_ccjl = ccjl_detail.get(name)
-                    if s_ccjl:
-                        if equip in s_ccjl:
-                            s_ccjl[equip] = s_ccjl[equip] + p_dic[equip]
+                        if s_ccjl:
+                            c_time = ccjl_flag.get(f"{name}-{day}")
+                            if c_time:
+                                ccjl_detail[name][c_time + 1] = p_dic[equip] + (ccjl_detail[name][c_time + 1] if ccjl_detail[name].get(c_time + 1) else 0)
+                            else:
+                                ccjl_detail[name][1] += p_dic[equip]
+                                ccjl_flag[f"{name}-{day}"] = 1
                         else:
-                            s_ccjl[equip] = p_dic[equip]
-                    else:
-                        ccjl_detail[name] = {equip: p_dic[equip]}
+                            ccjl_detail[name] = {1: p_dic[equip]}
+                            ccjl_flag[f"{name}-{day}"] = 1
             if section in ['班长', '机动']:
                 _s = 0.2 if section == '班长' else 0.15
                 p = round(sum(p_dic.values()) / len(p_dic) * _s, 2) if p_dic.values() else 0
@@ -4112,15 +4130,20 @@ class PerformanceSummaryView(APIView):
                         p = round(sum(p_dic.values()) / len(equip_qty[key].values()), 2) if p_dic.values() else 0
                 else:
                     p = round(max(p_dic.values()), 2) if p_dic.values() else 0
-            # results[name]['超产奖励'] = round(results[name]['超产奖励'] + p, 2)
-            # results[name]['all'] = round(results[name]['all'] + p, 2)
+
             if p > 0:
+                _d = f"{year}-{month}-{day}"
                 if ccjl_dic.get(name):
-                    ccjl_dic[name].append({'date': f"{year}-{month}-{day}", 'price': p})
+                    if ccjl_dic[name].get(_d):
+                        ccjl_dic[name][_d]['price'].append(p)
+                    else:
+                        ccjl_dic[name][_d] = {"date": _d, 'price': [p]}
                 else:
-                    ccjl_dic[name] = [{'date': f"{year}-{month}-{day}", 'price': p}]
+                    ccjl_dic[name] = {_d: {"date": _d, 'price': [p]}}
         if ccjl:  # 超产奖励详情
-            return Response({'results': ccjl_dic.get(name_d, None)})
+            res = ccjl_dic.get(name_d, {}).values()
+            len_data = [len(i['price']) for i in res]
+            return Response({'results': res, 'max_id': max(len_data) if len_data else 0})
         for item in list(results.values()):
             # 其他奖惩+生产补贴
             additional = SubsidyInfo.objects.filter(name=item['name'], type__in=[1, 2], date__year=year,
