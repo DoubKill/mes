@@ -83,22 +83,6 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         # 物料编码、物料名称、物料重量、单位、扫码物料
         material_no, material_name, total_weight, unit, scan_material = None, None, 0, 'KG', ''
         now_date = datetime.now()
-        # b_instance = BarCodeTraceDetail.objects.filter(bra_code=bra_code, code_type='密炼')
-        # wms = WmsAddPrint.objects.filter(bra_code=bra_code).first()
-        # if wms:
-        #     scan_material_type = '胶皮'
-        #     scan_material = wms.material_name
-        #     # 查询配方中对应名称[扫码:环保型塑解剂, 群控: 环保型塑解剂-C]
-        #     material_name = '268丁基胶'
-        #     material_no = material_name
-        #     total_weight = wms.single_weight
-        #     unit = 'KG'
-        #     if not b_instance:
-        #         BarCodeTraceDetail.objects.create(
-        #             bra_code=bra_code, BarCodeTraceDetail=scan_material, product_time=wms.created_date, material_name_record=material_name,
-        #             standard_weight=total_weight
-        #         )
-        # raise serializers.ValidationError('扫码成功')
         # 获取计划
         classes_plan = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid).first()
         if not classes_plan:
@@ -1009,7 +993,7 @@ class WeightBatchingLogCreateSerializer(BaseModelSerializer):
             if not b_instance:
                 b_instance = BarCodeTraceDetail.objects.create(
                     bra_code=bra_code, code_type='料罐', scan_material_record=scan_material, product_time=single.created_date,
-                    standard_weight=round(single.single_weight * single.package_count, 2), display=True, scan_result=True
+                    standard_weight=round(float(single.single_weight) * single.package_count, 2), display=True, scan_result=True
                 )
         else:
             # 查原材料出库履历查到原材料物料编码
