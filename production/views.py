@@ -3340,7 +3340,7 @@ class SummaryOfWeighingOutput(APIView):
             key = f"{item['factory_date__day']}-{item['classes']}-{item['equip']}"
             if users.get(key):
                 work_times[key][item['user__username'] + '_' + item['section']] = [item['calculate_begin_date'], item['calculate_end_date']]
-                users[key][item['user__username']] = [item['section']] + users[key][item['user__username']]
+                users[key][item['user__username']] = [item['section']] + ([] if not users[key].get(item['user__username']) else users[key][item['user__username']])
             else:
                 work_times[key] = {item['user__username'] + '_' + item['section']: [item['calculate_begin_date'], item['calculate_end_date']]}
                 users[key] = {item['user__username']: [item['section']]}
