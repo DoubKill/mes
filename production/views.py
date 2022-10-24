@@ -6543,37 +6543,41 @@ class RubberLogView(APIView):
         target_month = self.request.query_params.get('target_month')
         display_type = self.request.query_params.get('display_type')  # 存在表示汇总表
         title, _temp, max_times = self.display_content(target_month, display_type)
-        if not display_type and max_times:  # 保存合计到汇总表
-            # 记录当月汇总
-            year, month = target_month.split('-')
-            exist_record = RubberLogSummary.objects.filter(target_month=year, day=month, times=max_times)
-            if not exist_record:
-                _add_info = []
-                for k, v in _temp.get('合计', {}).items():
-                    if k == 'day':
+        flag = _temp.pop('add', None)
+        if flag:
+            results = _temp.values()
+        else:
+            if not display_type and max_times:  # 保存合计到汇总表
+                # 记录当月汇总
+                year, month = target_month.split('-')
+                exist_record = RubberLogSummary.objects.filter(target_month=year, day=month, times=max_times)
+                if not exist_record:
+                    _add_info = []
+                    for k, v in _temp.get('合计', {}).items():
+                        if k == 'day':
+                            continue
+                        supplier_name, r_type, r_size = k.split('-')
+                        if supplier_name in ['合计', '总计']:
+                            continue
+                        _s_data = {'target_month': year, 'day': month, 'times': max_times, 'supplier_name': supplier_name, 'r_type': r_type,
+                                   'r_size': r_size, 'nums': v}
+                        _add_info.append(RubberLogSummary(**_s_data))
+                    RubberLogSummary.objects.bulk_create(_add_info)
+            else:  # 补全数据(每月缺失的品牌)
+                for i in _temp.values():
+                    # 获取所有品牌
+                    _u_data, day = {}, i.get('day')
+                    names = set([k.split('-')[0] for k in i.keys() if k.split('-')[0] not in ['day', '合计', '总计']])
+                    diff = set(title) - names
+                    if not diff:
                         continue
-                    supplier_name, r_type, r_size = k.split('-')
-                    if supplier_name in ['合计', '总计']:
-                        continue
-                    _s_data = {'target_month': year, 'day': month, 'times': max_times, 'supplier_name': supplier_name, 'r_type': r_type,
-                               'r_size': r_size, 'nums': v}
-                    _add_info.append(RubberLogSummary(**_s_data))
-                RubberLogSummary.objects.bulk_create(_add_info)
-        else:  # 补全数据(每月缺失的品牌)
-            for i in _temp.values():
-                # 获取所有品牌
-                _u_data, day = {}, i.get('day')
-                names = set([k.split('-')[0] for k in i.keys() if k.split('-')[0] not in ['day', '合计', '总计']])
-                diff = set(title) - names
-                if not diff:
-                    continue
-                for name in diff:
-                    if isinstance(day, int) or day == '合计':
-                        _u_data.update({f"{name}-进-大": 0, f"{name}-进-小": 0, f"{name}-出-大": 0, f"{name}-出-小": 0})
-                    else:
-                        _u_data.update({f"{name}": 0})
-                i.update(_u_data)
-        results = sorted(_temp.values(), key=lambda x: str(x['day']))
+                    for name in diff:
+                        if isinstance(day, int) or day == '合计':
+                            _u_data.update({f"{name}-进-大": 0, f"{name}-进-小": 0, f"{name}-出-大": 0, f"{name}-出-小": 0})
+                        else:
+                            _u_data.update({f"{name}": 0})
+                    i.update(_u_data)
+            results = sorted(_temp.values(), key=lambda x: x['day'])
         return Response({'results': results, 'title': title})
 
     @atomic
@@ -6593,7 +6597,7 @@ class RubberLogView(APIView):
                 continue
             for k, v in i.items():
                 supplier_name, r_type, r_size = k.split('-')
-                if supplier_name in ['合计', '总计']:
+                if not supplier_name or supplier_name in ['合计', '总计']:
                     continue
                 _s_data = {'target_month': target_month, 'day': day, 'created_datetime': now_time, 'created_username': username, 'times': times,
                            'supplier_name': supplier_name, 'r_type': r_type, 'r_size': r_size, 'nums': v if v else 0}
@@ -6602,14 +6606,15 @@ class RubberLogView(APIView):
         return Response('保存成功')
 
     def display_content(self, target_month, display_type):
-        title, _temp = [], {}
+        title, _temp, exist_day = [], {}, []
+        days = [int(i.split('-')[-1]) for i in days_cur_month_dates(target_month)] + [32, 33, 34] if not display_type else []
         if not display_type:
             max_times = RubberLog.objects.filter(target_month=target_month).aggregate(max_times=Max('times'))['max_times']
             if not max_times:
                 max_times = 0
             query_set = RubberLog.objects.filter(target_month=target_month, times=max_times).values('day', 'supplier_name', 'r_type', 'r_size', 'nums')
         else:
-            max_times = RubberLogSummary.objects.filter(target_month=target_month).values('day').annotate(s_times=Max('times')).values_list('day', 'times')
+            max_times = RubberLogSummary.objects.filter(target_month=target_month).values('day').annotate(s_times=Max('times')).values_list('day', 's_times')
             if not max_times:
                 max_times = []
             query_set = []
@@ -6617,6 +6622,7 @@ class RubberLogView(APIView):
                 s_data = RubberLogSummary.objects.filter(target_month=target_month, day=i[0], times=i[1]).values('day', 'supplier_name', 'r_type', 'r_size', 'nums')
                 query_set.extend(s_data)
         if query_set:
+            # 32:合计 33:结余(大) 34:结余(小)
             for i in query_set:
                 if i['supplier_name'] not in title:
                     title.append(i['supplier_name'])
@@ -6645,7 +6651,7 @@ class RubberLogView(APIView):
                         _temp['合计'][f"合计-{i['r_type']}-{i['r_size']}"] = i['nums']
                         _temp['合计'][f"总计-{i['r_type']}-{i['r_size']}"] = i['nums']
                 else:
-                    _temp['合计'] = {'day': '合计', z_key1: i['nums'], f"合计-{i['r_type']}-{i['r_size']}": i['nums'], f"总计-{i['r_type']}-{i['r_size']}": i['nums']}
+                    _temp['合计'] = {'day': 32, z_key1: i['nums'], f"合计-{i['r_type']}-{i['r_size']}": i['nums'], f"总计-{i['r_type']}-{i['r_size']}": i['nums']}
                 # 结余
                 _num = -i['nums'] if i['r_type'] == '出' else i['nums']
                 if f"结余({i['r_size']})" in _temp:
@@ -6655,5 +6661,16 @@ class RubberLogView(APIView):
                         _temp[f"结余({i['r_size']})"][f"{i['supplier_name']}"] += _num
                     _temp[f"结余({i['r_size']})"][f"总计"] += _num
                 else:
-                    _temp[f"结余({i['r_size']})"] = {'day': f"结余({i['r_size']})", f"总计": _num, f"{i['supplier_name']}": _num}
+                    _temp[f"结余({i['r_size']})"] = {'day': 33 if i['r_size'] == '大' else 34, f"总计": _num, f"{i['supplier_name']}": _num}
+                # 补全月份
+                if not display_type:
+                    exist_day.append(i['day'])
+            if exist_day:
+                other_day = set(days[:-3]) - set(exist_day)
+                for s_day in other_day:
+                    _temp[s_day] = {'day': s_day}
+        else:
+            if not display_type:  # 月份没有数据新增行头(非汇总表)
+                _temp = {day: {'day': day} for day in days}
+                _temp['add'] = True
         return title, _temp, max_times
