@@ -1317,7 +1317,6 @@ class WeightPackageDailyTimeConsumeViewSet(ModelViewSet):
         final_devoted_materials = final_pd.batching_details.filter(
             material__material_type__global_name__in=stages,
             type=1, material__material_no__icontains='-{}-'.format(product_no)).first()
-        final_devoted_weight = None  # 终炼投入前段次终炼
         xl_dp_flag = False  # 细料是否单配
         lh_dp_flag = False  # 终炼是否单配
         mixin_chemical_kind = 0  # 混炼单配化工数量
@@ -1330,6 +1329,8 @@ class WeightPackageDailyTimeConsumeViewSet(ModelViewSet):
         aw_qty = None  # AW数量
         if final_devoted_materials:
             final_devoted_weight = float(final_devoted_materials.actual_weight / 1000)
+        else:
+            raise ValidationError('未找到终炼配方投入前段次规格重量！')
         mixin_cl_recipe_name = '{}({})'.format(mixin_pd.stage_product_batch_no, mixin_dev_type)
         for equip_no in Equip.objects.filter(equip_no__startswith='F').values_list('equip_no', flat=True):
             recipe_model = JZRecipePre if equip_no in JZ_EQUIP_NO else RecipePre
@@ -1457,7 +1458,6 @@ class WeightPackageDailyTimeConsumeViewSet(ModelViewSet):
                 final_devoted_materials = final_pd.batching_details.filter(
                     material__material_type__global_name__in=stages,
                     type=1, material__material_no__icontains='-{}-'.format(product_no)).first()
-                final_devoted_weight = None  # 终炼投入前段次终炼
                 xl_dp_flag = False  # 细料是否单配
                 lh_dp_flag = False  # 终炼是否单配
                 mixin_chemical_kind = 0  # 混炼单配化工数量
@@ -1470,6 +1470,8 @@ class WeightPackageDailyTimeConsumeViewSet(ModelViewSet):
                 aw_qty = None  # AW数量
                 if final_devoted_materials:
                     final_devoted_weight = float(final_devoted_materials.actual_weight / 1000)
+                else:
+                    raise ValidationError('未找到终炼配方投入前段次规格重量！')
                 mixin_cl_recipe_name = '{}({})'.format(mixin_pd.stage_product_batch_no, mixin_dev_type)
                 for equip_no in Equip.objects.filter(equip_no__startswith='F').values_list('equip_no', flat=True):
                     recipe_model = JZRecipePre if equip_no in JZ_EQUIP_NO else RecipePre
@@ -1522,8 +1524,8 @@ class WeightPackageDailyTimeConsumeViewSet(ModelViewSet):
                         delete_flag=False,
                         material__material_name__icontains='塑解剂'
                     ).values_list('material__material_name', 'standard_weight'))
-                    for i in hl_materials_data:
-                        hl_materials += '{}:{}'.format(i[0], i[1])
+                    for j in hl_materials_data:
+                        hl_materials += '{}:{}'.format(j[0], j[1])
                 lh_plan_qty = int(plan_weight / final_devoted_weight * lh_split_qty)  # 硫磺计划包数
                 lh_dp_qty = None if not lh_dp_flag else lh_plan_qty  # 硫磺单配包数
                 manual_instance = WeightPackageManual.objects.filter(
