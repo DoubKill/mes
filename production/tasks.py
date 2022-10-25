@@ -93,7 +93,7 @@ class SaveFinishRatio(object):
         data = equip_production_data_dict.values()
         for i in data:
             total_target_trains = i['days'] * i['target_trains'] * 2
-            result[i['equip_no']] = 0 if total_target_trains == 0 else round(i['total_trains'] / total_target_trains, 2)
+            result[i['equip_no']] = 0 if total_target_trains == 0 else i['total_trains'] / total_target_trains
         return result
 
     def handle_attendance(self, select_date, equip_ratio):
@@ -119,7 +119,7 @@ class SaveFinishRatio(object):
                 continue
             max_key = max(v, key=v.get)
             equips = max_key.split('-')[2:]
-            _ratio = round(sum([equip_ratio.get(equip, 0) for equip in equips]) / len(equips), 2)
+            _ratio = sum([equip_ratio.get(equip, 0) for equip in equips]) / len(equips)
             user_ratio.append({'target_month': select_date, 'username': k, 'ratio': _ratio, 'equip_list': ','.join(equips), 'actual_time': v[max_key]})
         return user_ratio
 

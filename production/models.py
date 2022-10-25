@@ -760,9 +760,10 @@ class EquipDownDetails(models.Model):
 class FinishRatio(models.Model):
     target_month = models.CharField(max_length=8, help_text='年-月')
     username = models.CharField(max_length=8, help_text='人员')
-    ratio = models.FloatField(help_text='完成率: 45.55')
+    ratio = models.FloatField(help_text='完成率: 0.4534')
     equip_list = models.CharField(max_length=128, help_text='机台', null=True, blank=True)
     actual_time = models.FloatField(help_text='工作时长', null=True, blank=True)
+    u_time = models.DateTimeField(help_text='更新时间', auto_now=True)
 
     class Meta:
         db_table = 'finish_ratio'

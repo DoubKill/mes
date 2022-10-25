@@ -3920,7 +3920,7 @@ class PerformanceSummaryView(APIView):
             equip_qty = {}
             equip_price = {}
             # 完成率
-            s_ratio = round(ratio.get(name_d, 0) / 100, 2)
+            s_ratio = ratio.get(name_d, 0)
             hj = {'name': '产量工资合计', 'price': 0, 'ccjl': 0}
             for item in results1.values():
                 for dic in item:
@@ -4021,7 +4021,7 @@ class PerformanceSummaryView(APIView):
 
         for item in list(results1.values()):
             section, name, day, group = item[0].get('section'), item[0].get('name'), item[0].get('day'), item[0].get('group')
-            s_ratio = round(ratio.get(name, 0) / 100, 2) if section not in ['班长', '机动'] else 1
+            s_ratio = ratio.get(name, 0) if section not in ['班长', '机动'] else 1
             key = f"{name}_{day}_{section}"
             a = float(coefficient_dic.get('是'))  # 是否独立上岗系数
             aa = '是'  # 是否独立上岗
