@@ -842,7 +842,8 @@ class MaterialInHistoryOther(models.Model):
     initiator = models.CharField(max_length=64, db_column='LastUserId')
     start_time = models.DateTimeField(verbose_name='发起时间', help_text='发起时间', blank=True, null=True,
                                       db_column='CreaterTime')
-    fin_time = models.DateTimeField(verbose_name='完成时间', help_text='完成时间', blank=True, null=True, db_column='LastTime')
+    last_time = models.DateTimeField(verbose_name='开始时间', help_text='开始时间', blank=True, null=True, db_column='LastTime')
+    fin_time = models.DateTimeField(verbose_name='完成时间', help_text='完成时间', blank=True, null=True, db_column='CompleteTime')
 
     class Meta:
         db_table = 't_stock_in_task'
@@ -896,9 +897,10 @@ class MaterialOutHistoryOther(models.Model):
     initiator = models.CharField(max_length=64, db_column='LastUserId',help_text='创建人')
     start_time = models.DateTimeField(verbose_name='创建时间', help_text='创建时间', blank=True, null=True,
                                       db_column='CreaterTime')
-    fin_time = models.DateTimeField(verbose_name='完成时间', help_text='完成时间', blank=True, null=True, db_column='LastTime')
+    last_time = models.DateTimeField(verbose_name='开始时间', help_text='开始时间', blank=True, null=True, db_column='LastTime')
     task_type = models.IntegerField(db_column='StockOutTaskType', help_text='出库类型', choices=TASK_TYPE_CHOICE)
     task_status = models.IntegerField(db_column='StockOutTaskState', help_text='出库状态', choices=TASK_STATUS_CHOICE)
+    fin_time = models.DateTimeField(verbose_name='完成时间', help_text='完成时间', blank=True, null=True, db_column='CompleteTime')
 
     class Meta:
         db_table = 't_stock_out_task'
