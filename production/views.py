@@ -1,4 +1,5 @@
 import calendar
+import copy
 import decimal
 import json
 import datetime
@@ -3489,8 +3490,12 @@ class EmployeeAttendanceRecordsView(APIView):
                         state, approve_user = 2, audit_approve.approve_user
         # 增加能否导出的标记  08-19:默认可以导出[去除审核以后才能导出的限制]
         export_flag = True
+        # 返回岗位与机台关联
+        s_choice = list(PerformanceJobLadder.objects.filter(type=clock_type, relation=1, delete_flag=False).values_list('name', flat=True).distinct())
+        m_choice = list(PerformanceJobLadder.objects.filter(type=clock_type, relation=2, delete_flag=False).values_list('name', flat=True).distinct())
         return Response({'results': results_sort, 'group_list': group_list, 'export_flag': export_flag, 'state': state,
-                         'audit_user':  audit_user, 'user_groups': user_groups, 'approve_user': approve_user})
+                         'audit_user':  audit_user, 'user_groups': user_groups, 'approve_user': approve_user,
+                         's_choice': s_choice, 'm_choice': m_choice})
 
     # 导入出勤记录
     @atomic
@@ -5680,7 +5685,14 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
         clock_type = self.request.data.get('clock_type')
         factory_date, opera_type, delete_ids = None, None, []
         if report_list:  # 添加考勤数据
-            serializer = self.get_serializer(data=report_list, many=True)
+            # 处理机台数据
+            s_data, create_data = report_list[0], []
+            equip = s_data.get('equip', [])
+            for s_equip in equip:
+                i = copy.deepcopy(s_data)
+                i['equip'] = s_equip
+                create_data.append(i)
+            serializer = self.get_serializer(data=create_data, many=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
         elif confirm_list:  # 确认某一天的考勤数据
