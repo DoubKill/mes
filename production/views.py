@@ -3274,7 +3274,7 @@ class SummaryOfWeighingOutput(APIView):
             day = int(date.split('-')[2])    # 2  早班
             classes = item['grouptime']  # 早班/ 中班 / 夜班
             dic[f'{day}{classes}'] = item['count']
-            dic['hj'] += item['count']
+            dic['hj'] = dic.get('hj', 0) + item['count']
             names = users.get(f'{day}-{classes}-{equip_no}')
             if names:
                 status = names.pop('status', None)
@@ -3862,7 +3862,7 @@ class PerformanceSummaryView(APIView):
         for item in user_query:
             key = f"{item[2]}_{item[3]}_{item[1]}_{item[4]}_{item[6]}"  # 1_A班_挤出_Z01_早班
             if user_dic.get(key):  # 可能出现调岗后又换回来的情况，两次时间累加
-                user_dic[key]['actual_time'] += item[5]
+                user_dic[key]['actual_time'] = user_dic[key].get('actual_time', 0) + item[5]
             else:
                 user_dic[key] = {'name': item[0], 'section': item[1], 'day': item[2], 'group': item[3],
                                  'equip': item[4], 'actual_time': item[5], 'classes': item[6],
@@ -4008,9 +4008,9 @@ class PerformanceSummaryView(APIView):
                     hj['ccjl'] = '、'.join([str(i) for i in ccjl_dic.values()])
                 k = equip_price[section].values()
                 if post_standard == 1:
-                    hj['price'] += round(max(k) * post_coefficient * coefficient * a * w_coefficient, 2) if k else 0
+                    hj['price'] = hj.get('price', 0) + (round(max(k) * post_coefficient * coefficient * a * w_coefficient, 2) if k else 0)
                 else:
-                    hj['price'] += round(sum(k) / len(k) * post_coefficient * coefficient * a * w_coefficient, 2) if k else 0
+                    hj['price'] = hj.get('price', 0) + (round(sum(k) / len(k) * post_coefficient * coefficient * a * w_coefficient, 2) if k else 0)
                 hj['price'] = round(hj['price'] * s_ratio, 2)
             return Response({'results': results_sort.values(), 'hj': hj, 'all_price': hj['price'], '超产奖励': hj['ccjl'], 'group_list': group_list})
 
@@ -4067,8 +4067,8 @@ class PerformanceSummaryView(APIView):
                 price = round(price * coefficient * a * post_coefficient * w_coefficient * s_ratio, 2)
             if results.get(name):
                 results[name][f"{day}_{group}"] = round(results[name].get(f"{day}_{group}", 0) + price, 2)
-                results[name]['hj'] += price
-                results[name]['all'] += price
+                results[name]['hj'] = results[name].get('hj', 0) + price
+                results[name]['all'] = results[name].get('all', 0) + price
             else:
                 results[name] = {'name': name, '超产奖励': 0, '是否定岗': aa, 'hj': price, 'all': price,
                                  f"{day}_{group}": price}
@@ -4100,7 +4100,7 @@ class PerformanceSummaryView(APIView):
                             c_time = ccjl_flag.get(f"{name}-{_date}")  # 记录当天第几次超产
                             if c_time:
                                 ccjl_date[name][_date]['price'].append(p_dic[equip])
-                                ccjl_flag[f"{name}-{_date}"] += 1
+                                ccjl_flag[f"{name}-{_date}"] = ccjl_flag.get(f"{name}-{_date}", 0) + 1
                             else:
                                 ccjl_flag[f"{name}-{_date}"] = 1
                                 ccjl_date[name][_date] = {'date': _date, 'price': [p_dic[equip]]}
@@ -4113,11 +4113,11 @@ class PerformanceSummaryView(APIView):
                         if s_ccjl:
                             c_time = ccjl_flag.get(f"{name}-{_date}")
                             if c_time:
-                                ccjl_detail[name][c_time + 1] = p_dic[equip] + (ccjl_detail[name][c_time + 1] if ccjl_detail[name].get(c_time + 1) else 0)
+                                ccjl_detail[name][c_time + 1] = ccjl_detail[name].get(c_time + 1, 0) + p_dic[equip]
                                 ccjl_date[name][_date]['price'].append(p_dic[equip])
-                                ccjl_flag[f"{name}-{_date}"] += 1
+                                ccjl_flag[f"{name}-{_date}"] = ccjl_flag.get(f"{name}-{_date}", 0) + 1
                             else:
-                                ccjl_detail[name][1] += p_dic[equip]
+                                ccjl_detail[name][1] = ccjl_detail[name].get(1, 0) + p_dic[equip]
                                 ccjl_flag[f"{name}-{_date}"] = 1
                                 ccjl_date[name][_date] = {'date': _date, 'price': [p_dic[equip]]}
                         else:
@@ -4164,7 +4164,7 @@ class PerformanceSummaryView(APIView):
                                                                                  prods=Sum('price', filter=Q(type=2)))
             item['其他奖惩'] = additional['others'] if additional['others'] else 0
             item['生产补贴'] = additional['prods'] if additional['prods'] else 0
-            item['all'] += (item['其他奖惩'] + item['生产补贴'])
+            item['all'] = item.get('all', 0) + (item['其他奖惩'] + item['生产补贴'])
             # 乘员工类别系数
             if independent.get(item['name']):
                 work_type = independent[item['name']].get('work_type')
