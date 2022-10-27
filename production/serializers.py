@@ -15,7 +15,7 @@ from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, Pla
     OperationLog, UnReachedCapacityCause, ProcessFeedback, AlarmLog, RubberCannotPutinReason, PerformanceJobLadder, \
     ProductInfoDingJi, SetThePrice, SubsidyInfo, AttendanceGroupSetup, EmployeeAttendanceRecords, FillCardApply, \
     ApplyForExtraWork, Equip190EWeight, OuterMaterial, Equip190E, AttendanceClockDetail, EmployeeAttendanceRecordsLog, \
-    WeightClassPlan, WeightClassPlanDetail
+    WeightClassPlan, WeightClassPlanDetail, EquipDownDetails
 from recipe.models import MaterialAttribute
 from system.models import User
 from terminal.utils import get_current_factory_date
@@ -644,3 +644,25 @@ class WeightClassPlanUpdateSerializer(serializers.ModelSerializer):
         model = WeightClassPlan
         fields = ('target_month', 'station', 'weight_class_details')
         read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class EquipDownDetailsImportSerializer(serializers.ModelSerializer):
+
+    def validate(self, validated_data):
+        equip_no = validated_data['equip_no']
+        group_name = validated_data['group']
+        classes = validated_data['classes']
+        if len(equip_no) == 2:
+            new_eq_name = '{}0{}'.format(equip_no[0], equip_no[1])
+            validated_data['equip_no'] = new_eq_name
+        if len(classes) == 1:
+            new_cs_name = classes + '班'
+            validated_data['classes'] = new_cs_name
+        if len(group_name) == 1:
+            new_gp_name = group_name + '班'
+            validated_data['group'] = new_gp_name
+        return validated_data
+
+    class Meta:
+        model = EquipDownDetails
+        fields = '__all__'

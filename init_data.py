@@ -1132,6 +1132,15 @@ permission_data = [
     {'id': 1120, 'code': 'recipe_change_history', 'name': 'MES配方变更履历', 'parent_id': None, 'category_name': '工艺管理'},
     {'id': 1121, 'code': 'view_recipe_change_history', 'name': '查看', 'parent_id': 1120},
 
+    {'id': 1122, 'code': 'shift_production_summary', 'name': '各班产量统计', 'parent_id': None, 'category_name': '生产管理'},
+    {'id': 1123, 'code': 'view_shift_production_summary', 'name': '查看', 'parent_id': 1122},
+
+    {'id': 1124, 'code': 'equip_down_detail', 'name': '计划停机时间', 'parent_id': None, 'category_name': '生产管理'},
+    {'id': 1125, 'code': 'view_equip_down_detail', 'name': '查看', 'parent_id': 1124},
+
+    {'id': 1126, 'code': 'group_production_summary', 'name': '班组产量明细汇总', 'parent_id': None, 'category_name': '生产管理'},
+    {'id': 1127, 'code': 'view_group_production_summary', 'name': '查看', 'parent_id': 1126},
+
     {'id': 1128, 'code': 'equip_fault_statistic', 'name': '设备故障统计列表', 'parent_id': None, 'category_name': '设备管理'},
     {'id': 1129, 'code': 'view_equip_fault_statistic', 'name': '查看', 'parent_id': 1128},
     {'id': 1130, 'code': 'export_equip_fault_statistic', 'name': '导出', 'parent_id': 1128},
@@ -1140,7 +1149,12 @@ permission_data = [
     {'id': 1132, 'code': 'view_equip_fault_analyse', 'name': '查看', 'parent_id': 1131},
     {'id': 1133, 'code': 'export_equip_fault_analyse', 'name': '导出', 'parent_id': 1131}
 
-    # 下一个 1134 开始
+    {'id': 1140, 'code': 'rubber_log', 'name': '胶架进出登记表', 'parent_id': None, 'category_name': '生产管理'},
+    {'id': 1141, 'code': 'view_rubber_log', 'name': '查看', 'parent_id': 1140},
+    {'id': 1142, 'code': 'add_rubber_log', 'name': '保存', 'parent_id': 1140},
+    {'id': 1143, 'code': 'export_rubber_log', 'name': '导出', 'parent_id': 1140},
+
+    # 下一个 1144 开始
 ]
 
 

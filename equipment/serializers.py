@@ -1726,7 +1726,7 @@ class CheckPointStandardSerializer(BaseModelSerializer):
     def to_representation(self, instance):
         res = super().to_representation(instance)
         check_contents, check_styles = '', ''
-        contents = instance.check_details.filter(delete_flag=False)
+        contents = instance.check_details.filter(delete_flag=False).order_by('sn')
         if contents:
             for index, content in enumerate(contents):
                 check_contents += f'{index + 1}、{content.check_content}；'
@@ -1873,6 +1873,8 @@ class CheckPointTableSerializer(BaseModelSerializer):
         # 填写过项目则变为已点检
         if table_check_result:
             instance.status = '已点检' if standard_type == '点检' else '已检查'
+            instance.point_user = self.context['request'].user.username
+            instance.point_time = datetime.now()
         instance.check_result = table_check_result
         instance.save()
         return instance
