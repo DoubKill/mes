@@ -1141,7 +1141,20 @@ permission_data = [
     {'id': 1126, 'code': 'group_production_summary', 'name': '班组产量明细汇总', 'parent_id': None, 'category_name': '生产管理'},
     {'id': 1127, 'code': 'view_group_production_summary', 'name': '查看', 'parent_id': 1126},
 
-    # 下一个 1128 开始
+    {'id': 1128, 'code': 'daily_weight_package', 'name': '料包日需求及耗时统计', 'parent_id': None, 'category_name': '生产计划管理'},
+    {'id': 1129, 'code': 'view_daily_weight_package', 'name': '查看', 'parent_id': 1128},
+    {'id': 1130, 'code': 'add_daily_weight_package', 'name': '新增', 'parent_id': 1128},
+    {'id': 1131, 'code': 'change_daily_weight_package', 'name': '编辑', 'parent_id': 1128},
+    {'id': 1132, 'code': 'delete_daily_weight_package', 'name': '删除', 'parent_id': 1128},
+    {'id': 1133, 'code': 'import_daily_weight_package', 'name': '导入', 'parent_id': 1128},
+    {'id': 1134, 'code': 'export_daily_weight_package', 'name': '导出', 'parent_id': 1128},
+
+    {'id': 1135, 'code': 'rubber_log', 'name': '胶架进出登记表', 'parent_id': None, 'category_name': '生产管理'},
+    {'id': 1136, 'code': 'view_rubber_log', 'name': '查看', 'parent_id': 1134},
+    {'id': 1137, 'code': 'add_rubber_log', 'name': '保存', 'parent_id': 1134},
+    {'id': 1138, 'code': 'export_rubber_log', 'name': '导出', 'parent_id': 1134},
+
+    # 下一个 1139 开始
 ]
 
 

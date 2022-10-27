@@ -55,7 +55,7 @@ from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, Pla
     FillCardApply, ApplyForExtraWork, EquipMaxValueCache, Equip190EWeight, OuterMaterial, Equip190E, \
     AttendanceClockDetail, AttendanceResultAudit, ManualInputTrains, ActualWorkingDay, EmployeeAttendanceRecordsLog, \
     RubberFrameRepair, ToolManageAccount, ActualWorkingEquip, ActualWorkingDay190E, WeightClassPlan, \
-    WeightClassPlanDetail, EquipDownDetails
+    WeightClassPlanDetail, EquipDownDetails, FinishRatio, RubberLog, RubberLogSummary
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, \
@@ -3274,7 +3274,7 @@ class SummaryOfWeighingOutput(APIView):
             day = int(date.split('-')[2])    # 2  早班
             classes = item['grouptime']  # 早班/ 中班 / 夜班
             dic[f'{day}{classes}'] = item['count']
-            dic['hj'] += item['count']
+            dic['hj'] = dic.get('hj', 0) + item['count']
             names = users.get(f'{day}-{classes}-{equip_no}')
             if names:
                 status = names.pop('status', None)
@@ -3340,7 +3340,7 @@ class SummaryOfWeighingOutput(APIView):
             key = f"{item['factory_date__day']}-{item['classes']}-{item['equip']}"
             if users.get(key):
                 work_times[key][item['user__username'] + '_' + item['section']] = [item['calculate_begin_date'], item['calculate_end_date']]
-                users[key][item['user__username']] = [item['section']] + users[key][item['user__username']]
+                users[key][item['user__username']] = [item['section']] + ([] if not users[key].get(item['user__username']) else users[key][item['user__username']])
             else:
                 work_times[key] = {item['user__username'] + '_' + item['section']: [item['calculate_begin_date'], item['calculate_end_date']]}
                 users[key] = {item['user__username']: [item['section']]}
@@ -3685,7 +3685,8 @@ class PerformanceJobLadderViewSet(ModelViewSet):
     def list(self, request, *args, **kwargs):
         if self.request.query_params.get('all'):
             if self.request.query_params.get('weight'):
-                res = PerformanceJobLadder.objects.filter(delete_flag=False, type='生产配料').values('name').annotate(c=Count('id')).values('name')
+                check_type = self.request.query_params.get('type', '')
+                res = PerformanceJobLadder.objects.filter(delete_flag=False, type=check_type).values('name').annotate(c=Count('id')).values('name')
             else:
                 res = self.filter_queryset(self.get_queryset()).values('id', 'type', 'name')
             return Response({'results': res})
@@ -3759,44 +3760,57 @@ class SetThePriceViewSet(ModelViewSet):
 @method_decorator([api_recorder], name="dispatch")
 class PerformanceSummaryView(APIView):
     permission_classes = (IsAuthenticated,)
+    qty_data = {}
 
     def concat_user_train(self, key, detail, equip_dic, price_dic, dj_list, date):
         day, group, section, equip, classes = key.split('_')
         begin_date, end_date = detail.pop('calculate_begin_date'), detail.pop('calculate_end_date')
-        equip_kwargs = {'equip_no': equip, 'classes': classes}
-        add_qty = ManualInputTrains.objects.filter(**equip_kwargs, factory_date=f'{date}-' + '%02d' % int(day)).values('id', 'actual_trains', 'product_no')
-        if equip == 'Z04':
-            equip_kwargs['operation_user'] = 'Mixer1'
-        equip_kwargs.update({'begin_time__gte': begin_date, 'end_time__lte': end_date, 'factory_date__day': day})
-        query_set = TrainsFeedbacks.objects.filter(**equip_kwargs).values('product_no').annotate(actual_trains=Count('id')).values('actual_trains', 'product_no')
-        ready_data = list(query_set) + list(add_qty)
-        for item in ready_data:
-            m_id, equip_type = item.get('id'), equip_dic.get(equip)
-            try:
-                state = item['product_no'].split('-')[1]
-                if state in ['XCJ', 'DJXCJ']:
-                    if item['product_no'].split('-')[0] == 'FM':
-                        state = 'RFM'
-                    elif item['product_no'].split('-')[0] == 'WL':
-                        state = 'RMB'
+        k = f"{equip}-{classes}-{begin_date.strftime('%Y-%m-%d %H:%M:%S')}-{end_date.strftime('%Y-%m-%d %H:%M:%S')}"
+        _data = self.qty_data.get(k)
+        if _data:
+            detail.update(_data)
+        else:
+            equip_kwargs = {'equip_no': equip, 'classes': classes}
+            add_qty = ManualInputTrains.objects.filter(**equip_kwargs, factory_date=f'{date}-' + '%02d' % int(day)).values('id', 'actual_trains', 'product_no')
+            if equip == 'Z04':
+                equip_kwargs['operation_user'] = 'Mixer1'
+            equip_kwargs.update({'begin_time__gte': begin_date, 'end_time__lte': end_date, 'factory_date__day': day})
+            query_set = TrainsFeedbacks.objects.filter(**equip_kwargs).values('product_no').annotate(actual_trains=Count('id')).values('actual_trains', 'product_no')
+            ready_data = list(query_set) + list(add_qty)
+            for item in ready_data:
+                m_id, equip_type = item.get('id'), equip_dic.get(equip)
+                try:
+                    state = item['product_no'].split('-')[1]
+                    if state in ['XCJ', 'DJXCJ']:
+                        if item['product_no'].split('-')[0] == 'FM':
+                            state = 'RFM'
+                        elif item['product_no'].split('-')[0] == 'WL':
+                            state = 'RMB'
+                        else:
+                            continue
+                except:
+                    continue
+                if not price_dic.get(f"{equip_type}_{state}"):
+                    PerformanceUnitPrice.objects.create(state=state, equip_type=equip_type, dj=1.2, pt=1.1)
+                    price_dic[f"{equip_type}_{state}"] = {'pt': 1.2, 'dj': 1.1}
+                # 判断是否是丁基胶
+                frame_type = 'dj' if item['product_no'] in dj_list else 'pt'
+                # 根据工作时长求机台的产量
+                work_time = detail['actual_time']
+                if section in ['三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库']:
+                    unit = price_dic.get(f"fz_{state}").get(frame_type)
+                else:
+                    unit = price_dic.get(f"{equip_type}_{state}").get(frame_type)
+                now_qty = (item['actual_trains'] / 12 * work_time) if m_id else item['actual_trains']
+                if self.qty_data.get(k):
+                    if self.qty_data[k].get(f"{state}_{frame_type}_qty"):
+                        self.qty_data[k][f"{state}_{frame_type}_qty"] = round(self.qty_data[k][f"{state}_{frame_type}_qty"] + now_qty, 2)
                     else:
-                        continue
-            except:
-                continue
-            if not price_dic.get(f"{equip_type}_{state}"):
-                PerformanceUnitPrice.objects.create(state=state, equip_type=equip_type, dj=1.2, pt=1.1)
-                price_dic[f"{equip_type}_{state}"] = {'pt': 1.2, 'dj': 1.1}
-            # 判断是否是丁基胶
-            frame_type = 'dj' if item['product_no'] in dj_list else 'pt'
-            # 根据工作时长求机台的产量
-            work_time = detail['actual_time']
-            if '叉车' in section:
-                unit = price_dic.get(f"fz_{state}").get(frame_type)
-            else:
-                unit = price_dic.get(f"{equip_type}_{state}").get(frame_type)
-            now_qty = (item['actual_trains'] / 12 * work_time) if m_id else item['actual_trains']
-            detail[f"{state}_{frame_type}_qty"] = round(detail.get(f"{state}_{frame_type}_qty", 0) + now_qty, 2)
-            detail[f"{state}_{frame_type}_unit"] = unit
+                        self.qty_data[k].update({f"{state}_{frame_type}_qty": round(now_qty, 2), f"{state}_{frame_type}_unit": unit})
+                else:
+                    self.qty_data[k] = {f"{state}_{frame_type}_qty": round(now_qty, 2), f"{state}_{frame_type}_unit": unit}
+            if self.qty_data.get(k):
+                detail.update(self.qty_data[k])
 
     def get(self, request):
         date = self.request.query_params.get('date')
@@ -3839,7 +3853,7 @@ class PerformanceSummaryView(APIView):
             kwargs2['factory_date__day'] = day_d
         user_query = EmployeeAttendanceRecords.objects.filter(Q(**kwargs) & ~Q(is_use__in=['废弃', '驳回']),
                                                               end_date__isnull=False, begin_date__isnull=False,
-                                                              clock_type='密炼')\
+                                                              clock_type='密炼').order_by('user', 'factory_date', 'equip')\
             .values_list('user__username', 'section', 'factory_date__day', 'group', 'equip', 'actual_time', 'classes', 'calculate_begin_date', 'calculate_end_date')
         user_dic = {}
         equip_dic = {}
@@ -3849,7 +3863,7 @@ class PerformanceSummaryView(APIView):
         for item in user_query:
             key = f"{item[2]}_{item[3]}_{item[1]}_{item[4]}_{item[6]}"  # 1_A班_挤出_Z01_早班
             if user_dic.get(key):  # 可能出现调岗后又换回来的情况，两次时间累加
-                user_dic[key]['actual_time'] += item[5]
+                user_dic[key]['actual_time'] = user_dic[key].get('actual_time', 0) + item[5]
             else:
                 user_dic[key] = {'name': item[0], 'section': item[1], 'day': item[2], 'group': item[3],
                                  'equip': item[4], 'actual_time': item[5], 'classes': item[6],
@@ -3874,16 +3888,19 @@ class PerformanceSummaryView(APIView):
         results1 = {}
         # 是否独立上岗
         independent = {}
-        independent_lst = IndependentPostTemplate.objects.filter(date_time=date).values('name', 'status', 'work_type')
+        independent_lst = IndependentPostTemplate.objects.all().values('name', 'status', 'work_type')
         for item in independent_lst:
             independent[item['name']] = {'status': item['status'], 'work_type': item['work_type']}
         if not independent:
-            raise ValidationError(f'请添加{date}员工类别')
+            raise ValidationError(f'请添加员工类别')
         # 取每个机台设定的目标值
         max_setting_id = MachineTargetYieldSettings.objects.filter(target_month=date).aggregate(m_id=Max('id'))['m_id']
         if not max_setting_id:
             raise ValidationError('请先完成当月的机台目标值设定')
         target_setting = MachineTargetYieldSettings.objects.filter(id=max_setting_id).values()[0]
+        # 获取该月人员密炼完成率
+        ratio_info = FinishRatio.objects.filter(target_month=date).values('username', 'ratio')
+        ratio = {i['username']: i['ratio'] for i in ratio_info}
         # 计算薪资
         for k, v in user_dic.items():
             name, day, group, section = v['name'], v['day'], v['group'], v['section']
@@ -3893,6 +3910,7 @@ class PerformanceSummaryView(APIView):
             else:
                 results1[key] = [v]
         ccjl_detail = {}  # 按月统计超产奖励
+        ccjl_flag = {}  # 超产次数
         # 绩效详情
         if day_d and group_d:
             start_with = f"{name_d}_{day_d}_{group_d}"
@@ -3902,6 +3920,8 @@ class PerformanceSummaryView(APIView):
             results_sort = {}
             equip_qty = {}
             equip_price = {}
+            # 完成率
+            s_ratio = ratio.get(name_d, 0)
             hj = {'name': '产量工资合计', 'price': 0, 'ccjl': 0}
             for item in results1.values():
                 for dic in item:
@@ -3940,7 +3960,6 @@ class PerformanceSummaryView(APIView):
                     a = float(coefficient_dic.get('否'))
                 work_type = independent.get(name_d).get('work_type')
                 w_coefficient = float(employee_type_dic.get(work_type))
-
             # 计算超产奖励
             for section, equip_dic in equip_qty.items():
                 coefficient = section_info[section]['coefficient'] / 100
@@ -3961,40 +3980,51 @@ class PerformanceSummaryView(APIView):
                             price = (qty - s) * float(coefficient1_dic.get('超过目标产量部分'))
                         if price == 0:
                             continue
-                        if section in ['班长', '机动']:
-                            ccjl_dic[equip] = round(ccjl_dic.get(equip, 0) + price * a * w_coefficient * 0.15, 2)
+                        if section in ['班长', '机动', '三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库']:
+                            _s = 0.2 if section == '班长' else 0.15
+                            ccjl_dic[equip] = round(ccjl_dic.get(equip, 0) + price * a * w_coefficient * _s, 2)
                         else:
                             ccjl_dic[equip] = round(ccjl_dic.get(equip, 0) + price * a * w_coefficient * coefficient, 2)
                 # 岗位不同，计算超产奖励的方式不同
-                if section in ['班长', '机动']:
-                    hj['ccjl'] += round(sum(ccjl_dic.values()) / len(ccjl_dic), 2) if ccjl_dic.values() else 0
-                elif section in ['三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库']:
-                    hj['ccjl'] += round(sum(ccjl_dic.values()) * 0.2 * coefficient, 2) if ccjl_dic.values() else 0
+                # if section in ['班长', '机动']:
+                #     s_ratio = 1
+                #     hj['ccjl'] += round(sum(ccjl_dic.values()) / len(ccjl_dic), 2) if ccjl_dic.values() else 0
+                # elif section in ['三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库']:
+                #     hj['ccjl'] += round(sum(ccjl_dic.values()) * 0.2 * coefficient, 2) if ccjl_dic.values() else 0
+                # else:
+                #     if len(equip_dic.values()) > 1:
+                #         if post_standard == 1:  # 最大值
+                #             hj['ccjl'] += round(max(ccjl_dic.values()), 2) if ccjl_dic.values() else 0
+                #         else:
+                #             hj['ccjl'] += round(sum(ccjl_dic.values()) / (len(results_sort) // 3),
+                #                                2) if ccjl_dic.values() else 0
+                #     else:
+                #         hj['ccjl'] = round(max(ccjl_dic.values()), 2) if ccjl_dic.values() else 0
+                if section in ['班长', '机动', '三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库']:
+                    s_ratio = 1
+                    hj['ccjl'] = str(round(sum(ccjl_dic.values()) / len(ccjl_dic), 2) if ccjl_dic.values() else 0)
+                # elif section in ['三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库']:
+                #     hj['ccjl'] = str(round(sum(ccjl_dic.values()) * 0.2 * coefficient, 2) if ccjl_dic.values() else 0)
                 else:
-                    if len(equip_dic.values()) > 1:
-                        if post_standard == 1:  # 最大值
-                            hj['ccjl'] += round(max(ccjl_dic.values()), 2) if ccjl_dic.values() else 0
-                        else:
-                            hj['ccjl'] += round(sum(ccjl_dic.values()) / (len(results_sort) // 3),
-                                               2) if ccjl_dic.values() else 0
-                    else:
-                        hj['ccjl'] = round(max(ccjl_dic.values()), 2) if ccjl_dic.values() else 0
+                    hj['ccjl'] = '、'.join([str(i) for i in ccjl_dic.values()])
                 k = equip_price[section].values()
                 if post_standard == 1:
-                    hj['price'] += round(max(k) * post_coefficient * coefficient * a * w_coefficient, 2) if k else 0
+                    hj['price'] = hj.get('price', 0) + (round(max(k) * post_coefficient * coefficient * a * w_coefficient, 2) if k else 0)
                 else:
-                    hj['price'] += round(sum(k) / len(k) * post_coefficient * coefficient * a * w_coefficient, 2) if k else 0
-                hj['price'] = round(hj['price'], 2)
+                    hj['price'] = hj.get('price', 0) + (round(sum(k) / len(k) * post_coefficient * coefficient * a * w_coefficient, 2) if k else 0)
+                hj['price'] = round(hj['price'] * s_ratio, 2)
             return Response({'results': results_sort.values(), 'hj': hj, 'all_price': hj['price'], '超产奖励': hj['ccjl'], 'group_list': group_list})
 
         results = {}
-        ccjl_dic = {}
+        ccjl_date = {}
         equip_qty = {}
         equip_price = {}
 
         for item in list(results1.values()):
             section, name, day, group = item[0].get('section'), item[0].get('name'), item[0].get('day'), item[0].get('group')
+            s_ratio = ratio.get(name, 0) if section not in ['班长', '机动', '三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库'] else 1
             key = f"{name}_{day}_{section}"
+            _date = f"{date}-{day}"
             a = float(coefficient_dic.get('是'))  # 是否独立上岗系数
             aa = '是'  # 是否独立上岗
             w_coefficient = 1  # 员工类别系数
@@ -4035,11 +4065,11 @@ class PerformanceSummaryView(APIView):
                 else:  # 平均值
                     price = round(
                         sum(equip_price.get(key).values()) / len(equip_price.get(key)), 2)
-                price = round(price * coefficient * a * post_coefficient * w_coefficient, 2)
+                price = round(price * coefficient * a * post_coefficient * w_coefficient * s_ratio, 2)
             if results.get(name):
                 results[name][f"{day}_{group}"] = round(results[name].get(f"{day}_{group}", 0) + price, 2)
-                results[name]['hj'] += price
-                results[name]['all'] += price
+                results[name]['hj'] = results[name].get('hj', 0) + price
+                results[name]['all'] = results[name].get('all', 0) + price
             else:
                 results[name] = {'name': name, '超产奖励': 0, '是否定岗': aa, 'hj': price, 'all': price,
                                  f"{day}_{group}": price}
@@ -4059,21 +4089,45 @@ class PerformanceSummaryView(APIView):
                         price = (qty - s) * float(coefficient1_dic.get('超过目标产量部分'))
                     if price == 0:
                         continue
-                    if section in ['班长', '机动']:
+                    # 记录超产奖励明细[班长和机动一类计算方式、其他人一类]
+                    s_ccjl = ccjl_detail.get(name)
+                    if section in ['班长', '机动', '三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库']:
                         p_dic[equip] = round(price * a * w_coefficient, 2)  # 员工类别系数、是否独立上岗系数
+                        if s_ccjl:
+                            if equip in s_ccjl:
+                                s_ccjl[equip] = s_ccjl[equip] + p_dic[equip]
+                            else:
+                                s_ccjl[equip] = p_dic[equip]
+                            c_time = ccjl_flag.get(f"{name}-{_date}")  # 记录当天第几次超产
+                            if c_time:
+                                ccjl_date[name][_date]['price'].append(p_dic[equip])
+                                ccjl_flag[f"{name}-{_date}"] = ccjl_flag.get(f"{name}-{_date}", 0) + 1
+                            else:
+                                ccjl_flag[f"{name}-{_date}"] = 1
+                                ccjl_date[name][_date] = {'date': _date, 'price': [p_dic[equip]]}
+                        else:
+                            ccjl_detail[name] = {equip: p_dic[equip]}
+                            ccjl_flag[f"{name}-{_date}"] = 1
+                            ccjl_date[name] = {_date: {'date': _date, 'price': [p_dic[equip]]}}
                     else:
                         p_dic[equip] = round(price * a * w_coefficient * coefficient, 2)  # 绩效需要乘绩效系数、员工类别系数、是否独立上岗系数
-                    # 记录超产奖励明细
-                    s_ccjl = ccjl_detail.get(name)
-                    if s_ccjl:
-                        if equip in s_ccjl:
-                            s_ccjl[equip] = s_ccjl[equip] + p_dic[equip]
+                        if s_ccjl:
+                            c_time = ccjl_flag.get(f"{name}-{_date}")
+                            if c_time:
+                                ccjl_detail[name][c_time + 1] = ccjl_detail[name].get(c_time + 1, 0) + p_dic[equip]
+                                ccjl_date[name][_date]['price'].append(p_dic[equip])
+                                ccjl_flag[f"{name}-{_date}"] = ccjl_flag.get(f"{name}-{_date}", 0) + 1
+                            else:
+                                ccjl_detail[name][1] = ccjl_detail[name].get(1, 0) + p_dic[equip]
+                                ccjl_flag[f"{name}-{_date}"] = 1
+                                ccjl_date[name][_date] = {'date': _date, 'price': [p_dic[equip]]}
                         else:
-                            s_ccjl[equip] = p_dic[equip]
-                    else:
-                        ccjl_detail[name] = {equip: p_dic[equip]}
-            if section in ['班长', '机动']:
-                p = round(sum(p_dic.values()) / len(p_dic) * 0.15, 2) if p_dic.values() else 0
+                            ccjl_detail[name] = {1: p_dic[equip]}
+                            ccjl_flag[f"{name}-{_date}"] = 1
+                            ccjl_date[name] = {_date: {'date': _date, 'price': [p_dic[equip]]}}
+            if section in ['班长', '机动', '三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库']:
+                _s = 0.2 if section == '班长' else 0.15
+                p = round(sum(p_dic.values()) / len(p_dic) * _s, 2) if p_dic.values() else 0
                 s_ccjl = ccjl_detail.get(name)
                 if s_ccjl:
                     if ccjl_detail[name].get('all'):
@@ -4081,25 +4135,29 @@ class PerformanceSummaryView(APIView):
                     else:
                         ccjl_detail[name]['all'] = p
 
-            elif section in ['三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库']:
-                p = round(sum(p_dic.values()) * 0.2 * coefficient, 2) if p_dic.values() else 0
-            else:
-                if len(equip_qty[key].values()) > 1:
-                    if post_standard == 1:
-                        p = round(max(p_dic.values()), 2) if p_dic.values() else 0
-                    else:
-                        p = round(sum(p_dic.values()) / len(equip_qty[key].values()), 2) if p_dic.values() else 0
-                else:
-                    p = round(max(p_dic.values()), 2) if p_dic.values() else 0
-            # results[name]['超产奖励'] = round(results[name]['超产奖励'] + p, 2)
-            # results[name]['all'] = round(results[name]['all'] + p, 2)
-            if p > 0:
-                if ccjl_dic.get(name):
-                    ccjl_dic[name].append({'date': f"{year}-{month}-{day}", 'price': p})
-                else:
-                    ccjl_dic[name] = [{'date': f"{year}-{month}-{day}", 'price': p}]
+            # elif section in ['三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库']:
+            #     p = round(sum(p_dic.values()) * 0.2 * coefficient, 2) if p_dic.values() else 0
+            # else:
+            #     if len(equip_qty[key].values()) > 1:
+            #         if post_standard == 1:
+            #             p = round(max(p_dic.values()), 2) if p_dic.values() else 0
+            #         else:
+            #             p = round(sum(p_dic.values()) / len(equip_qty[key].values()), 2) if p_dic.values() else 0
+            #     else:
+            #         p = round(max(p_dic.values()), 2) if p_dic.values() else 0
+            # if p > 0:
+            #     _d = f"{year}-{month}-{day}"
+            #     if ccjl_dic.get(name):
+            #         if ccjl_dic[name].get(_d):
+            #             ccjl_dic[name][_d]['price'].append(p)
+            #         else:
+            #             ccjl_dic[name][_d] = {"date": _d, 'price': [p]}
+            #     else:
+            #         ccjl_dic[name] = {_d: {"date": _d, 'price': [p]}}
         if ccjl:  # 超产奖励详情
-            return Response({'results': ccjl_dic.get(name_d, None)})
+            res = ccjl_date.get(f"{name_d}", {}).values()
+            len_data = [len(i['price']) for i in res]
+            return Response({'results': res, 'max_id': max(len_data) if len_data else 0})
         for item in list(results.values()):
             # 其他奖惩+生产补贴
             additional = SubsidyInfo.objects.filter(name=item['name'], type__in=[1, 2], date__year=year,
@@ -4107,7 +4165,7 @@ class PerformanceSummaryView(APIView):
                                                                                  prods=Sum('price', filter=Q(type=2)))
             item['其他奖惩'] = additional['others'] if additional['others'] else 0
             item['生产补贴'] = additional['prods'] if additional['prods'] else 0
-            item['all'] += (item['其他奖惩'] + item['生产补贴'])
+            item['all'] = item.get('all', 0) + (item['其他奖惩'] + item['生产补贴'])
             # 乘员工类别系数
             if independent.get(item['name']):
                 work_type = independent[item['name']].get('work_type')
@@ -6371,8 +6429,8 @@ class GroupProductionSummary(APIView):
         if not target_month:
             raise ValidationError('请选择月份！')
         month_split = target_month.split('-')
-        year = month_split[0]
-        month = month_split[1]
+        year = int(month_split[0])
+        month = int(month_split[1])
         production_data = TrainsFeedbacks.objects.filter(
             factory_date__year=year,
             factory_date__month=month
@@ -6531,3 +6589,146 @@ class TimeEnergyConsuming(APIView):
             'ISO-8859-1') + '.xls'
         response.write(output.getvalue())
         return response
+
+
+@method_decorator([api_recorder], name='dispatch')
+class RubberLogView(APIView):
+
+    permission_classes = (IsAuthenticated,)
+
+    @atomic
+    def get(self, request):
+        target_month = self.request.query_params.get('target_month')
+        display_type = self.request.query_params.get('display_type')  # 存在表示汇总表
+        title, _temp, max_times = self.display_content(target_month, display_type)
+        flag = _temp.pop('add', None)
+        if flag:
+            results = _temp.values()
+        else:
+            if not display_type and max_times:  # 保存合计到汇总表
+                # 记录当月汇总
+                year, month = target_month.split('-')
+                exist_record = RubberLogSummary.objects.filter(target_month=year, day=month, times=max_times)
+                if not exist_record:
+                    _add_info = []
+                    for k, v in _temp.get('合计', {}).items():
+                        if k == 'day':
+                            continue
+                        supplier_name, r_type, r_size = k.split('-')
+                        if supplier_name in ['合计', '总计']:
+                            continue
+                        _s_data = {'target_month': year, 'day': month, 'times': max_times, 'supplier_name': supplier_name, 'r_type': r_type,
+                                   'r_size': r_size, 'nums': v}
+                        _add_info.append(RubberLogSummary(**_s_data))
+                    RubberLogSummary.objects.bulk_create(_add_info)
+            else:  # 补全数据(每月缺失的品牌)
+                for i in _temp.values():
+                    # 获取所有品牌
+                    _u_data, day = {}, i.get('day')
+                    names = set([k.split('-')[0] for k in i.keys() if k.split('-')[0] not in ['day', '合计', '总计']])
+                    diff = set(title) - names
+                    if not diff:
+                        continue
+                    for name in diff:
+                        if isinstance(day, int) or day == '合计':
+                            _u_data.update({f"{name}-进-大": 0, f"{name}-进-小": 0, f"{name}-出-大": 0, f"{name}-出-小": 0})
+                        else:
+                            _u_data.update({f"{name}": 0})
+                    i.update(_u_data)
+            results = sorted(_temp.values(), key=lambda x: x['day'])
+        return Response({'results': results, 'title': title})
+
+    @atomic
+    def post(self, request):
+        target_month = self.request.data.get('target_month')
+        details = self.request.data.get('details')
+        if not all([target_month, details]):
+            raise ValidationError('参数异常')
+        username = self.request.user.username
+        now_time = datetime.datetime.now()
+        max_times = RubberLog.objects.filter(target_month=target_month).aggregate(max_times=Max('times'))['max_times']
+        times = 1 + (0 if not max_times else max_times)
+        add_info = []
+        for i in details:
+            day = i.pop('day')
+            if day in ['合计', '结余(大)', '结余(小)']:
+                continue
+            for k, v in i.items():
+                supplier_name, r_type, r_size = k.split('-')
+                if not supplier_name or supplier_name in ['合计', '总计']:
+                    continue
+                _s_data = {'target_month': target_month, 'day': day, 'created_datetime': now_time, 'created_username': username, 'times': times,
+                           'supplier_name': supplier_name, 'r_type': r_type, 'r_size': r_size, 'nums': v if v else 0}
+                add_info.append(RubberLog(**_s_data))
+        RubberLog.objects.bulk_create(add_info)
+        return Response('保存成功')
+
+    def display_content(self, target_month, display_type):
+        title, _temp, exist_day = [], {}, []
+        days = [int(i.split('-')[-1]) for i in days_cur_month_dates(target_month)] + [32, 33, 34] if not display_type else []
+        if not display_type:
+            max_times = RubberLog.objects.filter(target_month=target_month).aggregate(max_times=Max('times'))['max_times']
+            if not max_times:
+                max_times = 0
+            query_set = RubberLog.objects.filter(target_month=target_month, times=max_times).values('day', 'supplier_name', 'r_type', 'r_size', 'nums')
+        else:
+            max_times = RubberLogSummary.objects.filter(target_month=target_month).values('day').annotate(s_times=Max('times')).values_list('day', 's_times')
+            if not max_times:
+                max_times = []
+            query_set = []
+            for i in max_times:
+                s_data = RubberLogSummary.objects.filter(target_month=target_month, day=i[0], times=i[1]).values('day', 'supplier_name', 'r_type', 'r_size', 'nums')
+                query_set.extend(s_data)
+        if query_set:
+            # 32:合计 33:结余(大) 34:结余(小)
+            for i in query_set:
+                if i['supplier_name'] not in title:
+                    title.append(i['supplier_name'])
+                key = f"{i['supplier_name']}-{i['r_type']}-{i['r_size']}"
+                total_key = f"总计-{i['r_type']}-{i['r_size']}"
+                if _temp.get(i['day']):
+                    _temp[i['day']][key] = i['nums']
+                else:
+                    _temp[i['day']] = {'day': i['day'], key: i['nums']}
+                # 横向合计
+                if total_key in _temp[i['day']]:
+                    _temp[i['day']][total_key] = _temp[i['day']][total_key] + i['nums']
+                else:
+                    _temp[i['day']][total_key] = i['nums']
+                # 纵向合计
+                z_key1 = f"{i['supplier_name']}-{i['r_type']}-{i['r_size']}"
+                if '合计' in _temp:
+                    if z_key1 not in _temp['合计']:
+                        _temp['合计'][z_key1] = i['nums']
+                    else:
+                        _temp['合计'][z_key1] += i['nums']
+                    if f"合计-{i['r_type']}-{i['r_size']}" in _temp['合计']:
+                        _temp['合计'][f"合计-{i['r_type']}-{i['r_size']}"] += i['nums']
+                        _temp['合计'][f"总计-{i['r_type']}-{i['r_size']}"] += i['nums']
+                    else:
+                        _temp['合计'][f"合计-{i['r_type']}-{i['r_size']}"] = i['nums']
+                        _temp['合计'][f"总计-{i['r_type']}-{i['r_size']}"] = i['nums']
+                else:
+                    _temp['合计'] = {'day': 32, z_key1: i['nums'], f"合计-{i['r_type']}-{i['r_size']}": i['nums'], f"总计-{i['r_type']}-{i['r_size']}": i['nums']}
+                # 结余
+                _num = -i['nums'] if i['r_type'] == '出' else i['nums']
+                if f"结余({i['r_size']})" in _temp:
+                    if f"{i['supplier_name']}" not in _temp[f"结余({i['r_size']})"]:
+                        _temp[f"结余({i['r_size']})"][f"{i['supplier_name']}"] = _num
+                    else:
+                        _temp[f"结余({i['r_size']})"][f"{i['supplier_name']}"] += _num
+                    _temp[f"结余({i['r_size']})"][f"总计"] += _num
+                else:
+                    _temp[f"结余({i['r_size']})"] = {'day': 33 if i['r_size'] == '大' else 34, f"总计": _num, f"{i['supplier_name']}": _num}
+                # 补全月份
+                if not display_type:
+                    exist_day.append(i['day'])
+            if exist_day:
+                other_day = set(days[:-3]) - set(exist_day)
+                for s_day in other_day:
+                    _temp[s_day] = {'day': s_day}
+        else:
+            if not display_type:  # 月份没有数据新增行头(非汇总表)
+                _temp = {day: {'day': day} for day in days}
+                _temp['add'] = True
+        return title, _temp, max_times

@@ -1509,6 +1509,7 @@ class InOutCommonSerializer(serializers.Serializer):
     initiator = serializers.SerializerMethodField()
     start_time = serializers.DateTimeField(source='task.start_time', read_only=True)
     fin_time = serializers.DateTimeField(source='task.fin_time', read_only=True)
+    last_time = serializers.DateTimeField(source='task.last_time', read_only=True)
     task_no = serializers.CharField(source='task.order_no', read_only=True)
     order_type = serializers.SerializerMethodField()
     batch_no = serializers.CharField(max_length=64, read_only=True)

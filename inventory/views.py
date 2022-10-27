@@ -443,6 +443,10 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         store_name = self.request.query_params.get("warehouse_name", '混炼胶库')
         start_time = self.request.query_params.get("start_time")
         end_time = self.request.query_params.get("end_time")
+        task_start_st = self.request.query_params.get("task_start_st")
+        task_start_et = self.request.query_params.get("task_start_et")
+        task_end_st = self.request.query_params.get("task_end_st")
+        task_end_et = self.request.query_params.get("task_end_et")
         location = self.request.query_params.get("location")
         material_no = self.request.query_params.get("material_no")
         e_material_no = self.request.query_params.get("e_material_no")
@@ -544,6 +548,14 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
                 filter_dict.update(task__start_time__gte=start_time)
             if end_time:
                 filter_dict.update(task__start_time__lte=end_time)
+            if task_start_st:
+                filter_dict.update(task__last_time__gte=task_start_st)
+            if task_start_et:
+                filter_dict.update(task__last_time__lte=task_start_et)
+            if task_end_st:
+                filter_dict.update(task__fin_time__gte=task_end_st)
+            if task_end_et:
+                filter_dict.update(task__fin_time__lte=task_end_et)
             if material_name:
                 filter_dict.update(material_name__icontains=material_name)
             if batch_no:
@@ -2684,6 +2696,8 @@ class WmsInventoryStockView(APIView):
         page = self.request.query_params.get('page', 1)
         page_size = self.request.query_params.get('page_size', 15)
         mooney_level = self.request.query_params.get('mooney_level')
+        pallet_no = self.request.query_params.get('pallet_no')
+        tunnel = self.request.query_params.get('tunnel')
         st = (int(page) - 1) * int(page_size)
         et = int(page) * int(page_size)
         extra_where_str = ""
@@ -2697,6 +2711,11 @@ class WmsInventoryStockView(APIView):
             extra_where_str += " and a.StockDetailState={}".format(quality_status)
         if batch_no:
             extra_where_str += " and a.BatchNo like '%{}%'".format(batch_no)
+        if pallet_no:
+            extra_where_str += " and a.LadenToolNumber ='{}'".format(pallet_no)
+        if tunnel:
+            extra_where_str += " and a.SpaceId like 'ZCM-{}%'".format(tunnel)
+
         sql = """SELECT
                  a.StockDetailState,
                  c.MaterialCode,
@@ -6451,9 +6470,25 @@ class HFRealStatusView(APIView):
                         i.update({'OastStartTime': '', 'OastServiceTime': ''})
                 response_data['results'] = hf_info
             elif data_type == '1':  # 任务列表
-                sql = f"""select F_Id, TaskState, ProductName, RFID, TaskStartTime, OastInTime, OastOutTime, 
-                                 OastStartTime, OastEntTime, TaskEntTime, RoadWay, OastNo from dsp_OastTask where 
-                                 TaskState != 6 order by -F_Id """
+                TaskState = self.request.query_params.get('TaskState')
+                ProductName = self.request.query_params.get('ProductName')
+                RFID = self.request.query_params.get('RFID')
+                OastNo = self.request.query_params.get('OastNo')
+                RoadWay = self.request.query_params.get('RoadWay')
+                extra_where_str = 'where TaskState != 6'
+                if TaskState:
+                    extra_where_str += " and TaskState = {}".format(TaskState)
+                if ProductName:
+                    extra_where_str += " and ProductName like N'%{}%'".format(ProductName)
+                if RFID:
+                    extra_where_str += " and RFID like '%{}%'".format(RFID)
+                if OastNo:
+                    extra_where_str += " and OastNo = {}".format(OastNo)
+                if RoadWay:
+                    extra_where_str += " and RoadWay = {}".format(RoadWay)
+                sql = """select F_Id, TaskState, ProductName, RFID, TaskStartTime, OastInTime, OastOutTime, 
+                                 OastStartTime, OastEntTime, TaskEntTime, RoadWay, OastNo from dsp_OastTask {} 
+                                 order by -F_Id """.format(extra_where_str)
                 sc = SqlClient(sql=sql, **self.DATABASE_CONF)
                 res = sc.all()
                 all_pages = math.ceil(len(res) / page_size)
