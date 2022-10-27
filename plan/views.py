@@ -1495,7 +1495,7 @@ class WeightPackageDailyTimeConsumeViewSet(ModelViewSet):
                                 if k not in xl_material_details:
                                     mixin_chemical_kind += 1
                                     mixin_materials += '{}:{}kg;'.format(k, v)
-                    break
+                        break
 
                 final_cl_recipe_name = '{}({})'.format(final_pd.stage_product_batch_no, final_dev_type)
                 for equip_no in Equip.objects.filter(equip_no__startswith='S').values_list('equip_no', flat=True):
