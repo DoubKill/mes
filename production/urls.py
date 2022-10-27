@@ -169,6 +169,8 @@ urlpatterns = [
     # 机台停机明细导入及汇总
     path('equip-down-detail/', EquipDownDetailView.as_view()),
     path('group-production-summary/', GroupProductionSummary.as_view()),
-    path('time-energy-consuming/', TimeEnergyConsuming.as_view())
+    path('time-energy-consuming/', TimeEnergyConsuming.as_view()),
+    # 胶架进出登记表
+    path('rubber-log/', RubberLogView.as_view()),
 
 ]

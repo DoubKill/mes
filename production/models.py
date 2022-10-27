@@ -768,3 +768,34 @@ class FinishRatio(models.Model):
     class Meta:
         db_table = 'finish_ratio'
         verbose_name_plural = verbose_name = '人员炼胶完成率'
+
+
+class RubberLog(models.Model):
+    target_month = models.CharField(max_length=8, help_text='月份')
+    day = models.PositiveIntegerField(help_text='天数')
+    supplier_name = models.CharField(max_length=16, help_text='厂家')
+    r_type = models.CharField(max_length=8, help_text='类别: 进、出')
+    r_size = models.CharField(max_length=8, help_text='尺寸: 大、小')
+    nums = models.IntegerField(help_text='数值', default=0)
+    times = models.PositiveIntegerField(help_text='保存次数')
+    created_datetime = models.DateTimeField(auto_now_add=True, help_text='创建时间')
+    created_username = models.CharField(max_length=64, help_text='创建人')
+
+    class Meta:
+        db_table = 'rubber_log'
+        verbose_name_plural = verbose_name = '胶架进出登记表'
+
+
+class RubberLogSummary(models.Model):
+    target_month = models.IntegerField(help_text='年份')
+    day = models.IntegerField(help_text='月份')
+    supplier_name = models.CharField(max_length=16, help_text='厂家')
+    r_type = models.CharField(max_length=8, help_text='类别: 进、出')
+    r_size = models.CharField(max_length=8, help_text='尺寸: 大、小')
+    nums = models.IntegerField(help_text='数值', default=0)
+    times = models.PositiveIntegerField(help_text='保存次数')
+
+    class Meta:
+        db_table = 'rubber_log_summary'
+        verbose_name_plural = verbose_name = '胶架进出登记汇总表'
+
