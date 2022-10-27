@@ -106,7 +106,7 @@ class BatchProductionInfoView(APIView):
     def get(self, request):
         mac_address = self.request.query_params.get('mac_address')
         classes = self.request.query_params.get('classes')
-        if not mac_address:
+        if not all([mac_address, classes]):
             raise ValidationError('参数缺失')
         terminal_location = TerminalLocation.objects.filter(terminal__no=mac_address).first()
         if not terminal_location:
@@ -121,17 +121,19 @@ class BatchProductionInfoView(APIView):
             plan_schedule__work_schedule__work_procedure__global_name='密炼'
         ).first()
         if current_work_schedule_plan:
-            date_now = str(current_work_schedule_plan.plan_schedule.day_time)
+            s_date_now = current_work_schedule_plan.plan_schedule.day_time
+            if '07:00:00' <= now.strftime('%H:%M:%S') <= '08:00:00' and classes == '早班':
+                s_date_now = s_date_now + timedelta(days=1)
+            date_now = str(s_date_now)
         else:
             date_now = str(now.date())
         plan_actual_data = []  # 计划对比实际数据
         current_product_data = {}  # 当前生产数据
         classes_plans = ProductClassesPlan.objects.filter(
             work_schedule_plan__plan_schedule__day_time=date_now,
+            work_schedule_plan__classes__global_name=classes,
             equip__equip_no=equip_no,
             delete_flag=False)
-        if classes:
-            classes_plans = classes_plans.filter(work_schedule_plan__classes__global_name=classes)
         for plan in classes_plans:
             # 任务状态
             plan_status_info = PlanStatus.objects.using("SFJ").filter(plan_classes_uid=plan.plan_classes_uid, delete_flag=False).order_by('created_date').last()
