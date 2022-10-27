@@ -349,9 +349,9 @@ class SectionViewSet(ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        if instance.section_users.count() > 0:
+        if instance.section_users.filter(delete_flag=False).exists():
             raise ValidationError('操作无效，该部门下存在用户！')
-        if instance.children_sections.count() > 0:
+        if instance.children_sections.exists():
             raise ValidationError('操作无效，该部门下存在子部门！')
         return super().destroy(request, *args, **kwargs)
 
