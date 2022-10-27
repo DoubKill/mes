@@ -1347,9 +1347,10 @@ class WeightPackageDailyTimeConsumeViewSet(ModelViewSet):
                 if len(xl_material_details) != len(mes_material_details):
                     xl_dp_flag = True
                     for k, v in mes_material_details.items():
+                        k = k.rstrip('-C').rstrip('-X')
                         if k not in xl_material_details:
                             mixin_chemical_kind += 1
-                            mixin_materials += '{}:{};'.format(k, v)
+                            mixin_materials += '{}:{}kg;'.format(k, v)
 
         final_cl_recipe_name = '{}({})'.format(final_pd.stage_product_batch_no, final_dev_type)
         for equip_no in Equip.objects.filter(equip_no__startswith='S').values_list('equip_no', flat=True):
@@ -1365,9 +1366,10 @@ class WeightPackageDailyTimeConsumeViewSet(ModelViewSet):
                 if len(lh_material_details) != len(mes_material_details):
                     lh_dp_flag = True
                     for k, v in mes_material_details.items():
+                        k = k.rstrip('-C').rstrip('-X')
                         if k not in lh_material_details:
                             final_chemical_kind += 1
-                            final_materials += '{}:{};'.format(k, v)
+                            final_materials += '{}:{}kg;'.format(k, v)
                 break
         xl_plan_qty = int(plan_weight / mixin_weight * xl_split_qty)  # 细料计划包数
         xl_dp_qty = None if not xl_dp_flag else xl_plan_qty  # 细料单配包数
@@ -1383,7 +1385,7 @@ class WeightPackageDailyTimeConsumeViewSet(ModelViewSet):
                 material__material_name__icontains='塑解剂'
             ).values_list('material__material_name', 'standard_weight'))
             for i in hl_materials_data:
-                hl_materials += '{}:{}'.format(i[0], i[1])
+                hl_materials += '{}:{}kg'.format(i[0].rstrip('-C').rstrip('-X'), i[1])
         lh_plan_qty = int(plan_weight / final_devoted_weight * lh_split_qty)  # 硫磺计划包数
         lh_dp_qty = None if not lh_dp_flag else lh_plan_qty  # 硫磺单配包数
         manual_instance = WeightPackageManual.objects.filter(
@@ -1488,9 +1490,10 @@ class WeightPackageDailyTimeConsumeViewSet(ModelViewSet):
                         if len(xl_material_details) != len(mes_material_details):
                             xl_dp_flag = True
                             for k, v in mes_material_details.items():
+                                k = k.rstrip('-C').rstrip('-X')
                                 if k not in xl_material_details:
                                     mixin_chemical_kind += 1
-                                    mixin_materials += '{}:{};'.format(k, v)
+                                    mixin_materials += '{}:{}kg;'.format(k, v)
 
                 final_cl_recipe_name = '{}({})'.format(final_pd.stage_product_batch_no, final_dev_type)
                 for equip_no in Equip.objects.filter(equip_no__startswith='S').values_list('equip_no', flat=True):
@@ -1506,9 +1509,10 @@ class WeightPackageDailyTimeConsumeViewSet(ModelViewSet):
                         if len(lh_material_details) != len(mes_material_details):
                             lh_dp_flag = True
                             for k, v in mes_material_details.items():
+                                k = k.rstrip('-C').rstrip('-X')
                                 if k not in lh_material_details:
                                     final_chemical_kind += 1
-                                    final_materials += '{}:{};'.format(k, v)
+                                    final_materials += '{}:{}kg;'.format(k, v)
                         break
                 xl_plan_qty = int(plan_weight / mixin_weight * xl_split_qty)  # 细料计划包数
                 xl_dp_qty = None if not xl_dp_flag else xl_plan_qty  # 细料单配包数
@@ -1525,7 +1529,7 @@ class WeightPackageDailyTimeConsumeViewSet(ModelViewSet):
                         material__material_name__icontains='塑解剂'
                     ).values_list('material__material_name', 'standard_weight'))
                     for j in hl_materials_data:
-                        hl_materials += '{}:{}'.format(j[0], j[1])
+                        hl_materials += '{}:{}kg'.format(j[0].rstrip('-C').rstrip('-X'), j[1])
                 lh_plan_qty = int(plan_weight / final_devoted_weight * lh_split_qty)  # 硫磺计划包数
                 lh_dp_qty = None if not lh_dp_flag else lh_plan_qty  # 硫磺单配包数
                 manual_instance = WeightPackageManual.objects.filter(
