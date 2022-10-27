@@ -1149,7 +1149,12 @@ permission_data = [
     {'id': 1133, 'code': 'import_daily_weight_package', 'name': '导入', 'parent_id': 1128},
     {'id': 1134, 'code': 'export_daily_weight_package', 'name': '导出', 'parent_id': 1128},
 
-    # 下一个 1128 开始
+    {'id': 1135, 'code': 'rubber_log', 'name': '胶架进出登记表', 'parent_id': None, 'category_name': '生产管理'},
+    {'id': 1136, 'code': 'view_rubber_log', 'name': '查看', 'parent_id': 1134},
+    {'id': 1137, 'code': 'add_rubber_log', 'name': '保存', 'parent_id': 1134},
+    {'id': 1138, 'code': 'export_rubber_log', 'name': '导出', 'parent_id': 1134},
+
+    # 下一个 1139 开始
 ]
 
 

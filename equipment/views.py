@@ -3254,8 +3254,9 @@ class EquipAutoPlanView(APIView):
                 return Response({"success": False, "message": '条码扫描有误', "data": None})
             obj = order.equip_spare
             if order.status in [1, 2, 3]:  # 入库单据
-                # quantity = order.plan_in_quantity - order.in_quantity
-                quantity = 1.0
+                quantity = order.plan_in_quantity - order.in_quantity
+                if quantity <= 0:
+                    quantity = 1.0
                 queryset = EquipWarehouseInventory.objects.filter(equip_spare=obj, quantity__gt=0)
                 default = queryset.first()
                 area = EquipWarehouseArea.objects.filter(
@@ -5442,7 +5443,7 @@ class DailyCleanTableViewSet(ModelViewSet):
                 point_standard = CheckPointStandard.objects.filter(delete_flag=False, equip_no__icontains=equip_no,
                                                                    standard_type='日清扫', station=station).last()
                 if point_standard:
-                    res = list(point_standard.check_details.all().values('sn', 'check_content', 'check_style'))
+                    res = list(point_standard.check_details.filter(delete_flag=False).order_by('sn').values('sn', 'check_content', 'check_style'))
                     check_point_standard = point_standard.id
                     point_standard_code = point_standard.point_standard_code
                     point_standard_name = point_standard.point_standard_name
@@ -5638,7 +5639,7 @@ class CheckPointTableViewSet(ModelViewSet):
                 point_standard = CheckPointStandard.objects.filter(delete_flag=False, equip_no__icontains=equip_no,
                                                                    standard_type='点检', station=station).last()
                 if point_standard:
-                    res = list(point_standard.check_details.all().values('sn', 'check_content', 'check_style'))
+                    res = list(point_standard.check_details.filter(delete_flag=False).order_by('sn').values('sn', 'check_content', 'check_style'))
                     check_point_standard = point_standard.id
                     point_standard_code = point_standard.point_standard_code
                     point_standard_name = point_standard.point_standard_name

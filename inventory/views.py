@@ -6470,9 +6470,25 @@ class HFRealStatusView(APIView):
                         i.update({'OastStartTime': '', 'OastServiceTime': ''})
                 response_data['results'] = hf_info
             elif data_type == '1':  # 任务列表
-                sql = f"""select F_Id, TaskState, ProductName, RFID, TaskStartTime, OastInTime, OastOutTime, 
-                                 OastStartTime, OastEntTime, TaskEntTime, RoadWay, OastNo from dsp_OastTask where 
-                                 TaskState != 6 order by -F_Id """
+                TaskState = self.request.query_params.get('TaskState')
+                ProductName = self.request.query_params.get('ProductName')
+                RFID = self.request.query_params.get('RFID')
+                OastNo = self.request.query_params.get('OastNo')
+                RoadWay = self.request.query_params.get('RoadWay')
+                extra_where_str = 'where TaskState != 6'
+                if TaskState:
+                    extra_where_str += " and TaskState = {}".format(TaskState)
+                if ProductName:
+                    extra_where_str += " and ProductName like N'%{}%'".format(ProductName)
+                if RFID:
+                    extra_where_str += " and RFID like '%{}%'".format(RFID)
+                if OastNo:
+                    extra_where_str += " and OastNo = {}".format(OastNo)
+                if RoadWay:
+                    extra_where_str += " and RoadWay = {}".format(RoadWay)
+                sql = """select F_Id, TaskState, ProductName, RFID, TaskStartTime, OastInTime, OastOutTime, 
+                                 OastStartTime, OastEntTime, TaskEntTime, RoadWay, OastNo from dsp_OastTask {} 
+                                 order by -F_Id """.format(extra_where_str)
                 sc = SqlClient(sql=sql, **self.DATABASE_CONF)
                 res = sc.all()
                 all_pages = math.ceil(len(res) / page_size)
