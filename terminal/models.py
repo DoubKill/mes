@@ -1014,7 +1014,7 @@ class EquipHaltReason(AbstractEntity):
 class BarCodeTraceDetail(AbstractEntity):
     """原材料以及胶皮相关信息"""
     # 通用字段
-    bra_code = models.CharField(max_length=64, help_text='条码', unique=True)
+    bra_code = models.CharField(max_length=64, help_text='条码')
     code_type = models.CharField(max_length=64, help_text='条码来源: 密炼/料罐', default='密炼')
     scan_material_record = models.CharField(max_length=128, help_text='条码对应物料名')
     display = models.BooleanField(help_text='是否在原材料追溯中显示', default=False)
@@ -1040,6 +1040,7 @@ class BarCodeTraceDetail(AbstractEntity):
     class Meta:
         db_table = 'bar_code_trace_detail'
         verbose_name_plural = verbose_name = '原材料以及胶皮相关信息'
+        unique_together = ('bra_code', 'code_type')
 
 
 # class TempPlan(models.Model):
