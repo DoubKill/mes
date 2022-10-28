@@ -4183,7 +4183,14 @@ class PerformanceSummaryView(APIView):
             item['hj'] = round(item['hj'], 2)
             # 并入月超产奖励
             s_ccjl = ccjl_detail.get(item['name'])
-            p = 0 if not s_ccjl else (round(max(s_ccjl.values()), 2) if 'all' not in s_ccjl else s_ccjl.get('all'))
+            # 存在员工升班长或者班长降员工场景(分别计算)
+            if not s_ccjl:
+                p = 0
+            else:
+                common_p = dict(filter(lambda x: isinstance(x[0], int), s_ccjl.items()))
+                leader_p = s_ccjl.get('all', 0)
+                p = leader_p + round(max(common_p.values(), default=0), 2)
+            # p = 0 if not s_ccjl else (round(max(s_ccjl.values()), 2) if 'all' not in s_ccjl else s_ccjl.get('all'))
             item['超产奖励'] = round(p, 2)
             item['all'] = round(item['all'] + p, 2)
         return Response({'results': results.values(), 'group_list': group_list})
