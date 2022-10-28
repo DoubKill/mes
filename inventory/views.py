@@ -445,6 +445,10 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         store_name = self.request.query_params.get("warehouse_name", '混炼胶库')
         start_time = self.request.query_params.get("start_time")
         end_time = self.request.query_params.get("end_time")
+        task_start_st = self.request.query_params.get("task_start_st")
+        task_start_et = self.request.query_params.get("task_start_et")
+        task_end_st = self.request.query_params.get("task_end_st")
+        task_end_et = self.request.query_params.get("task_end_et")
         location = self.request.query_params.get("location")
         material_no = self.request.query_params.get("material_no")
         e_material_no = self.request.query_params.get("e_material_no")
@@ -546,6 +550,14 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
                 filter_dict.update(task__start_time__gte=start_time)
             if end_time:
                 filter_dict.update(task__start_time__lte=end_time)
+            if task_start_st:
+                filter_dict.update(task__last_time__gte=task_start_st)
+            if task_start_et:
+                filter_dict.update(task__last_time__lte=task_start_et)
+            if task_end_st:
+                filter_dict.update(task__fin_time__gte=task_end_st)
+            if task_end_et:
+                filter_dict.update(task__fin_time__lte=task_end_et)
             if material_name:
                 filter_dict.update(material_name__icontains=material_name)
             if batch_no:

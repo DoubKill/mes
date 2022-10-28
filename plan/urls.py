@@ -11,7 +11,7 @@ from plan.views import ProductDayPlanViewSet, \
     SchedulingWashPlaceKeywordViewSet, SchedulingWashPlaceOperaKeywordViewSet, RecipeMachineWeight, \
     SchedulingProductDemandedDeclareViewSet, ProductDeclareSummaryViewSet, SchedulingProductSafetyParamsViewSet, \
     SchedulingResultViewSet, SchedulingEquipShutDownPlanViewSet, SchedulingProceduresView, SchedulingStockSummary, \
-    SchedulingMaterialDemanded, RecipeStages, MaterialPlanConsumeView
+    SchedulingMaterialDemanded, RecipeStages, MaterialPlanConsumeView, WeightPackageDailyTimeConsumeViewSet
 
 router = DefaultRouter()
 
@@ -37,6 +37,7 @@ router.register(r'scheduling-product-safety-params', SchedulingProductSafetyPara
 router.register(r'scheduling-result', SchedulingResultViewSet)  # 排程结果
 router.register(r'scheduling-equip-shutdown-plan', SchedulingEquipShutDownPlanViewSet)  # 计划停机
 router.register(r'scheduling-stock-summary', SchedulingStockSummary)  # 无硫库存统计
+router.register('weight-package-daily-time-consumer', WeightPackageDailyTimeConsumeViewSet)
 
 
 urlpatterns = [

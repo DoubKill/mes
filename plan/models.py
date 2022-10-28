@@ -415,3 +415,33 @@ class SchedulingEquipShutDownPlan(AbstractEntity):
     class Meta:
         db_table = 'aps_equip_shutdown_plan'
         verbose_name_plural = verbose_name = '机台停机计划'
+
+
+class WeightPackageDailyTimeConsume(models.Model):
+    factory_date = models.DateField(help_text='工厂日期')
+    product_no = models.CharField(max_length=64, help_text='胶料规格')
+    plan_weight = models.FloatField(help_text='计划（吨）')
+    mixin_weight = models.FloatField(help_text='混炼单车重量')
+    mixin_dev_type = models.CharField(max_length=16, help_text='混炼机型')
+    xl_split_qty = models.IntegerField(help_text='细料分包数量')
+    xl_plan_qty = models.IntegerField(help_text='细料计划数量')
+    xl_dp_qty = models.IntegerField(help_text='混炼单配需求包数', blank=True, null=True)
+    mixin_chemical_kind = models.IntegerField(help_text='混炼单配化工种数', blank=True, null=True)
+    hl_materials = models.CharField(max_length=1024, help_text='合练/母胶单配物料', blank=True, null=True)
+    hl_time_consume = models.FloatField(help_text='合练单配耗时', blank=True, null=True)
+    mixin_materials = models.CharField(max_length=1024, help_text='混炼单配物料', blank=True, null=True)
+    mixin_time_consume = models.FloatField(help_text='混炼单配耗时', blank=True, null=True)
+    aw_qty = models.IntegerField(help_text='手工单配含AW的数量', blank=True, null=True)
+    final_devoted_weight = models.FloatField(help_text='终炼单车投入前规格重量')
+    final_dev_type = models.CharField(max_length=16, help_text='终炼机型')
+    lh_split_qty = models.IntegerField(help_text='硫磺分包数量')
+    lh_plan_qty = models.IntegerField(help_text='硫磺计划数量')
+    lh_dp_qty = models.IntegerField(help_text='硫磺单配需求包数', blank=True, null=True)
+    final_chemical_kind = models.IntegerField(help_text='终炼单配化工种数', blank=True, null=True)
+    final_materials = models.CharField(max_length=1024, help_text='终炼单配物料', blank=True, null=True)
+    final_time_consume = models.FloatField(help_text='终炼单配耗时', blank=True, null=True)
+    product_type = models.IntegerField(help_text='胶种类型 1:常规机台 2：190E机台', default=1)
+
+    class Meta:
+        db_table = 'weight_package_daily_time_consume'
+        verbose_name_plural = verbose_name = '料包日需求耗时'
