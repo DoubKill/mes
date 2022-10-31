@@ -3391,10 +3391,10 @@ class SummaryOfWeighingOutput(APIView):
             if result1.get(name):
                 result1[name][f"{day}{classes}"] = price
                 result1[name][f"{day}{classes}_count"] = count_
-                result1[name]['xl'] += xl
-                result1[name]['lh'] += lh
+                result1[name]['xl'] = round(result1[name].get('xl', 0) + xl, 2)
+                result1[name]['lh'] = round(result1[name].get('lh', 0) + lh, 2)
             else:
-                result1[name] = {'name': name, f"{day}{classes}": price, f"{day}{classes}_count": count_, 'xl': xl, 'lh': lh}
+                result1[name] = {'name': name, f"{day}{classes}": price, f"{day}{classes}_count": count_, 'xl': round(xl, 2), 'lh': round(lh, 2)}
         return Response({'results': result, 'users': result1.values()})
 
 
