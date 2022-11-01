@@ -230,5 +230,7 @@ urlpatterns = [
 
     path('product-stock-outbound/', OutboundStock.as_view()),
 
-    path('product-inventory-lock/', ProductInventoryLockedView.as_view())
+    path('product-inventory-lock/', ProductInventoryLockedView.as_view()),
+
+    path('bz-inventory-working-tasks/', BZInventoryWorkingTasksView.as_view())
 ]
