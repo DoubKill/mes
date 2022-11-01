@@ -10,9 +10,13 @@ from io import BytesIO
 import requests
 import xlwt
 import xmltodict
+from django.db.models import Q
 from django.http import HttpResponse
 from rest_framework.exceptions import ValidationError
 from suds.client import Client
+
+from production.models import PalletFeedbacks
+from terminal.models import LoadMaterialLog, FeedingMaterialLog
 
 
 class BaseUploader(object):
@@ -194,3 +198,31 @@ class HFSystem(object):
         if res_json.get('Result') == '0':
             raise ValueError(res_json.get('Message'))
         return f"{data.get('OastNo')}号烘箱强制操作成功"
+
+
+def get_all_codes(bar_code):
+    """通过收皮条码获取投入该物料的所有胶皮条码"""
+    result = []
+    bs = bar_code if isinstance(bar_code, list) else [bar_code]
+    pallets = PalletFeedbacks.objects.filter(lot_no__in=bs)
+    for pallet in pallets:
+        l = []
+        init_data = LoadMaterialLog.objects.using('SFJ').filter(status=1, feed_log__trains__gte=pallet.begin_trains,
+                                                                feed_log__trains__lte=pallet.end_trains,
+                                                                feed_log__plan_classes_uid=pallet.plan_classes_uid).values_list('bra_code', flat=True).distinct()
+        for i in init_data:
+            if i in result or len(i) < 6:
+                continue
+            if i.startswith('AAJ1Z20') or i[:2] in ['MC', 'MM', 'F0', 'S0', 'WM']:
+                continue
+            elif i.startswith('AAJ1Z'):
+                l.append(i)
+            else:
+                result.append(i)
+        # 胶皮数据
+        if l:
+            get_all_codes(l)
+    return result
+
+
+
