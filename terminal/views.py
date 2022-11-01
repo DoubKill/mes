@@ -50,7 +50,7 @@ from terminal.models import TerminalLocation, EquipOperationLog, WeightBatchingL
     ReplaceMaterial, ReturnRubber, ToleranceDistinguish, ToleranceProject, ToleranceHandle, ToleranceRule, \
     WeightPackageManual, WeightPackageSingle, WeightPackageWms, OtherMaterialLog, EquipHaltReason, \
     WeightPackageLogManualDetails, WmsAddPrint, JZReportWeight, JZMaterialInfo, JZBin, JZReportBasic, JZPlan, \
-    JZRecipeMaterial, JZRecipePre, JZExecutePlan, BatchScanLog
+    JZRecipeMaterial, JZRecipePre, JZExecutePlan, BatchScanLog, BarCodeTraceDetail
 from terminal.serializers import LoadMaterialLogCreateSerializer, \
     EquipOperationLogSerializer, BatchingClassesEquipPlanSerializer, WeightBatchingLogSerializer, \
     WeightBatchingLogCreateSerializer, FeedingLogSerializer, WeightTankStatusSerializer, \
@@ -495,7 +495,7 @@ class WeightBatchingLogViewSet(TerminalCreateAPIView, mixins.ListModelMixin, Gen
         return response(success=True, data=serializer.data)
 
     def create(self, request, *args, **kwargs):
-        equip_no = self.request.data.get('equip_no')
+        equip_no, bra_code = self.request.data.get('equip_no'), self.request.data.get('bra_code')
         serializer = self.get_serializer(data=self.request.data, context={'request': request})
         # ERP与MES物料未绑定
         if not serializer.is_valid():
@@ -503,6 +503,8 @@ class WeightBatchingLogViewSet(TerminalCreateAPIView, mixins.ListModelMixin, Gen
         instance = serializer.save()
         if instance.status == 2:
             return response(success=False, message=instance.failed_reason)
+        else:  # 投料成功
+            BarCodeTraceDetail.objects.filter(bar_code=bra_code, code_type='料罐').update(scan_result=True)
         # 开门
         try:
             if equip_no in JZ_EQUIP_NO:
@@ -2449,20 +2451,15 @@ class ReportWeightView(ListAPIView):
             filter_kwargs['recipe'] = recipe
 
         plan_model, weight_model = [JZPlan, JZReportWeight] if equip_no in JZ_EQUIP_NO else [Plan, ReportWeight]
-        if st or et:
-            filter_plan = {}
-            if st:
-                filter_plan['date_time__gte'] = st
-            if et:
-                filter_plan['date_time__lte'] = et
-            try:
-                plan_ids = plan_model.objects.using(equip_no).filter(**filter_plan).values_list('planid', flat=True)
-            except Exception:
-                raise ValidationError('称量机台{}服务错误！'.format(equip_no))
-            filter_kwargs['planid__in'] = list(plan_ids)
-
-        queryset = weight_model.objects.using(equip_no).filter(**filter_kwargs)
+        if st:
+            h_st = ''.join(st.split('-')) if equip_no in JZ_EQUIP_NO else ''.join(st.split('-'))[2:]
+            filter_kwargs['planid__gte'] = h_st
+        if et:
+            et2 = (datetime.datetime.strptime(et, '%Y-%m-%d') + datetime.timedelta(days=1)).strftime('%Y-%m-%d')
+            e_st = ''.join(et2.split('-')) if equip_no in JZ_EQUIP_NO else ''.join(et2.split('-'))[2:]
+            filter_kwargs['planid__lte'] = e_st
         try:
+            queryset = weight_model.objects.using(equip_no).filter(**filter_kwargs)
             page = self.paginate_queryset(queryset)
             serializer = self.get_serializer(page, many=True)
         except ConnectionDoesNotExist:

@@ -1154,7 +1154,16 @@ permission_data = [
     {'id': 1137, 'code': 'add_rubber_log', 'name': '保存', 'parent_id': 1134},
     {'id': 1138, 'code': 'export_rubber_log', 'name': '导出', 'parent_id': 1134},
 
-    # 下一个 1139 开始
+    {'id': 1139, 'code': 'barcode_trace', 'name': '条码追溯(原材料->终炼胶)', 'parent_id': None, 'category_name': '工艺管理'},
+    {'id': 1140, 'code': 'view_barcode_trace', 'name': '查看', 'parent_id': 1139},
+    {'id': 1141, 'code': 'add_barcode_trace', 'name': '导出', 'parent_id': 1139},
+
+    {'id': 1142, 'code': 'barcode_trace1', 'name': '条码追溯(终炼胶->原材料)', 'parent_id': None, 'category_name': '工艺管理'},
+    {'id': 1143, 'code': 'view_barcode_trace1', 'name': '查看', 'parent_id': 1142},
+    {'id': 1144, 'code': 'add_barcode_trace1', 'name': '导出', 'parent_id': 1142},
+
+    # 下一个 1145 开始
+
 ]
 
 
