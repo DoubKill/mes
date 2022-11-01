@@ -36,6 +36,14 @@ class EquipStatusSerializer(BaseModelSerializer):
 class TrainsFeedbacksBatchSerializer(BaseModelSerializer):
     """批量上传车次报表序列化器"""
 
+    def create(self, validated_data):
+        if 'classes' in validated_data and 'plan_classes_uid' in validated_data:
+            if not validated_data['classes']:
+                ps = ProductClassesPlan.objects.filter(plan_classes_uid=validated_data['plan_classes_uid']).first()
+                if ps:
+                    validated_data['classes'] = ps.work_schedule_plan.classes.global_name
+        return super().create(validated_data)
+
     class Meta:
         model = TrainsFeedbacks
         fields = "__all__"
