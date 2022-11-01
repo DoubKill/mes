@@ -2451,20 +2451,15 @@ class ReportWeightView(ListAPIView):
             filter_kwargs['recipe'] = recipe
 
         plan_model, weight_model = [JZPlan, JZReportWeight] if equip_no in JZ_EQUIP_NO else [Plan, ReportWeight]
-        if st or et:
-            filter_plan = {}
-            if st:
-                filter_plan['date_time__gte'] = st
-            if et:
-                filter_plan['date_time__lte'] = et
-            try:
-                plan_ids = plan_model.objects.using(equip_no).filter(**filter_plan).values_list('planid', flat=True)
-            except Exception:
-                raise ValidationError('称量机台{}服务错误！'.format(equip_no))
-            filter_kwargs['planid__in'] = list(plan_ids)
-
-        queryset = weight_model.objects.using(equip_no).filter(**filter_kwargs)
+        if st:
+            h_st = ''.join(st.split('-')) if equip_no in JZ_EQUIP_NO else ''.join(st.split('-'))[2:]
+            filter_kwargs['planid__gte'] = h_st
+        if et:
+            et2 = (datetime.datetime.strptime(et, '%Y-%m-%d') + datetime.timedelta(days=1)).strftime('%Y-%m-%d')
+            e_st = ''.join(et2.split('-')) if equip_no in JZ_EQUIP_NO else ''.join(et2.split('-'))[2:]
+            filter_kwargs['planid__lte'] = e_st
         try:
+            queryset = weight_model.objects.using(equip_no).filter(**filter_kwargs)
             page = self.paginate_queryset(queryset)
             serializer = self.get_serializer(page, many=True)
         except ConnectionDoesNotExist:
