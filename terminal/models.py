@@ -82,6 +82,9 @@ class LoadMaterialLog(models.Model):
     status = models.PositiveIntegerField(help_text='状态', choices=STATUS_CHOICE, blank=True, null=True)
     created_username = models.CharField(max_length=8, help_text='投入人', null=True, blank=True)
     display_name = models.CharField(max_length=64, help_text='履历展示名称', null=True, blank=True)
+    scan_material = models.CharField(max_length=64, help_text='扫码物料名称', null=True, blank=True)
+    scan_material_type = models.CharField(max_length=64, help_text='投料类别:胶皮、胶块..', null=True, blank=True)
+    stage = models.CharField(max_length=64, help_text='段次', null=True, blank=True)
 
     class Meta:
         db_table = 'load_material_log'
@@ -1007,7 +1010,40 @@ class EquipHaltReason(AbstractEntity):
         db_table = 'equip_halt_reason'
         verbose_name_plural = verbose_name = '密炼机台停机原因'
 
-    # class TempPlan(models.Model):
+
+class BarCodeTraceDetail(AbstractEntity):
+    """原材料以及胶皮相关信息"""
+    # 通用字段
+    bra_code = models.CharField(max_length=64, help_text='条码')
+    code_type = models.CharField(max_length=64, help_text='条码来源: 密炼/料罐', default='密炼')
+    scan_material_record = models.CharField(max_length=128, help_text='条码对应物料名')
+    display = models.BooleanField(help_text='是否在原材料追溯中显示', default=False)
+    scan_result = models.BooleanField(help_text='是否投入成功', default=False)
+    material_name_record = models.CharField(max_length=128, help_text='条码对应配方物料名', null=True, blank=True)
+    product_time = models.DateTimeField(max_length=16, help_text='生产日期', null=True, blank=True)
+    standard_weight = models.FloatField(help_text='重量', null=True, blank=True)
+    pallet_no = models.CharField(max_length=64, help_text='托盘号', null=True, blank=True)
+    # 料罐相关字段
+    supplier = models.CharField(max_length=128, help_text='厂商', null=True, blank=True)
+    batch_no = models.CharField(max_length=64, help_text='批次号', null=True, blank=True)
+    erp_in_time = models.DateTimeField(help_text='ERP入库日期', null=True, blank=True)
+    # 密炼相关字段
+    equip_no = models.CharField(max_length=64, help_text='机台', null=True, blank=True)
+    group = models.CharField(max_length=64, help_text='班组', null=True, blank=True)
+    classes = models.CharField(max_length=64, help_text='班次', null=True, blank=True)
+    trains = models.CharField(max_length=64, help_text='车次', null=True, blank=True)
+    plan_classes_uid = models.CharField(max_length=64, help_text='计划编号', null=True, blank=True)
+    begin_time = models.DateTimeField(help_text='密炼/配料 开始时间', null=True, blank=True)
+    end_time = models.DateTimeField(help_text='密炼/配料 结束时间', null=True, blank=True)
+    arrange_rubber_time = models.DateTimeField(help_text='收皮时间', null=True, blank=True)
+
+    class Meta:
+        db_table = 'bar_code_trace_detail'
+        verbose_name_plural = verbose_name = '原材料以及胶皮相关信息'
+        unique_together = ('bra_code', 'code_type')
+
+
+# class TempPlan(models.Model):
 #     id = models.BigIntegerField(db_column='ID')  # Field name made lowercase.
 #     planid = models.CharField(max_length=14, blank=True, null=True)
 #     recipe = models.CharField(max_length=50, blank=True, null=True)
