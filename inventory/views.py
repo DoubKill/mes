@@ -276,6 +276,11 @@ class OutWorkFeedBack(APIView):
                     dp_obj.status = 3
                     dp_obj.finish_time = datetime.datetime.now()
                     dp_obj.save()
+                    OutBoundDeliveryOrderDetail.objects.filter(
+                        location=dp_obj.location,
+                        status=2,
+                        outbound_delivery_order__warehouse=dp_obj.outbound_delivery_order.warehouse
+                    ).update(status=3)
                     # try:
                     #     depot_name = '混炼线边库区' if dp_obj.outbound_delivery_order.warehouse == '混炼胶库' else "终炼线边库区"
                     #     depot_site_name = '混炼线边库位' if dp_obj.outbound_delivery_order.warehouse == '混炼胶库' else "终炼线边库位"
@@ -7639,3 +7644,33 @@ class ProductInventoryLockedView(APIView):
                 item['locked_user'] = locked_dict_data['kj_locked_user']
                 item['locked_reason'] = locked_dict_data['kj_locked_reason']
         return Response(s.data)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class BZInventoryWorkingTasksView(APIView):
+
+    def get(self, request):
+        warehouse = self.request.query_params.get('warehouse')
+        product_no = self.request.query_params.get('product_no')
+        station = self.request.query_params.get('station')
+        tunnel = self.request.query_params.get('tunnel')
+        filter_kwargs = {'status': 2}
+        if warehouse:
+            filter_kwargs['outbound_delivery_order__warehouse'] = warehouse
+        if product_no:
+            filter_kwargs['outbound_delivery_order__product_no'] = product_no
+        if station:
+            filter_kwargs['outbound_delivery_order__station'] = station
+        if tunnel:
+            filter_kwargs['location__startswith'] = tunnel
+        qs = OutBoundDeliveryOrderDetail.objects.filter(**filter_kwargs).order_by('id', 'location')
+        s_data = OutBoundDeliveryOrderDetailListSerializer(qs, many=True).data
+        tunnel_task_num_dict = {}
+        for i in s_data:
+            tunnel = i['location'][0]
+            if tunnel_task_num_dict.get(tunnel, 0) == 2:
+                i['task_status'] = '等待'
+                continue
+            i['task_status'] = '进行中'
+            tunnel_task_num_dict[tunnel] = tunnel_task_num_dict.get(tunnel, 0) + 1
+        return Response(s_data)
