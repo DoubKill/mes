@@ -504,7 +504,7 @@ class WeightBatchingLogViewSet(TerminalCreateAPIView, mixins.ListModelMixin, Gen
         if instance.status == 2:
             return response(success=False, message=instance.failed_reason)
         else:  # 投料成功
-            BarCodeTraceDetail.objects.filter(bar_code=bra_code, code_type='料罐').update(scan_result=True)
+            BarCodeTraceDetail.objects.filter(bra_code=bra_code, code_type='料罐').update(scan_result=True)
         # 开门
         try:
             if equip_no in JZ_EQUIP_NO:
