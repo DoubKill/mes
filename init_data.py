@@ -177,7 +177,7 @@ permission_data = [
     {'id': 135, 'code': 'in_out_history', 'name': '胶料库出入库履历查询', 'parent_id': None, 'category_name': '库存管理'},
     {'id': 136, 'code': 'view_in_out_history', 'name': '查看', 'parent_id': 135},
 
-    {'id': 150, 'code': 'material_attr', 'name': '物料属性管理', 'parent_id': None, 'category_name': '库存管理'},
+    {'id': 150, 'code': 'material_attr', 'name': '日限管理', 'parent_id': None, 'category_name': '工艺管理'},
     {'id': 151, 'code': 'view_material_attr', 'name': '查看', 'parent_id': 150},
     {'id': 152, 'code': 'add_material_attr', 'name': '新增', 'parent_id': 150},
     {'id': 153, 'code': 'change_material_attr', 'name': '修改', 'parent_id': 150},
