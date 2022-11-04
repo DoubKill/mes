@@ -6604,11 +6604,12 @@ class TimeEnergyConsuming(APIView):
                 if product_batching:
                     v['actual_weight'] = product_batching.batching_weight
                     v['devoted_weight'] = product_batching.batching_weight
-                    devoted_materials = product_batching.batching_details.filter(
+                    devoted_material = product_batching.batching_details.filter(
                         type=1,
+                        delete_flag=False,
                         material__material_no__endswith=recipe_no).first()
-                    if devoted_materials:
-                        v['devoted_weight'] = devoted_materials.actual_weight
+                    if devoted_material:
+                        v['devoted_weight'] = devoted_material.actual_weight
 
                 for idx, field_name in stage_idx.get(k, {}).items():
                     if field_name == 'evacuation_energy':  # 计算耗电量，每个机台都不一样
