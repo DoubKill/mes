@@ -2020,6 +2020,7 @@ class PlanUpdateSerializer(serializers.ModelSerializer):
         elif action == 4:
             ins.stop(instance.planid)
             instance.state = '终止'
+            instance.stoptime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             instance.save()
         else:
             raise serializers.ValidationError('action参数错误！')
@@ -2060,6 +2061,9 @@ class JZPlanUpdateSerializer(serializers.ModelSerializer):
                     ins.update_trains(instance.planid, setno)
                 elif action == 4:
                     ins.stop(instance.planid)
+                    instance.state = '终止'
+                    instance.stoptime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    instance.save()
                 else:
                     raise serializers.ValidationError('action参数错误！')
             except Exception as e:
