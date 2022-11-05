@@ -180,13 +180,15 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                     unit = unit
                     if not b_instance:
                         t = TrainsFeedbacks.objects.filter(plan_classes_uid=s_rubber.plan_classes_uid, actual_trains=s_rubber.begin_trains).last()
+                        t2 = TrainsFeedbacks.objects.filter(plan_classes_uid=s_rubber.plan_classes_uid, actual_trains=s_rubber.end_trains).last()
                         p = ProductClassesPlan.objects.filter(plan_classes_uid=s_rubber.plan_classes_uid, delete_flag=False).last()
                         BarCodeTraceDetail.objects.create(
                             bra_code=bra_code, scan_material_record=scan_material, product_time=t.product_time if t else s_rubber.product_time,
                             material_name_record=material_name, standard_weight=total_weight, pallet_no=s_rubber.pallet_no, equip_no=s_rubber.equip_no,
                             group=p.work_schedule_plan.group.global_name if p else None, classes=s_rubber.classes,
                             trains=f'{s_rubber.begin_trains}-{s_rubber.end_trains}', plan_classes_uid=s_rubber.plan_classes_uid,
-                            begin_time=s_rubber.begin_time, end_time=s_rubber.end_time, arrange_rubber_time=s_rubber.product_time
+                            begin_time=t.begin_time if t else s_rubber.begin_time, end_time=t2.end_time if t2 else s_rubber.end_time,
+                            arrange_rubber_time=s_rubber.product_time
                         )
                     # DepotPallt.objects.filter(pallet_data__lot_no=bra_code).update(outer_time=now_date, pallet_status=2)
         elif len(bra_code) > 12 and bra_code[12] in ['H', 'Z']:  # 胶皮补打
@@ -2020,6 +2022,7 @@ class PlanUpdateSerializer(serializers.ModelSerializer):
         elif action == 4:
             ins.stop(instance.planid)
             instance.state = '终止'
+            instance.stoptime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             instance.save()
         else:
             raise serializers.ValidationError('action参数错误！')
@@ -2060,6 +2063,9 @@ class JZPlanUpdateSerializer(serializers.ModelSerializer):
                     ins.update_trains(instance.planid, setno)
                 elif action == 4:
                     ins.stop(instance.planid)
+                    instance.state = '终止'
+                    instance.stoptime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    instance.save()
                 else:
                     raise serializers.ValidationError('action参数错误！')
             except Exception as e:

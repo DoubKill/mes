@@ -149,6 +149,8 @@ urlpatterns = [
     path('over-time/', OverTimeView.as_view()),
     # 考勤记录查询
     path('attendance-record-search/', AttendanceRecordSearch.as_view()),
+    # 班组打卡明细(钉钉端)
+    path('group-clock-detail/', GroupClockDetailView.as_view()),
     # 考勤打卡审批
     path('attendance-result-audit/', AttendanceResultAuditView.as_view()),
     # 物料消耗统计报表

@@ -3352,7 +3352,7 @@ class SummaryOfWeighingOutput(APIView):
         price_obj = SetThePrice.objects.first()
         if not price_obj:
             raise ValidationError('请先去添加细料/硫磺单价')
-        pool = ThreadPool(8)
+        pool = ThreadPool(32)
         for equip_no in equip_list:
             pool.apply_async(self.concat_user_package, args=(equip_no, result, factory_date, users, work_times, user_result))
         pool.close()
@@ -3885,7 +3885,7 @@ class PerformanceSummaryView(APIView):
         for item in price_list:
             price_dic[f"{item['equip_type']}_{item['state']}"] = {'pt': item['pt'], 'dj': item['dj']}
         dj_list = ProductInfoDingJi.objects.filter(is_use=True).values_list('product_name', flat=True)
-        pool = ThreadPool(8)
+        pool = ThreadPool(32)
         for key, detail in user_dic.items():
             pool.apply_async(self.concat_user_train, args=(key, detail, equip_dic, price_dic, dj_list, date))
         pool.close()
@@ -5603,6 +5603,64 @@ class AttendanceRecordSearch(APIView):
                 results['avg_times'] =0
         results['work_times'] = round(results['work_times'], 2)
         return Response({'results': results})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class GroupClockDetailView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        query_name = self.request.query_params.get('query_name')
+        group = self.request.query_params.get('group', 'A班')
+        select_date = self.request.query_params.get('select_date', datetime.datetime.now().strftime('%Y-%m-%d'))
+        results = {}
+        if not query_name:
+            user_name = self.request.user.username
+            # 查看人员是否为考勤负责人
+            u_flag = User.objects.filter(is_superuser=True, username=user_name)
+            if not u_flag:  # 是否为管理员
+                group_sets = AttendanceGroupSetup.objects.filter(principal__icontains=user_name)
+                if not group_sets:
+                    raise ValidationError('当前用户不是考勤组负责人, 请联系管理员')
+                clock_types = group_sets.values_list('type', flat=True).distinct()
+            else:
+                clock_types = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='绩效计算岗位类别').values_list('global_name', flat=True).distinct()
+            records = EmployeeAttendanceRecords.objects.filter(~Q(is_use='废弃'), clock_type__in=clock_types, factory_date=select_date, group=group).order_by('clock_type', 'section', 'user__username', 'status')
+            exist_r = []
+            for s in records:
+                name, section, status, clock_type = s.user.username, s.section, s.status, s.clock_type
+                _key = f"{select_date}-{name}-{section}"
+                if _key in exist_r:
+                    continue
+                exist_r.append(_key)
+                real_name = name if status != '调岗' else f"{name}[{status}]"
+                s_type = results.get(clock_type)
+                if s_type:
+                    s_section = s_type.get(section)
+                    if s_section:
+                        s_section += ([real_name] if real_name not in s_section else [])
+                    else:
+                        s_type[section] = [real_name]
+                else:
+                    results[clock_type] = {section: [real_name]}
+        else:  # 某位员工当班组打卡明细
+            clock_type = self.request.query_params.get('clock_type')
+            section = self.request.query_params.get('section')
+            user_name = query_name.split('[')[0]
+            records = EmployeeAttendanceRecords.objects.filter(~Q(is_use='废弃'), user__username=user_name, factory_date=select_date,
+                                                               group=group, clock_type=clock_type, section=section).order_by('begin_date', 'equip')
+            for s in records:
+                section, status, equip = s.section, s.status, s.equip
+                begin_date = s.begin_date.strftime('%Y-%m-%d %H:%M:%S') if s.begin_date else None
+                end_date = s.end_date.strftime('%Y-%m-%d %H:%M:%S') if s.end_date else None
+                s_status = results.get(status)
+                if s_status:
+                    s_status['equip'] += f",{equip}"
+                else:
+                    results[status] = {'id': s.id, 'user_name': user_name, 'section': section, 'equip': equip, 'status': status,
+                                       'begin_date': begin_date, "end_date": end_date}
+            results = results.values()
+        return Response(results)
 
 
 @method_decorator([api_recorder], name="dispatch")
