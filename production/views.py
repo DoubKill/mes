@@ -3352,7 +3352,7 @@ class SummaryOfWeighingOutput(APIView):
         price_obj = SetThePrice.objects.first()
         if not price_obj:
             raise ValidationError('请先去添加细料/硫磺单价')
-        pool = ThreadPool(8)
+        pool = ThreadPool(32)
         for equip_no in equip_list:
             pool.apply_async(self.concat_user_package, args=(equip_no, result, factory_date, users, work_times, user_result))
         pool.close()
@@ -3885,7 +3885,7 @@ class PerformanceSummaryView(APIView):
         for item in price_list:
             price_dic[f"{item['equip_type']}_{item['state']}"] = {'pt': item['pt'], 'dj': item['dj']}
         dj_list = ProductInfoDingJi.objects.filter(is_use=True).values_list('product_name', flat=True)
-        pool = ThreadPool(8)
+        pool = ThreadPool(32)
         for key, detail in user_dic.items():
             pool.apply_async(self.concat_user_train, args=(key, detail, equip_dic, price_dic, dj_list, date))
         pool.close()
