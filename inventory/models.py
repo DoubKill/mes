@@ -876,6 +876,46 @@ class MaterialInHistory(models.Model):
         managed = False
 
 
+class THInHistoryOther(models.Model):
+    id = models.BigIntegerField(primary_key=True, db_column='Id')
+    order_no = models.CharField(max_length=64, db_column='TaskNumber')
+    initiator = models.CharField(max_length=64, db_column='LastUserId')
+    start_time = models.DateTimeField(verbose_name='发起时间', help_text='发起时间', blank=True, null=True,
+                                      db_column='CreaterTime')
+    last_time = models.DateTimeField(verbose_name='开始时间', help_text='开始时间', blank=True, null=True, db_column='LastTime')
+    # fin_time = models.DateTimeField(verbose_name='完成时间', help_text='完成时间', blank=True, null=True, db_column='CompleteTime')
+
+    class Meta:
+        db_table = 't_stock_in_task'
+        managed = False
+
+
+class THInHistory(models.Model):
+    """原材料入库记录"""
+    id = models.BigIntegerField(primary_key=True, db_column='Id')
+    batch_no = models.CharField(max_length=64, db_column="BatchNo")
+    supplier = models.CharField(max_length=255, db_column="ContactCompanyName")
+    order_no = models.CharField(max_length=64, db_column='TaskId')
+    pallet_no = models.CharField(max_length=64, db_column='LadenToolNumber')
+    location = models.CharField(max_length=64, db_column='SpaceId', help_text="货位地址")
+    qty = models.DecimalField(max_digits=18, decimal_places=2, db_column='Quantity')
+    weight = models.DecimalField(max_digits=18, decimal_places=2, db_column='WeightOfActual')
+    unit = models.CharField(db_column='WeightUnit', max_length=50)
+    lot_no = models.CharField(max_length=64, db_column='TrackingNumber', null=True, blank=True)
+    inout_type = models.IntegerField(db_column='TaskType')
+    material_no = models.CharField(max_length=64, db_column='MaterialCode')
+    material_name = models.CharField(max_length=64, db_column='MaterialName')
+    task = models.ForeignKey("THInHistoryOther", on_delete=models.CASCADE, related_name="mih",
+                             db_column="StockInTaskEntityId")
+    sl = models.DecimalField(max_digits=18, decimal_places=4, db_column='SL')
+    zl = models.DecimalField(max_digits=18, decimal_places=4, db_column='ZL')
+    task_status = models.IntegerField(db_column='TaskState', help_text='入库状态')
+
+    class Meta:
+        db_table = 't_stock_in_task_upper'
+        managed = False
+
+
 class MaterialOutHistoryOther(models.Model):
     """原材料出库记录"""
     TASK_STATUS_CHOICE = (
@@ -936,6 +976,66 @@ class MaterialOutHistory(models.Model):
         db_table = 't_stock_out_task_down'
         managed = False
 
+
+class THOutHistoryOther(models.Model):
+    """原材料出库记录"""
+    TASK_STATUS_CHOICE = (
+        (1, '已创建'),
+        (2, '等待出库'),
+        (3, '出库中'),
+        (4, '已出库'),
+        (5, '异常出库'),
+        (6, '取消'),
+    )
+    TASK_TYPE_CHOICE = (
+        (1, '生产正常出库'),
+        (2, 'mes指定库位出库'),
+        (3, 'mes指定重量出库'),
+        (4, '自主创建'),
+    )
+    id = models.BigIntegerField(primary_key=True, db_column='Id')
+    order_no = models.CharField(max_length=64, db_column='TaskNumber')
+    initiator = models.CharField(max_length=64, db_column='LastUserId',help_text='创建人')
+    start_time = models.DateTimeField(verbose_name='创建时间', help_text='创建时间', blank=True, null=True,
+                                      db_column='CreaterTime')
+    last_time = models.DateTimeField(verbose_name='开始时间', help_text='开始时间', blank=True, null=True, db_column='LastTime')
+    task_type = models.IntegerField(db_column='StockOutTaskType', help_text='出库类型', choices=TASK_TYPE_CHOICE)
+    task_status = models.IntegerField(db_column='StockOutTaskState', help_text='出库状态', choices=TASK_STATUS_CHOICE)
+    # fin_time = models.DateTimeField(verbose_name='完成时间', help_text='完成时间', blank=True, null=True, db_column='CompleteTime')
+
+    class Meta:
+        db_table = 't_stock_out_task'
+        managed = False
+
+
+class THOutHistory(models.Model):
+    """原材料出库记录"""
+    id = models.BigIntegerField(primary_key=True, db_column='Id')
+    batch_no = models.CharField(max_length=64, db_column="BatchNo", help_text='批次号')
+    supplier = models.CharField(max_length=255, db_column="ContactCompanyName", help_text='供应商')
+    order_no = models.CharField(max_length=64, db_column='TaskId', help_text='下架任务号')
+    pallet_no = models.CharField(max_length=64, db_column='LadenToolNumber', help_text='托盘号')
+    location = models.CharField(max_length=64, db_column='SpaceId', help_text="货位地址")
+    qty = models.DecimalField(max_digits=18, decimal_places=2, db_column='Quantity', help_text='数量')
+    weight = models.DecimalField(max_digits=18, decimal_places=2, db_column='WeightOfActual', help_text='重量')
+    unit = models.CharField(db_column='WeightUnit', max_length=64, help_text='单位重量')
+    lot_no = models.CharField(max_length=64, db_column='TrackingNumber', null=True, blank=True, help_text='追踪码')
+    inout_type = models.IntegerField(db_column='TaskType', help_text='出库类型')
+    material_no = models.CharField(max_length=64, db_column='MaterialCode', help_text='物料编码')
+    material_name = models.CharField(max_length=64, db_column='MaterialName', help_text='物料名称')
+    task = models.ForeignKey("THOutHistoryOther", on_delete=models.CASCADE, related_name="moh",
+                             db_column="StockOutTaskEntityId", help_text='出库单据ID')
+    entrance = models.CharField(max_length=64, db_column='EntranceCode', help_text='出库口')
+    task_status = models.IntegerField(db_column='TaskState', help_text='出库状态')
+    standard_unit = models.CharField(max_length=64, db_column='StandardUnit', help_text='标准单位')
+    piece_count = models.DecimalField(max_digits=18, decimal_places=2, db_column='PieceCount')
+    zc_num = models.CharField(max_length=64, db_column='ZcdNumber')
+    sl = models.DecimalField(max_digits=18, decimal_places=4, db_column='SL')
+    zl = models.DecimalField(max_digits=18, decimal_places=4, db_column='ZL')
+
+    class Meta:
+        db_table = 't_stock_out_task_down'
+        managed = False
 
 class BarcodeQuality(models.Model):
     # material = models.OneToOneField(Material, related_name="barcode_quality", on_delete=models.CASCADE, null=True)
