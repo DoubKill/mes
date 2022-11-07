@@ -1886,7 +1886,7 @@ class BarcodeTraceView(APIView):
             if l_detail:
                 p_list = p.product_no.split('-')
                 s_stage = None if not p_list else (p_list[1] if len(p_list) > 2 else p_list[0])
-                results.update({s_stage: [{product_no: self.supplement_info(l_detail.values('scan_material_type', 'scan_material', 'bra_code', 'feed_log__trains', 'material_name')), 'behind': ''}]})
+                results.update({s_stage: [{product_no: self.supplement_info(l_detail.values('scan_material_type', 'scan_material', 'bra_code', 'feed_log__trains', 'material_name', 'actual_weight')), 'behind': ''}]})
                 others = l_detail.filter(~Q(Q(bra_code__startswith='AAJZ20') | Q(bra_code__startswith='WMS')), scan_material_type='胶皮').order_by('-stage')
                 if others:
                     res = self.trace_down(others, behind=s_stage)
@@ -1942,7 +1942,7 @@ class BarcodeTraceView(APIView):
                 _k = f"{bra_code}_{scan_material}"
                 if _k not in temp:
                     _i = {'scan_material_type': scan_material_type, 'scan_material': scan_material, 'bra_code': bra_code, 'feed_log__trains': trains,
-                          'material_name': i.material_name}
+                          'material_name': i.material_name, 'actual_weight': i.actual_weight}
                     s_info = self.supplement_info([_i])[0]
                     temp[_k] = s_info
                 else:
@@ -1972,7 +1972,7 @@ class BarcodeTraceView(APIView):
             if l_detail:
                 p_list = p.product_no.split('-')
                 s_stage = None if not p_list else (p_list[1] if len(p_list) > 2 else p_list[0])
-                s_info = {p.product_no: self.supplement_info(l_detail.values('scan_material_type', 'scan_material', 'bra_code', 'feed_log__trains', 'material_name', 'stage')), 'behind': f'{behind}-{index + 1}'}
+                s_info = {p.product_no: self.supplement_info(l_detail.values('scan_material_type', 'scan_material', 'bra_code', 'feed_log__trains', 'material_name', 'stage', 'actual_weight')), 'behind': f'{behind}-{index + 1}'}
                 if s_stage in res:
                     res[s_stage].append(s_info)
                 else:
@@ -1997,6 +1997,7 @@ class BarcodeTraceView(APIView):
                 add_data_temp = b[0] if b else {'scan_material_record': None, 'material_name_record': None, 'product_time': None, 'standard_weight': None,
                                                 'pallet_no': None, 'equip_no': None, 'group': None, 'classes': None, 'trains': None,
                                                 'plan_classes_uid': None, 'begin_time': None, 'end_time': None, 'arrange_rubber_time': None}
+                add_data_temp['actual_weight'] = i.get('actual_weight', 0)
                 if i['bra_code'][0] in ['S', 'F']:  # 补充小料详情
                     res = self.get_xl_info(i['bra_code'], i['material_name'])
                     add_data_temp.update(res)
