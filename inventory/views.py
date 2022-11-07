@@ -1825,6 +1825,7 @@ class BarcodeTraceView(APIView):
                 .values('plan_classes_uid', 'actual_trains', 'equip_no', 'product_no', 'actual_weight', 'begin_time', 'end_time', 'factory_date', 'classes')
             for i in records:
                 plan_classes_uid, train = i['plan_classes_uid'], i['actual_trains']
+                actual_weight = 0 if not i['actual_weight'] else round(i['actual_weight'] / 100, 2)
                 begin_time = i['begin_time'] if not i['begin_time'] else i['begin_time'].strftime('%Y-%m-%d %H:%M:%S')
                 end_time = i['end_time'] if not i['end_time'] else i['end_time'].strftime('%Y-%m-%d %H:%M:%S')
                 p_info = PalletFeedbacks.objects.filter(plan_classes_uid=plan_classes_uid, begin_trains__lte=train, end_trains__gte=train).last()
@@ -1833,7 +1834,8 @@ class BarcodeTraceView(APIView):
                 if bra_code and (not lot_no or bra_code not in lot_no):
                     continue
                 group = p.work_schedule_plan.group.global_name if p else ''
-                i.update({'lot_no': lot_no, 'pallet_no': pallet_no, 'product_time': product_time, 'begin_time': begin_time, 'end_time': end_time, 'group': group})
+                i.update({'lot_no': lot_no, 'pallet_no': pallet_no, 'product_time': product_time, 'begin_time': begin_time, 'end_time': end_time,
+                          'group': group, 'actual_weight': actual_weight})
                 results.append(i)
         else:
             raise ValidationError('未知操作')
