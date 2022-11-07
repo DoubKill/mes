@@ -3426,7 +3426,8 @@ class EmployeeAttendanceRecordsView(APIView):
                 raise ValidationError(f'未找到当月{clock_type}排班信息')
             groups = basic_info.values_list('classes', flat=True).distinct()
             days = basic_info.last().weight_class_details.all().values_list('factory_date', flat=True)
-            group = [{'start_time__date': s_day, 'group__global_name': s_group.split('/')[0]} for s_day in days for s_group in groups]
+            dis_group = set([i.split('/')[0] for i in groups])
+            group = [{'start_time__date': s_day, 'group__global_name': s_group.split('/')[0]} for s_day in days for s_group in dis_group]
         group_list = []
         for key, group in groupby(list(group), key=lambda x: x['start_time__date']):
             group_list.append([item['group__global_name'] for item in group])
