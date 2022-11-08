@@ -6895,10 +6895,11 @@ class HFRealStatusView(APIView):
             res = hf.manual_out_hf(data)
             # 更新履历
             hf_log = HfBakeLog.objects.filter(oast_no=data['OastNo'], actual_temperature__isnull=True, actual_bake_time__isnull=True).last()
-            hf_log.actual_temperature = res.get('ShiJiT')
-            hf_log.actual_bake_time = res.get('ShiJiTime')
-            hf_log.last_updated_date = datetime.datetime.now()
-            hf_log.save()
+            if hf_log:
+                hf_log.actual_temperature = res.get('ShiJiT')
+                hf_log.actual_bake_time = res.get('ShiJiTime')
+                hf_log.last_updated_date = datetime.datetime.now()
+                hf_log.save()
         except Exception as e:
             raise ValidationError(e.args[0])
         else:
