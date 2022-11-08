@@ -6970,8 +6970,8 @@ class HFConfigSetView(APIView):
         repeat_material_name = []
         # 删除物料
         if delete_data:
-            HfBakeMaterialSet.objects.filter(id=delete_data).update(**{'delete_flag': True})
-            return Response('删除设置成功')
+            HfBakeMaterialSet.objects.filter(id=delete_data).delete()
+            return Response('删除成功')
         for s_data in data:
             rid, material_name, temperature_set, bake_time = s_data.get('id'),  s_data.get('material_name'), \
                                                              s_data.get('temperature_set'),  s_data.get('bake_time')
