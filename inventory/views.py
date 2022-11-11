@@ -279,9 +279,10 @@ class OutWorkFeedBack(APIView):
                     dp_obj.finish_time = datetime.datetime.now()
                     dp_obj.save()
                     OutBoundDeliveryOrderDetail.objects.filter(
-                        location=dp_obj.location,
+                        # location=dp_obj.location,
                         status=2,
-                        outbound_delivery_order__warehouse=dp_obj.outbound_delivery_order.warehouse
+                        pallet_no=dp_obj.pallet_no
+                        # outbound_delivery_order__warehouse=dp_obj.outbound_delivery_order.warehouse
                     ).update(status=3)
                     # try:
                     #     depot_name = '混炼线边库区' if dp_obj.outbound_delivery_order.warehouse == '混炼胶库' else "终炼线边库区"
