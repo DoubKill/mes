@@ -25,6 +25,7 @@ from basics.views import CommonDeleteMixin
 from equipment.utils import gen_template_response
 from inventory.models import ProductStockDailySummary
 from mes.common_code import get_weekdays
+from mes.conf import JZ_EQUIP_NO
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
 from mes.permissions import PermissionClass
@@ -36,7 +37,7 @@ from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, Ba
     BatchingClassesEquipPlan, SchedulingParamsSetting, SchedulingRecipeMachineSetting, SchedulingEquipCapacity, \
     SchedulingWashRule, SchedulingWashPlaceKeyword, SchedulingWashPlaceOperaKeyword, SchedulingProductDemandedDeclare, \
     SchedulingProductDemandedDeclareSummary, SchedulingProductSafetyParams, SchedulingResult, \
-    SchedulingEquipShutDownPlan
+    SchedulingEquipShutDownPlan, WeightPackageDailyTimeConsume
 from plan.serializers import ProductDayPlanSerializer, ProductClassesPlanManyCreateSerializer, \
     ProductBatchingSerializer, ProductBatchingDetailSerializer, ProductDayPlansySerializer, \
     ProductClassesPlansySerializer, MaterialsySerializer, BatchingClassesPlanSerializer, \
@@ -45,13 +46,15 @@ from plan.serializers import ProductDayPlanSerializer, ProductClassesPlanManyCre
     SchedulingWashRuleSerializer, SchedulingWashPlaceKeywordSerializer, SchedulingWashPlaceOperaKeywordSerializer, \
     RecipeMachineWeightSerializer, SchedulingProductDemandedDeclareSerializer, \
     SchedulingProductDemandedDeclareSummarySerializer, SchedulingProductSafetyParamsSerializer, \
-    SchedulingResultSerializer, SchedulingEquipShutDownPlanSerializer, ProductStockDailySummarySerializer
+    SchedulingResultSerializer, SchedulingEquipShutDownPlanSerializer, ProductStockDailySummarySerializer, \
+    WeightPackageDailyTimeConsumeSerializer
 from plan.utils import calculate_product_plan_trains, extend_last_aps_result, APSLink, \
     calculate_equip_recipe_avg_mixin_time, plan_sort
 from production.models import PlanStatus, TrainsFeedbacks, MaterialTankStatus
 from quality.utils import get_cur_sheet, get_sheet_data
 from recipe.models import ProductBatching, ProductBatchingDetail, Material, MaterialAttribute, WeighBatchingDetail
 from system.serializers import PlanReceiveSerializer
+from terminal.models import JZRecipePre, RecipePre, JZRecipeMaterial, RecipeMaterial, WeightPackageManual
 from terminal.utils import get_current_factory_date
 
 
@@ -1277,3 +1280,276 @@ class MaterialPlanConsumeView(APIView):
                     material_weight_dict[m_name] = material_weight_dict.get(m_name, 0) + weight
         result = sorted(ret, key=itemgetter('material_type', 'material_name', 'equip_no'))  #  按多个字段排序
         return Response({'result': result, 'material_weight_dict': material_weight_dict})
+
+
+@method_decorator([api_recorder], name='dispatch')
+class WeightPackageDailyTimeConsumeViewSet(ModelViewSet):
+    queryset = WeightPackageDailyTimeConsume.objects.order_by('product_no')
+    serializer_class = WeightPackageDailyTimeConsumeSerializer
+    permission_classes = (IsAuthenticated,)
+    pagination_class = None
+    filter_fields = ('factory_date', 'product_no', 'product_type')
+
+    @action(methods=['get'], detail=False, permission_classes=[], url_path='find-recipe',
+            url_name='find-recipe')
+    def find_recipe(self, request):
+        product_no = self.request.query_params.get('product_no')  # 胶料代码
+        mixin_dev_type = self.request.query_params.get('mixin_dev_type')  # 混炼机型
+        final_dev_type = self.request.query_params.get('final_dev_type')  # 终炼机型
+        plan_weight = float(self.request.query_params.get('plan_weight'))  # 计划吨数
+        # 混炼配方
+        mixin_pd = ProductBatching.objects.filter(batching_type=2,
+                                                  stage_product_batch_no__contains='-1MB-{}-'.format(product_no),
+                                                  used_type=4,
+                                                  dev_type__category_no=mixin_dev_type).first()
+        # 终炼配方
+        final_pd = ProductBatching.objects.filter(batching_type=2,
+                                                  stage_product_batch_no__contains='-FM-{}-'.format(product_no),
+                                                  used_type=4,
+                                                  dev_type__category_no=final_dev_type).first()
+        if not mixin_pd:
+            raise ValidationError('未找到该胶料启用状态混炼配方数据！')
+        if not final_pd:
+            raise ValidationError('未找到该胶料启用状态终炼配方数据！')
+        # 混炼车次重量
+        mixin_weight = float(mixin_pd.batching_weight / 1000)
+        stages = list(GlobalCode.objects.filter(global_type__type_name='胶料段次').values_list('global_name', flat=True))
+        final_devoted_materials = final_pd.batching_details.filter(
+            material__material_type__global_name__in=stages,
+            type=1, material__material_no__icontains='-{}-'.format(product_no)).first()
+        xl_dp_flag = False  # 细料是否单配
+        lh_dp_flag = False  # 终炼是否单配
+        mixin_chemical_kind = 0  # 混炼单配化工数量
+        final_chemical_kind = 0  # 终炼单配化工数量
+        hl_materials = ''  # 合练塑解剂物料及重量
+        mixin_materials = ''  # 混炼单配物料及重量
+        final_materials = ''  # 混炼单配物料及重量
+        xl_split_qty = 1  # 细料分包数量
+        lh_split_qty = 1  # 硫磺分包数量
+        aw_qty = None  # AW数量
+        if final_devoted_materials:
+            final_devoted_weight = float(final_devoted_materials.actual_weight / 1000)
+        else:
+            raise ValidationError('未找到终炼配方投入前段次规格重量！')
+        mixin_cl_recipe_name = '{}({})'.format(mixin_pd.stage_product_batch_no, mixin_dev_type)
+        for equip_no in Equip.objects.filter(equip_no__startswith='F').values_list('equip_no', flat=True):
+            recipe_model = JZRecipePre if equip_no in JZ_EQUIP_NO else RecipePre
+            material_detail_model = JZRecipeMaterial if equip_no in JZ_EQUIP_NO else RecipeMaterial
+            xl_recipe = recipe_model.objects.using(equip_no).filter(
+                name=mixin_cl_recipe_name).first()
+            if xl_recipe:
+                xl_split_qty = 1 if not xl_recipe.split_count else xl_recipe.split_count
+                xl_material_details = dict(material_detail_model.objects.using(equip_no).filter(
+                    recipe_name=mixin_cl_recipe_name).values_list('name', 'weight'))
+                mes_material_details = dict(WeighBatchingDetail.objects.filter(
+                    weigh_cnt_type__product_batching=mixin_pd,
+                    delete_flag=False).values_list('material__material_name', 'standard_weight'))
+                if len(xl_material_details) != len(mes_material_details):
+                    xl_dp_flag = True
+                    for k, v in mes_material_details.items():
+                        k = k.rstrip('-C').rstrip('-X')
+                        if k not in xl_material_details:
+                            mixin_chemical_kind += 1
+                            mixin_materials += '{}:{}kg;'.format(k, v)
+                break
+
+        final_cl_recipe_name = '{}({})'.format(final_pd.stage_product_batch_no, final_dev_type)
+        for equip_no in Equip.objects.filter(equip_no__startswith='S').values_list('equip_no', flat=True):
+            lh_recipe = RecipePre.objects.using(equip_no).filter(
+                name=final_cl_recipe_name).first()
+            if lh_recipe:
+                lh_split_qty = 1 if not lh_recipe.split_count else lh_recipe.split_count
+                lh_material_details = dict(RecipeMaterial.objects.using(equip_no).filter(
+                    recipe_name=final_cl_recipe_name).values_list('name', 'weight'))
+                mes_material_details = dict(WeighBatchingDetail.objects.filter(
+                    weigh_cnt_type__product_batching=final_pd,
+                    delete_flag=False).values_list('material__material_name', 'standard_weight'))
+                if len(lh_material_details) != len(mes_material_details):
+                    lh_dp_flag = True
+                    for k, v in mes_material_details.items():
+                        k = k.rstrip('-C').rstrip('-X')
+                        if k not in lh_material_details:
+                            final_chemical_kind += 1
+                            final_materials += '{}:{}kg;'.format(k, v)
+                break
+        xl_plan_qty = int(plan_weight / mixin_weight * xl_split_qty)  # 细料计划包数
+        xl_dp_qty = None if not xl_dp_flag else xl_plan_qty  # 细料单配包数
+        hl_pd = ProductBatching.objects.filter(batching_type=2,
+                                               used_type=4,
+                                               dev_type__category_no=mixin_dev_type
+                                               ).filter(Q(stage_product_batch_no__contains='-HMB-{}-'.format(product_no)) |
+                                                        Q(stage_product_batch_no__contains='-CMB-{}-'.format(product_no))).first()
+        if hl_pd:
+            hl_materials_data = list(WeighBatchingDetail.objects.filter(
+                weigh_cnt_type__product_batching=hl_pd,
+                delete_flag=False,
+                material__material_name__icontains='塑解剂'
+            ).values_list('material__material_name', 'standard_weight'))
+            for i in hl_materials_data:
+                hl_materials += '{}:{}kg'.format(i[0].rstrip('-C').rstrip('-X'), i[1])
+        lh_plan_qty = int(plan_weight / final_devoted_weight * lh_split_qty)  # 硫磺计划包数
+        lh_dp_qty = None if not lh_dp_flag else lh_plan_qty  # 硫磺单配包数
+        manual_instance = WeightPackageManual.objects.filter(
+            product_no=mixin_cl_recipe_name, dev_type=mixin_dev_type).order_by('id').last()
+        if manual_instance:
+            if manual_instance.package_details.filter(material_name__icontains='AW').exists():
+                aw_qty = xl_split_qty
+
+        return Response({'mixin_weight': mixin_weight, 'final_devoted_weight': final_devoted_weight,
+                         'xl_split_qty': xl_split_qty, 'lh_split_qty': lh_split_qty,
+                         'xl_plan_qty': xl_plan_qty, 'xl_dp_qty': xl_dp_qty,
+                         'mixin_chemical_kind': mixin_chemical_kind, 'hl_materials': hl_materials,
+                         'mixin_materials': mixin_materials, 'lh_plan_qty': lh_plan_qty,
+                         'lh_dp_qty': lh_dp_qty, 'final_materials': final_materials,
+                         'final_chemical_kind': final_chemical_kind, "product_no": product_no,
+                         'mixin_dev_type': mixin_dev_type, 'final_dev_type': final_dev_type,
+                         'plan_weight': plan_weight, 'aw_qty': aw_qty})
+
+    @action(methods=['post'], detail=False, permission_classes=[], url_path='import-xlsx',
+            url_name='import-xlsx')
+    def import_xlsx(self, request):
+        excel_file = request.FILES.get('file', None)
+        factory_date = request.data.get('factory_date')
+        if not excel_file:
+            raise ValidationError('文件不可为空！')
+        file_name = excel_file.name
+        if not file_name.split('.')[-1] in ['xls', 'xlsx', 'xlsm']:
+            raise ValidationError('文件格式错误,仅支持 xls、xlsx、xlsm文件')
+        try:
+            data = xlrd.open_workbook(filename=None, file_contents=excel_file.read())
+            sheet0 = data.sheets()[0]
+            sheet1 = data.sheets()[1]
+        except Exception:
+            raise ValidationError('打开文件错误')
+        if sheet0.ncols != 7 and sheet0.ncols != 7:
+            raise ValidationError('导入文件数据错误！')
+        data0 = get_sheet_data(sheet0)
+        data1 = get_sheet_data(sheet1)
+        data = {1: data0, 2: data1}
+        instance_list = []
+        stages = list(
+            GlobalCode.objects.filter(global_type__type_name='胶料段次').values_list('global_name', flat=True))
+        for product_type, row_data in data.items():
+            for i in row_data:
+                try:
+                    product_no = i[0].strip()
+                    plan_weight = float(i[1])
+                    mixin_dev_type = i[2].strip()
+                    final_dev_type = i[3].strip()
+                    hl_time_consume = None if not i[4] else float(i[4])
+                    mixin_time_consume = None if not i[5] else float(i[5])
+                    final_time_consume = None if not i[6] else float(i[6])
+                except Exception:
+                    raise ValidationError('导入数据错误，修改后重试！')
+                # 混炼配方
+                mixin_pd = ProductBatching.objects.filter(batching_type=2,
+                                                          stage_product_batch_no__contains='-1MB-{}-'.format(
+                                                              product_no),
+                                                          used_type=4,
+                                                          dev_type__category_no=mixin_dev_type).first()
+                # 终炼配方
+                final_pd = ProductBatching.objects.filter(batching_type=2,
+                                                          stage_product_batch_no__contains='-FM-{}-'.format(product_no),
+                                                          used_type=4,
+                                                          dev_type__category_no=final_dev_type).first()
+                if not mixin_pd:
+                    raise ValidationError('未找到该胶料启用状态混炼配方数据：{}！'.format(product_no))
+                if not final_pd:
+                    raise ValidationError('未找到该胶料启用状态终炼配方数据：{}！'.format(product_no))
+                # 混炼车次重量
+                mixin_weight = float(mixin_pd.batching_weight / 1000)
+                final_devoted_materials = final_pd.batching_details.filter(
+                    material__material_type__global_name__in=stages,
+                    type=1, material__material_no__icontains='-{}-'.format(product_no)).first()
+                xl_dp_flag = False  # 细料是否单配
+                lh_dp_flag = False  # 终炼是否单配
+                mixin_chemical_kind = 0  # 混炼单配化工数量
+                final_chemical_kind = 0  # 终炼单配化工数量
+                hl_materials = ''  # 合练塑解剂物料及重量
+                mixin_materials = ''  # 混炼单配物料及重量
+                final_materials = ''  # 混炼单配物料及重量
+                xl_split_qty = 1  # 细料分包数量
+                lh_split_qty = 1  # 硫磺分包数量
+                aw_qty = None  # AW数量
+                if final_devoted_materials:
+                    final_devoted_weight = float(final_devoted_materials.actual_weight / 1000)
+                else:
+                    raise ValidationError('未找到终炼配方投入前段次规格重量！')
+                mixin_cl_recipe_name = '{}({})'.format(mixin_pd.stage_product_batch_no, mixin_dev_type)
+                for equip_no in Equip.objects.filter(equip_no__startswith='F').values_list('equip_no', flat=True):
+                    recipe_model = JZRecipePre if equip_no in JZ_EQUIP_NO else RecipePre
+                    material_detail_model = JZRecipeMaterial if equip_no in JZ_EQUIP_NO else RecipeMaterial
+                    xl_recipe = recipe_model.objects.using(equip_no).filter(
+                        name=mixin_cl_recipe_name).first()
+                    if xl_recipe:
+                        xl_split_qty = 1 if not xl_recipe.split_count else xl_recipe.split_count
+                        xl_material_details = dict(material_detail_model.objects.using(equip_no).filter(
+                            recipe_name=mixin_cl_recipe_name).values_list('name', 'weight'))
+                        mes_material_details = dict(WeighBatchingDetail.objects.filter(
+                            weigh_cnt_type__product_batching=mixin_pd,
+                            delete_flag=False).values_list('material__material_name', 'standard_weight'))
+                        if len(xl_material_details) != len(mes_material_details):
+                            xl_dp_flag = True
+                            for k, v in mes_material_details.items():
+                                k = k.rstrip('-C').rstrip('-X')
+                                if k not in xl_material_details:
+                                    mixin_chemical_kind += 1
+                                    mixin_materials += '{}:{}kg;'.format(k, v)
+                        break
+
+                final_cl_recipe_name = '{}({})'.format(final_pd.stage_product_batch_no, final_dev_type)
+                for equip_no in Equip.objects.filter(equip_no__startswith='S').values_list('equip_no', flat=True):
+                    lh_recipe = RecipePre.objects.using(equip_no).filter(
+                        name=final_cl_recipe_name).first()
+                    if lh_recipe:
+                        lh_split_qty = 1 if not lh_recipe.split_count else lh_recipe.split_count
+                        lh_material_details = dict(RecipeMaterial.objects.using(equip_no).filter(
+                            recipe_name=final_cl_recipe_name).values_list('name', 'weight'))
+                        mes_material_details = dict(WeighBatchingDetail.objects.filter(
+                            weigh_cnt_type__product_batching=final_pd,
+                            delete_flag=False).values_list('material__material_name', 'standard_weight'))
+                        if len(lh_material_details) != len(mes_material_details):
+                            lh_dp_flag = True
+                            for k, v in mes_material_details.items():
+                                k = k.rstrip('-C').rstrip('-X')
+                                if k not in lh_material_details:
+                                    final_chemical_kind += 1
+                                    final_materials += '{}:{}kg;'.format(k, v)
+                        break
+                xl_plan_qty = int(plan_weight / mixin_weight * xl_split_qty)  # 细料计划包数
+                xl_dp_qty = None if not xl_dp_flag else xl_plan_qty  # 细料单配包数
+                hl_pd = ProductBatching.objects.filter(batching_type=2,
+                                                       used_type=4,
+                                                       dev_type__category_no=mixin_dev_type
+                                                       ).filter(
+                    Q(stage_product_batch_no__contains='-HMB-{}-'.format(product_no)) |
+                    Q(stage_product_batch_no__contains='-CMB-{}-'.format(product_no))).first()
+                if hl_pd:
+                    hl_materials_data = list(WeighBatchingDetail.objects.filter(
+                        weigh_cnt_type__product_batching=hl_pd,
+                        delete_flag=False,
+                        material__material_name__icontains='塑解剂'
+                    ).values_list('material__material_name', 'standard_weight'))
+                    for j in hl_materials_data:
+                        hl_materials += '{}:{}kg'.format(j[0].rstrip('-C').rstrip('-X'), j[1])
+                lh_plan_qty = int(plan_weight / final_devoted_weight * lh_split_qty)  # 硫磺计划包数
+                lh_dp_qty = None if not lh_dp_flag else lh_plan_qty  # 硫磺单配包数
+                manual_instance = WeightPackageManual.objects.filter(
+                    product_no=mixin_cl_recipe_name, dev_type=mixin_dev_type).order_by('id').last()
+                if manual_instance:
+                    if manual_instance.package_details.filter(material_name__icontains='AW').exists():
+                        aw_qty = xl_split_qty
+                instance_list.append(WeightPackageDailyTimeConsume(**{
+                    'mixin_weight': mixin_weight, 'final_devoted_weight': final_devoted_weight,
+                    'xl_split_qty': xl_split_qty, 'lh_split_qty': lh_split_qty,
+                    'xl_plan_qty': xl_plan_qty, 'xl_dp_qty': xl_dp_qty,
+                    'mixin_chemical_kind': mixin_chemical_kind, 'hl_materials': hl_materials,
+                    'mixin_materials': mixin_materials, 'lh_plan_qty': lh_plan_qty,
+                    'lh_dp_qty': lh_dp_qty, 'final_materials': final_materials,
+                    'final_chemical_kind': final_chemical_kind, "product_no": product_no,
+                    'mixin_dev_type': mixin_dev_type, 'final_dev_type': final_dev_type,
+                    'plan_weight': plan_weight, 'aw_qty': aw_qty, 'factory_date': factory_date,
+                    'product_type': product_type, 'hl_time_consume': hl_time_consume,
+                    'mixin_time_consume': mixin_time_consume, 'final_time_consume': final_time_consume}))
+        WeightPackageDailyTimeConsume.objects.bulk_create(instance_list)
+        return Response('ok')

@@ -1,4 +1,5 @@
 import calendar
+import copy
 import decimal
 import json
 import datetime
@@ -76,7 +77,7 @@ from production.utils import get_standard_time, get_classes_plan, get_user_group
 from quality.models import MaterialTestOrder, MaterialDealResult, MaterialTestResult, MaterialDataPointIndicator
 from quality.utils import get_cur_sheet, get_sheet_data
 from system.models import Section
-from recipe.models import Material, MaterialAttribute
+from recipe.models import Material, MaterialAttribute, ProductBatching
 from system.models import User
 from terminal.models import Plan, JZPlan, JZReportBasic, ReportBasic
 from equipment.utils import DinDinAPI
@@ -3391,10 +3392,10 @@ class SummaryOfWeighingOutput(APIView):
             if result1.get(name):
                 result1[name][f"{day}{classes}"] = price
                 result1[name][f"{day}{classes}_count"] = count_
-                result1[name]['xl'] += xl
-                result1[name]['lh'] += lh
+                result1[name]['xl'] = round(result1[name].get('xl', 0) + xl, 2)
+                result1[name]['lh'] = round(result1[name].get('lh', 0) + lh, 2)
             else:
-                result1[name] = {'name': name, f"{day}{classes}": price, f"{day}{classes}_count": count_, 'xl': xl, 'lh': lh}
+                result1[name] = {'name': name, f"{day}{classes}": price, f"{day}{classes}_count": count_, 'xl': round(xl, 2), 'lh': round(lh, 2)}
         return Response({'results': result, 'users': result1.values()})
 
 
@@ -3489,8 +3490,12 @@ class EmployeeAttendanceRecordsView(APIView):
                         state, approve_user = 2, audit_approve.approve_user
         # 增加能否导出的标记  08-19:默认可以导出[去除审核以后才能导出的限制]
         export_flag = True
+        # 返回岗位与机台关联
+        s_choice = list(PerformanceJobLadder.objects.filter(type=clock_type, relation=1, delete_flag=False).values_list('name', flat=True).distinct())
+        m_choice = list(PerformanceJobLadder.objects.filter(type=clock_type, relation=2, delete_flag=False).values_list('name', flat=True).distinct())
         return Response({'results': results_sort, 'group_list': group_list, 'export_flag': export_flag, 'state': state,
-                         'audit_user':  audit_user, 'user_groups': user_groups, 'approve_user': approve_user})
+                         'audit_user':  audit_user, 'user_groups': user_groups, 'approve_user': approve_user,
+                         's_choice': s_choice, 'm_choice': m_choice})
 
     # 导入出勤记录
     @atomic
@@ -4178,7 +4183,14 @@ class PerformanceSummaryView(APIView):
             item['hj'] = round(item['hj'], 2)
             # 并入月超产奖励
             s_ccjl = ccjl_detail.get(item['name'])
-            p = 0 if not s_ccjl else (round(max(s_ccjl.values()), 2) if 'all' not in s_ccjl else s_ccjl.get('all'))
+            # 存在员工升班长或者班长降员工场景(分别计算)
+            if not s_ccjl:
+                p = 0
+            else:
+                common_p = dict(filter(lambda x: isinstance(x[0], int), s_ccjl.items()))
+                leader_p = s_ccjl.get('all', 0)
+                p = leader_p + round(max(common_p.values(), default=0), 2)
+            # p = 0 if not s_ccjl else (round(max(s_ccjl.values()), 2) if 'all' not in s_ccjl else s_ccjl.get('all'))
             item['超产奖励'] = round(p, 2)
             item['all'] = round(item['all'] + p, 2)
         return Response({'results': results.values(), 'group_list': group_list})
@@ -5680,7 +5692,14 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
         clock_type = self.request.data.get('clock_type')
         factory_date, opera_type, delete_ids = None, None, []
         if report_list:  # 添加考勤数据
-            serializer = self.get_serializer(data=report_list, many=True)
+            # 处理机台数据
+            s_data, create_data = report_list[0], []
+            equip = s_data.get('equip', [])
+            for s_equip in equip:
+                i = copy.deepcopy(s_data)
+                i['equip'] = s_equip
+                create_data.append(i)
+            serializer = self.get_serializer(data=create_data, many=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
         elif confirm_list:  # 确认某一天的考勤数据
@@ -5968,7 +5987,7 @@ class ShiftTimeSummaryView(APIView):
             results[key][f'{equip_no}_time_abnormal'] = time_consuming if abs(time_consuming) > 20 else None
             results[key]['consuming'] += time_consuming if abs(time_consuming) <= 20 else 0
             results[key]['abnormal'] += time_consuming if abs(time_consuming) > 20 else 0
-            results[key][f'{equip_no}_rate'] = None if not standard_time else round((standard_time / time_consuming) * 100, 2)
+            results[key][f'{equip_no}_rate'] = None if not standard_time else round((standard_time / 60 / time_consuming) * 100, 2)
         res = list(results.values())
         for item in res:
             equip_count = (len(item) - 5) // 2
@@ -6497,20 +6516,30 @@ class GroupProductionSummary(APIView):
 class TimeEnergyConsuming(APIView):
 
     def get(self, request):
-        st = self.request.query_params.get('st', '2022-09-01')
-        et = self.request.query_params.get('et', '2022-09-15')
+        st = self.request.query_params.get('st')
+        et = self.request.query_params.get('et')
         if not all([st, et]):
             raise ValidationError('请选择开始结束时间！')
+        # 产量数据，按每个规格和车次数量排序
         production_data = TrainsFeedbacks.objects.filter(
             factory_date__gte=st,
             factory_date__lte=et
         ).values('product_no', 'equip_no').annotate(cnt=Count('id'),
-                                                    plan_weight=Max('plan_weight'),
                                                     actual_weight=Max('actual_weight')/100,
                                                     evacuation_energy=Avg('evacuation_energy'),
-                                                    consum_time=Max('consum_time')).order_by('cnt', 'product_no')
-        recipe_machine_data = SchedulingRecipeMachineSetting.objects.order_by('rubber_type', 'product_no', 'version')
+                                                    consum_time=Max('consum_time')).order_by('product_no', 'cnt')
         item_dict = {}
+        # 设备机台对应机型字典数据
+        equip_dev_type_dict = dict(Equip.objects.filter(
+            category__equip_type__global_name="密炼设备"
+        ).values_list("equip_no", 'category_id'))
+        pt_dict = {}
+        pt = GlobalCode.objects.filter(global_type__type_name='配方类别').order_by('id').values('global_no', 'global_name')
+        for item in pt:
+            type_name = item['global_no']
+            for i in item['global_name'].split(','):
+                pt_dict[i] = type_name
+        # 每个规格，找到生产车次最多的机台数据
         for item in production_data:
             try:
                 pb_split = item['product_no'].split('-')
@@ -6522,52 +6551,74 @@ class TimeEnergyConsuming(APIView):
                 evacuation_energy = item['evacuation_energy'] * 2
             else:
                 evacuation_energy = item['evacuation_energy']
+            actual_weight = item['actual_weight']
             if recipe_no not in item_dict:
-                item_dict[recipe_no] = {stage: {'plan_weight': item['plan_weight'],
-                                                'actual_weight': item['actual_weight'],
+                item_dict[recipe_no] = {stage: {'devoted_weight': actual_weight,
+                                                'actual_weight': actual_weight,
                                                 'evacuation_energy': evacuation_energy,
                                                 'consum_time': item['consum_time'],
                                                 'equip_no': item['equip_no'],
                                                 }}
             else:
-                item_dict[recipe_no][stage] = {'plan_weight': item['plan_weight'],
-                                                'actual_weight': item['actual_weight'],
+                item_dict[recipe_no][stage] = {'devoted_weight': actual_weight,
+                                                'actual_weight': actual_weight,
                                                 'evacuation_energy': evacuation_energy,
                                                 'consum_time': item['consum_time'],
                                                 'equip_no': item['equip_no']}
+        # 写入excel表格
         wb = load_workbook('xlsx_template/energy_consume.xlsx')
-        ws = wb.worksheets[0]
-        sheet = wb.copy_worksheet(ws)
+        sheet = wb.worksheets[0]
         sheet.title = '吨耗时(吨耗能)'
         data_row = 4
-        stage_idx = {'CMB': {7: 'equip_no', 8: 'plan_weight', 9: 'actual_weight', 10: 'evacuation_energy', 11: 'consum_time'},
-                     'HMB': {14: 'equip_no', 15: 'plan_weight', 16: 'actual_weight', 17: 'evacuation_energy', 18: 'consum_time'},
-                     '1MB': {21: 'equip_no', 22: 'plan_weight', 23: 'actual_weight', 24: 'evacuation_energy', 25: 'consum_time'},
-                     '2MB': {28: 'equip_no', 29: 'plan_weight', 30: 'actual_weight', 31: 'evacuation_energy', 32: 'consum_time'},
-                     '3MB': {35: 'equip_no', 36: 'plan_weight', 37: 'actual_weight', 38: 'evacuation_energy', 39: 'consum_time'},
-                     'RMB': {42: 'equip_no', 43: 'plan_weight', 44: 'actual_weight', 45: 'evacuation_energy', 46: 'consum_time'},
-                     'FM': {49: 'equip_no', 50: 'plan_weight', 51: 'actual_weight', 52: 'evacuation_energy', 53: 'consum_time'},
+        stage_idx = {'CMB': {7: 'equip_no', 8: 'devoted_weight', 9: 'actual_weight', 10: 'evacuation_energy', 11: 'consum_time'},
+                     'HMB': {14: 'equip_no', 15: 'devoted_weight', 16: 'actual_weight', 17: 'evacuation_energy', 18: 'consum_time'},
+                     '1MB': {21: 'equip_no', 22: 'devoted_weight', 23: 'actual_weight', 24: 'evacuation_energy', 25: 'consum_time'},
+                     '2MB': {28: 'equip_no', 29: 'devoted_weight', 30: 'actual_weight', 31: 'evacuation_energy', 32: 'consum_time'},
+                     '3MB': {35: 'equip_no', 36: 'devoted_weight', 37: 'actual_weight', 38: 'evacuation_energy', 39: 'consum_time'},
+                     'RMB': {42: 'equip_no', 43: 'devoted_weight', 44: 'actual_weight', 45: 'evacuation_energy', 46: 'consum_time'},
+                     'FM': {49: 'equip_no', 50: 'devoted_weight', 51: 'actual_weight', 52: 'evacuation_energy', 53: 'consum_time'},
                      }
-        for m in recipe_machine_data:
-            recipe_no = '{}-{}'.format(m.product_no, m.version)
-            if recipe_no not in item_dict:
-                continue
-            stages = m.stages.split('/')
-            sheet.cell(data_row, 1).value = m.rubber_type
-            sheet.cell(data_row, 4).value = m.product_no
-            sheet.cell(data_row, 5).value = m.version
-            sheet.cell(data_row, 6).value = len(stages)
-            for k, v in item_dict[recipe_no].items():
+        for recipe_no, stage_data in item_dict.items():
+            pn_split = recipe_no.split('-')
+            try:
+                re_result = re.match(r'[A-Z]+', pn_split[0])
+                if not re_result:
+                    recipe_type = '未知'
+                else:
+                    recipe_type = pt_dict.get(re_result.group(), '未知')
+            except Exception:
+                recipe_type = '未知'
+            sheet.cell(data_row, 1).value = recipe_type
+            sheet.cell(data_row, 2).value = data_row - 3
+            sheet.cell(data_row, 4).value = pn_split[0]
+            sheet.cell(data_row, 5).value = pn_split[1]
+            sheet.cell(data_row, 6).value = len(stage_data)
+            for k, v in stage_data.items():
+                equip_no = v['equip_no']
+                #  查询配方数据，如果查到配方则补充收皮重量为配方重量，以及补充每个段次所投入上段次的重量
+                product_batching = ProductBatching.objects.filter(
+                    batching_type=2,
+                    dev_type_id=equip_dev_type_dict.get(equip_no),
+                    stage_product_batch_no__endswith='{}-{}'.format(k, recipe_no)
+                ).order_by('id').last()
+                if product_batching:
+                    v['actual_weight'] = product_batching.batching_weight
+                    v['devoted_weight'] = product_batching.batching_weight
+                    devoted_material = product_batching.batching_details.filter(
+                        type=1,
+                        delete_flag=False,
+                        material__material_no__endswith=recipe_no).first()
+                    if devoted_material:
+                        v['devoted_weight'] = devoted_material.actual_weight
+
                 for idx, field_name in stage_idx.get(k, {}).items():
-                    equip_no = v['equip_no']
-                    actual_weight = v['plan_weight']
-                    if field_name == 'evacuation_energy':
+                    if field_name == 'evacuation_energy':  # 计算耗电量，每个机台都不一样
                         if equip_no == 'Z01':
                             evacuation_energy = int(v['evacuation_energy'] / 10)
                         elif equip_no == 'Z02':
                             evacuation_energy = int(v['evacuation_energy'] / 0.6)
                         elif equip_no == 'Z04':
-                            evacuation_energy = int(v['evacuation_energy'] * 0.28 * float(actual_weight) / 1000)
+                            evacuation_energy = int(v['evacuation_energy'] * 0.28 * float(v['actual_weight']) / 1000)
                         elif equip_no == 'Z12':
                             evacuation_energy = int(v['evacuation_energy'] / 5.3)
                         elif equip_no == 'Z13':
@@ -6578,7 +6629,6 @@ class TimeEnergyConsuming(APIView):
                     else:
                         sheet.cell(data_row, idx).value = v[field_name]
             data_row += 1
-        wb.remove_sheet(ws)
         output = BytesIO()
         wb.save(output)
         # 重新定位到开始

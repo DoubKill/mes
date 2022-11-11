@@ -16,7 +16,7 @@ from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, Pr
     BatchingClassesPlan, BatchingClassesEquipPlan, SchedulingParamsSetting, SchedulingRecipeMachineSetting, \
     SchedulingEquipCapacity, SchedulingWashRule, SchedulingWashRuleDetail, SchedulingWashPlaceKeyword, \
     SchedulingWashPlaceOperaKeyword, SchedulingProductDemandedDeclare, SchedulingProductDemandedDeclareSummary, \
-    SchedulingProductSafetyParams, SchedulingResult, SchedulingEquipShutDownPlan
+    SchedulingProductSafetyParams, SchedulingResult, SchedulingEquipShutDownPlan, WeightPackageDailyTimeConsume
 from plan.uuidfield import UUidTools
 from production.models import PlanStatus
 from quality.utils import get_cur_sheet
@@ -944,3 +944,30 @@ class ProductStockDailySummarySerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductStockDailySummary
         fields = '__all__'
+
+
+class WeightPackageDailyTimeConsumeSerializer(serializers.ModelSerializer):
+
+    def update(self, instance, validated_data):
+        plan_weight = validated_data['plan_weight']
+        xl_plan_qty = int(plan_weight / instance.mixin_weight * instance.xl_split_qty)  # 细料计划包数
+        xl_dp_qty = None if not instance.xl_dp_qty else xl_plan_qty  # 细料单配包数
+        lh_plan_qty = int(plan_weight / instance.final_devoted_weight * instance.lh_split_qty)  # 硫磺计划包数
+        lh_dp_qty = None if not instance.lh_dp_qty else lh_plan_qty  # 硫磺单配包数
+        validated_data['xl_plan_qty'] = xl_plan_qty
+        validated_data['xl_dp_qty'] = xl_dp_qty
+        validated_data['lh_plan_qty'] = lh_plan_qty
+        validated_data['lh_dp_qty'] = lh_dp_qty
+        return super().update(instance, validated_data)
+
+    class Meta:
+        model = WeightPackageDailyTimeConsume
+        fields = '__all__'
+
+
+class WeightPackageDailyTimeConsumeImportSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = WeightPackageDailyTimeConsume
+        fields = ('product_no', 'plan_weight', 'mixin_dev_type', 'final_devoted_weight',
+                  'hl_time_consume', 'mixin_time_consume', 'final_time_consume')

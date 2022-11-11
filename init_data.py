@@ -177,7 +177,7 @@ permission_data = [
     {'id': 135, 'code': 'in_out_history', 'name': '胶料库出入库履历查询', 'parent_id': None, 'category_name': '库存管理'},
     {'id': 136, 'code': 'view_in_out_history', 'name': '查看', 'parent_id': 135},
 
-    {'id': 150, 'code': 'material_attr', 'name': '物料属性管理', 'parent_id': None, 'category_name': '库存管理'},
+    {'id': 150, 'code': 'material_attr', 'name': '日限管理', 'parent_id': None, 'category_name': '工艺管理'},
     {'id': 151, 'code': 'view_material_attr', 'name': '查看', 'parent_id': 150},
     {'id': 152, 'code': 'add_material_attr', 'name': '新增', 'parent_id': 150},
     {'id': 153, 'code': 'change_material_attr', 'name': '修改', 'parent_id': 150},
@@ -1141,20 +1141,37 @@ permission_data = [
     {'id': 1126, 'code': 'group_production_summary', 'name': '班组产量明细汇总', 'parent_id': None, 'category_name': '生产管理'},
     {'id': 1127, 'code': 'view_group_production_summary', 'name': '查看', 'parent_id': 1126},
 
-    {'id': 1128, 'code': 'equip_fault_statistic', 'name': '设备故障统计列表', 'parent_id': None, 'category_name': '设备管理'},
-    {'id': 1129, 'code': 'view_equip_fault_statistic', 'name': '查看', 'parent_id': 1128},
-    {'id': 1130, 'code': 'export_equip_fault_statistic', 'name': '导出', 'parent_id': 1128},
+    {'id': 1128, 'code': 'daily_weight_package', 'name': '料包日需求及耗时统计', 'parent_id': None, 'category_name': '生产计划管理'},
+    {'id': 1129, 'code': 'view_daily_weight_package', 'name': '查看', 'parent_id': 1128},
+    {'id': 1130, 'code': 'add_daily_weight_package', 'name': '新增', 'parent_id': 1128},
+    {'id': 1131, 'code': 'change_daily_weight_package', 'name': '编辑', 'parent_id': 1128},
+    {'id': 1132, 'code': 'delete_daily_weight_package', 'name': '删除', 'parent_id': 1128},
+    {'id': 1133, 'code': 'import_daily_weight_package', 'name': '导入', 'parent_id': 1128},
+    {'id': 1134, 'code': 'export_daily_weight_package', 'name': '导出', 'parent_id': 1128},
 
-    {'id': 1131, 'code': 'equip_fault_analyse', 'name': '设备故障分析报表', 'parent_id': None, 'category_name': '设备管理'},
-    {'id': 1132, 'code': 'view_equip_fault_analyse', 'name': '查看', 'parent_id': 1131},
-    {'id': 1133, 'code': 'export_equip_fault_analyse', 'name': '导出', 'parent_id': 1131}
+    {'id': 1135, 'code': 'rubber_log', 'name': '胶架进出登记表', 'parent_id': None, 'category_name': '生产管理'},
+    {'id': 1136, 'code': 'view_rubber_log', 'name': '查看', 'parent_id': 1134},
+    {'id': 1137, 'code': 'add_rubber_log', 'name': '保存', 'parent_id': 1134},
+    {'id': 1138, 'code': 'export_rubber_log', 'name': '导出', 'parent_id': 1134},
 
-    {'id': 1140, 'code': 'rubber_log', 'name': '胶架进出登记表', 'parent_id': None, 'category_name': '生产管理'},
-    {'id': 1141, 'code': 'view_rubber_log', 'name': '查看', 'parent_id': 1140},
-    {'id': 1142, 'code': 'add_rubber_log', 'name': '保存', 'parent_id': 1140},
-    {'id': 1143, 'code': 'export_rubber_log', 'name': '导出', 'parent_id': 1140},
+    {'id': 1139, 'code': 'barcode_trace', 'name': '条码追溯(原材料->终炼胶)', 'parent_id': None, 'category_name': '工艺管理'},
+    {'id': 1140, 'code': 'view_barcode_trace', 'name': '查看', 'parent_id': 1139},
+    {'id': 1141, 'code': 'add_barcode_trace', 'name': '导出', 'parent_id': 1139},
 
-    # 下一个 1144 开始
+    {'id': 1142, 'code': 'barcode_trace1', 'name': '条码追溯(终炼胶->原材料)', 'parent_id': None, 'category_name': '工艺管理'},
+    {'id': 1143, 'code': 'view_barcode_trace1', 'name': '查看', 'parent_id': 1142},
+    {'id': 1144, 'code': 'add_barcode_trace1', 'name': '导出', 'parent_id': 1142},
+
+    {'id': 1145, 'code': 'equip_fault_statistic', 'name': '设备故障统计列表', 'parent_id': None, 'category_name': '设备管理'},
+    {'id': 1146, 'code': 'view_equip_fault_statistic', 'name': '查看', 'parent_id': 1145},
+    {'id': 1147, 'code': 'export_equip_fault_statistic', 'name': '导出', 'parent_id': 1145},
+
+    {'id': 1148, 'code': 'equip_fault_analyse', 'name': '设备故障分析报表', 'parent_id': None, 'category_name': '设备管理'},
+    {'id': 1149, 'code': 'view_equip_fault_analyse', 'name': '查看', 'parent_id': 1148},
+    {'id': 1150, 'code': 'export_equip_fault_analyse', 'name': '导出', 'parent_id': 1148},
+
+    # 下一个 1151 开始
+
 ]
 
 
