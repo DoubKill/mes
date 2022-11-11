@@ -256,8 +256,8 @@ class SchedulingRecipeMachineSetting(AbstractEntity):
     vice_machine_2MB = models.CharField(max_length=128, help_text='2MB辅机台', default='', blank=True)
     main_machine_3MB = models.CharField(max_length=128, help_text='3MB主机台', default='', blank=True)
     vice_machine_3MB = models.CharField(max_length=128, help_text='3MB辅机台', default='', blank=True)
-    main_machine_RMB = models.CharField(max_length=128, help_text='RMB主机台', default='', blank=True)
-    vice_machine_RMB = models.CharField(max_length=128, help_text='RMB辅机台', default='', blank=True)
+    main_machine_4MB = models.CharField(max_length=128, help_text='4MB主机台', default='', blank=True)
+    vice_machine_4MB = models.CharField(max_length=128, help_text='4MB辅机台', default='', blank=True)
     main_machine_FM = models.CharField(max_length=128, help_text='FM主机台', default='', blank=True)
     vice_machine_FM = models.CharField(max_length=128, help_text='FM辅机台', default='', blank=True)
 

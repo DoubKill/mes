@@ -279,9 +279,10 @@ class OutWorkFeedBack(APIView):
                     dp_obj.finish_time = datetime.datetime.now()
                     dp_obj.save()
                     OutBoundDeliveryOrderDetail.objects.filter(
-                        location=dp_obj.location,
+                        # location=dp_obj.location,
                         status=2,
-                        outbound_delivery_order__warehouse=dp_obj.outbound_delivery_order.warehouse
+                        pallet_no=dp_obj.pallet_no
+                        # outbound_delivery_order__warehouse=dp_obj.outbound_delivery_order.warehouse
                     ).update(status=3)
                     # try:
                     #     depot_name = '混炼线边库区' if dp_obj.outbound_delivery_order.warehouse == '混炼胶库' else "终炼线边库区"
@@ -1825,6 +1826,7 @@ class BarcodeTraceView(APIView):
                 .values('plan_classes_uid', 'actual_trains', 'equip_no', 'product_no', 'actual_weight', 'begin_time', 'end_time', 'factory_date', 'classes')
             for i in records:
                 plan_classes_uid, train = i['plan_classes_uid'], i['actual_trains']
+                actual_weight = 0 if not i['actual_weight'] else round(i['actual_weight'] / 100, 2)
                 begin_time = i['begin_time'] if not i['begin_time'] else i['begin_time'].strftime('%Y-%m-%d %H:%M:%S')
                 end_time = i['end_time'] if not i['end_time'] else i['end_time'].strftime('%Y-%m-%d %H:%M:%S')
                 p_info = PalletFeedbacks.objects.filter(plan_classes_uid=plan_classes_uid, begin_trains__lte=train, end_trains__gte=train).last()
@@ -1833,7 +1835,8 @@ class BarcodeTraceView(APIView):
                 if bra_code and (not lot_no or bra_code not in lot_no):
                     continue
                 group = p.work_schedule_plan.group.global_name if p else ''
-                i.update({'lot_no': lot_no, 'pallet_no': pallet_no, 'product_time': product_time, 'begin_time': begin_time, 'end_time': end_time, 'group': group})
+                i.update({'lot_no': lot_no, 'pallet_no': pallet_no, 'product_time': product_time, 'begin_time': begin_time, 'end_time': end_time,
+                          'group': group, 'actual_weight': actual_weight})
                 results.append(i)
         else:
             raise ValidationError('未知操作')
@@ -1884,7 +1887,7 @@ class BarcodeTraceView(APIView):
             if l_detail:
                 p_list = p.product_no.split('-')
                 s_stage = None if not p_list else (p_list[1] if len(p_list) > 2 else p_list[0])
-                results.update({s_stage: [{product_no: self.supplement_info(l_detail.values('scan_material_type', 'scan_material', 'bra_code', 'feed_log__trains', 'material_name')), 'behind': ''}]})
+                results.update({s_stage: [{product_no: self.supplement_info(l_detail.values('scan_material_type', 'scan_material', 'bra_code', 'feed_log__trains', 'material_name', 'actual_weight')), 'behind': ''}]})
                 others = l_detail.filter(~Q(Q(bra_code__startswith='AAJZ20') | Q(bra_code__startswith='WMS')), scan_material_type='胶皮').order_by('-stage')
                 if others:
                     res = self.trace_down(others, behind=s_stage)
@@ -1940,7 +1943,7 @@ class BarcodeTraceView(APIView):
                 _k = f"{bra_code}_{scan_material}"
                 if _k not in temp:
                     _i = {'scan_material_type': scan_material_type, 'scan_material': scan_material, 'bra_code': bra_code, 'feed_log__trains': trains,
-                          'material_name': i.material_name}
+                          'material_name': i.material_name, 'actual_weight': i.actual_weight}
                     s_info = self.supplement_info([_i])[0]
                     temp[_k] = s_info
                 else:
@@ -1970,7 +1973,7 @@ class BarcodeTraceView(APIView):
             if l_detail:
                 p_list = p.product_no.split('-')
                 s_stage = None if not p_list else (p_list[1] if len(p_list) > 2 else p_list[0])
-                s_info = {p.product_no: self.supplement_info(l_detail.values('scan_material_type', 'scan_material', 'bra_code', 'feed_log__trains', 'material_name', 'stage')), 'behind': f'{behind}-{index + 1}'}
+                s_info = {p.product_no: self.supplement_info(l_detail.values('scan_material_type', 'scan_material', 'bra_code', 'feed_log__trains', 'material_name', 'stage', 'actual_weight')), 'behind': f'{behind}-{index + 1}'}
                 if s_stage in res:
                     res[s_stage].append(s_info)
                 else:
@@ -1995,6 +1998,7 @@ class BarcodeTraceView(APIView):
                 add_data_temp = b[0] if b else {'scan_material_record': None, 'material_name_record': None, 'product_time': None, 'standard_weight': None,
                                                 'pallet_no': None, 'equip_no': None, 'group': None, 'classes': None, 'trains': None,
                                                 'plan_classes_uid': None, 'begin_time': None, 'end_time': None, 'arrange_rubber_time': None}
+                add_data_temp['actual_weight'] = i.get('actual_weight', 0)
                 if i['bra_code'][0] in ['S', 'F']:  # 补充小料详情
                     res = self.get_xl_info(i['bra_code'], i['material_name'])
                     add_data_temp.update(res)
@@ -6892,10 +6896,11 @@ class HFRealStatusView(APIView):
             res = hf.manual_out_hf(data)
             # 更新履历
             hf_log = HfBakeLog.objects.filter(oast_no=data['OastNo'], actual_temperature__isnull=True, actual_bake_time__isnull=True).last()
-            hf_log.actual_temperature = res.get('ShiJiT')
-            hf_log.actual_bake_time = res.get('ShiJiTime')
-            hf_log.last_updated_date = datetime.datetime.now()
-            hf_log.save()
+            if hf_log:
+                hf_log.actual_temperature = res.get('ShiJiT')
+                hf_log.actual_bake_time = res.get('ShiJiTime')
+                hf_log.last_updated_date = datetime.datetime.now()
+                hf_log.save()
         except Exception as e:
             raise ValidationError(e.args[0])
         else:
@@ -6967,8 +6972,8 @@ class HFConfigSetView(APIView):
         repeat_material_name = []
         # 删除物料
         if delete_data:
-            HfBakeMaterialSet.objects.filter(id=delete_data).update(**{'delete_flag': True})
-            return Response('删除设置成功')
+            HfBakeMaterialSet.objects.filter(id=delete_data).delete()
+            return Response('删除成功')
         for s_data in data:
             rid, material_name, temperature_set, bake_time = s_data.get('id'),  s_data.get('material_name'), \
                                                              s_data.get('temperature_set'),  s_data.get('bake_time')
