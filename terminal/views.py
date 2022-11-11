@@ -3543,11 +3543,12 @@ class XlRecipeNoticeView(APIView):
             if xl_equip not in e_xl_equip:
                 update_info = f'{e_xl_equip},{xl_equip}' if e_xl_equip else xl_equip
                 ProductBatchingEquip.objects.filter(product_batching=product_batching).update(send_xl_equip=update_info)
-            record = RecipeChangeDetail.objects.filter(change_history__recipe_no=product_no.split('_NEW')[0], change_history__dev_type=product_batching.dev_type.category_name).order_by('id').last()
-            if record:
-                record.weight_down_time = datetime.datetime.now()
-                record.weight_down_username = self.request.user.username
-                record.save()
+            if not wf_flag:  # 非外发配方记录履历
+                record = RecipeChangeDetail.objects.filter(change_history__recipe_no=product_no.split('_NEW')[0], change_history__dev_type=product_batching.dev_type.category_name).order_by('id').last()
+                if record:
+                    record.weight_down_time = datetime.datetime.now()
+                    record.weight_down_username = self.request.user.username
+                    record.save()
         return Response(f'{xl_equip}:\n {detail_msg}')
 
     def issue_xl_system(self, xl_equip, data):

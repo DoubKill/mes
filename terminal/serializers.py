@@ -158,8 +158,8 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                     total_weight = Decimal(320 * (return_rubber.end_trains - return_rubber.begin_trains + 1))
                     if not b_instance:
                         BarCodeTraceDetail.objects.create(
-                            bra_code=bra_code, scan_material_record=scan_material, product_time=return_rubber.created_date, material_name_record=material_name,
-                            standard_weight=total_weight
+                            bra_code=bra_code, scan_material_record=scan_material, product_time=return_rubber.created_date,
+                            material_name_record=material_name, standard_weight=total_weight
                         )
             else:  # 收皮条码
                 s_rubber = PalletFeedbacks.objects.filter(lot_no=bra_code).first()
@@ -180,13 +180,15 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                     unit = unit
                     if not b_instance:
                         t = TrainsFeedbacks.objects.filter(plan_classes_uid=s_rubber.plan_classes_uid, actual_trains=s_rubber.begin_trains).last()
+                        t2 = TrainsFeedbacks.objects.filter(plan_classes_uid=s_rubber.plan_classes_uid, actual_trains=s_rubber.end_trains).last()
                         p = ProductClassesPlan.objects.filter(plan_classes_uid=s_rubber.plan_classes_uid, delete_flag=False).last()
                         BarCodeTraceDetail.objects.create(
                             bra_code=bra_code, scan_material_record=scan_material, product_time=t.product_time if t else s_rubber.product_time,
                             material_name_record=material_name, standard_weight=total_weight, pallet_no=s_rubber.pallet_no, equip_no=s_rubber.equip_no,
                             group=p.work_schedule_plan.group.global_name if p else None, classes=s_rubber.classes,
                             trains=f'{s_rubber.begin_trains}-{s_rubber.end_trains}', plan_classes_uid=s_rubber.plan_classes_uid,
-                            begin_time=s_rubber.begin_time, end_time=s_rubber.end_time, arrange_rubber_time=s_rubber.product_time
+                            begin_time=t.begin_time if t else s_rubber.begin_time, end_time=t2.end_time if t2 else s_rubber.end_time,
+                            arrange_rubber_time=s_rubber.product_time
                         )
                     # DepotPallt.objects.filter(pallet_data__lot_no=bra_code).update(outer_time=now_date, pallet_status=2)
         elif len(bra_code) > 12 and bra_code[12] in ['H', 'Z']:  # 胶皮补打
@@ -221,8 +223,12 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 scan_material = material_no
                 if not b_instance:
                     BarCodeTraceDetail.objects.create(
-                        bra_code=bra_code, scan_material_record=scan_material, product_time=weight_package.batch_time,
-                        material_name_record=material_name, standard_weight=total_weight
+                        bra_code=bra_code, scan_material_record=scan_material,
+                        product_time=weight_package.batch_time.date() if weight_package.batch_time else weight_package.batch_time,
+                        material_name_record=material_name, standard_weight=total_weight, equip_no=weight_package.equip_no,
+                        plan_classes_uid=weight_package.plan_weight_uid, trains=f"{weight_package.begin_trains}-{weight_package.end_trains}",
+                        begin_time=weight_package.batch_time, end_time=weight_package.created_date, group=weight_package.batch_group,
+                        classes=weight_package.batch_classes
                     )
                 if common_scan:
                     save_scan_log(scan_data, scan_message='本计划只能扫通用料包', scan_material=material_name, scan_material_type='通用料包', unit='包', init_weight=total_weight)
@@ -247,8 +253,10 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 scan_material = manual.product_no
                 if not b_instance:
                     BarCodeTraceDetail.objects.create(
-                        bra_code=bra_code, scan_material_record=scan_material, product_time=manual.created_date,
-                        material_name_record=manual.product_no, standard_weight=total_weight
+                        bra_code=bra_code, scan_material_record=scan_material, product_time=manual.created_date.date(),
+                        material_name_record=manual.product_no, standard_weight=total_weight, equip_no=manual.batching_equip,
+                        group=manual.batch_group, classes=manual.batch_class, trains=f"{manual.begin_trains}-{manual.end_trains}",
+                        begin_time=manual.created_date, end_time=manual.created_date
                     )
         elif bra_code.startswith('MC'):  # 人工配(油料、CTP、配方物料)[隶属原材料胶块]
             single = WeightPackageSingle.objects.filter(bra_code=bra_code).first()
@@ -268,8 +276,9 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 unit = '包'
                 if not b_instance:
                     BarCodeTraceDetail.objects.create(
-                        bra_code=bra_code, scan_material_record=scan_material, product_time=single.created_date,
-                        material_name_record=material_name, standard_weight=total_weight
+                        bra_code=bra_code, scan_material_record=scan_material, product_time=single.created_date.date(),
+                        material_name_record=material_name, standard_weight=total_weight, group=single.batch_group, classes=single.batch_class,
+                        trains=f"{single.begin_trains}-{single.end_trains}", begin_time=single.created_date, end_time=single.created_date
                     )
         elif bra_code.startswith('WMS'):
             wms = WmsAddPrint.objects.filter(bra_code=bra_code).first()
@@ -284,8 +293,9 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 unit = 'KG'
                 if not b_instance:
                     BarCodeTraceDetail.objects.create(
-                        bra_code=bra_code, scan_material_record=scan_material, product_time=wms.created_date,
-                        material_name_record=material_name, standard_weight=total_weight
+                        bra_code=bra_code, scan_material_record=scan_material, product_time=wms.created_date.date(),
+                        material_name_record=material_name, standard_weight=total_weight, group=wms.batch_group, classes=wms.batch_class,
+                        begin_time=wms.created_date, end_time=wms.created_date
                     )
         else:  # 总厂胶块:查原材料出库履历查到原材料物料编码
             try:
@@ -992,8 +1002,10 @@ class WeightBatchingLogCreateSerializer(BaseModelSerializer):
             material_name_set = {single.material_name}
             if not b_instance:
                 b_instance = BarCodeTraceDetail.objects.create(
-                    bra_code=bra_code, code_type='料罐', scan_material_record=scan_material, product_time=single.created_date,
-                    standard_weight=round(float(single.single_weight) * single.package_count, 2), display=True, scan_result=True
+                    bra_code=bra_code, code_type='料罐', scan_material_record=scan_material, product_time=single.created_date.date(),
+                    standard_weight=round(float(single.single_weight) * single.package_count, 2), display=True, scan_result=True,
+                    group=single.batch_group, classes=single.batch_class, trains=f"{single.begin_trains}-{single.end_trains}",
+                    begin_time=single.created_date, end_time=single.created_date
                 )
         else:
             # 查原材料出库履历查到原材料物料编码
@@ -2020,6 +2032,7 @@ class PlanUpdateSerializer(serializers.ModelSerializer):
         elif action == 4:
             ins.stop(instance.planid)
             instance.state = '终止'
+            instance.stoptime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             instance.save()
         else:
             raise serializers.ValidationError('action参数错误！')
@@ -2060,6 +2073,9 @@ class JZPlanUpdateSerializer(serializers.ModelSerializer):
                     ins.update_trains(instance.planid, setno)
                 elif action == 4:
                     ins.stop(instance.planid)
+                    instance.state = '终止'
+                    instance.stoptime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    instance.save()
                 else:
                     raise serializers.ValidationError('action参数错误！')
             except Exception as e:

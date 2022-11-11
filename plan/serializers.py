@@ -654,7 +654,7 @@ class SchedulingRecipeMachineSettingSerializer(BaseModelSerializer):
     vice_machine_1MB = serializers.ListField(write_only=True, required=False, allow_empty=True)
     vice_machine_2MB = serializers.ListField(write_only=True, required=False, allow_empty=True)
     vice_machine_3MB = serializers.ListField(write_only=True, required=False, allow_empty=True)
-    vice_machine_RMB = serializers.ListField(write_only=True, required=False, allow_empty=True)
+    vice_machine_4MB = serializers.ListField(write_only=True, required=False, allow_empty=True)
     vice_machine_FM = serializers.ListField(write_only=True, required=False, allow_empty=True)
     stages = serializers.ListField(write_only=True, required=False, allow_empty=True)
 
@@ -680,10 +680,10 @@ class SchedulingRecipeMachineSettingSerializer(BaseModelSerializer):
             data['vice_machine_3MB'] = instance.vice_machine_3MB.split('/')
         else:
             data['vice_machine_3MB'] = []
-        if instance.vice_machine_RMB:
-            data['vice_machine_RMB'] = instance.vice_machine_RMB.split('/')
+        if instance.vice_machine_4MB:
+            data['vice_machine_4MB'] = instance.vice_machine_4MB.split('/')
         else:
-            data['vice_machine_RMB'] = []
+            data['vice_machine_4MB'] = []
         if instance.vice_machine_FM:
             data['vice_machine_FM'] = instance.vice_machine_FM.split('/')
         else:
@@ -700,7 +700,7 @@ class SchedulingRecipeMachineSettingSerializer(BaseModelSerializer):
         attrs['vice_machine_1MB'] = '/'.join(attrs.get('vice_machine_1MB', ''))
         attrs['vice_machine_2MB'] = '/'.join(attrs.get('vice_machine_2MB', ''))
         attrs['vice_machine_3MB'] = '/'.join(attrs.get('vice_machine_3MB', ''))
-        attrs['vice_machine_RMB'] = '/'.join(attrs.get('vice_machine_RMB', ''))
+        attrs['vice_machine_4MB'] = '/'.join(attrs.get('vice_machine_4MB', ''))
         attrs['vice_machine_FM'] = '/'.join(attrs.get('vice_machine_FM', ''))
         attrs['stages'] = '/'.join(attrs.get('stages', ''))
         return attrs
