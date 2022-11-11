@@ -168,7 +168,7 @@ class HFSystem(object):
 
     def __init__(self):
         self.url = 'http://10.4.24.25:3000/StockService?wsdl'
-        self.hf_system = Client(self.url, timeout=3)
+        self.hf_system = Client(self.url, timeout=10)
 
     def get_hf_info(self):
         """获取烘箱信息"""
