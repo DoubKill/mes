@@ -957,23 +957,24 @@ class ProductBatchingPartialUpdateSerializer(BaseModelSerializer):
                 instance.used_type = 5
                 instance.reject_user = self.context['request'].user
                 instance.reject_time = datetime.now()
-        try:
-            record = RecipeChangeHistory.objects.filter(recipe_no=instance.stage_product_batch_no,
-                                                        dev_type=instance.dev_type.category_name,
-                                                        )
-            record.update(used_type=instance.used_type)
-            if all([record, opera_type]):
-                s_record = RecipeChangeDetail.objects.filter(change_history=record.last()).order_by('id').last()
-                if s_record:
-                    if opera_type == '提交':
-                        s_record.submit_time = instance.submit_time
-                        s_record.submit_username = instance.submit_user.username
-                    else:
-                        s_record.confirm_time = instance.check_time
-                        s_record.confirm_username = instance.check_user.username
-                    s_record.save()
-        except Exception as e:
-            error_logger.error(f'记录修改配方状态失败:{e.args[0]}')
+        if instance.batching_type == 2:  # 只记录机型配方履历
+            try:
+                record = RecipeChangeHistory.objects.filter(recipe_no=instance.stage_product_batch_no,
+                                                            dev_type=instance.dev_type.category_name,
+                                                            )
+                record.update(used_type=instance.used_type)
+                if all([record, opera_type]):
+                    s_record = RecipeChangeDetail.objects.filter(change_history=record.last()).order_by('id').last()
+                    if s_record:
+                        if opera_type == '提交':
+                            s_record.submit_time = instance.submit_time
+                            s_record.submit_username = instance.submit_user.username
+                        else:
+                            s_record.confirm_time = instance.check_time
+                            s_record.confirm_username = instance.check_user.username
+                        s_record.save()
+            except Exception as e:
+                error_logger.error(f'记录修改配方状态失败:{e.args[0]}')
         instance.last_updated_user = self.context['request'].user
         instance.save()
         return instance

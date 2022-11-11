@@ -3352,7 +3352,7 @@ class SummaryOfWeighingOutput(APIView):
         price_obj = SetThePrice.objects.first()
         if not price_obj:
             raise ValidationError('请先去添加细料/硫磺单价')
-        pool = ThreadPool(8)
+        pool = ThreadPool(32)
         for equip_no in equip_list:
             pool.apply_async(self.concat_user_package, args=(equip_no, result, factory_date, users, work_times, user_result))
         pool.close()
@@ -3426,7 +3426,8 @@ class EmployeeAttendanceRecordsView(APIView):
                 raise ValidationError(f'未找到当月{clock_type}排班信息')
             groups = basic_info.values_list('classes', flat=True).distinct()
             days = basic_info.last().weight_class_details.all().values_list('factory_date', flat=True)
-            group = [{'start_time__date': s_day, 'group__global_name': s_group.split('/')[0]} for s_day in days for s_group in groups]
+            dis_group = set([i.split('/')[0] for i in groups])
+            group = [{'start_time__date': s_day, 'group__global_name': s_group.split('/')[0]} for s_day in days for s_group in dis_group]
         group_list = []
         for key, group in groupby(list(group), key=lambda x: x['start_time__date']):
             group_list.append([item['group__global_name'] for item in group])
@@ -3885,7 +3886,7 @@ class PerformanceSummaryView(APIView):
         for item in price_list:
             price_dic[f"{item['equip_type']}_{item['state']}"] = {'pt': item['pt'], 'dj': item['dj']}
         dj_list = ProductInfoDingJi.objects.filter(is_use=True).values_list('product_name', flat=True)
-        pool = ThreadPool(8)
+        pool = ThreadPool(32)
         for key, detail in user_dic.items():
             pool.apply_async(self.concat_user_train, args=(key, detail, equip_dic, price_dic, dj_list, date))
         pool.close()
