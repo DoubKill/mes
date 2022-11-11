@@ -539,8 +539,8 @@ class SchedulingRecipeMachineSettingView(ModelViewSet):
                               "vice_machine_2MB": item[11],
                               "main_machine_3MB": item[12],
                               "vice_machine_3MB": item[13],
-                              "main_machine_RMB": item[14],
-                              "vice_machine_RMB": item[15],
+                              "main_machine_4MB": item[14],
+                              "vice_machine_4MB": item[15],
                               "main_machine_FM": item[16],
                               "vice_machine_FM": item[17],
                               },
@@ -1219,9 +1219,9 @@ class RecipeStages(APIView):
             raise ValidationError('bad request')
         pbs = ProductBatching.objects.using('SFJ').exclude(used_type=6).filter(
             stage_product_batch_no__icontains='-{}-{}'.format(product_no, version),
-            stage__global_name__in=('HMB', 'CMB', '1MB', '2MB', '3MB', 'FM')
+            stage__global_name__in=('HMB', 'CMB', '1MB', '2MB', '3MB', '4MB', 'FM')
         ).values_list('stage__global_name', flat=True)
-        idx_keys = {'HMB': 1, 'CMB': 2, '1MB': 3, '2MB': 4, '3MB': 5, 'FM': 6}
+        idx_keys = {'HMB': 1, 'CMB': 2, '1MB': 3, '2MB': 4, '3MB': 5, '4MB': 6, 'FM': 7}
         pbs = sorted(list(set(pbs)), key=lambda d: idx_keys[d])
         return Response(pbs)
 
