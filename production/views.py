@@ -6549,6 +6549,8 @@ class TimeEnergyConsuming(APIView):
                 recipe_no = '{}-{}'.format(product_no, version)
             except Exception:
                 continue
+            if stage not in ['CMB', 'HMB', '1MB', '2MB', '3MB', 'RMB', 'FM']:
+                continue
             if item['equip_no'] == 'Z04':
                 evacuation_energy = item['evacuation_energy'] * 2
             else:
