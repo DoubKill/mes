@@ -3867,7 +3867,7 @@ class PerformanceSummaryView(APIView):
         coefficient1_dic = {dic['global_no']: dic['global_name'] for dic in coefficient1}
         if not coefficient or not coefficient1:
             raise ValidationError('请先去添加独立上岗或超产奖励系数')
-        # 员工考勤记录 (考勤记录)
+        # 员工考勤记录
         section_info = {}
         for item in PerformanceJobLadder.objects.filter(type='密炼').values('name', 'coefficient', 'post_standard', 'post_coefficient', 'type'):
             section_info[item['name']] = {'coefficient': item['coefficient'], 'post_standard': item['post_standard'],
