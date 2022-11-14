@@ -3265,6 +3265,7 @@ class SummaryOfMillOutput(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class SummaryOfWeighingOutput(APIView):
     permission_classes = (IsAuthenticated,)
+    qty_data = {}
 
     def concat_user_package(self, equip_no, result, factory_date, users, work_times, user_result):
         dic = {'equip_no': equip_no, 'hj': 0}
@@ -3283,16 +3284,23 @@ class SummaryOfWeighingOutput(APIView):
                 for name, section_list in names.items():
                     for section in section_list:
                         key = f"{name}_{day}_{classes}_{section}"
-                        work_time = work_times.get(f'{day}-{classes}-{equip_no}').get(name + '_' + section)
-                        c_num = report_basic.objects.using(equip_no).filter(starttime__gte=work_time[0], savetime__lte=work_time[1]).aggregate(num=Count('id'))['num']
-                        num = 0 if not c_num else c_num  # 是否需要去除为0的机台再取平均
+                        work_time = work_times.get(f'{day}-{classes}-{equip_no}').get(name + '_' + section, [])
+                        if len(work_time) < 2:
+                            continue
+                        st, et = work_time[:2]
+                        if f'{day}-{st}-{et}' in self.qty_data:
+                            num = self.qty_data[f'{day}-{st}-{et}']
+                        else:
+                            c_num = report_basic.objects.using(equip_no).filter(starttime__gte=work_time[0], savetime__lte=work_time[1]).aggregate(num=Count('id'))['num']
+                            num = c_num if c_num else 0  # 是否需要去除为0的机台再取平均
+                            self.qty_data[f'{day}-{st}-{et}'] = num
                         # 车数计算：当天产量 / 12小时 * 实际工作时间 -> 修改为根据考勤时间计算
                         if f"{name}_{day}_{classes}" not in key_dic:
                             key_dic[f"{name}_{day}_{classes}"] = key
                         else:
                             key = key_dic[f"{name}_{day}_{classes}"]
                         if user_result.get(key):
-                            user_result[key][equip_no] = num if not user_result[key].get(equip_no) else (user_result[key][equip_no] + num)
+                            user_result[key][equip_no] = user_result[key].get(equip_no, 0) + num
                         else:
                             user_result[key] = {equip_no: num}
                         if status == '调岗':
@@ -3417,7 +3425,8 @@ class SummaryOfWeighingOutput(APIView):
                 result1[name]['lh'] = round(result1[name].get('lh', 0) + lh, 2)
             else:
                 result1[name] = {'name': name, f"{day}{classes}": price, f"{day}{classes}_count": count_, 'xl': round(xl, 2), 'lh': round(lh, 2)}
-        return Response({'results': result, 'users': result1.values()})
+        sort_res = sorted(result, key=lambda x: x['equip_no'])
+        return Response({'results': sort_res, 'users': result1.values()})
 
 
 @method_decorator([api_recorder], name="dispatch")
