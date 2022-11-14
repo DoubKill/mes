@@ -3304,18 +3304,39 @@ class SummaryOfWeighingOutput(APIView):
         year = int(factory_date.split('-')[0])
         month = int(factory_date.split('-')[1])
         equip_list = Equip.objects.filter(category__equip_type__global_name='称量设备').values_list('equip_no', flat=True)
+        # 获取人员包数
+        u_name = self.request.query_params.get('name')
+        day = int(self.request.query_params.get('day', 0))
+        classes = self.request.query_params.get('classes')
+        filter_kwargs = {}
+        if all([u_name, day, classes]):
+            filter_kwargs = {'user__username': u_name, 'factory_date__day': day, 'classes': classes}
         result = []
         result1 = {}
         users = {}
         work_times = {}
         user_result = {}
-        days = days_cur_month_dates(date_time=factory_date)
+        user_package = {}
         # 查询称量分类下当前月上班的所有员工
         user_list = EmployeeAttendanceRecords.objects.filter(
             Q(factory_date__year=year, factory_date__month=month, equip__in=equip_list) &
-            Q(end_date__isnull=False, begin_date__isnull=False) & ~Q(is_use='废弃'), ~Q(clock_type='密炼'))\
+            Q(end_date__isnull=False, begin_date__isnull=False) & ~Q(is_use='废弃'), ~Q(clock_type='密炼'), **filter_kwargs)\
             .values('user__username', 'factory_date__day', 'group', 'classes', 'section', 'equip', 'calculate_begin_date', 'calculate_end_date', 'status')
-
+        if filter_kwargs:  # 获取包数
+            data = user_list.order_by('equip')
+            for i in data:
+                section, equip_no, st, et = i.get('section'), i.get('equip'), i.get('calculate_begin_date'), i.get('calculate_end_date')
+                plan_model, report_basic = [JZPlan, JZReportBasic] if equip_no in JZ_EQUIP_NO else [Plan, ReportBasic]
+                num = report_basic.objects.using(equip_no).filter(starttime__gte=st, savetime__lte=et).aggregate(num=Count('id'))['num']
+                if not num:
+                    continue
+                equip_data = user_package.get(equip_no)
+                if equip_data:
+                    equip_data[section] = equip_data.get(section, 0) + num
+                    equip_data['total'] += num
+                else:
+                    user_package[equip_no] = {section: num, 'total': num}
+            return Response(user_package)
         # 岗位系数
         section_dic = {}
         section_info = PerformanceJobLadder.objects.filter(delete_flag=False, type='生产配料').values('type', 'name', 'coefficient', 'post_standard', 'post_coefficient')
