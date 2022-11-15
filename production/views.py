@@ -2124,32 +2124,41 @@ class MachineTargetValue(APIView):
 
     def get(self, request):
         target_month = self.request.query_params.get('target_month')
+        equip_no = self.request.query_params.get('equip_no')
         if not target_month:
             raise ValidationError('请选择月份')
-        queryset = MachineTargetYieldSettings.objects.filter(target_month=target_month)
         results = []
+        queryset = list(MachineTargetYieldSettings.objects.filter(target_month=target_month).order_by('day', 'id').values())
+        equip_list = ['Z01', 'Z02', 'Z03', 'Z04', 'Z05', 'Z06', 'Z07', 'Z08', 'Z09', 'Z10', 'Z11', 'Z12', 'Z13', 'Z14', 'Z15', '190E']
         if not queryset:
-            equip_list = ['Z01', 'Z02', 'Z03', 'Z04', 'Z05', 'Z06', 'Z07', 'Z08', 'Z09', 'Z10', 'Z11', 'Z12', 'Z13',
-                          'Z14', 'Z15', '190E']
-            for equip_no in equip_list:
-                if equip_no == '190E':
-                    k = 'E190'
-                else:
-                    k = equip_no
-                results.append({'equip_no': equip_no,
-                                'target_weight': '',
-                                'max_weight': ''})
+            if not equip_no:
+                for equip_no in equip_list:
+                    if equip_no == '190E':
+                        k = 'E190'
+                    else:
+                        k = equip_no
+                    results.append({'equip_no': equip_no,
+                                    'target_weight': '',
+                                    'max_weight': ''})
         else:
-            data = queryset.values()[0]
-            equip_list = ['Z01', 'Z02', 'Z03', 'Z04', 'Z05',  'Z06',  'Z07',  'Z08',  'Z09',  'Z10',  'Z11', 'Z12', 'Z13', 'Z14', 'Z15', '190E']
-            for equip_no in equip_list:
-                if equip_no == '190E':
-                    k = 'E190'
-                else:
-                    k = equip_no
-                results.append({'equip_no': equip_no,
-                                'target_weight': data.get(k),
-                                'max_weight': data.get('{}_max'.format(k))})
+            if not equip_no:
+                data = queryset[-1]
+                for equip_no in equip_list:
+                    if equip_no == '190E':
+                        k = 'E190'
+                    else:
+                        k = equip_no
+                    results.append({'equip_no': equip_no,
+                                    'target_weight': data.get(k),
+                                    'max_weight': data.get('{}_max'.format(k))})
+            else:
+                for i in queryset:
+                    results.append({'equip_no': equip_no,
+                                    'day': i.get('day'),
+                                    'classes': i.get('classes'),
+                                    'target_weight': i.get(equip_no),
+                                    'max_weight': i.get(f'{equip_no}_max')})
+
         return Response({'results': results})
 
     def post(self, request):
@@ -2166,8 +2175,21 @@ class MachineTargetValue(APIView):
             max_weight = item['max_weight']
             data[k] = target_weight
             data['{}_max'.format(k)] = max_weight
-
-        MachineTargetYieldSettings.objects.update_or_create(defaults=data, **{'target_month': target_month})
+        # 获取设定值(存在则更新，否则创建)
+        exist_month = MachineTargetYieldSettings.objects.filter(target_month=target_month).order_by('id')
+        if not exist_month:
+            data.update(day=1, classes='早班', target_month=target_month)
+            MachineTargetYieldSettings.objects.create(**data)
+        else:
+            last_setting = exist_month.last()
+            if last_setting.day == 1 and last_setting.classes == '早班':
+                day, classes = 1, '早班'
+            else:
+                res = get_current_factory_date()
+                if len(res) < 2:
+                    raise ValidationError(f'{target_month}密炼排班数据录入不全')
+                day, classes = res.get('factory_date').day, res.get('classes')
+            MachineTargetYieldSettings.objects.update_or_create(defaults=data, **{'target_month': target_month, 'day': day, 'classes': classes})
         return Response('ok')
 
 
@@ -3930,10 +3952,11 @@ class PerformanceSummaryView(APIView):
         if not independent:
             raise ValidationError(f'请添加员工类别')
         # 取每个机台设定的目标值
-        max_setting_id = MachineTargetYieldSettings.objects.filter(target_month=date).aggregate(m_id=Max('id'))['m_id']
-        if not max_setting_id:
+        max_setting = MachineTargetYieldSettings.objects.filter(target_month=date).order_by('day', 'classes').values()
+        if not max_setting:
             raise ValidationError('请先完成当月的机台目标值设定')
-        target_setting = MachineTargetYieldSettings.objects.filter(id=max_setting_id).values()[0]
+        # 处理机台目标值
+        target_info = {f"{i['day']}-{i['classes']}": i for i in max_setting}
         # 获取该月人员密炼完成率
         ratio_info = FinishRatio.objects.filter(target_month=date).values('username', 'ratio')
         ratio = {i['username']: i['ratio'] for i in ratio_info}
@@ -3997,6 +4020,9 @@ class PerformanceSummaryView(APIView):
                 work_type = independent.get(name_d).get('work_type')
                 w_coefficient = float(employee_type_dic.get(work_type))
             # 计算超产奖励
+            res = get_current_factory_date(select_date=f"{date}-{'%02d' % int(day_d)}", group=group_d)
+            s_target_setting = target_info.get(f"{day_d}-{res.get('classes')}")
+            target_setting = s_target_setting if s_target_setting else list(target_info.values())[0]
             for section, equip_dic in equip_qty.items():
                 coefficient = section_info[section]['coefficient'] / 100
                 post_coefficient = section_info[section]['post_coefficient'] / 100
@@ -4057,7 +4083,7 @@ class PerformanceSummaryView(APIView):
         equip_price = {}
 
         for item in list(results1.values()):
-            section, name, day, group = item[0].get('section'), item[0].get('name'), item[0].get('day'), item[0].get('group')
+            section, name, day, group, classes = item[0].get('section'), item[0].get('name'), item[0].get('day'), item[0].get('group'), item[0].get('classes')
             s_ratio = ratio.get(name, 0) if section not in ['班长', '机动', '三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库'] else 1
             key = f"{name}_{day}_{section}"
             _date = f"{date}-{day}"
@@ -4113,6 +4139,8 @@ class PerformanceSummaryView(APIView):
             p_dic = {}
             if not equip_qty.get(key):
                 continue
+            s_target_setting = target_info.get(f"{day}-{classes}")
+            target_setting = s_target_setting if s_target_setting else list(target_info.values())[0]
             for equip, qty in equip_qty[key].items():
                 m, s = target_setting.get(equip + '_max'), target_setting.get(equip)
                 if m and s:

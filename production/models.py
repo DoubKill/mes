@@ -393,6 +393,9 @@ class MachineTargetYieldSettings(models.Model):
     Z15_max = models.IntegerField(help_text='机台最高值', default=0)
     E190_max = models.IntegerField(help_text='机台最高值/190E', default=0)
     target_month = models.CharField(max_length=7, help_text='月份', blank=True, null=True)
+    day = models.IntegerField(help_text='天数', null=True, blank=True)
+    classes = models.CharField(max_length=64, help_text='班次', null=True, blank=True)
+    update_time = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = 'machine_target_yield_settings'
