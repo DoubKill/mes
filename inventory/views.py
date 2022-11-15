@@ -3056,7 +3056,10 @@ class WmsInventoryStockView(APIView):
         if pallet_no:
             extra_where_str += " and a.LadenToolNumber ='{}'".format(pallet_no)
         if tunnel:
-            extra_where_str += " and a.SpaceId like 'ZCM-{}%'".format(tunnel)
+            if self.DB == 'WMS':
+                extra_where_str += " and a.SpaceId like 'ZCM-{}%'".format(tunnel)
+            else:
+                extra_where_str += " and a.SpaceId like 'ZCB-{}%'".format(tunnel)
 
         sql = """SELECT
                  a.StockDetailState,
