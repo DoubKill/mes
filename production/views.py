@@ -6527,7 +6527,7 @@ class TimeEnergyConsuming(APIView):
         ).values('product_no', 'equip_no').annotate(cnt=Count('id'),
                                                     actual_weight=Max('actual_weight')/100,
                                                     evacuation_energy=Avg('evacuation_energy'),
-                                                    consum_time=OAvg((F('end_time') - F('begin_time')))
+                                                    consum_time=OSum((F('end_time') - F('begin_time')))
                                                     ).order_by('product_no', 'cnt')
         item_dict = {}
         # 设备机台对应机型字典数据
@@ -6555,18 +6555,24 @@ class TimeEnergyConsuming(APIView):
             else:
                 evacuation_energy = item['evacuation_energy']
             actual_weight = item['actual_weight']
+            try:
+                consum_time = item['consum_time'].seconds//item['cnt']
+                if not consum_time or consum_time <= 50 or consum_time >= 500:
+                    consum_time = 150
+            except Exception:
+                consum_time = 150
             if recipe_no not in item_dict:
                 item_dict[recipe_no] = {stage: {'devoted_weight': actual_weight,
                                                 'actual_weight': actual_weight,
                                                 'evacuation_energy': evacuation_energy,
-                                                'consum_time': item['consum_time'].seconds,
+                                                'consum_time': consum_time,
                                                 'equip_no': item['equip_no'],
                                                 }}
             else:
                 item_dict[recipe_no][stage] = {'devoted_weight': actual_weight,
                                                 'actual_weight': actual_weight,
                                                 'evacuation_energy': evacuation_energy,
-                                                'consum_time': item['consum_time'].seconds,
+                                                'consum_time': consum_time,
                                                 'equip_no': item['equip_no']}
         # 写入excel表格
         wb = load_workbook('xlsx_template/energy_consume.xlsx')
@@ -6591,6 +6597,8 @@ class TimeEnergyConsuming(APIView):
                     recipe_type = pt_dict.get(re_result.group(), '未知')
             except Exception:
                 recipe_type = '未知'
+            if recipe_type == '未知':
+                continue
             sheet.cell(data_row, 1).value = recipe_type
             sheet.cell(data_row, 2).value = data_row - 3
             sheet.cell(data_row, 4).value = pn_split[0]
