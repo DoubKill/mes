@@ -5,6 +5,7 @@ import json
 import datetime
 import re
 import logging
+from bisect import bisect
 
 from io import BytesIO
 from itertools import groupby
@@ -3757,36 +3758,48 @@ class PerformanceUnitPriceView(APIView):
 
     def get(self, request):
         results = {}
-        state_lst = GlobalCode.objects.filter(global_type__type_name='胶料段次').values('global_name')
-        # category_lst = EquipCategoryAttribute.objects.filter(delete_flag=False).values('category_no')
+        state = self.request.query_params.get('state')
         category_lst = ['E580', 'F370', 'GK320', 'GK255', 'GK400', 'fz']
-
-        for state in state_lst:
-            state = state['global_name']
-            results[state] = {'state': state}
-            for category in category_lst:
-                results[state][f"{category}_pt"] = None
-                results[state][f"{category}_dj"] = None
-
-        queryset = PerformanceUnitPrice.objects.values('state', 'equip_type', 'pt', 'dj')
-        for item in queryset:
-            results[f"{item['state']}"][f"{item['equip_type']}_pt"] = item['pt']
-            results[f"{item['state']}"][f"{item['equip_type']}_dj"] = item['dj']
-
+        if state:  # 历史价格变化
+            state_data = PerformanceUnitPrice.objects.filter(state=state, equip_type__in=category_lst).order_by('target_month', 'equip_type').values('equip_type', 'pt', 'dj', 'target_month')
+            for i in state_data:
+                target_month, equip_type, pt, dj = i['target_month'], i['equip_type'], i['pt'], i['dj']
+                if target_month in results:
+                    results[target_month].update({f"{equip_type}_pt": pt, f"{equip_type}_dj": dj})
+                else:
+                    results[target_month] = {'target_month': target_month, f"{equip_type}_pt": pt, f"{equip_type}_dj": dj}
+        else:
+            state_lst = GlobalCode.objects.filter(global_type__type_name='胶料段次').values('global_name')
+            # category_lst = EquipCategoryAttribute.objects.filter(delete_flag=False).values('category_no')
+            for state in state_lst:
+                state = state['global_name']
+                results[state] = {'state': state}
+                for category in category_lst:
+                    results[state][f"{category}_pt"] = None
+                    results[state][f"{category}_dj"] = None
+            p = PerformanceUnitPrice.objects.filter(target_month__isnull=False).order_by('target_month').last()
+            if p:
+                queryset = PerformanceUnitPrice.objects.filter(target_month=p.target_month).values('state', 'equip_type', 'pt', 'dj')
+                for item in queryset:
+                    results[f"{item['state']}"][f"{item['equip_type']}_pt"] = item['pt']
+                    results[f"{item['state']}"][f"{item['equip_type']}_dj"] = item['dj']
         return Response({'result': results.values()})
 
     @atomic
     def post(self, request):
         data = self.request.data  # list
+        username = self.request.user.username
         category_lst = ['E580', 'F370', 'GK320', 'GK255', 'GK400', 'fz']
+        # 当前日期
+        factory_date = get_current_factory_date()['factory_date']
         for item in data:
             for category in category_lst:
                 pt = item[f"{category}_pt"]
                 dj = item[f"{category}_dj"]
-                PerformanceUnitPrice.objects.update_or_create(defaults={'state': item['state'],
-                                                                        'equip_type': category,
-                                                                        'pt': pt,
-                                                                        'dj': dj}, state=item['state'], equip_type=category)
+                PerformanceUnitPrice.objects.update_or_create(defaults={'state': item['state'], 'equip_type': category,
+                                                                        'pt': pt, 'dj': dj, 'opera_user': username,
+                                                                        'target_month': factory_date},
+                                                              state=item['state'], equip_type=category, target_month=factory_date)
 
         return Response('添加成功')
 
@@ -3820,8 +3833,34 @@ class PerformanceSummaryView(APIView):
     permission_classes = (IsAuthenticated,)
     qty_data = {}
 
-    def concat_user_train(self, key, detail, equip_dic, price_dic, dj_list, date):
+    def get_unit(self, date):
+        price_dic, index_list = {}, []
+        # 当月1号是否存在单价设置
+        day_one = PerformanceUnitPrice.objects.filter(target_month=f"{date}-01").last()
+        if not day_one:
+            p = PerformanceUnitPrice.objects.filter(target_month__lt=f"{date}-01").order_by('target_month').last()
+            if p:
+                now_units = PerformanceUnitPrice.objects.filter(target_month=p.target_month).values('state', 'equip_type', 'pt', 'dj')
+                s_data = {}
+                for item in now_units:
+                    s_data[f"{item['equip_type']}_{item['state']}"] = {'pt': item['pt'], 'dj': item['dj']}
+                price_dic = {1: s_data}
+                index_list.append(1)
+        month_data = PerformanceUnitPrice.objects.filter(target_month__startswith=date).order_by('target_month').values('state', 'equip_type', 'pt', 'dj', 'target_month')
+        for i in month_data:
+            day = i['target_month'].day
+            if day in price_dic:
+                price_dic[day][f"{i['equip_type']}_{i['state']}"] = {'pt': i['pt'], 'dj': i['dj']}
+            else:
+                price_dic[day] = {f"{i['equip_type']}_{i['state']}": {'pt': i['pt'], 'dj': i['dj']}}
+            if day not in index_list:
+                index_list.append(day)
+        return price_dic, index_list
+
+    def concat_user_train(self, key, detail, equip_dic, price_info, index_list, dj_list, date):
         day, group, section, equip, classes = key.split('_')
+        _day = bisect(index_list, int(day)) - 1
+        price_dic = price_info.get(index_list[_day], {})
         begin_date, end_date = detail.pop('calculate_begin_date'), detail.pop('calculate_end_date')
         k = f"{equip}-{classes}-{begin_date.strftime('%Y-%m-%d %H:%M:%S')}-{end_date.strftime('%Y-%m-%d %H:%M:%S')}"
         _data = self.qty_data.get(k)
@@ -3849,8 +3888,8 @@ class PerformanceSummaryView(APIView):
                 except:
                     continue
                 if not price_dic.get(f"{equip_type}_{state}"):
-                    PerformanceUnitPrice.objects.create(state=state, equip_type=equip_type, dj=1.2, pt=1.1)
-                    price_dic[f"{equip_type}_{state}"] = {'pt': 1.2, 'dj': 1.1}
+                    # PerformanceUnitPrice.objects.create(state=state, equip_type=equip_type, dj=1.2, pt=1.1)
+                    price_dic.update({f"{equip_type}_{state}": {'pt': 1.2, 'dj': 1.1}, f"fz_{state}": {'pt': 1.2, 'dj': 1.1}})
                 # 判断是否是丁基胶
                 frame_type = 'dj' if item['product_no'] in dj_list else 'pt'
                 # 根据工作时长求机台的产量
@@ -3932,15 +3971,14 @@ class PerformanceSummaryView(APIView):
         group_list = []
         for key, g in groupby(list(group), key=lambda x: x[2]):
             group_list.append([item[0] for item in g])
-
-        price_dic = {}
-        price_list = PerformanceUnitPrice.objects.values('equip_type', 'state', 'pt', 'dj')
-        for item in price_list:
-            price_dic[f"{item['equip_type']}_{item['state']}"] = {'pt': item['pt'], 'dj': item['dj']}
+        # 单价
+        price_info, index_list = self.get_unit(date)
+        if not price_info:
+            raise ValidationError(f'{date}单价设置异常')
         dj_list = ProductInfoDingJi.objects.filter(is_use=True).values_list('product_name', flat=True)
         pool = ThreadPool(32)
         for key, detail in user_dic.items():
-            pool.apply_async(self.concat_user_train, args=(key, detail, equip_dic, price_dic, dj_list, date))
+            pool.apply_async(self.concat_user_train, args=(key, detail, equip_dic, price_info, index_list, dj_list, date))
         pool.close()
         pool.join()
         results1 = {}
