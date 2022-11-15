@@ -2886,6 +2886,12 @@ class DailyProductionCompletionReport(APIView):
                     float(item['weight']) / l3, 2)
             elif item['name'] in ('单机台效率-1（吨/台）', '单机台效率-2（吨/台）', '每日段数'):
                 item['avg'] = item['weight']
+            elif item['name'] == '吨耗时（分钟/吨）':
+                length = len(results['name_14']) - 2
+                item['avg'] = '' if not length else round(item['weight'] / length, 2)
+            elif item['name'] == '吨耗能（KWH/吨）':
+                length = len(results['name_15']) - 2
+                item['avg'] = '' if not length else round(item['weight'] / length, 2)
             else:
                 item['avg'] = "" if month_working_days <= 0 else round(float(item['weight']) / month_working_days, 2)
         try:
