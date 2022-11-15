@@ -1,7 +1,12 @@
+import calendar
+from io import BytesIO
+
 from django.db import connection
 from django.db.models import Q, Max, Sum, Count, F, DecimalField, Min
+from django.http import HttpResponse
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
+from openpyxl import load_workbook
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated
@@ -384,6 +389,49 @@ class CutTimeCollect(APIView):
     FILE_NAME = '规格切换时间汇总'
     permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_product_exchange_consume'}))
 
+    def export_xlsx(self, export_fields_dict, data, file_name, columns, result, date_month):
+        export_fields = list(export_fields_dict.values())
+        sheet_heads = list(export_fields_dict.keys())
+        wb = load_workbook('xlsx_template/example.xlsx')
+        sheet = wb.worksheets[0]
+        sheet.title = '规格切换时间明细'
+        sheet1 = wb.create_sheet(title='规格切换次数统计')
+
+        sheet1.cell(1, 1).value = date_month
+
+        for idx, sheet_head in enumerate(sheet_heads):
+            sheet.cell(1, idx + 1).value = sheet_head
+
+        data_row = 2
+        for i in data:
+            for col_num, data_key in enumerate(export_fields):
+                set_value = i[data_key]
+                sheet.cell(data_row, col_num + 1).value = set_value
+            data_row += 1
+
+        columns.insert(0, '机台')
+        columns.insert(1, '总次数')
+        columns.insert(2, '平均次数')
+        # 写入文件标题
+        for idx, sheet_head in enumerate(columns):
+            sheet1.cell(2, idx + 1).value = sheet_head
+        data_row1 = 3
+        for i in result:
+            for col_num, data_key in enumerate(columns):
+                sheet1.cell(data_row1, col_num + 1).value = i.get(data_key)
+            data_row1 += 1
+        # wb.remove_sheet(ws)
+        output = BytesIO()
+        wb.save(output)
+        # 重新定位到开始
+        output.seek(0)
+        response = HttpResponse(content_type='application/vnd.ms-excel')
+        filename = file_name
+        response['Content-Disposition'] = u'attachment;filename= ' + filename.encode('gbk').decode(
+            'ISO-8859-1') + '.xls'
+        response.write(output.getvalue())
+        return response
+
     def get(self, request, *args, **kwargs):
         # 筛选工厂
         equip_no = self.request.query_params.get('equip_no')  # 设备编号
@@ -466,7 +514,28 @@ class CutTimeCollect(APIView):
         if classes:
             return_list = list(filter(lambda x: x['classes'] == classes, return_list))
         if self.request.query_params.get('export'):
-            return gen_template_response(self.EXPORT_FIELDS_DICT, return_list, self.FILE_NAME)
+            year = s_time.year
+            month = s_time.month
+            product_info_shift_queryset = TrainsFeedbacks.objects.filter(
+                factory_date__year=year, factory_date__month=month).values(
+                'factory_date', 'equip_no').annotate(cnt=Count('product_no', distinct=True))
+            product_info_shift_data = {i: {} for i in Equip.objects.filter(
+                category__equip_type__global_name="密炼设备"
+            ).order_by('equip_no').values_list('equip_no', flat=True)}
+            days_list = [str(i) + '日' for i in range(1, calendar.monthrange(year, month)[1] + 1)]
+            for i in product_info_shift_queryset:
+                equip_no = i['equip_no']
+                factory_date = str(i['factory_date'].day) + '日'
+                cnt = i['cnt']
+                product_info_shift_data[equip_no][factory_date] = cnt
+            for k, v in product_info_shift_data.items():
+                total_cnt = sum(v.values())
+                avg_cnt = '' if not v else round(total_cnt / len(v), 1)
+                v['机台'] = k
+                v['总次数'] = total_cnt
+                v['平均次数'] = avg_cnt
+            date_month = '月份：{}年{}月'.format(year, month)
+            return self.export_xlsx(self.EXPORT_FIELDS_DICT, return_list, self.FILE_NAME, days_list, product_info_shift_data.values(), date_month)
         avg_normal = None if not cnt_normal else round(sum_normal / cnt_normal)
         avg_error = None if not cnt_error else round(sum_error / cnt_error)
         avg_rate = None if cnt_normal + cnt_error == 0 else round(sum_rate / (cnt_normal + cnt_error), 2)

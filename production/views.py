@@ -37,7 +37,7 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet, ViewSet
 from basics.models import GlobalCode, WorkSchedulePlan
 from equipment.models import EquipMaintenanceOrder
 from inventory.models import ProductInventoryLocked, BzFinalMixingRubberInventory, BzFinalMixingRubberInventoryLB
-from mes.common_code import OSum, date_range, days_cur_month_dates, get_virtual_time
+from mes.common_code import OSum, date_range, days_cur_month_dates, get_virtual_time, OAvg
 from mes.conf import EQUIP_LIST, JZ_EQUIP_NO
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
@@ -6528,7 +6528,8 @@ class TimeEnergyConsuming(APIView):
         ).values('product_no', 'equip_no').annotate(cnt=Count('id'),
                                                     actual_weight=Max('actual_weight')/100,
                                                     evacuation_energy=Avg('evacuation_energy'),
-                                                    consum_time=Max('consum_time')).order_by('product_no', 'cnt')
+                                                    consum_time=OAvg((F('end_time') - F('begin_time')))
+                                                    ).order_by('product_no', 'cnt')
         item_dict = {}
         # 设备机台对应机型字典数据
         equip_dev_type_dict = dict(Equip.objects.filter(
@@ -6548,6 +6549,8 @@ class TimeEnergyConsuming(APIView):
                 recipe_no = '{}-{}'.format(product_no, version)
             except Exception:
                 continue
+            if stage not in ['CMB', 'HMB', '1MB', '2MB', '3MB', 'RMB', 'FM']:
+                continue
             if item['equip_no'] == 'Z04':
                 evacuation_energy = item['evacuation_energy'] * 2
             else:
@@ -6557,14 +6560,14 @@ class TimeEnergyConsuming(APIView):
                 item_dict[recipe_no] = {stage: {'devoted_weight': actual_weight,
                                                 'actual_weight': actual_weight,
                                                 'evacuation_energy': evacuation_energy,
-                                                'consum_time': item['consum_time'],
+                                                'consum_time': item['consum_time'].seconds,
                                                 'equip_no': item['equip_no'],
                                                 }}
             else:
                 item_dict[recipe_no][stage] = {'devoted_weight': actual_weight,
                                                 'actual_weight': actual_weight,
                                                 'evacuation_energy': evacuation_energy,
-                                                'consum_time': item['consum_time'],
+                                                'consum_time': item['consum_time'].seconds,
                                                 'equip_no': item['equip_no']}
         # 写入excel表格
         wb = load_workbook('xlsx_template/energy_consume.xlsx')
