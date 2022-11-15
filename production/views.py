@@ -2592,7 +2592,9 @@ class DailyProductionCompletionReport(APIView):
             'name_9': {'name': '实际生产机台数', 'weight': 0},
             'name_11': {'name': '单机台效率-1（吨/台）', 'weight': 0},
             'name_12': {'name': '单机台效率-2（吨/台）', 'weight': 0},
-            'name_13': {'name': '每日段数', 'weight': 0}
+            'name_13': {'name': '每日段数', 'weight': 0},
+            'name_14': {'name': '吨耗时（分钟/吨）', 'weight': 0},
+            'name_15': {'name': '吨耗能（KWH/吨）', 'weight': 0}
         }
 
         # 除去洗车胶的总车次报表数据
@@ -2707,6 +2709,34 @@ class DailyProductionCompletionReport(APIView):
             factory_date__year=year,
             factory_date__month=month).values('factory_date__day').annotate(weight=Sum('weight', output_field=DecimalField()))
         out_queryset_dict = dict(out_queryset.values_list('factory_date__day', 'weight'))
+
+        time_consume_dict = dict(TrainsFeedbacks.objects.filter(
+            factory_date__year=year,
+            factory_date__month=month).values('factory_date').annotate(
+            time_consume=OSum((F('end_time') - F('begin_time')))).values_list('factory_date__day', 'time_consume'))
+        energy_consume_data = TrainsFeedbacks.objects.filter(
+            factory_date__year=year,
+            factory_date__month=month).extra().values('factory_date__day', 'equip_no').annotate(
+            energy_consume=Sum('evacuation_energy'),
+            sum_weight=Avg('plan_weight')
+        )
+        energy_consume_dict = {}
+        for e in energy_consume_data:
+            energy_consume = 0 if not e['energy_consume'] else e['energy_consume']
+            equip_no = e['equip_no']
+            if equip_no == 'Z01':
+                evacuation_energy = energy_consume / 10
+            elif equip_no == 'Z02':
+                evacuation_energy = energy_consume / 0.6
+            elif equip_no == 'Z04':
+                evacuation_energy = energy_consume * 0.28 * float(e['sum_weight']) / 1000
+            elif equip_no == 'Z12':
+                evacuation_energy = energy_consume / 5.3
+            elif equip_no == 'Z13':
+                evacuation_energy = energy_consume / 31.7
+            else:
+                evacuation_energy = energy_consume
+            energy_consume_dict[e['factory_date__day']] = energy_consume_dict.get(e['factory_date__day'], 0) + evacuation_energy
         for item in mix_queryset:
             mixin_weight = round(item['weight'], 2)
             if not(item['factory_date__day'] == now_day and exclude_today_flat):
@@ -2814,10 +2844,21 @@ class DailyProductionCompletionReport(APIView):
         for k, v in results['name_5'].items():
             if k[0].isdigit():
                 ds = actual_working_equip_dict.get(int(k[:-1]))
-                if not ds:
-                    continue
-                value = round(float(v) / ds, 2)
-                results['name_12'][k] = value
+                if ds:
+                    value = round(float(v) / ds, 2)
+                    results['name_12'][k] = value
+                time_consume = time_consume_dict.get(int(k[:-1]))
+                if time_consume:
+                    time_value = round(float(time_consume.total_seconds()) / 60 / float(v), 2)
+                    results['name_14'][k] = time_value
+                    if not (k == now_day and exclude_today_flat):
+                        results['name_14']['weight'] = round(results['name_14']['weight'] + time_value, 2)
+                energy_consume = energy_consume_dict.get(int(k[:-1]))
+                if energy_consume:
+                    energy_value = round(float(energy_consume) / float(v), 2)
+                    results['name_15'][k] = energy_value
+                    if not (k == now_day and exclude_today_flat):
+                        results['name_15']['weight'] = round(results['name_15']['weight'] + energy_value, 2)
         results['name_12']['weight'] = 0 if not actual_working_equips else round(float(results['name_5']['weight']) / actual_working_equips, 2)
 
         # 计算平均值
@@ -6556,7 +6597,7 @@ class TimeEnergyConsuming(APIView):
                 evacuation_energy = item['evacuation_energy']
             actual_weight = item['actual_weight']
             try:
-                consum_time = item['consum_time'].seconds//item['cnt']
+                consum_time = item['consum_time'].total_seconds()//item['cnt']
                 if not consum_time or consum_time <= 50 or consum_time >= 500:
                     consum_time = 150
             except Exception:
