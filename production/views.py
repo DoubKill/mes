@@ -2989,7 +2989,8 @@ class DailyProductionCompletionReport(APIView):
                               + sum(list(total_manual_input_trains_final_dict.values()))
         results['name_13']['weight'] = "" if not total_fm_weight or not total_weight else round(total_weight/total_fm_weight, 2)
         results['name_13']['avg'] = 0 if not cnt2 else round(sum_ds2/cnt2, 2)
-
+        results['name_14']['weight'] = '' if not results['name_5']['weight'] else round(sum([i.total_seconds() / 60 for i in time_consume_dict.values()]) / float(results['name_5']['weight']), 2)
+        results['name_15']['weight'] = '' if not results['name_5']['weight'] else round(sum(energy_consume_dict.values()) / float(results['name_5']['weight']), 2)
         # 总产量加硫、无硫、段数平均值
         avg_results = {'jl': results['name_2']['avg'],
                        'wl': results['name_1']['avg'],
