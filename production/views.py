@@ -3355,19 +3355,21 @@ class SummaryOfWeighingOutput(APIView):
             .values('user__username', 'factory_date__day', 'group', 'classes', 'section', 'equip', 'calculate_begin_date', 'calculate_end_date', 'status')
         if filter_kwargs:  # 获取包数
             data = user_list.order_by('equip')
+            user_total = {}
             for i in data:
                 section, equip_no, st, et = i.get('section'), i.get('equip'), i.get('calculate_begin_date'), i.get('calculate_end_date')
                 plan_model, report_basic = [JZPlan, JZReportBasic] if equip_no in JZ_EQUIP_NO else [Plan, ReportBasic]
                 num = report_basic.objects.using(equip_no).filter(starttime__gte=st, savetime__lte=et).aggregate(num=Count('id'))['num']
                 if not num:
                     continue
-                equip_data = user_package.get(equip_no)
+                key = f"{equip_no}-{section}"
+                equip_data = user_package.get(key)
                 if equip_data:
-                    equip_data[section] = equip_data.get(section, 0) + num
-                    equip_data['total'] += num
+                    equip_data['num'] += num
                 else:
-                    user_package[equip_no] = {section: num, 'total': num}
-            return Response(user_package)
+                    user_package[key] = {'section': section, 'num': num, 'equip_no': equip_no}
+                user_total[equip_no] = user_total.get(equip_no, 0) + num
+            return Response({'detail': user_package.values(), 'user_total': user_total})
         # 岗位系数
         section_dic = {}
         section_info = PerformanceJobLadder.objects.filter(delete_flag=False, type='生产配料').values('type', 'name', 'coefficient', 'post_standard', 'post_coefficient')
