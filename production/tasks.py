@@ -223,6 +223,6 @@ if __name__ == '__main__':
     u = UpdateTargetTrains()
     u.execute()
     t = datetime.now().strftime('%H:%M:%S')
-    if '08:01:00' < t < '08:02:00' or '20:01:00' < t < '20:02:00':
+    if '08:05:00' < t < '08:06:00' or '20:05:00' < t < '20:06:00':
         u = UpdateTargetTrains()
         u.execute()
