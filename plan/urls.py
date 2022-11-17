@@ -11,7 +11,8 @@ from plan.views import ProductDayPlanViewSet, \
     SchedulingWashPlaceKeywordViewSet, SchedulingWashPlaceOperaKeywordViewSet, RecipeMachineWeight, \
     SchedulingProductDemandedDeclareViewSet, ProductDeclareSummaryViewSet, SchedulingProductSafetyParamsViewSet, \
     SchedulingResultViewSet, SchedulingEquipShutDownPlanViewSet, SchedulingProceduresView, SchedulingStockSummary, \
-    SchedulingMaterialDemanded, RecipeStages, MaterialPlanConsumeView, WeightPackageDailyTimeConsumeViewSet
+    SchedulingMaterialDemanded, RecipeStages, MaterialPlanConsumeView, WeightPackageDailyTimeConsumeViewSet, \
+    APSExportDataView
 
 router = DefaultRouter()
 
@@ -64,5 +65,6 @@ urlpatterns = [
     path('scheduling-procedures/', SchedulingProceduresView.as_view()),
     path('scheduling-material-demanded/', SchedulingMaterialDemanded.as_view()),
     path('scheduling-recipe-stages/', RecipeStages.as_view()),
-    path('xl-plan-consume/', MaterialPlanConsumeView.as_view())
+    path('xl-plan-consume/', MaterialPlanConsumeView.as_view()),
+    path('aps-export-data/', APSExportDataView.as_view())
 ]
