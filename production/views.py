@@ -1,11 +1,11 @@
 import calendar
-import copy
 import decimal
 import json
 import datetime
 import re
 import logging
 from bisect import bisect
+from copy import deepcopy
 
 from io import BytesIO
 from itertools import groupby
@@ -74,7 +74,7 @@ from rest_framework.generics import ListAPIView, UpdateAPIView, \
     get_object_or_404
 from datetime import timedelta
 
-from production.utils import get_standard_time, get_classes_plan, get_user_group, get_user_weight_flag, get_work_time
+from production.utils import get_standard_time, get_classes_plan, get_user_group, get_user_weight_flag, get_work_time, actual_clock_data
 from quality.models import MaterialTestOrder, MaterialDealResult, MaterialTestResult, MaterialDataPointIndicator
 from quality.utils import get_cur_sheet, get_sheet_data
 from system.models import Section
@@ -3332,8 +3332,21 @@ class SummaryOfWeighingOutput(APIView):
 
     def get(self, request):
         factory_date = self.request.query_params.get('factory_date')
+        export = self.request.query_params.get('export')
         year = int(factory_date.split('-')[0])
         month = int(factory_date.split('-')[1])
+        if export:  # 导出员工实际考勤
+            try:
+                days, export_data = actual_clock_data(factory_date, '生产配料')
+            except Exception as e:
+                logger.error(e.args[0])
+                raise ValidationError('导出实际考勤数据异常')
+            if not export_data:
+                raise ValidationError('无考勤数据可以导出')
+            EXPORT_FIELDS_DICT = {'姓名': 'username', '岗位': 'section', '班组': 'group'}
+            add_key = {'/'.join(i.split('-')[1:]): i for i in days}
+            EXPORT_FIELDS_DICT.update(add_key)
+            return gen_template_response(EXPORT_FIELDS_DICT, export_data.values(), f'{factory_date}配料间实际考勤数据', sheet_name=factory_date, handle_str=True)
         equip_list = Equip.objects.filter(category__equip_type__global_name='称量设备').values_list('equip_no', flat=True)
         # 获取人员包数
         u_name = self.request.query_params.get('name')
@@ -3913,12 +3926,25 @@ class PerformanceSummaryView(APIView):
 
     def get(self, request):
         date = self.request.query_params.get('date')
+        export = self.request.query_params.get('export')
         name_d = self.request.query_params.get('name_d')
         day_d = self.request.query_params.get('day_d')
         group_d = self.request.query_params.get('group_d')
         ccjl = self.request.query_params.get('ccjl')
         year = int(date.split('-')[0])
         month = int(date.split('-')[1])
+        if export:  # 导出员工实际考勤
+            try:
+                days, export_data = actual_clock_data(date, '密炼')
+            except Exception as e:
+                logger.error(e.args[0])
+                raise ValidationError('导出实际考勤数据异常')
+            if not export_data:
+                raise ValidationError('无考勤数据可以导出')
+            EXPORT_FIELDS_DICT = {'姓名': 'username', '岗位': 'section', '班组': 'group'}
+            add_key = {'/'.join(i.split('-')[1:]): i for i in days}
+            EXPORT_FIELDS_DICT.update(add_key)
+            return gen_template_response(EXPORT_FIELDS_DICT, export_data.values(), f'{date}密炼实际考勤数据', sheet_name=date, handle_str=True)
         # 员工独立上岗系数
         coefficient = GlobalCode.objects.filter(global_type__type_name='是否独立上岗系数', global_type__use_flag=True, use_flag=True).values('global_no', 'global_name')
         coefficient_dic = {dic['global_no']: dic['global_name'] for dic in coefficient}
@@ -5853,7 +5879,7 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
             s_data, create_data = report_list[0], []
             equip = s_data.get('equip', [])
             for s_equip in equip:
-                i = copy.deepcopy(s_data)
+                i = deepcopy(s_data)
                 i['equip'] = s_equip
                 create_data.append(i)
             serializer = self.get_serializer(data=create_data, many=True)
