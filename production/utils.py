@@ -159,6 +159,8 @@ def actual_clock_data(date, choice_type):
         # 排班信息
         if user_data:
             if key1 in same_day:
+                if user_data.get(factory_date) != code:  # 同一天已经有排班切不相同则为1-8
+                    user_data[factory_date] = '1-8'
                 continue
             user_data[factory_date] = code
             same_day.append(key1)
