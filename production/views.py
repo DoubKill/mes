@@ -5338,20 +5338,21 @@ class ReissueCardView(APIView):
             et = int(page) * int(page_size)
         except:
             raise ValidationError("page/page_size异常，请修正后重试")
-        group_setup = AttendanceGroupSetup.objects.filter(principal__icontains=self.request.user.username, type=clock_type).first()
+        group_setup = AttendanceGroupSetup.objects.filter(principal__icontains=self.request.user.username, type=clock_type)
         if self.request.query_params.get('apply'):  # 查看自己的补卡申请
             user_list = [self.request.user.username]
             if group_setup:
-                user_list += list(group_setup.users.all().values_list('username', flat=True))
+                user_list += list(group_setup.last().users.all().values_list('username', flat=True))
             data = self.queryset.filter(user__username__in=user_list).order_by('-id')
             data2 = None
         else:  # 审批补卡申请
             if not group_setup:
                 raise ValidationError('当前用户非考勤负责人')
-            principal = group_setup.principal
-            attendance_users_list = list(group_setup.users.all().values_list('username', flat=True))
-            attendance_users_list.extend(principal.split(','))
-            # 列表中找出和name想象的
+            attendance_users_list = []
+            for i in group_setup:
+                attendance_users_list.extend(list(i.users.all().values_list('username', flat=True)))
+                attendance_users_list.extend(i.principal.split(','))
+                # 列表中找出和name想象的
             if name:
                 attendance_users_list = [user for user in attendance_users_list if name in user]
             data = self.queryset.filter(user__username__in=attendance_users_list)
