@@ -2219,7 +2219,7 @@ class MonthlyOutputStatisticsReport(APIView):
         st_month = st[:7]
         et_month = et[:7]
         if st_month == et_month:
-            month_target = MachineTargetYieldSettings.objects.filter(target_month=st_month)
+            month_target = MachineTargetYieldSettings.objects.filter(target_month=st_month).order_by('-id')
             if not month_target:
                 equip_target = {}
             else:
@@ -2229,8 +2229,8 @@ class MonthlyOutputStatisticsReport(APIView):
                 equip_target = {k: v*diff_days*2 for k, v in equip_target.items()}
         else:
             equip_target = {}
-            st_month_target = MachineTargetYieldSettings.objects.filter(target_month=st_month)
-            et_month_target = MachineTargetYieldSettings.objects.filter(target_month=et_month)
+            st_month_target = MachineTargetYieldSettings.objects.filter(target_month=st_month).order_by('-id')
+            et_month_target = MachineTargetYieldSettings.objects.filter(target_month=et_month).order_by('-id')
             if st_month_target and et_month_target:
                 st_month_days = calendar.monthrange(int(st_month[:4]), int(st_month[5:7]))[1] - int(st[8:10]) + 1
                 et_month_days = int(et[8:10])
@@ -6470,7 +6470,7 @@ class ShiftProductionSummaryView(APIView):
             factory_date__year=year,
             factory_date__month=month
         ).values('equip_no', 'factory_date', 'classes').annotate(total_trains=Count('id')).order_by('equip_no', 'factory_date')
-        equip_target_data = MachineTargetYieldSettings.objects.filter(target_month=target_month).values()
+        equip_target_data = MachineTargetYieldSettings.objects.filter(target_month=target_month).order_by('-id').values()
         target_data = {}
         if equip_target_data:
             target_data = equip_target_data[0]
@@ -6661,7 +6661,7 @@ class GroupProductionSummary(APIView):
             factory_date__year=year,
             factory_date__month=month
         ).values('group', 'equip_no').annotate(s=Sum('times'))
-        equip_target_data = MachineTargetYieldSettings.objects.filter(target_month=target_month).values()
+        equip_target_data = MachineTargetYieldSettings.objects.filter(target_month=target_month).order_by('-id').values()
         target_data = {}
         if equip_target_data:
             target_data = equip_target_data[0]
