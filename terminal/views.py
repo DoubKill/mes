@@ -3327,13 +3327,13 @@ class ReturnRubberViewSet(ModelViewSet):
     """
     queryset = ReturnRubber.objects.all().order_by('-id')
     serializer_class = ReturnRubberSerializer
-    pagination_class = None
     permission_classes = ()
     filter_backends = (DjangoFilterBackend,)
     filter_class = ReturnRubberFilter
 
     def get_permissions(self):
         if self.request.query_params.get('client'):
+            self.pagination_class = None
             return ()
         else:
             return (IsAuthenticated(),)
