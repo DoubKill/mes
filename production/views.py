@@ -3875,7 +3875,7 @@ class PerformanceSummaryView(APIView):
         return price_dic, index_list
 
     def concat_user_train(self, key, detail, equip_dic, price_info, index_list, dj_list, date):
-        day, group, section, equip, classes = key.split('_')
+        day, group, section, equip, classes, user_name = key.split('_')
         _day = bisect(index_list, int(day)) - 1
         price_dic = price_info.get(index_list[_day], {})
         begin_date, end_date = detail.pop('calculate_begin_date'), detail.pop('calculate_end_date')
@@ -3988,7 +3988,7 @@ class PerformanceSummaryView(APIView):
         for item in equip_list:
             equip_dic[item['equip_no']] = item['category__category_no']
         for item in user_query:
-            key = f"{item[2]}_{item[3]}_{item[1]}_{item[4]}_{item[6]}"  # 1_A班_挤出_Z01_早班
+            key = f"{item[2]}_{item[3]}_{item[1]}_{item[4]}_{item[6]}_{item[0]}"  # 1_A班_挤出_Z01_早班
             if user_dic.get(key):  # 可能出现调岗后又换回来的情况，两次时间累加
                 user_dic[key]['actual_time'] = user_dic[key].get('actual_time', 0) + item[5]
             else:
