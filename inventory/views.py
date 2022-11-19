@@ -7724,7 +7724,7 @@ class EmptyTrayOutboundDeliveryView(APIView):
             req_data = {"ktpType": 0, "ktpNum": out_num}
         else:
             req_data = {'ktpType': 1, 'ktpNum': out_num}
-        if DEBUG:
+        if not DEBUG:
             headers = {"Content-Type": "text/xml; charset=utf-8",
                        "SOAPAction": "http://tempuri.org/IStockService/IssueKtpTypeAndNum"}
             data = """<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
