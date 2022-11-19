@@ -3872,11 +3872,13 @@ class PerformanceSummaryView(APIView):
                 index_list.append(day)
         return price_dic, index_list
 
-    def concat_user_train(self, key, detail, equip_dic, price_info, index_list, dj_list, date, qty_data):
+    def concat_user_train(self, key, detail, equip_dic, price_info, index_list, dj_list, date, qty_data, r_time):
         day, group, section, equip, classes, user_name = key.split('_')
         _day = bisect(index_list, int(day)) - 1
         price_dic = price_info.get(index_list[_day], {})
-        begin_date, end_date = detail.pop('calculate_begin_date'), detail.pop('calculate_end_date')
+        calculate_begin, calculate_end, standard_begin, standard_end = detail.pop('calculate_begin_date'), detail.pop('calculate_end_date'), detail.pop('standard_begin_date'), detail.pop('standard_end_date')
+        begin_date = (standard_begin - timedelta(minutes=r_time)) if calculate_begin <= standard_begin else calculate_begin
+        end_date = (standard_end - timedelta(minutes=r_time)) if calculate_end >= standard_end else calculate_end
         k = f"{equip}-{classes}-{begin_date.strftime('%Y-%m-%d-%H-%M-%S')}-{end_date.strftime('%Y-%m-%d-%H-%M-%S')}"
         _data = qty_data.get(k)
         if _data:
@@ -3984,7 +3986,8 @@ class PerformanceSummaryView(APIView):
         user_query = EmployeeAttendanceRecords.objects.filter(Q(**kwargs) & ~Q(is_use__in=['废弃', '驳回']),
                                                               end_date__isnull=False, begin_date__isnull=False,
                                                               clock_type='密炼').order_by('user', 'factory_date', 'equip')\
-            .values_list('user__username', 'section', 'factory_date__day', 'group', 'equip', 'actual_time', 'classes', 'calculate_begin_date', 'calculate_end_date')
+            .values_list('user__username', 'section', 'factory_date__day', 'group', 'equip', 'actual_time', 'classes',
+                         'calculate_begin_date', 'calculate_end_date', 'standard_begin_date', 'standard_end_date')
         user_dic = {}
         equip_dic = {}
         equip_list = Equip.objects.filter(category__equip_type__global_name='密炼设备').values('category__category_no', 'equip_no')
@@ -3997,13 +4000,20 @@ class PerformanceSummaryView(APIView):
             else:
                 user_dic[key] = {'name': item[0], 'section': item[1], 'day': item[2], 'group': item[3],
                                  'equip': item[4], 'actual_time': item[5], 'classes': item[6],
-                                 'calculate_begin_date': item[7], 'calculate_end_date': item[8]}
+                                 'calculate_begin_date': item[7], 'calculate_end_date': item[8],
+                                 'standard_begin_date': item[9], 'standard_end_date': item[10]}
         group = WorkSchedulePlan.objects.filter(start_time__year=year, start_time__month=month,
                                                 plan_schedule__work_schedule__work_procedure__global_name='密炼')\
             .values_list('group__global_name', 'classes__global_name', 'start_time__day').order_by('start_time')
         group_list = []
         for key, g in groupby(list(group), key=lambda x: x[2]):
             group_list.append([item[0] for item in g])
+        # 密炼交接班产量弹性时间
+        r_instance = GlobalCode.objects.filter(global_type__type_name='密炼交接班产量弹性时间', global_type__use_flag=True, use_flag=True).last()
+        try:
+            r_time = int(r_instance.global_name)
+        except:
+            r_time = 0
         # 单价
         price_info, index_list = self.get_unit(date)
         if not price_info:
@@ -4012,7 +4022,7 @@ class PerformanceSummaryView(APIView):
         qty_data, t_num = {}, 32
         pool = ThreadPool(t_num)
         for key, detail in user_dic.items():
-            pool.apply_async(self.concat_user_train, args=(key, detail, equip_dic, price_info, index_list, dj_list, date, qty_data))
+            pool.apply_async(self.concat_user_train, args=(key, detail, equip_dic, price_info, index_list, dj_list, date, qty_data, r_time))
         pool.close()
         pool.join()
         results1 = {}
