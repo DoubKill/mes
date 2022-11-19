@@ -3289,9 +3289,8 @@ class SummaryOfMillOutput(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class SummaryOfWeighingOutput(APIView):
     permission_classes = (IsAuthenticated,)
-    qty_data = {}
 
-    def concat_user_package(self, equip_no, result, factory_date, users, work_times, user_result):
+    def concat_user_package(self, equip_no, result, factory_date, users, work_times, user_result, qty_data):
         dic = {'equip_no': equip_no, 'hj': 0}
         plan_model, report_basic = [JZPlan, JZReportBasic] if equip_no in JZ_EQUIP_NO else [Plan, ReportBasic]
         data = plan_model.objects.using(equip_no).filter(actno__gt=1, date_time__istartswith=factory_date).values('date_time', 'grouptime').annotate(count=Sum('actno'))
@@ -3312,12 +3311,12 @@ class SummaryOfWeighingOutput(APIView):
                         if len(work_time) < 2:
                             continue
                         st, et = work_time[:2]
-                        if f'{day}-{st}-{et}' in self.qty_data:
-                            num = self.qty_data[f'{day}-{st}-{et}']
+                        if f'{day}-{st}-{et}' in qty_data:
+                            num = qty_data[f'{day}-{st}-{et}']
                         else:
                             c_num = report_basic.objects.using(equip_no).filter(starttime__gte=work_time[0], savetime__lte=work_time[1]).aggregate(num=Count('id'))['num']
                             num = c_num if c_num else 0  # 是否需要去除为0的机台再取平均
-                            self.qty_data[f'{day}-{st}-{et}'] = num
+                            qty_data[f'{day}-{st}-{et}'] = num
                         # 车数计算：当天产量 / 12小时 * 实际工作时间 -> 修改为根据考勤时间计算
                         if f"{name}_{day}_{classes}" not in key_dic:
                             key_dic[f"{name}_{day}_{classes}"] = key
@@ -3420,10 +3419,10 @@ class SummaryOfWeighingOutput(APIView):
         price_obj = SetThePrice.objects.first()
         if not price_obj:
             raise ValidationError('请先去添加细料/硫磺单价')
-        t_num = 8 if settings.DEBUG else 32
+        qty_data, t_num = {}, 32
         pool = ThreadPool(t_num)
         for equip_no in equip_list:
-            pool.apply_async(self.concat_user_package, args=(equip_no, result, factory_date, users, work_times, user_result))
+            pool.apply_async(self.concat_user_package, args=(equip_no, result, factory_date, users, work_times, user_result, qty_data))
         pool.close()
         pool.join()
         for key, value in user_result.items():
@@ -3848,7 +3847,6 @@ class SetThePriceViewSet(ModelViewSet):
 @method_decorator([api_recorder], name="dispatch")
 class PerformanceSummaryView(APIView):
     permission_classes = (IsAuthenticated,)
-    qty_data = {}
 
     def get_unit(self, date):
         price_dic, index_list = {}, []
@@ -3874,14 +3872,21 @@ class PerformanceSummaryView(APIView):
                 index_list.append(day)
         return price_dic, index_list
 
-    def concat_user_train(self, key, detail, equip_dic, price_info, index_list, dj_list, date):
+    def concat_user_train(self, key, detail, equip_dic, price_info, index_list, dj_list, date, qty_data):
         day, group, section, equip, classes, user_name = key.split('_')
         _day = bisect(index_list, int(day)) - 1
         price_dic = price_info.get(index_list[_day], {})
         begin_date, end_date = detail.pop('calculate_begin_date'), detail.pop('calculate_end_date')
-        k = f"{equip}-{classes}-{begin_date.strftime('%Y-%m-%d %H:%M:%S')}-{end_date.strftime('%Y-%m-%d %H:%M:%S')}"
-        _data = self.qty_data.get(k)
+        k = f"{equip}-{classes}-{begin_date.strftime('%Y-%m-%d-%H-%M-%S')}-{end_date.strftime('%Y-%m-%d-%H-%M-%S')}"
+        _data = qty_data.get(k)
         if _data:
+            # 更新单价
+            for i in _data:
+                _i = i.split('_')
+                if _i[-1] == 'unit':
+                    m, n = '_'.join(_i[:2]), i[2]
+                    if price_dic.get(m) and price_dic.get(m).get(n):
+                        _data[i] = price_dic.get(m).get(n)
             detail.update(_data)
         else:
             equip_kwargs = {'equip_no': equip, 'classes': classes}
@@ -3911,20 +3916,18 @@ class PerformanceSummaryView(APIView):
                 frame_type = 'dj' if item['product_no'] in dj_list else 'pt'
                 # 根据工作时长求机台的产量
                 work_time = detail['actual_time']
-                if section in ['三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库']:
-                    unit = price_dic.get(f"fz_{state}").get(frame_type)
-                else:
-                    unit = price_dic.get(f"{equip_type}_{state}").get(frame_type)
+                equip_type = 'fz' if section in ['三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库'] else equip_type
+                unit = price_dic.get(f"{equip_type}_{state}").get(frame_type)
                 now_qty = (item['actual_trains'] / 12 * work_time) if m_id else item['actual_trains']
-                if self.qty_data.get(k):
-                    if self.qty_data[k].get(f"{state}_{frame_type}_qty"):
-                        self.qty_data[k][f"{state}_{frame_type}_qty"] = round(self.qty_data[k][f"{state}_{frame_type}_qty"] + now_qty, 2)
+                if qty_data.get(k):
+                    if qty_data[k].get(f"{equip_type}_{state}_{frame_type}_qty"):
+                        qty_data[k][f"{equip_type}_{state}_{frame_type}_qty"] = round(qty_data[k][f"{equip_type}_{state}_{frame_type}_qty"] + now_qty, 2)
                     else:
-                        self.qty_data[k].update({f"{state}_{frame_type}_qty": round(now_qty, 2), f"{state}_{frame_type}_unit": unit})
+                        qty_data[k].update({f"{equip_type}_{state}_{frame_type}_qty": round(now_qty, 2), f"{equip_type}_{state}_{frame_type}_unit": unit})
                 else:
-                    self.qty_data[k] = {f"{state}_{frame_type}_qty": round(now_qty, 2), f"{state}_{frame_type}_unit": unit}
-            if self.qty_data.get(k):
-                detail.update(self.qty_data[k])
+                    qty_data[k] = {f"{equip_type}_{state}_{frame_type}_qty": round(now_qty, 2), f"{equip_type}_{state}_{frame_type}_unit": unit}
+            if qty_data.get(k):
+                detail.update(qty_data[k])
 
     def get(self, request):
         date = self.request.query_params.get('date')
@@ -4006,10 +4009,10 @@ class PerformanceSummaryView(APIView):
         if not price_info:
             raise ValidationError(f'{date}单价设置异常')
         dj_list = ProductInfoDingJi.objects.filter(is_use=True).values_list('product_name', flat=True)
-        t_num = 8 if settings.DEBUG else 32
+        qty_data, t_num = {}, 32
         pool = ThreadPool(t_num)
         for key, detail in user_dic.items():
-            pool.apply_async(self.concat_user_train, args=(key, detail, equip_dic, price_info, index_list, dj_list, date))
+            pool.apply_async(self.concat_user_train, args=(key, detail, equip_dic, price_info, index_list, dj_list, date, qty_data))
         pool.close()
         pool.join()
         results1 = {}
@@ -4059,12 +4062,14 @@ class PerformanceSummaryView(APIView):
                     if not equip_qty.get(section):
                         equip_qty[section] = {}
                         equip_price[section] = {}
+                    _dic = {}
                     for k in dic.keys():
                         if k.split('_')[-1] == 'qty':
-                            state = k.split('_')[0]
-                            type1 = k.split('_')[1]
-                            qty = dic.get(f"{state}_{type1}_qty")  # 数量
-                            unit = dic.get(f"{state}_{type1}_unit")  # 单价
+                            _dic = {'_'.join(i.split('_')[1:]): dic[i] for i in dic if i.split('_')[-1] in ['qty', 'unit']} if not _dic else _dic
+                            state = k.split('_')[1]
+                            type1 = k.split('_')[2]
+                            qty = _dic.get(f"{state}_{type1}_qty")  # 数量
+                            unit = _dic.get(f"{state}_{type1}_unit")  # 单价
                             equip_qty[section][equip] = equip_qty[section].get(equip, 0) + qty
                             equip_price[section][equip] = equip_price[section].get(equip, 0) + round(qty * unit, 2)
 
@@ -4072,11 +4077,11 @@ class PerformanceSummaryView(APIView):
                             type2 = '普通' if type1 == 'pt' else '丁基'
                             if results.get(f"{equip}_{type2}_{section}_1"):
                                 results[f"{equip}_{type2}_{section}_1"].update({state: dic[k]})
-                                results[f"{equip}_{type2}_{section}_2"].update({state: dic[f"{state}_{type1}_unit"]})
+                                results[f"{equip}_{type2}_{section}_2"].update({state: _dic[f"{state}_{type1}_unit"]})
                                 results[f"{equip}_{type2}_{section}_3"].update({state: section})
                             else:
                                 results[f"{equip}_{type2}_{section}_1"] = {'name': f"{equip}{type2}-车数", state: dic[k]}
-                                results[f"{equip}_{type2}_{section}_2"] = {'name': f"{equip}{type2}-单价", state: dic[f"{state}_{type1}_unit"]}
+                                results[f"{equip}_{type2}_{section}_2"] = {'name': f"{equip}{type2}-单价", state: _dic[f"{state}_{type1}_unit"]}
                                 results[f"{equip}_{type2}_{section}_3"] = {'name': f"{equip}{type2}-岗位", state: section}
 
             for i in sorted(results):
@@ -4172,12 +4177,14 @@ class PerformanceSummaryView(APIView):
                 equip = dic.get('equip')
                 if len(dic) == 7:
                     continue
+                _dic = {}
                 for k in dic.keys():
                     if k.split('_')[-1] == 'qty':
-                        state = k.split('_')[0]
-                        type1 = k.split('_')[1]
-                        qty = dic.get(f"{state}_{type1}_qty")  # 数量
-                        unit = dic.get(f"{state}_{type1}_unit")  # 单价
+                        _dic = {'_'.join(i.split('_')[1:]): dic[i] for i in dic if i.split('_')[-1] in ['qty', 'unit']} if not _dic else _dic
+                        state = k.split('_')[1]
+                        type1 = k.split('_')[2]
+                        qty = _dic.get(f"{state}_{type1}_qty")  # 数量
+                        unit = _dic.get(f"{state}_{type1}_unit")  # 单价
                         # 统计车数
                         if equip_qty.get(key):
                             equip_qty[key][equip] = equip_qty[key].get(equip, 0) + qty
