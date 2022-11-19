@@ -13,6 +13,7 @@ from operator import itemgetter
 import pandas as pd
 import requests
 import xlwt
+import xmltodict
 from django.core.paginator import Paginator
 from django.db.models import Sum, Count, Q, F, Max, FloatField, Min
 from django.db.transaction import atomic
@@ -6726,6 +6727,8 @@ class HFInventoryLogView(APIView):
         et = self.request.query_params.get('et')  # 结束时间
         material_no = self.request.query_params.get('material_no')  # 物料编码
         material_name = self.request.query_params.get('material_name')  # 物料名称
+        pallet_no = self.request.query_params.get('pallet_no')  # 托盘号
+        lot_no = self.request.query_params.get('lot_no')  # 条码
         page = int(self.request.query_params.get('page', 1))
         page_size = int(self.request.query_params.get('page_size', 10))
         inventory_type = self.request.query_params.get('inventory_type', '入烘房')
@@ -6743,10 +6746,16 @@ class HFInventoryLogView(APIView):
             if et:
                 extra_where_str += " and OastOutTime <= '{}'".format(et)
         if material_name:
-            extra_where_str += " and ProductName like N'%{}%'".format(material_name)
+            extra_where_str += " and ProductName like N'%{}%'".format(material_name.strip())
         if material_no:
-            extra_where_str += " and ProductNo like '%{}%'".format(material_no)
-
+            extra_where_str += " and ProductNo like '%{}%'".format(material_no.strip())
+        if pallet_no:
+            extra_where_str += " and RFID = '{}'".format(pallet_no.strip())
+        if lot_no:
+            last_out_log = MaterialOutHistory.objects.using('wms').filter(lot_no=lot_no.strip()).order_by('id').last()
+            if not last_out_log:
+                return Response({})
+            extra_where_str += " and MissionID = '{}'".format(last_out_log.order_no.strip())
         if not export:
             limit_str = 'OFFSET {} ROWS FETCH FIRST {} ROWS ONLY'.format((page-1)*page_size, page_size)
         else:
@@ -7692,3 +7701,53 @@ class BZInventoryWorkingTasksView(APIView):
             i['task_status'] = '进行中'
             tunnel_task_num_dict[tunnel] = tunnel_task_num_dict.get(tunnel, 0) + 1
         return Response(s_data)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class EmptyTrayOutboundDeliveryView(APIView):
+
+    def get(self, request):
+        gc = GlobalCode.objects.filter(global_type__type_name='炭黑空托盘出库模式').order_by('id').first()
+        if not gc:
+            return Response({'out_type': ''})
+        total_qty = WmsInventoryStock.objects.using('cb').filter(material_name='空托盘').count()
+        return Response({'out_type': gc.global_name, 'total_qty': total_qty})
+
+    def post(self, request):
+        req_data = self.request.data
+        out_type = req_data.get('out_type')
+        out_num = req_data.get('out_num', 0)
+        gc = GlobalCode.objects.filter(global_type__type_name='炭黑空托盘出库模式').order_by('id').first()
+        if not gc:
+            raise ValidationError('请配置炭黑空托盘出库模式公共代码！')
+        if out_type == '手动':
+            req_data = {"ktpType": 0, "ktpNum": out_num}
+        else:
+            req_data = {'ktpType': 1, 'ktpNum': out_num}
+        if DEBUG:
+            headers = {"Content-Type": "text/xml; charset=utf-8",
+                       "SOAPAction": "http://tempuri.org/IStockService/IssueKtpTypeAndNum"}
+            data = """<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
+            <soapenv:Header/>
+            <soapenv:Body>
+            <tem:IssueKtpTypeAndNum>
+             <tem:JsonGet>{}</tem:JsonGet>
+            </tem:IssueKtpTypeAndNum>
+            </soapenv:Body>
+            </soapenv:Envelope>""".format(json.dumps(req_data))
+            url = 'http://10.4.24.33:3000/StockService?wsdl'
+            try:
+                ret = requests.post(url, data=data.encode('utf-8'), headers=headers, timeout=5)
+            except Exception:
+                raise ValidationError('接口调用失败，请联系管理员！')
+            try:
+                resp_xml = ret.text
+                json_data = xmltodict.parse(resp_xml)
+                status_data = json.loads(json_data.get('s:Envelope').get('s:Body').get('IssueKtpTypeAndNumResponse').get('IssueKtpTypeAndNumResult'))
+                if status_data.get('Result') != '0':
+                    raise ValidationError('操作失败：{}'.format(status_data.get('Message')))
+            except Exception:
+                pass
+        gc.global_name = out_type
+        gc.save()
+        return Response('ok')
