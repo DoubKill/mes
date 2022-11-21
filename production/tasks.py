@@ -25,82 +25,111 @@ class SaveFinishRatio(object):
             s_time = now_date - timedelta(days=1)
         else:
             s_time = now_date
-        return now_date.strftime("%Y-%m")
+        return s_time.strftime("%Y-%m")
 
-    def get_equip_ratio(self, target_month, group_name=None):
+    def get_equip_ratio(self, target_month):
         month_split = target_month.split('-')
         year = int(month_split[0])
         month = int(month_split[1])
-        schedule_data = WorkSchedulePlan.objects.filter(plan_schedule__work_schedule__work_procedure__global_name='密炼', plan_schedule__day_time__year=year,
-                                                        plan_schedule__day_time__month=month)\
-            .order_by('start_time').values('plan_schedule__day_time', 'classes__global_name', 'group__global_name')
-        production_data = TrainsFeedbacks.objects.filter(factory_date__year=year, factory_date__month=month)\
-            .values('equip_no', 'factory_date', 'classes').annotate(total_trains=Count('id')).order_by('equip_no', 'factory_date')
-        equip_target_data = MachineTargetYieldSettings.objects.filter(target_month=target_month).values()
-        target_data = {}
-        if equip_target_data:
-            target_data = equip_target_data[0]
-        schedule_dict = {}
-        for i in schedule_data:
-            k = '{}-{}'.format(i['plan_schedule__day_time'].strftime("%m/%d"), i['classes__global_name'][0])
-            schedule_dict[k] = i['group__global_name'][0]
-
-        working_days = ActualWorkingDay.objects.filter(
-            factory_date__year=year, factory_date__month=month).aggregate(days=Sum('num'))['days']
-        working_days = 0 if not working_days else working_days
-        down_days_dict = dict(EquipDownDetails.objects.filter(
+        production_data = TrainsFeedbacks.objects.filter(
             factory_date__year=year,
             factory_date__month=month
-        ).values('equip_no').annotate(days=Sum('times') / 60 / 24).values_list('equip_no', 'days'))
+        ).values('equip_no', 'factory_date', 'classes').annotate(total_trains=Count('id'))
         if month == datetime.now().month and year == datetime.now().year:
             now_date = get_current_factory_date()['factory_date']
-            group_schedule_days = WorkSchedulePlan.objects.filter(
+            schedule_queryset = WorkSchedulePlan.objects.filter(
                 plan_schedule__work_schedule__work_procedure__global_name='密炼',
                 plan_schedule__day_time__year=year,
                 plan_schedule__day_time__month=month,
                 plan_schedule__day_time__lte=now_date,
-                group__global_name=group_name
-            ).count()
+            )
         else:
-            group_schedule_days = WorkSchedulePlan.objects.filter(
+            schedule_queryset = WorkSchedulePlan.objects.filter(
                 plan_schedule__work_schedule__work_procedure__global_name='密炼',
                 plan_schedule__day_time__year=year,
                 plan_schedule__day_time__month=month,
-                group__global_name=group_name
-            ).count()
-        group_down_days_dict = dict(EquipDownDetails.objects.filter(
+            )
+        group_schedule_data = schedule_queryset.values('group__global_name').annotate(cnt=Count('id'))
+        date_classes_dict = {'{}-{}'.format(i.plan_schedule.day_time.strftime("%m-%d"), i.classes.global_name): i.group.global_name for i in
+                             schedule_queryset}
+        down_data = EquipDownDetails.objects.filter(
             factory_date__year=year,
-            factory_date__month=month,
-            group=group_name
-        ).values('equip_no').annotate(days=Sum('times') / 60 / 24).values_list('equip_no', 'days'))
-        equip_production_data_dict = {i: {'equip_no': i,
-                                          'total_trains': 0,
-                                          'target_trains': target_data.get(i, 0),
-                                          'days': working_days - down_days_dict.get(i, 0),
-                                          'group_days': group_schedule_days - group_down_days_dict.get(i, 0),
-                                          } for i in
-                                      list(Equip.objects.filter(
-                                          category__equip_type__global_name="密炼设备"
-                                      ).order_by('equip_no').values_list("equip_no", flat=True))}
-        for d in production_data:
+            factory_date__month=month
+        ).values('group', 'equip_no').annotate(s=Sum('times'))
+        equip_target_data = MachineTargetYieldSettings.objects.filter(target_month=target_month).order_by('-day').values()
+        target_data = {}
+        if equip_target_data:
+            target_data = equip_target_data[0]
+        group_data_dict = {i: {'equip_no': i, 'target_trains': target_data.get(i, 0)} for i in
+                           list(Equip.objects.filter(
+                               category__equip_type__global_name="密炼设备"
+                           ).order_by('equip_no').values_list("equip_no", flat=True))}
+
+        for p in production_data:
+            equip_no = p['equip_no']
+            trains = p['total_trains'] if equip_no != 'Z04' else p['total_trains'] // 2
+            gp = date_classes_dict.get('{}-{}'.format(p['factory_date'].strftime("%m-%d"), p['classes']))
+            if not gp:
+                continue
+            gp_key = 'trains_{}'.format(gp)
+            if gp_key not in group_data_dict[equip_no]:
+                group_data_dict[equip_no][gp_key] = trains
+            else:
+                group_data_dict[equip_no][gp_key] += trains
+        group_list = []  # 获取班组
+        for s in group_schedule_data:
+            s_key = 'days_{}'.format(s['group__global_name'])
+            for equip_no in group_data_dict.keys():
+                group_data_dict[equip_no][s_key] = s['cnt']
+            if s['group__global_name'] not in group_list:
+                group_list.append(s['group__global_name'])
+
+        for d in down_data:
             equip_no = d['equip_no']
-            k = '{}-{}'.format(d['factory_date'].strftime("%m/%d"), d['classes'][0])
-            key = '{}-{}'.format(k, schedule_dict[k])
-            trains = d['total_trains'] // 2 if equip_no == 'Z04' else d['total_trains']
-            equip_production_data_dict[equip_no][key] = trains
-            equip_production_data_dict[equip_no]['total_trains'] += trains
-        result = {}
-        data = equip_production_data_dict.values()
-        for i in data:
-            total_target_trains = i['days'] * i['target_trains'] * 2
-            result[i['equip_no']] = 0 if total_target_trains == 0 else i['total_trains'] / total_target_trains
-        return result
+            gp = d['group']
+            times = d['s']
+            d_key = 'down_{}'.format(gp)
+            if d_key not in group_data_dict[equip_no]:
+                group_data_dict[equip_no][d_key] = times
+            else:
+                group_data_dict[equip_no][d_key] += times
+        res = {}
+        for i in group_data_dict.values():
+            target_trains = i.get('target_trains')
+            for g in group_list:
+                s_train, s_day = i.get(f'trains_{g}', 0), i.get(f'days_{g}', 0)
+                ratio = 0 if target_trains == 0 or s_day == 0 else round(s_train / (target_trains * s_day), 4)
+                if g not in res:
+                    res[g] = {i.get('equip_no'): ratio}
+                else:
+                    res[g][i.get('equip_no')] = ratio
+        return res
+
+    def get_user_group(self, select_date):
+        res, exist_r = {}, []
+        user_query = EmployeeAttendanceRecords.objects.filter(
+            ~Q(Q(is_use__in=['废弃', '驳回']) | Q(section__in=['班长', '机动']) | Q(status='调岗')),
+            end_date__isnull=False, begin_date__isnull=False,
+            actual_time__isnull=False, clock_type='密炼', factory_date__startswith=select_date)
+        for i in user_query:
+            username, group, factory_date = i.user.username, i.group, i.factory_date
+            key = f"{username}-{factory_date}"
+            if key in exist_r:
+                continue
+            if username in res:
+                res[username][group] = res[username].get(group, 0) + 1
+            else:
+                res[username] = {group: 1}
+            exist_r.append(key)
+        return res
 
     def handle_attendance(self, select_date, equip_ratio):
-        user_query = EmployeeAttendanceRecords.objects.filter(~Q(Q(is_use__in=['废弃', '驳回']) | Q(section__in=['班长', '机动'])),
-                                                              end_date__isnull=False, begin_date__isnull=False,
-                                                              actual_time__isnull=False, clock_type='密炼', factory_date__startswith=select_date)\
-            .values('user', 'factory_date', 'section', 'begin_date').annotate(avg_time=Avg('actual_time'), username=F('user__username'))\
+        user_query = EmployeeAttendanceRecords.objects.filter(
+            ~Q(Q(is_use__in=['废弃', '驳回']) | Q(section__in=['班长', '机动'])),
+            end_date__isnull=False, begin_date__isnull=False,
+            actual_time__isnull=False, clock_type='密炼', factory_date__startswith=select_date) \
+            .values('user', 'factory_date', 'section', 'begin_date').annotate(avg_time=Avg('actual_time'),
+                                                                              username=F('user__username')) \
             .values('username', 'factory_date', 'section', 'avg_time')
         _data = {}
         for i in user_query:
@@ -112,6 +141,8 @@ class SaveFinishRatio(object):
                 _data[i['username']] = {key: i['avg_time']}
             else:
                 user_data[key] = round(i['avg_time'] + (0 if not user_data.get(key) else user_data.get(key)), 2)
+        # 人员最长天数对应班组
+        user_group = self.get_user_group(select_date)
         # 个人最长时间的机台完成率
         user_ratio = []
         for k, v in _data.items():
@@ -119,7 +150,16 @@ class SaveFinishRatio(object):
                 continue
             max_key = max(v, key=v.get)
             equips = max_key.split('-')[2:]
-            _ratio = sum([equip_ratio.get(equip, 0) for equip in equips]) / len(equips)
+            group_info = user_group.get(k)
+            if not group_info:
+                _ratio = 0
+            else:
+                max_group = max(group_info, key=group_info.get)
+                equips_ratio = equip_ratio.get(max_group)
+                if not equips_ratio:
+                    _ratio = 0
+                else:
+                    _ratio = round(sum([equips_ratio.get(equip, 0) for equip in equips]) / len(equips), 4)
             user_ratio.append({'target_month': select_date, 'username': k, 'ratio': _ratio, 'equip_list': ','.join(equips), 'actual_time': v[max_key]})
         return user_ratio
 
@@ -136,7 +176,57 @@ class SaveFinishRatio(object):
             FinishRatio.objects.update_or_create(defaults=i, **{'target_month': select_date, 'username': i['username']})
 
 
-if __name__ == '__main__':
-    s = SaveFinishRatio()
-    s.execute_sync()
+class UpdateTargetTrains(object):
 
+    def execute(self):
+        # 获取当前班组
+        res = get_current_factory_date()
+        if len(res) == 2:
+            factory_date, classes = res.get('factory_date'), res.get('classes')
+            # 获取最新一条记录(头一天或者当天)
+            instance = MachineTargetYieldSettings.objects.filter(target_month=factory_date.strftime('%Y-%m'), day__lte=factory_date.day).order_by('id').last()
+            if not instance:  # 跨月
+                instance = MachineTargetYieldSettings.objects.order_by('id').last()
+            o_id = instance.id
+            l_info = {
+                'Z01': instance.Z01, 'Z02': instance.Z02, 'Z03': instance.Z03, 'Z04': instance.Z04, 'Z05': instance.Z05, 'Z06': instance.Z06,
+                'Z07': instance.Z07, 'Z08': instance.Z08, 'Z09': instance.Z09, 'Z10': instance.Z10, 'Z11': instance.Z11, 'Z12': instance.Z12,
+                'Z13': instance.Z13, 'Z14': instance.Z14, 'Z15': instance.Z15, 'E190': instance.E190, 'Z01_max': instance.Z01_max,
+                'Z02_max': instance.Z02_max, 'Z03_max': instance.Z03_max, 'Z04_max': instance.Z04_max, 'Z05_max': instance.Z05_max,
+                'Z06_max': instance.Z06_max, 'Z07_max': instance.Z07_max, 'Z08_max': instance.Z08_max, 'Z09_max': instance.Z09_max,
+                'Z10_max': instance.Z10_max, 'Z11_max': instance.Z11_max, 'Z12_max': instance.Z12_max, 'Z13_max': instance.Z13_max,
+                'Z14_max': instance.Z14_max, 'Z15_max': instance.Z15_max, 'E190_max': instance.E190_max, 'target_month': instance.target_month,
+                'classes': instance.classes, 'day': instance.day
+            }
+
+            # 对比该班次生产数据(上一个班次)
+            trains = TrainsFeedbacks.objects.filter(~Q(operation_user='Mixer2'), factory_date=f"{l_info['target_month']}-{'%02d' % l_info['day']}",
+                                                    classes=l_info['classes']).values('equip_no').annotate(total_trains=Count('id')).values('equip_no',
+                                                                                                                                            'total_trains')
+            if trains:
+                # 准备新建数据
+                for t in trains:
+                    s_equip_no, s_train = t['equip_no'], t['total_trains']
+                    if s_train > l_info[f'{s_equip_no}_max']:
+                        l_info[f'{s_equip_no}_max'] = s_train
+                if l_info['day'] == factory_date.day and l_info['classes'] == classes and l_info['target_month'] == factory_date.strftime('%Y-%m'):
+                    MachineTargetYieldSettings.objects.filter(id=o_id).update(**l_info)
+                else:
+                    if not instance:
+                        l_info['target_month'] = factory_date.strftime('%Y-%m')
+                    l_info.update(day=factory_date.day, classes=classes)
+                    MachineTargetYieldSettings.objects.create(**l_info)
+
+
+if __name__ == '__main__':
+    # 更新完成率
+    try:
+        s = SaveFinishRatio()
+        s.execute_sync()
+    except:
+        pass
+    # 更新目标车次
+    t = datetime.now().strftime('%H:%M:%S')
+    if '08:05:00' < t < '08:06:00' or '20:05:00' < t < '20:06:00':
+        u = UpdateTargetTrains()
+        u.execute()

@@ -75,7 +75,7 @@ def main():
             WmsInventoryStock.objects.using('wms').filter(
                 material_no=material_no,
                 batch_no=batch_no,
-                quality_status__in=(1, 3, 5)).update(quality_status=quality_status)
+                quality_status__in=(1, 5)).update(quality_status=quality_status)
 
     ex_time = datetime.now() - timedelta(days=7)
     # 核酸检测锁定（设定不合格）
