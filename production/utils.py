@@ -140,7 +140,7 @@ def actual_clock_data(date, choice_type):
     days = days_cur_month_dates(date)
     init_data = {d: '' for d in days}
     for i in user_query:
-        factory_date, username, section, group, classes, st, et, end_date, actual_time = i.factory_date.strftime('%Y-%m-%d'), i.user.username, i.section, i.group, i.classes, i.standard_begin_date.hour, i.standard_end_date.hour, i.end_date, i.actual_time
+        factory_date, username, section, group, classes, st, et, end_date, actual_time, status = i.factory_date.strftime('%Y-%m-%d'), i.user.username, i.section, i.group, i.classes, i.standard_begin_date.hour, i.standard_end_date.hour, i.end_date, i.actual_time, i.status
         user_data = export_data.get(username)
         if not end_date or actual_time < 4:
             code = '异常'
@@ -159,7 +159,7 @@ def actual_clock_data(date, choice_type):
         # 排班信息
         if user_data:
             if key1 in same_day:
-                if user_data.get(factory_date) != code and choice_type == '生产配料':  # 同一天已经有排班切不相同则为1-8
+                if user_data.get(factory_date) != code and choice_type == '生产配料' and status != '调岗':  # 同一天已经有排班切不相同则为1-8
                     user_data[factory_date] = '1-8'
                 continue
             user_data[factory_date] = code
