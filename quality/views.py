@@ -2030,6 +2030,12 @@ class WMSMaterialSearchView(APIView):
     """根据条码号搜索中策总厂wms物料信息，参数:?tmh=BHZ12105311651140001"""
 
     def get(self, request):
+        # ret = [{"ZCDBH": "DDRK2211150241", "KFID": "4", "KFMC": "中策安吉", "TOFAC": "AJ1", "TOFACNM": "AJ1",
+        #         "TMH": "BAJ12211151454000002", "WLXXID": "0F049162-3479-4C5E-8031-A8373289BE03", "WLMC": "溴化丁基2828(京博)",
+        #         "WLDWXXID": "186A2FBC-A8C6-4706-8576-5CA19A86A0C8", "WLDWMC": "山东京博中聚新材料有限公司", "CD": "京博",
+        #         "SCRQ": "2022-11-14", "SYQX": "2023-11-13", "PH": "202211151453", "PDM": "B2828", "SL": 36.0,
+        #         "BZDW": "块（34千克）", "ZL": 1224.0, "ZLDW": "千克kg", "SLDW": "块", "SM_USERID": "5008",
+        #         "SM_CREATE": "2022-11-15 17:06:25", "DDH": "CGDD2211100021", "ZSL": 864.0}]
         tmh = self.request.query_params.get('tmh')
         if not tmh:
             raise ValidationError('请输入条码号')
