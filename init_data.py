@@ -1028,7 +1028,7 @@ permission_data = [
     {'id': 1117, 'code': 'view4_d_equip_apply_order', 'name': '日清扫检查查询', 'parent_id': 1004},
     {'id': 1118, 'code': 'execute3_d_equip_apply_order', 'name': '日清扫检查实施', 'parent_id': 1004},
     {'id': 1119, 'code': 'confirm3_d_equip_apply_order', 'name': '日清扫检查确定', 'parent_id': 1004},
-    {'id': 1145, 'code': 'view4_d_equip_apply_order', 'name': '打卡记录', 'parent_id': 1004},
+    {'id': 1145, 'code': 'view5_d_equip_apply_order', 'name': '打卡记录', 'parent_id': 1004},
 
     {'id': 1014, 'code': 'wms_mooney_level', 'name': '原材料门尼值等级管理', 'parent_id': None, 'category_name': '质量管理'},
     {'id': 1015, 'code': 'view_wms_mooney_level', 'name': '查看', 'parent_id': 1014},
