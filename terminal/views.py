@@ -3663,7 +3663,7 @@ class FormulaPreparationView(APIView):
         weight_details = list(details.exclude(material__material_name__in=['细料', '硫磺']).values('sn', 'material__material_name', 'actual_weight', 'standard_error'))
         # 增加投料方式为R的[炭黑、油料、胶料]
         feed_r = ProductBatchingEquip.objects.filter(product_batching__stage_product_batch_no=product_no, is_used=True,
-                                                     product_batching__dev_type__category_name=sfj_recipe.dev_type.category_name,
+                                                     product_batching__dev_type__category_name=sfj_recipe.equip.category.category_name,
                                                      type__in=[1, 2, 3], feeding_mode__startswith='R')
         if feed_r:
             weight_details += list(feed_r.annotate(actual_weight=F('batching_detail_equip__actual_weight'),
@@ -3674,7 +3674,7 @@ class FormulaPreparationView(APIView):
         xl = details.filter(material__material_name__in=['细料', '硫磺'])
         # 查询mes料包信息
         if xl:
-            dev_name = sfj_recipe.dev_type.category_name
+            dev_name = sfj_recipe.equip.category.category_name
             mes_recipe = ProductBatching.objects.filter(used_type=4, batching_type=2, stage_product_batch_no=product_no,
                                                         dev_type__category_name=dev_name).last()
             if mes_recipe:

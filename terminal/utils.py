@@ -369,6 +369,8 @@ def material_out_barcode(bar_code, code_type='密炼'):
             raise ValueError('未找到该条码对应物料信息！')
         if data.get('Table'):
             ret = data.get('Table')[0]
+        else:  # 可能返回 {'Table': null}
+            raise ValueError('未找到该条码对应物料信息！')
     # 记录原材料信息到表
     try:
         if not BarCodeTraceDetail.objects.filter(bra_code=bar_code, code_type=code_type):
