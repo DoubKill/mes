@@ -1926,6 +1926,9 @@ class CheckPointTableUpdateSerializer(BaseModelSerializer):
                 if normal:
                     table_check_result = '点检正常' if standard_type == '点检' else '检查正常'
         if status == '已确认':
+            # 存在异常项目不可确认
+            if '异常' in table_check_result:
+                raise serializers.ValidationError('存在异常项目, 请处理后再确认')
             validated_data.update(check_result=table_check_result)
         else:
             status = '已点检' if standard_type == '点检' else '已检查'
