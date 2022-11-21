@@ -32,7 +32,7 @@ class SaveFinishRatio(object):
             s_time = now_date - timedelta(days=1)
         else:
             s_time = now_date
-        return now_date.strftime("%Y-%m")
+        return s_time.strftime("%Y-%m")
 
     def get_equip_ratio(self, target_month):
         month_split = target_month.split('-')
@@ -63,7 +63,7 @@ class SaveFinishRatio(object):
             factory_date__year=year,
             factory_date__month=month
         ).values('group', 'equip_no').annotate(s=Sum('times'))
-        equip_target_data = MachineTargetYieldSettings.objects.filter(target_month=target_month).values()
+        equip_target_data = MachineTargetYieldSettings.objects.filter(target_month=target_month).order_by('-day').values()
         target_data = {}
         if equip_target_data:
             target_data = equip_target_data[0]
@@ -183,6 +183,57 @@ class SaveFinishRatio(object):
             FinishRatio.objects.update_or_create(defaults=i, **{'target_month': select_date, 'username': i['username']})
 
 
+class UpdateTargetTrains(object):
+
+    def execute(self):
+        # 获取当前班组
+        res = get_current_factory_date()
+        if len(res) == 2:
+            factory_date, classes = res.get('factory_date'), res.get('classes')
+            # 获取最新一条记录(头一天或者当天)
+            instance = MachineTargetYieldSettings.objects.filter(target_month=factory_date.strftime('%Y-%m'), day__lte=factory_date.day).order_by('id').last()
+            if not instance:  # 跨月
+                instance = MachineTargetYieldSettings.objects.order_by('id').last()
+            o_id = instance.id
+            l_info = {
+                'Z01': instance.Z01, 'Z02': instance.Z02, 'Z03': instance.Z03, 'Z04': instance.Z04, 'Z05': instance.Z05, 'Z06': instance.Z06,
+                'Z07': instance.Z07, 'Z08': instance.Z08, 'Z09': instance.Z09, 'Z10': instance.Z10, 'Z11': instance.Z11, 'Z12': instance.Z12,
+                'Z13': instance.Z13, 'Z14': instance.Z14, 'Z15': instance.Z15, 'E190': instance.E190, 'Z01_max': instance.Z01_max,
+                'Z02_max': instance.Z02_max, 'Z03_max': instance.Z03_max, 'Z04_max': instance.Z04_max, 'Z05_max': instance.Z05_max,
+                'Z06_max': instance.Z06_max, 'Z07_max': instance.Z07_max, 'Z08_max': instance.Z08_max, 'Z09_max': instance.Z09_max,
+                'Z10_max': instance.Z10_max, 'Z11_max': instance.Z11_max, 'Z12_max': instance.Z12_max, 'Z13_max': instance.Z13_max,
+                'Z14_max': instance.Z14_max, 'Z15_max': instance.Z15_max, 'E190_max': instance.E190_max, 'target_month': instance.target_month,
+                'classes': instance.classes, 'day': instance.day
+            }
+
+            # 对比该班次生产数据(上一个班次)
+            trains = TrainsFeedbacks.objects.filter(~Q(operation_user='Mixer2'), factory_date=f"{l_info['target_month']}-{'%02d' % l_info['day']}",
+                                                    classes=l_info['classes']).values('equip_no').annotate(total_trains=Count('id')).values('equip_no',
+                                                                                                                                            'total_trains')
+            if trains:
+                # 准备新建数据
+                for t in trains:
+                    s_equip_no, s_train = t['equip_no'], t['total_trains']
+                    if s_train > l_info[f'{s_equip_no}_max']:
+                        l_info[f'{s_equip_no}_max'] = s_train
+                if l_info['day'] == factory_date.day and l_info['classes'] == classes and l_info['target_month'] == factory_date.strftime('%Y-%m'):
+                    MachineTargetYieldSettings.objects.filter(id=o_id).update(**l_info)
+                else:
+                    if not instance:
+                        l_info['target_month'] = factory_date.strftime('%Y-%m')
+                    l_info.update(day=factory_date.day, classes=classes)
+                    MachineTargetYieldSettings.objects.create(**l_info)
+
+
 if __name__ == '__main__':
-    s = SaveFinishRatio()
-    s.execute_sync()
+    # 更新完成率
+    try:
+        s = SaveFinishRatio()
+        s.execute_sync()
+    except:
+        pass
+    # 更新目标车次
+    t = datetime.now().strftime('%H:%M:%S')
+    if '08:05:00' < t < '08:06:00' or '20:05:00' < t < '20:06:00':
+        u = UpdateTargetTrains()
+        u.execute()

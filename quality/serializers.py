@@ -1107,6 +1107,7 @@ class MaterialExamineResultMainCreateSerializer(serializers.ModelSerializer):
                                                       tmh=material_tmh,
                                                       wlxxid=material_wlxxid)
         attrs['material'] = material
+        attrs['tmh'] = material_tmh
         return attrs
 
     @atomic()
@@ -1148,7 +1149,7 @@ class MaterialExamineResultMainSerializer(serializers.ModelSerializer):
     sample_name = serializers.ReadOnlyField(source='material.sample_name')
     batch = serializers.ReadOnlyField(source='material.batch')
     supplier = serializers.ReadOnlyField(source='material.supplier')
-    tmh = serializers.ReadOnlyField(source='material.tmh')
+    # tmh = serializers.ReadOnlyField(source='material.tmh')
     recorder_username = serializers.ReadOnlyField(source='recorder.username')
     sampling_username = serializers.ReadOnlyField(source='sampling_user.username')
     sample_qualified = serializers.ReadOnlyField(source='material.qualified')

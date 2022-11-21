@@ -384,6 +384,7 @@ permission_data = [
     {'id': 466, 'code': 'weight_th_outbound_record', 'name': '指定重量出库', 'parent_id': 463},
     {'id': 743, 'code': 'unqualified_th_outbound_record', 'name': '非合格品出库', 'parent_id': 463},
     {'id': 744, 'code': 'untested_th_outbound_record', 'name': '待检品出库', 'parent_id': 463},
+    {'id': 1146, 'code': 'empty_th_outbound_record', 'name': '空托盘出库', 'parent_id': 463},
 
     {'id': 467, 'code': 'th_outbound_task', 'name': '炭黑库出库任务', 'parent_id': None, 'category_name': '库存管理'},
     {'id': 468, 'code': 'view_th_outbound_task', 'name': '查看', 'parent_id': 467},
@@ -1027,6 +1028,7 @@ permission_data = [
     {'id': 1117, 'code': 'view4_d_equip_apply_order', 'name': '日清扫检查查询', 'parent_id': 1004},
     {'id': 1118, 'code': 'execute3_d_equip_apply_order', 'name': '日清扫检查实施', 'parent_id': 1004},
     {'id': 1119, 'code': 'confirm3_d_equip_apply_order', 'name': '日清扫检查确定', 'parent_id': 1004},
+    {'id': 1145, 'code': 'view4_d_equip_apply_order', 'name': '打卡记录', 'parent_id': 1004},
 
     {'id': 1014, 'code': 'wms_mooney_level', 'name': '原材料门尼值等级管理', 'parent_id': None, 'category_name': '质量管理'},
     {'id': 1015, 'code': 'view_wms_mooney_level', 'name': '查看', 'parent_id': 1014},
@@ -1150,9 +1152,9 @@ permission_data = [
     {'id': 1134, 'code': 'export_daily_weight_package', 'name': '导出', 'parent_id': 1128},
 
     {'id': 1135, 'code': 'rubber_log', 'name': '胶架进出登记表', 'parent_id': None, 'category_name': '生产管理'},
-    {'id': 1136, 'code': 'view_rubber_log', 'name': '查看', 'parent_id': 1134},
-    {'id': 1137, 'code': 'add_rubber_log', 'name': '保存', 'parent_id': 1134},
-    {'id': 1138, 'code': 'export_rubber_log', 'name': '导出', 'parent_id': 1134},
+    {'id': 1136, 'code': 'view_rubber_log', 'name': '查看', 'parent_id': 1135},
+    {'id': 1137, 'code': 'add_rubber_log', 'name': '保存', 'parent_id': 1135},
+    {'id': 1138, 'code': 'export_rubber_log', 'name': '导出', 'parent_id': 1135},
 
     {'id': 1139, 'code': 'barcode_trace', 'name': '条码追溯(原材料->终炼胶)', 'parent_id': None, 'category_name': '工艺管理'},
     {'id': 1140, 'code': 'view_barcode_trace', 'name': '查看', 'parent_id': 1139},
@@ -1162,7 +1164,7 @@ permission_data = [
     {'id': 1143, 'code': 'view_barcode_trace1', 'name': '查看', 'parent_id': 1142},
     {'id': 1144, 'code': 'add_barcode_trace1', 'name': '导出', 'parent_id': 1142},
 
-    # 下一个 1145 开始
+    # 下一个 1147 开始
 
 ]
 

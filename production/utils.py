@@ -5,10 +5,13 @@ datetime: 2020/8/3
 name: 
 """
 import json
+from copy import deepcopy
 from datetime import datetime, timedelta
 
+from django.db.models import Q
+
 from basics.models import WorkSchedulePlan, GlobalCode
-from mes.common_code import get_virtual_time
+from mes.common_code import get_virtual_time, days_cur_month_dates
 from production.models import OperationLog, EmployeeAttendanceRecords, AttendanceGroupSetup, WeightClassPlan, \
     WeightClassPlanDetail
 from production.serializers import OperationLogSerializer
@@ -126,4 +129,68 @@ def get_user_weight_flag(user):
         if classes_plan.class_code:
             flag, clock_type = True, '生产配料'
     return flag, clock_type
+
+
+def actual_clock_data(date, choice_type):
+    days, export_data, same_day, section_data, same_section, group_data, same_group = {}, {}, [], {}, [], {}, []
+    filter_kwargs = {'factory_date__startswith': date, 'clock_type': choice_type}
+    user_query = EmployeeAttendanceRecords.objects.filter(~Q(is_use__in=['废弃', '驳回']), **filter_kwargs).order_by('user', 'factory_date', 'status')
+    if not user_query:
+        return export_data, days
+    days = days_cur_month_dates(date)
+    init_data = {d: '' for d in days}
+    for i in user_query:
+        factory_date, username, section, group, classes, st, et, end_date, actual_time = i.factory_date.strftime('%Y-%m-%d'), i.user.username, i.section, i.group, i.classes, i.standard_begin_date.hour, i.standard_end_date.hour, i.end_date, i.actual_time
+        user_data = export_data.get(username)
+        if not end_date or actual_time < 4:
+            code = '异常'
+        else:
+            if st == 8:
+                code = 'Y1' if et in [19, 20] else '1'
+            elif st == 16:
+                code = '2'
+            elif st == 20:
+                code = 'Y3'
+            elif st == 0:
+                code = '3'
+            else:
+                code = ''
+        key1 = f"{factory_date}-{username}-{section}"
+        # 排班信息
+        if user_data:
+            if key1 in same_day:
+                if user_data.get(factory_date) != code and choice_type == '生产配料':  # 同一天已经有排班切不相同则为1-8
+                    user_data[factory_date] = '1-8'
+                continue
+            user_data[factory_date] = code
+            same_day.append(key1)
+        else:
+            s_data = deepcopy(init_data)
+            s_data.update({factory_date: code, 'username': username})
+            export_data[username] = s_data
+            same_day.append(key1)
+        key2 = f"{factory_date}-{username}-{group}"
+        # 岗位信息
+        if key1 not in same_section:
+            s_section = section_data.get(username)
+            if s_section:
+                s_section[section] = s_section.get(section, 0) + 1
+            else:
+                section_data[username] = {section: 1}
+                same_section.append(key1)
+        # 班组信息
+        if key2 not in same_group:
+            s_group = group_data.get(username)
+            if s_group:
+                s_group[group] = s_group.get(group, 0) + 1
+            else:
+                group_data[username] = {group: 1}
+                same_group.append(key2)
+    # 整合数据
+    for u in export_data:
+        _section, _group = section_data.get(u, {}), group_data.get(u, {})
+        section = max(_section, key=_section.get, default='')
+        group = max(_group, key=_group.get, default='')
+        export_data[u].update({'section': section, 'group': group})
+    return days, export_data
 

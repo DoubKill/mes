@@ -1,10 +1,11 @@
 import calendar
-import copy
 import decimal
 import json
 import datetime
 import re
 import logging
+from bisect import bisect
+from copy import deepcopy
 
 from io import BytesIO
 from itertools import groupby
@@ -37,7 +38,8 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet, ViewSet
 from basics.models import GlobalCode, WorkSchedulePlan
 from equipment.models import EquipMaintenanceOrder
 from inventory.models import ProductInventoryLocked, BzFinalMixingRubberInventory, BzFinalMixingRubberInventoryLB
-from mes.common_code import OSum, date_range, days_cur_month_dates, get_virtual_time
+from mes import settings
+from mes.common_code import OSum, date_range, days_cur_month_dates, get_virtual_time, OAvg
 from mes.conf import EQUIP_LIST, JZ_EQUIP_NO
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
@@ -73,7 +75,7 @@ from rest_framework.generics import ListAPIView, UpdateAPIView, \
     get_object_or_404
 from datetime import timedelta
 
-from production.utils import get_standard_time, get_classes_plan, get_user_group, get_user_weight_flag, get_work_time
+from production.utils import get_standard_time, get_classes_plan, get_user_group, get_user_weight_flag, get_work_time, actual_clock_data
 from quality.models import MaterialTestOrder, MaterialDealResult, MaterialTestResult, MaterialDataPointIndicator
 from quality.utils import get_cur_sheet, get_sheet_data
 from system.models import Section
@@ -2124,32 +2126,41 @@ class MachineTargetValue(APIView):
 
     def get(self, request):
         target_month = self.request.query_params.get('target_month')
+        equip_no = self.request.query_params.get('equip_no')
         if not target_month:
             raise ValidationError('请选择月份')
-        queryset = MachineTargetYieldSettings.objects.filter(target_month=target_month)
         results = []
+        queryset = list(MachineTargetYieldSettings.objects.filter(target_month=target_month).order_by('day', 'id').values())
+        equip_list = ['Z01', 'Z02', 'Z03', 'Z04', 'Z05', 'Z06', 'Z07', 'Z08', 'Z09', 'Z10', 'Z11', 'Z12', 'Z13', 'Z14', 'Z15', '190E']
         if not queryset:
-            equip_list = ['Z01', 'Z02', 'Z03', 'Z04', 'Z05', 'Z06', 'Z07', 'Z08', 'Z09', 'Z10', 'Z11', 'Z12', 'Z13',
-                          'Z14', 'Z15', '190E']
-            for equip_no in equip_list:
-                if equip_no == '190E':
-                    k = 'E190'
-                else:
-                    k = equip_no
-                results.append({'equip_no': equip_no,
-                                'target_weight': '',
-                                'max_weight': ''})
+            if not equip_no:
+                for equip_no in equip_list:
+                    if equip_no == '190E':
+                        k = 'E190'
+                    else:
+                        k = equip_no
+                    results.append({'equip_no': equip_no,
+                                    'target_weight': '',
+                                    'max_weight': ''})
         else:
-            data = queryset.values()[0]
-            equip_list = ['Z01', 'Z02', 'Z03', 'Z04', 'Z05',  'Z06',  'Z07',  'Z08',  'Z09',  'Z10',  'Z11', 'Z12', 'Z13', 'Z14', 'Z15', '190E']
-            for equip_no in equip_list:
-                if equip_no == '190E':
-                    k = 'E190'
-                else:
-                    k = equip_no
-                results.append({'equip_no': equip_no,
-                                'target_weight': data.get(k),
-                                'max_weight': data.get('{}_max'.format(k))})
+            if not equip_no:
+                data = queryset[-1]
+                for equip_no in equip_list:
+                    if equip_no == '190E':
+                        k = 'E190'
+                    else:
+                        k = equip_no
+                    results.append({'equip_no': equip_no,
+                                    'target_weight': data.get(k),
+                                    'max_weight': data.get('{}_max'.format(k))})
+            else:
+                for i in queryset:
+                    results.append({'equip_no': equip_no,
+                                    'day': i.get('day'),
+                                    'classes': i.get('classes'),
+                                    'target_weight': i.get(equip_no),
+                                    'max_weight': i.get(f'{equip_no}_max')})
+
         return Response({'results': results})
 
     def post(self, request):
@@ -2166,8 +2177,21 @@ class MachineTargetValue(APIView):
             max_weight = item['max_weight']
             data[k] = target_weight
             data['{}_max'.format(k)] = max_weight
-
-        MachineTargetYieldSettings.objects.update_or_create(defaults=data, **{'target_month': target_month})
+        # 获取设定值(存在则更新，否则创建)
+        exist_month = MachineTargetYieldSettings.objects.filter(target_month=target_month).order_by('id')
+        if not exist_month:
+            data.update(day=1, classes='早班', target_month=target_month)
+            MachineTargetYieldSettings.objects.create(**data)
+        else:
+            last_setting = exist_month.last()
+            if last_setting.day == 1 and last_setting.classes == '早班':
+                day, classes = 1, '早班'
+            else:
+                res = get_current_factory_date()
+                if len(res) < 2:
+                    raise ValidationError(f'{target_month}密炼排班数据录入不全')
+                day, classes = res.get('factory_date').day, res.get('classes')
+            MachineTargetYieldSettings.objects.update_or_create(defaults=data, **{'target_month': target_month, 'day': day, 'classes': classes})
         return Response('ok')
 
 
@@ -2195,7 +2219,7 @@ class MonthlyOutputStatisticsReport(APIView):
         st_month = st[:7]
         et_month = et[:7]
         if st_month == et_month:
-            month_target = MachineTargetYieldSettings.objects.filter(target_month=st_month)
+            month_target = MachineTargetYieldSettings.objects.filter(target_month=st_month).order_by('-id')
             if not month_target:
                 equip_target = {}
             else:
@@ -2205,8 +2229,8 @@ class MonthlyOutputStatisticsReport(APIView):
                 equip_target = {k: v*diff_days*2 for k, v in equip_target.items()}
         else:
             equip_target = {}
-            st_month_target = MachineTargetYieldSettings.objects.filter(target_month=st_month)
-            et_month_target = MachineTargetYieldSettings.objects.filter(target_month=et_month)
+            st_month_target = MachineTargetYieldSettings.objects.filter(target_month=st_month).order_by('-id')
+            et_month_target = MachineTargetYieldSettings.objects.filter(target_month=et_month).order_by('-id')
             if st_month_target and et_month_target:
                 st_month_days = calendar.monthrange(int(st_month[:4]), int(st_month[5:7]))[1] - int(st[8:10]) + 1
                 et_month_days = int(et[8:10])
@@ -2592,7 +2616,9 @@ class DailyProductionCompletionReport(APIView):
             'name_9': {'name': '实际生产机台数', 'weight': 0},
             'name_11': {'name': '单机台效率-1（吨/台）', 'weight': 0},
             'name_12': {'name': '单机台效率-2（吨/台）', 'weight': 0},
-            'name_13': {'name': '每日段数', 'weight': 0}
+            'name_13': {'name': '每日段数', 'weight': 0},
+            'name_14': {'name': '吨耗时（分钟/吨）', 'weight': 0},
+            'name_15': {'name': '吨耗能（KWH/吨）', 'weight': 0}
         }
 
         # 除去洗车胶的总车次报表数据
@@ -2707,6 +2733,34 @@ class DailyProductionCompletionReport(APIView):
             factory_date__year=year,
             factory_date__month=month).values('factory_date__day').annotate(weight=Sum('weight', output_field=DecimalField()))
         out_queryset_dict = dict(out_queryset.values_list('factory_date__day', 'weight'))
+
+        time_consume_dict = dict(TrainsFeedbacks.objects.filter(
+            factory_date__year=year,
+            factory_date__month=month).values('factory_date').annotate(
+            time_consume=OSum((F('end_time') - F('begin_time')))).values_list('factory_date__day', 'time_consume'))
+        energy_consume_data = TrainsFeedbacks.objects.filter(
+            factory_date__year=year,
+            factory_date__month=month).extra().values('factory_date__day', 'equip_no').annotate(
+            energy_consume=Sum('evacuation_energy'),
+            sum_weight=Avg('plan_weight')
+        )
+        energy_consume_dict = {}
+        for e in energy_consume_data:
+            energy_consume = 0 if not e['energy_consume'] else e['energy_consume']
+            equip_no = e['equip_no']
+            if equip_no == 'Z01':
+                evacuation_energy = energy_consume / 10
+            elif equip_no == 'Z02':
+                evacuation_energy = energy_consume / 0.6
+            elif equip_no == 'Z04':
+                evacuation_energy = energy_consume * 0.28 * float(e['sum_weight']) / 1000
+            elif equip_no == 'Z12':
+                evacuation_energy = energy_consume / 5.3
+            elif equip_no == 'Z13':
+                evacuation_energy = energy_consume / 31.7
+            else:
+                evacuation_energy = energy_consume
+            energy_consume_dict[e['factory_date__day']] = energy_consume_dict.get(e['factory_date__day'], 0) + evacuation_energy
         for item in mix_queryset:
             mixin_weight = round(item['weight'], 2)
             if not(item['factory_date__day'] == now_day and exclude_today_flat):
@@ -2814,10 +2868,21 @@ class DailyProductionCompletionReport(APIView):
         for k, v in results['name_5'].items():
             if k[0].isdigit():
                 ds = actual_working_equip_dict.get(int(k[:-1]))
-                if not ds:
-                    continue
-                value = round(float(v) / ds, 2)
-                results['name_12'][k] = value
+                if ds:
+                    value = round(float(v) / ds, 2)
+                    results['name_12'][k] = value
+                time_consume = time_consume_dict.get(int(k[:-1]))
+                if time_consume:
+                    time_value = round(float(time_consume.total_seconds()) / 60 / float(v), 2)
+                    results['name_14'][k] = time_value
+                    if not (k == now_day and exclude_today_flat):
+                        results['name_14']['weight'] = round(results['name_14']['weight'] + time_value, 2)
+                energy_consume = energy_consume_dict.get(int(k[:-1]))
+                if energy_consume:
+                    energy_value = round(float(energy_consume) / float(v), 2)
+                    results['name_15'][k] = energy_value
+                    if not (k == now_day and exclude_today_flat):
+                        results['name_15']['weight'] = round(results['name_15']['weight'] + energy_value, 2)
         results['name_12']['weight'] = 0 if not actual_working_equips else round(float(results['name_5']['weight']) / actual_working_equips, 2)
 
         # 计算平均值
@@ -2845,6 +2910,12 @@ class DailyProductionCompletionReport(APIView):
                     float(item['weight']) / l3, 2)
             elif item['name'] in ('单机台效率-1（吨/台）', '单机台效率-2（吨/台）', '每日段数'):
                 item['avg'] = item['weight']
+            elif item['name'] == '吨耗时（分钟/吨）':
+                length = len(results['name_14']) - 2
+                item['avg'] = '' if not length else round(item['weight'] / length, 2)
+            elif item['name'] == '吨耗能（KWH/吨）':
+                length = len(results['name_15']) - 2
+                item['avg'] = '' if not length else round(item['weight'] / length, 2)
             else:
                 item['avg'] = "" if month_working_days <= 0 else round(float(item['weight']) / month_working_days, 2)
         try:
@@ -2942,7 +3013,8 @@ class DailyProductionCompletionReport(APIView):
                               + sum(list(total_manual_input_trains_final_dict.values()))
         results['name_13']['weight'] = "" if not total_fm_weight or not total_weight else round(total_weight/total_fm_weight, 2)
         results['name_13']['avg'] = 0 if not cnt2 else round(sum_ds2/cnt2, 2)
-
+        results['name_14']['weight'] = '' if not results['name_5']['weight'] else round(sum([i.total_seconds() / 60 for i in time_consume_dict.values()]) / float(results['name_5']['weight']), 2)
+        results['name_15']['weight'] = '' if not results['name_5']['weight'] else round(sum(energy_consume_dict.values()) / float(results['name_5']['weight']), 2)
         # 总产量加硫、无硫、段数平均值
         avg_results = {'jl': results['name_2']['avg'],
                        'wl': results['name_1']['avg'],
@@ -3266,7 +3338,7 @@ class SummaryOfMillOutput(APIView):
 class SummaryOfWeighingOutput(APIView):
     permission_classes = (IsAuthenticated,)
 
-    def concat_user_package(self, equip_no, result, factory_date, users, work_times, user_result):
+    def concat_user_package(self, equip_no, result, factory_date, users, work_times, user_result, qty_data):
         dic = {'equip_no': equip_no, 'hj': 0}
         plan_model, report_basic = [JZPlan, JZReportBasic] if equip_no in JZ_EQUIP_NO else [Plan, ReportBasic]
         data = plan_model.objects.using(equip_no).filter(actno__gt=1, date_time__istartswith=factory_date).values('date_time', 'grouptime').annotate(count=Sum('actno'))
@@ -3283,16 +3355,23 @@ class SummaryOfWeighingOutput(APIView):
                 for name, section_list in names.items():
                     for section in section_list:
                         key = f"{name}_{day}_{classes}_{section}"
-                        work_time = work_times.get(f'{day}-{classes}-{equip_no}').get(name + '_' + section)
-                        c_num = report_basic.objects.using(equip_no).filter(starttime__gte=work_time[0], savetime__lte=work_time[1]).aggregate(num=Count('id'))['num']
-                        num = 0 if not c_num else c_num  # 是否需要去除为0的机台再取平均
+                        work_time = work_times.get(f'{day}-{classes}-{equip_no}').get(name + '_' + section, [])
+                        if len(work_time) < 2:
+                            continue
+                        st, et = work_time[:2]
+                        if f'{day}-{st}-{et}' in qty_data:
+                            num = qty_data[f'{day}-{st}-{et}']
+                        else:
+                            c_num = report_basic.objects.using(equip_no).filter(starttime__gte=work_time[0], savetime__lte=work_time[1]).aggregate(num=Count('id'))['num']
+                            num = c_num if c_num else 0  # 是否需要去除为0的机台再取平均
+                            qty_data[f'{day}-{st}-{et}'] = num
                         # 车数计算：当天产量 / 12小时 * 实际工作时间 -> 修改为根据考勤时间计算
                         if f"{name}_{day}_{classes}" not in key_dic:
                             key_dic[f"{name}_{day}_{classes}"] = key
                         else:
                             key = key_dic[f"{name}_{day}_{classes}"]
                         if user_result.get(key):
-                            user_result[key][equip_no] = num if not user_result[key].get(equip_no) else (user_result[key][equip_no] + num)
+                            user_result[key][equip_no] = user_result[key].get(equip_no, 0) + num
                         else:
                             user_result[key] = {equip_no: num}
                         if status == '调岗':
@@ -3301,21 +3380,57 @@ class SummaryOfWeighingOutput(APIView):
 
     def get(self, request):
         factory_date = self.request.query_params.get('factory_date')
+        export = self.request.query_params.get('export')
         year = int(factory_date.split('-')[0])
         month = int(factory_date.split('-')[1])
+        if export:  # 导出员工实际考勤
+            try:
+                days, export_data = actual_clock_data(factory_date, '生产配料')
+            except Exception as e:
+                logger.error(e.args[0])
+                raise ValidationError('导出实际考勤数据异常')
+            if not export_data:
+                raise ValidationError('无考勤数据可以导出')
+            EXPORT_FIELDS_DICT = {'姓名': 'username', '岗位': 'section', '班组': 'group'}
+            add_key = {'/'.join(i.split('-')[1:]): i for i in days}
+            EXPORT_FIELDS_DICT.update(add_key)
+            return gen_template_response(EXPORT_FIELDS_DICT, export_data.values(), f'{factory_date}配料间实际考勤数据', sheet_name=factory_date, handle_str=True)
         equip_list = Equip.objects.filter(category__equip_type__global_name='称量设备').values_list('equip_no', flat=True)
+        # 获取人员包数
+        u_name = self.request.query_params.get('name')
+        day = int(self.request.query_params.get('day', 0))
+        classes = self.request.query_params.get('classes')
+        filter_kwargs = {}
+        if all([u_name, day, classes]):
+            filter_kwargs = {'user__username': u_name, 'factory_date__day': day, 'classes': classes}
         result = []
         result1 = {}
         users = {}
         work_times = {}
         user_result = {}
-        days = days_cur_month_dates(date_time=factory_date)
+        user_package = {}
         # 查询称量分类下当前月上班的所有员工
         user_list = EmployeeAttendanceRecords.objects.filter(
             Q(factory_date__year=year, factory_date__month=month, equip__in=equip_list) &
-            Q(end_date__isnull=False, begin_date__isnull=False) & ~Q(is_use='废弃'), ~Q(clock_type='密炼'))\
+            Q(end_date__isnull=False, begin_date__isnull=False) & ~Q(is_use='废弃'), ~Q(clock_type='密炼'), **filter_kwargs)\
             .values('user__username', 'factory_date__day', 'group', 'classes', 'section', 'equip', 'calculate_begin_date', 'calculate_end_date', 'status')
-
+        if filter_kwargs:  # 获取包数
+            data = user_list.order_by('equip')
+            user_total = {}
+            for i in data:
+                section, equip_no, st, et = i.get('section'), i.get('equip'), i.get('calculate_begin_date'), i.get('calculate_end_date')
+                plan_model, report_basic = [JZPlan, JZReportBasic] if equip_no in JZ_EQUIP_NO else [Plan, ReportBasic]
+                num = report_basic.objects.using(equip_no).filter(starttime__gte=st, savetime__lte=et).aggregate(num=Count('id'))['num']
+                if not num:
+                    continue
+                key = f"{equip_no}-{section}"
+                equip_data = user_package.get(key)
+                if equip_data:
+                    equip_data['num'] += num
+                else:
+                    user_package[key] = {'section': section, 'num': num, 'equip_no': equip_no}
+                user_total[equip_no] = user_total.get(equip_no, 0) + num
+            return Response({'detail': user_package.values(), 'user_total': user_total})
         # 岗位系数
         section_dic = {}
         section_info = PerformanceJobLadder.objects.filter(delete_flag=False, type='生产配料').values('type', 'name', 'coefficient', 'post_standard', 'post_coefficient')
@@ -3352,9 +3467,10 @@ class SummaryOfWeighingOutput(APIView):
         price_obj = SetThePrice.objects.first()
         if not price_obj:
             raise ValidationError('请先去添加细料/硫磺单价')
-        pool = ThreadPool(32)
+        qty_data, t_num = {}, 32
+        pool = ThreadPool(t_num)
         for equip_no in equip_list:
-            pool.apply_async(self.concat_user_package, args=(equip_no, result, factory_date, users, work_times, user_result))
+            pool.apply_async(self.concat_user_package, args=(equip_no, result, factory_date, users, work_times, user_result, qty_data))
         pool.close()
         pool.join()
         for key, value in user_result.items():
@@ -3396,7 +3512,8 @@ class SummaryOfWeighingOutput(APIView):
                 result1[name]['lh'] = round(result1[name].get('lh', 0) + lh, 2)
             else:
                 result1[name] = {'name': name, f"{day}{classes}": price, f"{day}{classes}_count": count_, 'xl': round(xl, 2), 'lh': round(lh, 2)}
-        return Response({'results': result, 'users': result1.values()})
+        sort_res = sorted(result, key=lambda x: x['equip_no'])
+        return Response({'results': sort_res, 'users': result1.values()})
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -3705,36 +3822,48 @@ class PerformanceUnitPriceView(APIView):
 
     def get(self, request):
         results = {}
-        state_lst = GlobalCode.objects.filter(global_type__type_name='胶料段次').values('global_name')
-        # category_lst = EquipCategoryAttribute.objects.filter(delete_flag=False).values('category_no')
+        state = self.request.query_params.get('state')
         category_lst = ['E580', 'F370', 'GK320', 'GK255', 'GK400', 'fz']
-
-        for state in state_lst:
-            state = state['global_name']
-            results[state] = {'state': state}
-            for category in category_lst:
-                results[state][f"{category}_pt"] = None
-                results[state][f"{category}_dj"] = None
-
-        queryset = PerformanceUnitPrice.objects.values('state', 'equip_type', 'pt', 'dj')
-        for item in queryset:
-            results[f"{item['state']}"][f"{item['equip_type']}_pt"] = item['pt']
-            results[f"{item['state']}"][f"{item['equip_type']}_dj"] = item['dj']
-
+        if state:  # 历史价格变化
+            state_data = PerformanceUnitPrice.objects.filter(state=state, equip_type__in=category_lst).order_by('target_month', 'equip_type').values('equip_type', 'pt', 'dj', 'target_month')
+            for i in state_data:
+                target_month, equip_type, pt, dj = i['target_month'], i['equip_type'], i['pt'], i['dj']
+                if target_month in results:
+                    results[target_month].update({f"{equip_type}_pt": pt, f"{equip_type}_dj": dj})
+                else:
+                    results[target_month] = {'target_month': target_month, f"{equip_type}_pt": pt, f"{equip_type}_dj": dj}
+        else:
+            state_lst = GlobalCode.objects.filter(global_type__type_name='胶料段次').values('global_name')
+            # category_lst = EquipCategoryAttribute.objects.filter(delete_flag=False).values('category_no')
+            for state in state_lst:
+                state = state['global_name']
+                results[state] = {'state': state}
+                for category in category_lst:
+                    results[state][f"{category}_pt"] = None
+                    results[state][f"{category}_dj"] = None
+            p = PerformanceUnitPrice.objects.filter(target_month__isnull=False).order_by('target_month').last()
+            if p:
+                queryset = PerformanceUnitPrice.objects.filter(target_month=p.target_month).values('state', 'equip_type', 'pt', 'dj')
+                for item in queryset:
+                    results[f"{item['state']}"][f"{item['equip_type']}_pt"] = item['pt']
+                    results[f"{item['state']}"][f"{item['equip_type']}_dj"] = item['dj']
         return Response({'result': results.values()})
 
     @atomic
     def post(self, request):
         data = self.request.data  # list
+        username = self.request.user.username
         category_lst = ['E580', 'F370', 'GK320', 'GK255', 'GK400', 'fz']
+        # 当前日期
+        factory_date = get_current_factory_date()['factory_date']
         for item in data:
             for category in category_lst:
                 pt = item[f"{category}_pt"]
                 dj = item[f"{category}_dj"]
-                PerformanceUnitPrice.objects.update_or_create(defaults={'state': item['state'],
-                                                                        'equip_type': category,
-                                                                        'pt': pt,
-                                                                        'dj': dj}, state=item['state'], equip_type=category)
+                PerformanceUnitPrice.objects.update_or_create(defaults={'state': item['state'], 'equip_type': category,
+                                                                        'pt': pt, 'dj': dj, 'opera_user': username,
+                                                                        'target_month': factory_date},
+                                                              state=item['state'], equip_type=category, target_month=factory_date)
 
         return Response('添加成功')
 
@@ -3766,14 +3895,48 @@ class SetThePriceViewSet(ModelViewSet):
 @method_decorator([api_recorder], name="dispatch")
 class PerformanceSummaryView(APIView):
     permission_classes = (IsAuthenticated,)
-    qty_data = {}
 
-    def concat_user_train(self, key, detail, equip_dic, price_dic, dj_list, date):
-        day, group, section, equip, classes = key.split('_')
-        begin_date, end_date = detail.pop('calculate_begin_date'), detail.pop('calculate_end_date')
-        k = f"{equip}-{classes}-{begin_date.strftime('%Y-%m-%d %H:%M:%S')}-{end_date.strftime('%Y-%m-%d %H:%M:%S')}"
-        _data = self.qty_data.get(k)
+    def get_unit(self, date):
+        price_dic, index_list = {}, []
+        # 当月1号是否存在单价设置
+        day_one = PerformanceUnitPrice.objects.filter(target_month=f"{date}-01").last()
+        if not day_one:
+            p = PerformanceUnitPrice.objects.filter(target_month__lt=f"{date}-01").order_by('target_month').last()
+            if p:
+                now_units = PerformanceUnitPrice.objects.filter(target_month=p.target_month).values('state', 'equip_type', 'pt', 'dj')
+                s_data = {}
+                for item in now_units:
+                    s_data[f"{item['equip_type']}_{item['state']}"] = {'pt': item['pt'], 'dj': item['dj']}
+                price_dic = {1: s_data}
+                index_list.append(1)
+        month_data = PerformanceUnitPrice.objects.filter(target_month__startswith=date).order_by('target_month').values('state', 'equip_type', 'pt', 'dj', 'target_month')
+        for i in month_data:
+            day = i['target_month'].day
+            if day in price_dic:
+                price_dic[day][f"{i['equip_type']}_{i['state']}"] = {'pt': i['pt'], 'dj': i['dj']}
+            else:
+                price_dic[day] = {f"{i['equip_type']}_{i['state']}": {'pt': i['pt'], 'dj': i['dj']}}
+            if day not in index_list:
+                index_list.append(day)
+        return price_dic, index_list
+
+    def concat_user_train(self, key, detail, equip_dic, price_info, index_list, dj_list, date, qty_data, r_time):
+        day, group, section, equip, classes, user_name = key.split('_')
+        _day = bisect(index_list, int(day)) - 1
+        price_dic = price_info.get(index_list[_day], {})
+        calculate_begin, calculate_end, standard_begin, standard_end = detail.pop('calculate_begin_date'), detail.pop('calculate_end_date'), detail.pop('standard_begin_date'), detail.pop('standard_end_date')
+        begin_date = (standard_begin - timedelta(minutes=r_time)) if calculate_begin <= standard_begin else calculate_begin
+        end_date = (standard_end - timedelta(minutes=r_time)) if calculate_end >= standard_end else calculate_end
+        k = f"{equip}-{classes}-{begin_date.strftime('%Y-%m-%d-%H-%M-%S')}-{end_date.strftime('%Y-%m-%d-%H-%M-%S')}"
+        _data = qty_data.get(k)
         if _data:
+            # 更新单价
+            for i in _data:
+                _i = i.split('_')
+                if _i[-1] == 'unit':
+                    m, n = '_'.join(_i[:2]), i[2]
+                    if price_dic.get(m) and price_dic.get(m).get(n):
+                        _data[i] = price_dic.get(m).get(n)
             detail.update(_data)
         else:
             equip_kwargs = {'equip_no': equip, 'classes': classes}
@@ -3797,35 +3960,46 @@ class PerformanceSummaryView(APIView):
                 except:
                     continue
                 if not price_dic.get(f"{equip_type}_{state}"):
-                    PerformanceUnitPrice.objects.create(state=state, equip_type=equip_type, dj=1.2, pt=1.1)
-                    price_dic[f"{equip_type}_{state}"] = {'pt': 1.2, 'dj': 1.1}
+                    # PerformanceUnitPrice.objects.create(state=state, equip_type=equip_type, dj=1.2, pt=1.1)
+                    price_dic.update({f"{equip_type}_{state}": {'pt': 1.2, 'dj': 1.1}, f"fz_{state}": {'pt': 1.2, 'dj': 1.1}})
                 # 判断是否是丁基胶
                 frame_type = 'dj' if item['product_no'] in dj_list else 'pt'
                 # 根据工作时长求机台的产量
                 work_time = detail['actual_time']
-                if section in ['三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库']:
-                    unit = price_dic.get(f"fz_{state}").get(frame_type)
-                else:
-                    unit = price_dic.get(f"{equip_type}_{state}").get(frame_type)
+                equip_type = 'fz' if section in ['三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库'] else equip_type
+                unit = price_dic.get(f"{equip_type}_{state}").get(frame_type)
                 now_qty = (item['actual_trains'] / 12 * work_time) if m_id else item['actual_trains']
-                if self.qty_data.get(k):
-                    if self.qty_data[k].get(f"{state}_{frame_type}_qty"):
-                        self.qty_data[k][f"{state}_{frame_type}_qty"] = round(self.qty_data[k][f"{state}_{frame_type}_qty"] + now_qty, 2)
+                if qty_data.get(k):
+                    if qty_data[k].get(f"{equip_type}_{state}_{frame_type}_qty"):
+                        qty_data[k][f"{equip_type}_{state}_{frame_type}_qty"] = round(qty_data[k][f"{equip_type}_{state}_{frame_type}_qty"] + now_qty, 2)
                     else:
-                        self.qty_data[k].update({f"{state}_{frame_type}_qty": round(now_qty, 2), f"{state}_{frame_type}_unit": unit})
+                        qty_data[k].update({f"{equip_type}_{state}_{frame_type}_qty": round(now_qty, 2), f"{equip_type}_{state}_{frame_type}_unit": unit})
                 else:
-                    self.qty_data[k] = {f"{state}_{frame_type}_qty": round(now_qty, 2), f"{state}_{frame_type}_unit": unit}
-            if self.qty_data.get(k):
-                detail.update(self.qty_data[k])
+                    qty_data[k] = {f"{equip_type}_{state}_{frame_type}_qty": round(now_qty, 2), f"{equip_type}_{state}_{frame_type}_unit": unit}
+            if qty_data.get(k):
+                detail.update(qty_data[k])
 
     def get(self, request):
         date = self.request.query_params.get('date')
+        export = self.request.query_params.get('export')
         name_d = self.request.query_params.get('name_d')
         day_d = self.request.query_params.get('day_d')
         group_d = self.request.query_params.get('group_d')
         ccjl = self.request.query_params.get('ccjl')
         year = int(date.split('-')[0])
         month = int(date.split('-')[1])
+        if export:  # 导出员工实际考勤
+            try:
+                days, export_data = actual_clock_data(date, '密炼')
+            except Exception as e:
+                logger.error(e.args[0])
+                raise ValidationError('导出实际考勤数据异常')
+            if not export_data:
+                raise ValidationError('无考勤数据可以导出')
+            EXPORT_FIELDS_DICT = {'姓名': 'username', '岗位': 'section', '班组': 'group'}
+            add_key = {'/'.join(i.split('-')[1:]): i for i in days}
+            EXPORT_FIELDS_DICT.update(add_key)
+            return gen_template_response(EXPORT_FIELDS_DICT, export_data.values(), f'{date}密炼实际考勤数据', sheet_name=date, handle_str=True)
         # 员工独立上岗系数
         coefficient = GlobalCode.objects.filter(global_type__type_name='是否独立上岗系数', global_type__use_flag=True, use_flag=True).values('global_no', 'global_name')
         coefficient_dic = {dic['global_no']: dic['global_name'] for dic in coefficient}
@@ -3837,7 +4011,7 @@ class PerformanceSummaryView(APIView):
         coefficient1_dic = {dic['global_no']: dic['global_name'] for dic in coefficient1}
         if not coefficient or not coefficient1:
             raise ValidationError('请先去添加独立上岗或超产奖励系数')
-        # 员工考勤记录 (考勤记录)
+        # 员工考勤记录
         section_info = {}
         for item in PerformanceJobLadder.objects.filter(type='密炼').values('name', 'coefficient', 'post_standard', 'post_coefficient', 'type'):
             section_info[item['name']] = {'coefficient': item['coefficient'], 'post_standard': item['post_standard'],
@@ -3860,35 +4034,43 @@ class PerformanceSummaryView(APIView):
         user_query = EmployeeAttendanceRecords.objects.filter(Q(**kwargs) & ~Q(is_use__in=['废弃', '驳回']),
                                                               end_date__isnull=False, begin_date__isnull=False,
                                                               clock_type='密炼').order_by('user', 'factory_date', 'equip')\
-            .values_list('user__username', 'section', 'factory_date__day', 'group', 'equip', 'actual_time', 'classes', 'calculate_begin_date', 'calculate_end_date')
+            .values_list('user__username', 'section', 'factory_date__day', 'group', 'equip', 'actual_time', 'classes',
+                         'calculate_begin_date', 'calculate_end_date', 'standard_begin_date', 'standard_end_date')
         user_dic = {}
         equip_dic = {}
         equip_list = Equip.objects.filter(category__equip_type__global_name='密炼设备').values('category__category_no', 'equip_no')
         for item in equip_list:
             equip_dic[item['equip_no']] = item['category__category_no']
         for item in user_query:
-            key = f"{item[2]}_{item[3]}_{item[1]}_{item[4]}_{item[6]}"  # 1_A班_挤出_Z01_早班
+            key = f"{item[2]}_{item[3]}_{item[1]}_{item[4]}_{item[6]}_{item[0]}"  # 1_A班_挤出_Z01_早班
             if user_dic.get(key):  # 可能出现调岗后又换回来的情况，两次时间累加
                 user_dic[key]['actual_time'] = user_dic[key].get('actual_time', 0) + item[5]
             else:
                 user_dic[key] = {'name': item[0], 'section': item[1], 'day': item[2], 'group': item[3],
                                  'equip': item[4], 'actual_time': item[5], 'classes': item[6],
-                                 'calculate_begin_date': item[7], 'calculate_end_date': item[8]}
+                                 'calculate_begin_date': item[7], 'calculate_end_date': item[8],
+                                 'standard_begin_date': item[9], 'standard_end_date': item[10]}
         group = WorkSchedulePlan.objects.filter(start_time__year=year, start_time__month=month,
                                                 plan_schedule__work_schedule__work_procedure__global_name='密炼')\
             .values_list('group__global_name', 'classes__global_name', 'start_time__day').order_by('start_time')
         group_list = []
         for key, g in groupby(list(group), key=lambda x: x[2]):
             group_list.append([item[0] for item in g])
-
-        price_dic = {}
-        price_list = PerformanceUnitPrice.objects.values('equip_type', 'state', 'pt', 'dj')
-        for item in price_list:
-            price_dic[f"{item['equip_type']}_{item['state']}"] = {'pt': item['pt'], 'dj': item['dj']}
+        # 密炼交接班产量弹性时间
+        r_instance = GlobalCode.objects.filter(global_type__type_name='密炼交接班产量弹性时间', global_type__use_flag=True, use_flag=True).last()
+        try:
+            r_time = int(r_instance.global_name)
+        except:
+            r_time = 0
+        # 单价
+        price_info, index_list = self.get_unit(date)
+        if not price_info:
+            raise ValidationError(f'{date}单价设置异常')
         dj_list = ProductInfoDingJi.objects.filter(is_use=True).values_list('product_name', flat=True)
-        pool = ThreadPool(32)
+        qty_data, t_num = {}, 32
+        pool = ThreadPool(t_num)
         for key, detail in user_dic.items():
-            pool.apply_async(self.concat_user_train, args=(key, detail, equip_dic, price_dic, dj_list, date))
+            pool.apply_async(self.concat_user_train, args=(key, detail, equip_dic, price_info, index_list, dj_list, date, qty_data, r_time))
         pool.close()
         pool.join()
         results1 = {}
@@ -3900,10 +4082,11 @@ class PerformanceSummaryView(APIView):
         if not independent:
             raise ValidationError(f'请添加员工类别')
         # 取每个机台设定的目标值
-        max_setting_id = MachineTargetYieldSettings.objects.filter(target_month=date).aggregate(m_id=Max('id'))['m_id']
-        if not max_setting_id:
+        max_setting = MachineTargetYieldSettings.objects.filter(target_month=date).order_by('day', 'classes').values()
+        if not max_setting:
             raise ValidationError('请先完成当月的机台目标值设定')
-        target_setting = MachineTargetYieldSettings.objects.filter(id=max_setting_id).values()[0]
+        # 处理机台目标值
+        target_info = {f"{i['day']}-{i['classes']}": i for i in max_setting}
         # 获取该月人员密炼完成率
         ratio_info = FinishRatio.objects.filter(target_month=date).values('username', 'ratio')
         ratio = {i['username']: i['ratio'] for i in ratio_info}
@@ -3937,12 +4120,14 @@ class PerformanceSummaryView(APIView):
                     if not equip_qty.get(section):
                         equip_qty[section] = {}
                         equip_price[section] = {}
+                    _dic = {}
                     for k in dic.keys():
                         if k.split('_')[-1] == 'qty':
-                            state = k.split('_')[0]
-                            type1 = k.split('_')[1]
-                            qty = dic.get(f"{state}_{type1}_qty")  # 数量
-                            unit = dic.get(f"{state}_{type1}_unit")  # 单价
+                            _dic = {'_'.join(i.split('_')[1:]): dic[i] for i in dic if i.split('_')[-1] in ['qty', 'unit']} if not _dic else _dic
+                            state = k.split('_')[1]
+                            type1 = k.split('_')[2]
+                            qty = _dic.get(f"{state}_{type1}_qty")  # 数量
+                            unit = _dic.get(f"{state}_{type1}_unit")  # 单价
                             equip_qty[section][equip] = equip_qty[section].get(equip, 0) + qty
                             equip_price[section][equip] = equip_price[section].get(equip, 0) + round(qty * unit, 2)
 
@@ -3950,11 +4135,11 @@ class PerformanceSummaryView(APIView):
                             type2 = '普通' if type1 == 'pt' else '丁基'
                             if results.get(f"{equip}_{type2}_{section}_1"):
                                 results[f"{equip}_{type2}_{section}_1"].update({state: dic[k]})
-                                results[f"{equip}_{type2}_{section}_2"].update({state: dic[f"{state}_{type1}_unit"]})
+                                results[f"{equip}_{type2}_{section}_2"].update({state: _dic[f"{state}_{type1}_unit"]})
                                 results[f"{equip}_{type2}_{section}_3"].update({state: section})
                             else:
                                 results[f"{equip}_{type2}_{section}_1"] = {'name': f"{equip}{type2}-车数", state: dic[k]}
-                                results[f"{equip}_{type2}_{section}_2"] = {'name': f"{equip}{type2}-单价", state: dic[f"{state}_{type1}_unit"]}
+                                results[f"{equip}_{type2}_{section}_2"] = {'name': f"{equip}{type2}-单价", state: _dic[f"{state}_{type1}_unit"]}
                                 results[f"{equip}_{type2}_{section}_3"] = {'name': f"{equip}{type2}-岗位", state: section}
 
             for i in sorted(results):
@@ -3967,6 +4152,9 @@ class PerformanceSummaryView(APIView):
                 work_type = independent.get(name_d).get('work_type')
                 w_coefficient = float(employee_type_dic.get(work_type))
             # 计算超产奖励
+            res = get_current_factory_date(select_date=f"{date}-{'%02d' % int(day_d)}", group=group_d)
+            s_target_setting = target_info.get(f"{day_d}-{res.get('classes')}")
+            target_setting = s_target_setting if s_target_setting else list(target_info.values())[0]
             for section, equip_dic in equip_qty.items():
                 coefficient = section_info[section]['coefficient'] / 100
                 post_coefficient = section_info[section]['post_coefficient'] / 100
@@ -4027,7 +4215,7 @@ class PerformanceSummaryView(APIView):
         equip_price = {}
 
         for item in list(results1.values()):
-            section, name, day, group = item[0].get('section'), item[0].get('name'), item[0].get('day'), item[0].get('group')
+            section, name, day, group, classes = item[0].get('section'), item[0].get('name'), item[0].get('day'), item[0].get('group'), item[0].get('classes')
             s_ratio = ratio.get(name, 0) if section not in ['班长', '机动', '三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库'] else 1
             key = f"{name}_{day}_{section}"
             _date = f"{date}-{day}"
@@ -4047,12 +4235,14 @@ class PerformanceSummaryView(APIView):
                 equip = dic.get('equip')
                 if len(dic) == 7:
                     continue
+                _dic = {}
                 for k in dic.keys():
                     if k.split('_')[-1] == 'qty':
-                        state = k.split('_')[0]
-                        type1 = k.split('_')[1]
-                        qty = dic.get(f"{state}_{type1}_qty")  # 数量
-                        unit = dic.get(f"{state}_{type1}_unit")  # 单价
+                        _dic = {'_'.join(i.split('_')[1:]): dic[i] for i in dic if i.split('_')[-1] in ['qty', 'unit']} if not _dic else _dic
+                        state = k.split('_')[1]
+                        type1 = k.split('_')[2]
+                        qty = _dic.get(f"{state}_{type1}_qty")  # 数量
+                        unit = _dic.get(f"{state}_{type1}_unit")  # 单价
                         # 统计车数
                         if equip_qty.get(key):
                             equip_qty[key][equip] = equip_qty[key].get(equip, 0) + qty
@@ -4083,6 +4273,8 @@ class PerformanceSummaryView(APIView):
             p_dic = {}
             if not equip_qty.get(key):
                 continue
+            s_target_setting = target_info.get(f"{day}-{classes}")
+            target_setting = s_target_setting if s_target_setting else list(target_info.values())[0]
             for equip, qty in equip_qty[key].items():
                 m, s = target_setting.get(equip + '_max'), target_setting.get(equip)
                 if m and s:
@@ -5211,20 +5403,21 @@ class ReissueCardView(APIView):
             et = int(page) * int(page_size)
         except:
             raise ValidationError("page/page_size异常，请修正后重试")
-        group_setup = AttendanceGroupSetup.objects.filter(principal__icontains=self.request.user.username, type=clock_type).first()
+        group_setup = AttendanceGroupSetup.objects.filter(principal__icontains=self.request.user.username, type=clock_type)
         if self.request.query_params.get('apply'):  # 查看自己的补卡申请
             user_list = [self.request.user.username]
             if group_setup:
-                user_list += list(group_setup.users.all().values_list('username', flat=True))
+                user_list += list(group_setup.last().users.all().values_list('username', flat=True))
             data = self.queryset.filter(user__username__in=user_list).order_by('-id')
             data2 = None
         else:  # 审批补卡申请
             if not group_setup:
                 raise ValidationError('当前用户非考勤负责人')
-            principal = group_setup.principal
-            attendance_users_list = list(group_setup.users.all().values_list('username', flat=True))
-            attendance_users_list.extend(principal.split(','))
-            # 列表中找出和name想象的
+            attendance_users_list = []
+            for i in group_setup:
+                attendance_users_list.extend(list(i.users.all().values_list('username', flat=True)))
+                attendance_users_list.extend(i.principal.split(','))
+                # 列表中找出和name想象的
             if name:
                 attendance_users_list = [user for user in attendance_users_list if name in user]
             data = self.queryset.filter(user__username__in=attendance_users_list)
@@ -5607,6 +5800,64 @@ class AttendanceRecordSearch(APIView):
 
 
 @method_decorator([api_recorder], name="dispatch")
+class GroupClockDetailView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        query_name = self.request.query_params.get('query_name')
+        group = self.request.query_params.get('group', 'A班')
+        select_date = self.request.query_params.get('select_date', datetime.datetime.now().strftime('%Y-%m-%d'))
+        results = {}
+        if not query_name:
+            user_name = self.request.user.username
+            # 查看人员是否为考勤负责人
+            u_flag = User.objects.filter(is_superuser=True, username=user_name)
+            if not u_flag:  # 是否为管理员
+                group_sets = AttendanceGroupSetup.objects.filter(principal__icontains=user_name)
+                if not group_sets:
+                    raise ValidationError('当前用户不是考勤组负责人, 请联系管理员')
+                clock_types = group_sets.values_list('type', flat=True).distinct()
+            else:
+                clock_types = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='绩效计算岗位类别').values_list('global_name', flat=True).distinct()
+            records = EmployeeAttendanceRecords.objects.filter(~Q(is_use='废弃'), clock_type__in=clock_types, factory_date=select_date, group=group).order_by('clock_type', 'section', 'user__username', 'status')
+            exist_r = []
+            for s in records:
+                name, section, status, clock_type = s.user.username, s.section, s.status, s.clock_type
+                _key = f"{select_date}-{name}-{section}"
+                if _key in exist_r:
+                    continue
+                exist_r.append(_key)
+                real_name = name if status != '调岗' else f"{name}[{status}]"
+                s_type = results.get(clock_type)
+                if s_type:
+                    s_section = s_type.get(section)
+                    if s_section:
+                        s_section += ([real_name] if real_name not in s_section else [])
+                    else:
+                        s_type[section] = [real_name]
+                else:
+                    results[clock_type] = {section: [real_name]}
+        else:  # 某位员工当班组打卡明细
+            clock_type = self.request.query_params.get('clock_type')
+            section = self.request.query_params.get('section')
+            user_name = query_name.split('[')[0]
+            records = EmployeeAttendanceRecords.objects.filter(~Q(is_use='废弃'), user__username=user_name, factory_date=select_date,
+                                                               group=group, clock_type=clock_type, section=section).order_by('begin_date', 'equip')
+            for s in records:
+                section, status, equip = s.section, s.status, s.equip
+                begin_date = s.begin_date.strftime('%Y-%m-%d %H:%M:%S') if s.begin_date else None
+                end_date = s.end_date.strftime('%Y-%m-%d %H:%M:%S') if s.end_date else None
+                s_status = results.get(status)
+                if s_status:
+                    s_status['equip'] += f",{equip}"
+                else:
+                    results[status] = {'id': s.id, 'user_name': user_name, 'section': section, 'equip': equip, 'status': status,
+                                       'begin_date': begin_date, "end_date": end_date}
+            results = results.values()
+        return Response(results)
+
+
+@method_decorator([api_recorder], name="dispatch")
 class AttendanceTimeStatisticsViewSet(ModelViewSet):
     queryset = EmployeeAttendanceRecords.objects.filter(
         Q(end_date__isnull=False, begin_date__isnull=False) |
@@ -5697,7 +5948,7 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
             s_data, create_data = report_list[0], []
             equip = s_data.get('equip', [])
             for s_equip in equip:
-                i = copy.deepcopy(s_data)
+                i = deepcopy(s_data)
                 i['equip'] = s_equip
                 create_data.append(i)
             serializer = self.get_serializer(data=create_data, many=True)
@@ -6284,7 +6535,7 @@ class ShiftProductionSummaryView(APIView):
             factory_date__year=year,
             factory_date__month=month
         ).values('equip_no', 'factory_date', 'classes').annotate(total_trains=Count('id')).order_by('equip_no', 'factory_date')
-        equip_target_data = MachineTargetYieldSettings.objects.filter(target_month=target_month).values()
+        equip_target_data = MachineTargetYieldSettings.objects.filter(target_month=target_month).order_by('-id').values()
         target_data = {}
         if equip_target_data:
             target_data = equip_target_data[0]
@@ -6475,7 +6726,7 @@ class GroupProductionSummary(APIView):
             factory_date__year=year,
             factory_date__month=month
         ).values('group', 'equip_no').annotate(s=Sum('times'))
-        equip_target_data = MachineTargetYieldSettings.objects.filter(target_month=target_month).values()
+        equip_target_data = MachineTargetYieldSettings.objects.filter(target_month=target_month).order_by('-id').values()
         target_data = {}
         if equip_target_data:
             target_data = equip_target_data[0]
@@ -6528,7 +6779,8 @@ class TimeEnergyConsuming(APIView):
         ).values('product_no', 'equip_no').annotate(cnt=Count('id'),
                                                     actual_weight=Max('actual_weight')/100,
                                                     evacuation_energy=Avg('evacuation_energy'),
-                                                    consum_time=Max('consum_time')).order_by('product_no', 'cnt')
+                                                    consum_time=OSum((F('end_time') - F('begin_time')))
+                                                    ).order_by('product_no', 'cnt')
         item_dict = {}
         # 设备机台对应机型字典数据
         equip_dev_type_dict = dict(Equip.objects.filter(
@@ -6548,23 +6800,31 @@ class TimeEnergyConsuming(APIView):
                 recipe_no = '{}-{}'.format(product_no, version)
             except Exception:
                 continue
+            if stage not in ['CMB', 'HMB', '1MB', '2MB', '3MB', 'RMB', 'FM']:
+                continue
             if item['equip_no'] == 'Z04':
                 evacuation_energy = item['evacuation_energy'] * 2
             else:
                 evacuation_energy = item['evacuation_energy']
             actual_weight = item['actual_weight']
+            try:
+                consum_time = item['consum_time'].total_seconds()//item['cnt']
+                if not consum_time or consum_time <= 50 or consum_time >= 500:
+                    consum_time = 150
+            except Exception:
+                consum_time = 150
             if recipe_no not in item_dict:
                 item_dict[recipe_no] = {stage: {'devoted_weight': actual_weight,
                                                 'actual_weight': actual_weight,
                                                 'evacuation_energy': evacuation_energy,
-                                                'consum_time': item['consum_time'],
+                                                'consum_time': consum_time,
                                                 'equip_no': item['equip_no'],
                                                 }}
             else:
                 item_dict[recipe_no][stage] = {'devoted_weight': actual_weight,
                                                 'actual_weight': actual_weight,
                                                 'evacuation_energy': evacuation_energy,
-                                                'consum_time': item['consum_time'],
+                                                'consum_time': consum_time,
                                                 'equip_no': item['equip_no']}
         # 写入excel表格
         wb = load_workbook('xlsx_template/energy_consume.xlsx')
@@ -6589,6 +6849,8 @@ class TimeEnergyConsuming(APIView):
                     recipe_type = pt_dict.get(re_result.group(), '未知')
             except Exception:
                 recipe_type = '未知'
+            if recipe_type == '未知':
+                continue
             sheet.cell(data_row, 1).value = recipe_type
             sheet.cell(data_row, 2).value = data_row - 3
             sheet.cell(data_row, 4).value = pn_split[0]
