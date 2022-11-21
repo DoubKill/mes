@@ -1,10 +1,3 @@
-"""
-__Title__ = 'yzc_test.py'
-__Author__ = 'yangzhenchao'
-__Date__ = '2022/11/5'
-__Version__ = 'Python 3.9'
-__Software__ = 'PyCharm'
-"""
 import os
 import sys
 import django
