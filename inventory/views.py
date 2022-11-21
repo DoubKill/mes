@@ -1768,7 +1768,7 @@ class BarcodeTraceView(APIView):
     def get(self, request):
         data = self.request.query_params
         trace_flag, bra_code, trace_material, st, et = data.get('trace_flag'), data.get('bra_code'), data.get('trace_material'), data.get('st'), data.get('et')
-        filter_kwargs, results = {}, []
+        filter_kwargs, results, records = {}, [], []
         if trace_flag == '0':  # 原材料到胶料
             supplier, batch_no, se, ee = data.get('supplier'), data.get('batch_no'), data.get('se'), data.get('ee')
             if bra_code:
@@ -1787,7 +1787,8 @@ class BarcodeTraceView(APIView):
                 filter_kwargs['erp_in_time__gte'] = se
             if ee:
                 filter_kwargs['erp_in_time__lte'] = ee
-            records = BarCodeTraceDetail.objects.filter(**filter_kwargs, display=True).order_by('scan_material_record').values()
+            if filter_kwargs:
+                records = BarCodeTraceDetail.objects.filter(**filter_kwargs, display=True).order_by('scan_material_record').values()
             for i in records:
                 product_time = None if not i['product_time'] else i['product_time'].strftime('%Y-%m-%d %H:%M:%S')
                 erp_in_time = None if not i['erp_in_time'] else i['erp_in_time'].strftime('%Y-%m-%d %H:%M:%S')
@@ -1823,8 +1824,9 @@ class BarcodeTraceView(APIView):
                     filter_kwargs['actual_trains__gte'] = sc
                 if ec:
                     filter_kwargs['actual_trains__lte'] = ec
-            records = TrainsFeedbacks.objects.filter(**filter_kwargs).order_by('-factory_date', 'equip_no', 'actual_trains')\
-                .values('plan_classes_uid', 'actual_trains', 'equip_no', 'product_no', 'actual_weight', 'begin_time', 'end_time', 'factory_date', 'classes')
+            if filter_kwargs:
+                records = TrainsFeedbacks.objects.filter(**filter_kwargs).order_by('-factory_date', 'equip_no', 'actual_trains')\
+                    .values('plan_classes_uid', 'actual_trains', 'equip_no', 'product_no', 'actual_weight', 'begin_time', 'end_time', 'factory_date', 'classes')
             for i in records:
                 plan_classes_uid, train = i['plan_classes_uid'], i['actual_trains']
                 actual_weight = 0 if not i['actual_weight'] else round(i['actual_weight'] / 100, 2)

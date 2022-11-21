@@ -1150,9 +1150,9 @@ permission_data = [
     {'id': 1134, 'code': 'export_daily_weight_package', 'name': '导出', 'parent_id': 1128},
 
     {'id': 1135, 'code': 'rubber_log', 'name': '胶架进出登记表', 'parent_id': None, 'category_name': '生产管理'},
-    {'id': 1136, 'code': 'view_rubber_log', 'name': '查看', 'parent_id': 1134},
-    {'id': 1137, 'code': 'add_rubber_log', 'name': '保存', 'parent_id': 1134},
-    {'id': 1138, 'code': 'export_rubber_log', 'name': '导出', 'parent_id': 1134},
+    {'id': 1136, 'code': 'view_rubber_log', 'name': '查看', 'parent_id': 1135},
+    {'id': 1137, 'code': 'add_rubber_log', 'name': '保存', 'parent_id': 1135},
+    {'id': 1138, 'code': 'export_rubber_log', 'name': '导出', 'parent_id': 1135},
 
     {'id': 1139, 'code': 'barcode_trace', 'name': '条码追溯(原材料->终炼胶)', 'parent_id': None, 'category_name': '工艺管理'},
     {'id': 1140, 'code': 'view_barcode_trace', 'name': '查看', 'parent_id': 1139},
