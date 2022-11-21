@@ -3170,6 +3170,8 @@ class EquipWarehouseStatisticalViewSet(ListModelMixin, GenericViewSet):
             st = (int(page) - 1) * int(page_size)
             et = int(page) * int(page_size)
             if self.request.query_params.get('export'):
+                if not results:
+                    raise ValidationError(f'无数据可导出')
                 try:
                     response = gen_template_response(self.EXPORT_FIELDS_DICT, results, self.FILE_NAME, handle_str=True)
                 except Exception as e:

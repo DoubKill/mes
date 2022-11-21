@@ -369,15 +369,17 @@ def material_out_barcode(bar_code, code_type='密炼'):
             raise ValueError('未找到该条码对应物料信息！')
         if data.get('Table'):
             ret = data.get('Table')[0]
+        else:  # 可能返回 {'Table': null}
+            raise ValueError('未找到该条码对应物料信息！')
     # 记录原材料信息到表
     try:
-        if not BarCodeTraceDetail.objects.filter(bar_code=bar_code, code_type=code_type):
+        if not BarCodeTraceDetail.objects.filter(bra_code=bar_code, code_type=code_type):
             # 获取erp入库时间
             in_instance = MaterialInHistory.objects.using('wms').filter(lot_no=bar_code, task__isnull=False).last()
             if in_instance:
                 erp_in_time = in_instance.task.fin_time
             BarCodeTraceDetail.objects.create(
-                bar_code=bar_code, code_type=code_type, scan_material_record=ret.get('WLMC'), product_time=ret.get('SM_CREATE'), erp_in_time=erp_in_time,
+                bra_code=bar_code, code_type=code_type, scan_material_record=ret.get('WLMC'), product_time=ret.get('SM_CREATE'), erp_in_time=erp_in_time,
                 standard_weight=round(ret.get('ZL', 0), 2), pallet_no=pallet_no, supplier=ret.get('WLDWMC'), batch_no=ret.get('PH'), display=True,
                 scan_result=True
             )

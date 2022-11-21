@@ -637,6 +637,7 @@ class MaterialExamineResult(models.Model):
                                  related_name='record_material_examine_result')
     sampling_user = models.ForeignKey(User, help_text='抽样人', on_delete=models.CASCADE,
                                       related_name='sample_material_examine_result')
+    tmh = models.CharField(max_length=64, help_text='条码号， 总厂wms查询条件', default='')
 
     class Meta:
         db_table = 'material_examine_result'

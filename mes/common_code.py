@@ -10,7 +10,7 @@ import requests
 import xlwt
 from DBUtils.PooledDB import PooledDB
 from django.contrib.auth.backends import ModelBackend
-from django.db.models import Min, Max, Sum, Q, Aggregate, CharField
+from django.db.models import Min, Max, Sum, Q, Aggregate, CharField, Avg
 from django.http import HttpResponse
 from rest_framework import status, mixins
 from rest_framework.generics import CreateAPIView
@@ -291,6 +291,16 @@ class OMax(Max):
 
 
 class OMin(Min):
+    def as_oracle(self, compiler, connection):
+        # if self.output_field.get_internal_type() == 'DurationField':
+        expression = self.get_source_expressions()[0]
+        from django.db.backends.oracle.functions import IntervalToSeconds, SecondsToInterval
+        return compiler.compile(
+            SecondsToInterval(Min(IntervalToSeconds(expression), filter=self.filter))
+        )
+
+
+class OAvg(Avg):
     def as_oracle(self, compiler, connection):
         # if self.output_field.get_internal_type() == 'DurationField':
         expression = self.get_source_expressions()[0]

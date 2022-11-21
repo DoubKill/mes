@@ -13,6 +13,7 @@ from operator import itemgetter
 import pandas as pd
 import requests
 import xlwt
+import xmltodict
 from django.core.paginator import Paginator
 from django.db.models import Sum, Count, Q, F, Max, FloatField, Min
 from django.db.transaction import atomic
@@ -279,9 +280,10 @@ class OutWorkFeedBack(APIView):
                     dp_obj.finish_time = datetime.datetime.now()
                     dp_obj.save()
                     OutBoundDeliveryOrderDetail.objects.filter(
-                        location=dp_obj.location,
+                        # location=dp_obj.location,
                         status=2,
-                        outbound_delivery_order__warehouse=dp_obj.outbound_delivery_order.warehouse
+                        pallet_no=dp_obj.pallet_no
+                        # outbound_delivery_order__warehouse=dp_obj.outbound_delivery_order.warehouse
                     ).update(status=3)
                     # try:
                     #     depot_name = '混炼线边库区' if dp_obj.outbound_delivery_order.warehouse == '混炼胶库' else "终炼线边库区"
@@ -1766,7 +1768,7 @@ class BarcodeTraceView(APIView):
     def get(self, request):
         data = self.request.query_params
         trace_flag, bra_code, trace_material, st, et = data.get('trace_flag'), data.get('bra_code'), data.get('trace_material'), data.get('st'), data.get('et')
-        filter_kwargs, results = {}, []
+        filter_kwargs, results, records = {}, [], []
         if trace_flag == '0':  # 原材料到胶料
             supplier, batch_no, se, ee = data.get('supplier'), data.get('batch_no'), data.get('se'), data.get('ee')
             if bra_code:
@@ -1785,7 +1787,8 @@ class BarcodeTraceView(APIView):
                 filter_kwargs['erp_in_time__gte'] = se
             if ee:
                 filter_kwargs['erp_in_time__lte'] = ee
-            records = BarCodeTraceDetail.objects.filter(**filter_kwargs, display=True).order_by('scan_material_record').values()
+            if filter_kwargs:
+                records = BarCodeTraceDetail.objects.filter(**filter_kwargs, display=True).order_by('scan_material_record').values()
             for i in records:
                 product_time = None if not i['product_time'] else i['product_time'].strftime('%Y-%m-%d %H:%M:%S')
                 erp_in_time = None if not i['erp_in_time'] else i['erp_in_time'].strftime('%Y-%m-%d %H:%M:%S')
@@ -1821,10 +1824,12 @@ class BarcodeTraceView(APIView):
                     filter_kwargs['actual_trains__gte'] = sc
                 if ec:
                     filter_kwargs['actual_trains__lte'] = ec
-            records = TrainsFeedbacks.objects.filter(**filter_kwargs).order_by('-factory_date', 'equip_no', 'actual_trains')\
-                .values('plan_classes_uid', 'actual_trains', 'equip_no', 'product_no', 'actual_weight', 'begin_time', 'end_time', 'factory_date', 'classes')
+            if filter_kwargs:
+                records = TrainsFeedbacks.objects.filter(**filter_kwargs).order_by('-factory_date', 'equip_no', 'actual_trains')\
+                    .values('plan_classes_uid', 'actual_trains', 'equip_no', 'product_no', 'actual_weight', 'begin_time', 'end_time', 'factory_date', 'classes')
             for i in records:
                 plan_classes_uid, train = i['plan_classes_uid'], i['actual_trains']
+                actual_weight = 0 if not i['actual_weight'] else round(i['actual_weight'] / 100, 2)
                 begin_time = i['begin_time'] if not i['begin_time'] else i['begin_time'].strftime('%Y-%m-%d %H:%M:%S')
                 end_time = i['end_time'] if not i['end_time'] else i['end_time'].strftime('%Y-%m-%d %H:%M:%S')
                 p_info = PalletFeedbacks.objects.filter(plan_classes_uid=plan_classes_uid, begin_trains__lte=train, end_trains__gte=train).last()
@@ -1833,7 +1838,8 @@ class BarcodeTraceView(APIView):
                 if bra_code and (not lot_no or bra_code not in lot_no):
                     continue
                 group = p.work_schedule_plan.group.global_name if p else ''
-                i.update({'lot_no': lot_no, 'pallet_no': pallet_no, 'product_time': product_time, 'begin_time': begin_time, 'end_time': end_time, 'group': group})
+                i.update({'lot_no': lot_no, 'pallet_no': pallet_no, 'product_time': product_time, 'begin_time': begin_time, 'end_time': end_time,
+                          'group': group, 'actual_weight': actual_weight})
                 results.append(i)
         else:
             raise ValidationError('未知操作')
@@ -1884,7 +1890,7 @@ class BarcodeTraceView(APIView):
             if l_detail:
                 p_list = p.product_no.split('-')
                 s_stage = None if not p_list else (p_list[1] if len(p_list) > 2 else p_list[0])
-                results.update({s_stage: [{product_no: self.supplement_info(l_detail.values('scan_material_type', 'scan_material', 'bra_code', 'feed_log__trains', 'material_name')), 'behind': ''}]})
+                results.update({s_stage: [{product_no: self.supplement_info(l_detail.values('scan_material_type', 'scan_material', 'bra_code', 'feed_log__trains', 'material_name', 'actual_weight')), 'behind': ''}]})
                 others = l_detail.filter(~Q(Q(bra_code__startswith='AAJZ20') | Q(bra_code__startswith='WMS')), scan_material_type='胶皮').order_by('-stage')
                 if others:
                     res = self.trace_down(others, behind=s_stage)
@@ -1940,7 +1946,7 @@ class BarcodeTraceView(APIView):
                 _k = f"{bra_code}_{scan_material}"
                 if _k not in temp:
                     _i = {'scan_material_type': scan_material_type, 'scan_material': scan_material, 'bra_code': bra_code, 'feed_log__trains': trains,
-                          'material_name': i.material_name}
+                          'material_name': i.material_name, 'actual_weight': i.actual_weight}
                     s_info = self.supplement_info([_i])[0]
                     temp[_k] = s_info
                 else:
@@ -1970,7 +1976,7 @@ class BarcodeTraceView(APIView):
             if l_detail:
                 p_list = p.product_no.split('-')
                 s_stage = None if not p_list else (p_list[1] if len(p_list) > 2 else p_list[0])
-                s_info = {p.product_no: self.supplement_info(l_detail.values('scan_material_type', 'scan_material', 'bra_code', 'feed_log__trains', 'material_name', 'stage')), 'behind': f'{behind}-{index + 1}'}
+                s_info = {p.product_no: self.supplement_info(l_detail.values('scan_material_type', 'scan_material', 'bra_code', 'feed_log__trains', 'material_name', 'stage', 'actual_weight')), 'behind': f'{behind}-{index + 1}'}
                 if s_stage in res:
                     res[s_stage].append(s_info)
                 else:
@@ -1995,6 +2001,7 @@ class BarcodeTraceView(APIView):
                 add_data_temp = b[0] if b else {'scan_material_record': None, 'material_name_record': None, 'product_time': None, 'standard_weight': None,
                                                 'pallet_no': None, 'equip_no': None, 'group': None, 'classes': None, 'trains': None,
                                                 'plan_classes_uid': None, 'begin_time': None, 'end_time': None, 'arrange_rubber_time': None}
+                add_data_temp['actual_weight'] = i.get('actual_weight', 0)
                 if i['bra_code'][0] in ['S', 'F']:  # 补充小料详情
                     res = self.get_xl_info(i['bra_code'], i['material_name'])
                     add_data_temp.update(res)
@@ -2718,8 +2725,12 @@ class ProductDetailsView(APIView):
         stock_data_dict = {}
         for x in total_inventory_data:
             m_split_data = x['material_no'].strip().split('-')
-            stage = m_split_data[1]
-            product_no = m_split_data[2]
+            try:
+                stage = m_split_data[1]
+                product_no = m_split_data[2]
+            except Exception:
+                stage = m_split_data[0]
+                product_no = m_split_data[1]
             weight = x['weight'] / 1000
             qty = x['qty']
             quality_level = x['quality_level']
@@ -3055,7 +3066,10 @@ class WmsInventoryStockView(APIView):
         if pallet_no:
             extra_where_str += " and a.LadenToolNumber ='{}'".format(pallet_no)
         if tunnel:
-            extra_where_str += " and a.SpaceId like 'ZCM-{}%'".format(tunnel)
+            if self.DB == 'WMS':
+                extra_where_str += " and a.SpaceId like 'ZCM-{}%'".format(tunnel)
+            else:
+                extra_where_str += " and a.SpaceId like 'ZCB-{}%'".format(tunnel)
 
         sql = """SELECT
                  a.StockDetailState,
@@ -6722,6 +6736,8 @@ class HFInventoryLogView(APIView):
         et = self.request.query_params.get('et')  # 结束时间
         material_no = self.request.query_params.get('material_no')  # 物料编码
         material_name = self.request.query_params.get('material_name')  # 物料名称
+        pallet_no = self.request.query_params.get('pallet_no')  # 托盘号
+        lot_no = self.request.query_params.get('lot_no')  # 条码
         page = int(self.request.query_params.get('page', 1))
         page_size = int(self.request.query_params.get('page_size', 10))
         inventory_type = self.request.query_params.get('inventory_type', '入烘房')
@@ -6739,10 +6755,16 @@ class HFInventoryLogView(APIView):
             if et:
                 extra_where_str += " and OastOutTime <= '{}'".format(et)
         if material_name:
-            extra_where_str += " and ProductName like N'%{}%'".format(material_name)
+            extra_where_str += " and ProductName like N'%{}%'".format(material_name.strip())
         if material_no:
-            extra_where_str += " and ProductNo like '%{}%'".format(material_no)
-
+            extra_where_str += " and ProductNo like '%{}%'".format(material_no.strip())
+        if pallet_no:
+            extra_where_str += " and RFID = '{}'".format(pallet_no.strip())
+        if lot_no:
+            last_out_log = MaterialOutHistory.objects.using('wms').filter(lot_no=lot_no.strip()).order_by('id').last()
+            if not last_out_log:
+                return Response({})
+            extra_where_str += " and MissionID = '{}'".format(last_out_log.order_no.strip())
         if not export:
             limit_str = 'OFFSET {} ROWS FETCH FIRST {} ROWS ONLY'.format((page-1)*page_size, page_size)
         else:
@@ -6892,10 +6914,11 @@ class HFRealStatusView(APIView):
             res = hf.manual_out_hf(data)
             # 更新履历
             hf_log = HfBakeLog.objects.filter(oast_no=data['OastNo'], actual_temperature__isnull=True, actual_bake_time__isnull=True).last()
-            hf_log.actual_temperature = res.get('ShiJiT')
-            hf_log.actual_bake_time = res.get('ShiJiTime')
-            hf_log.last_updated_date = datetime.datetime.now()
-            hf_log.save()
+            if hf_log:
+                hf_log.actual_temperature = res.get('ShiJiT')
+                hf_log.actual_bake_time = res.get('ShiJiTime')
+                hf_log.last_updated_date = datetime.datetime.now()
+                hf_log.save()
         except Exception as e:
             raise ValidationError(e.args[0])
         else:
@@ -6967,8 +6990,8 @@ class HFConfigSetView(APIView):
         repeat_material_name = []
         # 删除物料
         if delete_data:
-            HfBakeMaterialSet.objects.filter(id=delete_data).update(**{'delete_flag': True})
-            return Response('删除设置成功')
+            HfBakeMaterialSet.objects.filter(id=delete_data).delete()
+            return Response('删除成功')
         for s_data in data:
             rid, material_name, temperature_set, bake_time = s_data.get('id'),  s_data.get('material_name'), \
                                                              s_data.get('temperature_set'),  s_data.get('bake_time')
@@ -7688,3 +7711,53 @@ class BZInventoryWorkingTasksView(APIView):
             i['task_status'] = '进行中'
             tunnel_task_num_dict[tunnel] = tunnel_task_num_dict.get(tunnel, 0) + 1
         return Response(s_data)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class EmptyTrayOutboundDeliveryView(APIView):
+
+    def get(self, request):
+        gc = GlobalCode.objects.filter(global_type__type_name='炭黑空托盘出库模式').order_by('id').first()
+        if not gc:
+            return Response({'out_type': ''})
+        total_qty = WmsInventoryStock.objects.using('cb').filter(material_name='空托盘').count()
+        return Response({'out_type': gc.global_name, 'total_qty': total_qty})
+
+    def post(self, request):
+        req_data = self.request.data
+        out_type = req_data.get('out_type')
+        out_num = req_data.get('out_num', 0)
+        gc = GlobalCode.objects.filter(global_type__type_name='炭黑空托盘出库模式').order_by('id').first()
+        if not gc:
+            raise ValidationError('请配置炭黑空托盘出库模式公共代码！')
+        if out_type == '手动':
+            req_data = {"ktpType": 0, "ktpNum": out_num}
+        else:
+            req_data = {'ktpType': 1, 'ktpNum': out_num}
+        if not DEBUG:
+            headers = {"Content-Type": "text/xml; charset=utf-8",
+                       "SOAPAction": "http://tempuri.org/IStockService/IssueKtpTypeAndNum"}
+            data = """<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
+            <soapenv:Header/>
+            <soapenv:Body>
+            <tem:IssueKtpTypeAndNum>
+             <tem:JsonGet>{}</tem:JsonGet>
+            </tem:IssueKtpTypeAndNum>
+            </soapenv:Body>
+            </soapenv:Envelope>""".format(json.dumps(req_data))
+            url = 'http://10.4.24.33:3000/StockService?wsdl'
+            try:
+                ret = requests.post(url, data=data.encode('utf-8'), headers=headers, timeout=5)
+            except Exception:
+                raise ValidationError('接口调用失败，请联系管理员！')
+            try:
+                resp_xml = ret.text
+                json_data = xmltodict.parse(resp_xml)
+                status_data = json.loads(json_data.get('s:Envelope').get('s:Body').get('IssueKtpTypeAndNumResponse').get('IssueKtpTypeAndNumResult'))
+                if status_data.get('Result') != '0':
+                    raise ValidationError('操作失败：{}'.format(status_data.get('Message')))
+            except Exception:
+                pass
+        gc.global_name = out_type
+        gc.save()
+        return Response('ok')
