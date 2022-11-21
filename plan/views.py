@@ -1,6 +1,8 @@
+import copy
 import datetime
 import json
 import re
+from io import BytesIO
 from operator import itemgetter
 
 import requests
@@ -8,8 +10,10 @@ import xlrd
 from django.db import connection, IntegrityError
 from django.db.models import Sum, Max, Q
 from django.db.transaction import atomic
+from django.http import HttpResponse
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
+from openpyxl import load_workbook
 from rest_framework import status, mixins
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -49,7 +53,7 @@ from plan.serializers import ProductDayPlanSerializer, ProductClassesPlanManyCre
     SchedulingResultSerializer, SchedulingEquipShutDownPlanSerializer, ProductStockDailySummarySerializer, \
     WeightPackageDailyTimeConsumeSerializer
 from plan.utils import calculate_product_plan_trains, extend_last_aps_result, APSLink, \
-    calculate_equip_recipe_avg_mixin_time, plan_sort
+    calculate_equip_recipe_avg_mixin_time, plan_sort, calculate_product_stock
 from production.models import PlanStatus, TrainsFeedbacks, MaterialTankStatus
 from quality.utils import get_cur_sheet, get_sheet_data
 from recipe.models import ProductBatching, ProductBatchingDetail, Material, MaterialAttribute, WeighBatchingDetail
@@ -1553,3 +1557,251 @@ class WeightPackageDailyTimeConsumeViewSet(ModelViewSet):
                     'mixin_time_consume': mixin_time_consume, 'final_time_consume': final_time_consume}))
         WeightPackageDailyTimeConsume.objects.bulk_create(instance_list)
         return Response('ok')
+
+
+@method_decorator([api_recorder], name='dispatch')
+class APSExportDataView(APIView):
+
+    def get(self, request):
+        aps_start_time = self.request.query_params.get('start_time')
+        factory_date = get_current_factory_date().get('factory_date', datetime.datetime.now().date())
+        wb = load_workbook('xlsx_template/aps_import_templete.xlsx')
+        if not aps_start_time:
+            aps_start_time = factory_date.strftime('%Y-%m-%d') + ' 08:00:00'
+        sps = SchedulingParamsSetting.objects.first()
+
+        demanded_data = SchedulingProductDemandedDeclareSummary.objects.filter(
+            factory_date=factory_date, demanded_weight__gt=0).order_by('available_time')
+        equip_stop_plan = SchedulingEquipShutDownPlan.objects.filter(
+            begin_time__gte=aps_start_time)
+        # summary info sheet
+        sheet = wb.worksheets[0]
+        sheet.cell(1, 2).value = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # 当前时间
+        sheet.cell(3, 2).value = 'APS1{}'.format(datetime.datetime.now().strftime('%Y%m%d%H%M%S'))  # 排程编号
+        sheet.cell(4, 2).value = Equip.objects.filter(category__equip_type__global_name="密炼设备").count()  # 机台数量
+        sheet.cell(5, 2).value = aps_start_time  # 排程开始时间
+        sheet.cell(6, 2).value = sps.scheduling_during_time  # 排程持续时间
+        sheet.cell(7, 2).value = len(set(equip_stop_plan.values_list('equip_no', flat=True)))  # 停机机台数量
+        sheet.cell(8, 2).value = demanded_data.count()  # 需要排程的规格数量
+
+        # project list sheet
+        sheet1 = wb.worksheets[1]
+        sheet2 = wb.worksheets[2]
+        job_list_data = {}
+        data_row = 2
+        data_row1 = 2
+        for i in demanded_data:
+            pd_ms = SchedulingRecipeMachineSetting.objects.filter(
+                product_no=i.product_no).first()
+            if not pd_ms:
+                raise ValidationError('未找到该规格：{}定机表数据！'.format(i.product_no))
+            pd_stages = pd_ms.stages.split('/')
+            need_stages = copy.deepcopy(pd_stages)
+            pb_version_name = '{}-{}'.format(pd_ms.product_no, pd_ms.version)
+            sheet1.cell(data_row, 1).value = data_row - 1  # 序号
+            sheet1.cell(data_row, 2).value = pb_version_name  # 规格名称（带版本号）
+            sheet1.cell(data_row, 3).value = 0  # 胶料代码开始时间(暂时无用)
+            sheet1.cell(data_row, 4).value = 0  # 关键路径持续时间（暂时无用）
+            sheet1.cell(data_row, 5).value = int(i.available_time * 60 * 24)  # 最晚完成时间
+
+            # write job list sheet
+            pbs = ProductBatching.objects.using('SFJ').filter(
+                used_type=4,
+                stage_product_batch_no__iendswith='-{}'.format(pb_version_name),
+            ).values('id', 'batching_weight', 'equip__equip_no', 'stage_product_batch_no',
+                     'equip__category__category_name', 'stage__global_name').order_by('batching_weight')
+            stage_devoted_weight = {}
+            weight_qty = i.demanded_weight * 1000
+
+            # 计算该规格每个段次所投入的重量
+            for s in pd_stages[1:][::-1]:
+                stage_recipes = list(
+                    filter(lambda x: x['stage_product_batch_no'].endswith('-{}-{}'.format(s, pb_version_name)), pbs))
+                if not stage_recipes:
+                    raise ValidationError('未找到该规格{}：段次：{}配方数据！'.format(i.product_no, s))
+                stage_recipe = stage_recipes[-1]  # 取该段次配方重量最大的一条
+                c_pb = ProductBatchingDetail.objects.using('SFJ').filter(
+                    product_batching=stage_recipe['id'],
+                    delete_flag=False,
+                    material__material_no__iendswith='-{}'.format(pb_version_name)).first()
+                if not c_pb:
+                    raise ValidationError('该规格{}：段次：{}配方错误，未找到投入前段次胶料数据！'.format(i.product_no, s))
+                devoted_weight = float(c_pb.actual_weight)  # 投入前段次重量
+                prev_stage = c_pb.material.material_no.split('-')[1]  # 前段次名称
+                stock_weight = calculate_product_stock(factory_date, pd_ms.product_no, prev_stage)  # 库存重量
+                pd_trains = weight_qty / float(stage_recipe['batching_weight'])
+                prev_need_weight = pd_trains * devoted_weight - stock_weight
+                # print(pd_trains, devoted_weight, stock_weight)
+                if prev_need_weight <= 0:
+                    weight_qty = 0
+                    stage_devoted_weight[prev_stage] = 0
+                    need_stages.remove(prev_stage)
+                else:
+                    weight_qty = prev_need_weight
+                    stage_devoted_weight[prev_stage] = weight_qty
+            # print(stage_devoted_weight)
+            idx_keys = {'HMB': 1, 'CMB': 2, '1MB': 3, '2MB': 4, '3MB': 5, '4MB': 6, 'FM': 7}
+            pbs = sorted(list(pbs), key=lambda x: idx_keys.get(x['stage__global_name'], 999))
+            for pb in pbs:
+                recipe_name = pb['stage_product_batch_no']  # 配方名称
+                stage = recipe_name.split('-')[1]  # 段次
+                equip_no = pb['equip__equip_no']  # 机台
+                batching_weight = pb['batching_weight']  # 配方重量
+                if stage not in need_stages:
+                    continue
+                if stage == 'HMB':
+                    # model_size = 1 if not pd_ms.vice_machine_HMB else len(pd_ms.vice_machine_HMB.split('/')) + 1
+                    if equip_no == pd_ms.main_machine_HMB:
+                        equip_main_standby = '主'
+                    elif equip_no in pd_ms.vice_machine_HMB.split('/'):
+                        equip_main_standby = '辅'
+                    else:
+                        continue
+                elif stage == 'CMB':
+                    # model_size = 1 if not pd_ms.vice_machine_CMB else len(pd_ms.vice_machine_CMB.split('/')) + 1
+                    if equip_no == pd_ms.main_machine_CMB:
+                        equip_main_standby = '主'
+                    elif equip_no in pd_ms.vice_machine_CMB.split('/'):
+                        equip_main_standby = '辅'
+                    else:
+                        continue
+                elif stage == '1MB':
+                    # model_size = 1 if not pd_ms.vice_machine_1MB else len(pd_ms.vice_machine_1MB.split('/')) + 1
+                    if equip_no == pd_ms.main_machine_1MB:
+                        equip_main_standby = '主'
+                    elif equip_no in pd_ms.vice_machine_1MB.split('/'):
+                        equip_main_standby = '辅'
+                    else:
+                        continue
+                elif stage == '2MB':
+                    # model_size = 1 if not pd_ms.vice_machine_2MB else len(pd_ms.vice_machine_2MB.split('/')) + 1
+                    if equip_no == pd_ms.main_machine_2MB:
+                        equip_main_standby = '主'
+                    elif equip_no in pd_ms.vice_machine_2MB.split('/'):
+                        equip_main_standby = '辅'
+                    else:
+                        continue
+                elif stage == '3MB':
+                    # model_size = 1 if not pd_ms.vice_machine_3MB else len(pd_ms.vice_machine_3MB.split('/')) + 1
+                    if equip_no == pd_ms.main_machine_3MB:
+                        equip_main_standby = '主'
+                    elif equip_no in pd_ms.vice_machine_3MB.split('/'):
+                        equip_main_standby = '辅'
+                    else:
+                        continue
+                elif stage == '4MB':
+                    # model_size = 1 if not pd_ms.vice_machine_4MB else len(pd_ms.vice_machine_4MB.split('/')) + 1
+                    if equip_no == pd_ms.main_machine_4MB:
+                        equip_main_standby = '主'
+                    elif equip_no in pd_ms.vice_machine_4MB.split('/'):
+                        equip_main_standby = '辅'
+                    else:
+                        continue
+                else:
+                    # model_size = 1 if not pd_ms.vice_machine_FM else len(pd_ms.vice_machine_FM.split('/')) + 1
+                    if equip_no == pd_ms.main_machine_FM:
+                        equip_main_standby = '主'
+                    elif equip_no in pd_ms.vice_machine_FM.split('/'):
+                        equip_main_standby = '辅'
+                    else:
+                        continue
+
+                if stage == 'FM':
+                    weight = round(i.demanded_weight * 1000, 2)
+                else:
+                    try:
+                        weight = round(stage_devoted_weight[stage], 2)
+                    except Exception:
+                        raise ValidationError('定机表该规格段次错误，请检查后重试!:{}'.format(pb_version_name))
+
+                if weight == 0:
+                    continue
+
+                plan_trains = weight//float(batching_weight)
+                train_time_consume = calculate_equip_recipe_avg_mixin_time(equip_no, pd_ms.product_no)
+                if pb_version_name not in job_list_data:
+                    job_list_data[pb_version_name] = {stage: {
+                        'project_name': pb_version_name,
+                        'serial_no': need_stages.index(stage) + 1,
+                        'job_name': recipe_name,
+                        'job_type': 'STANDARD',
+                        'weight_qty': weight,
+                        'model_size': 1,
+                        'details': [{'time_consume': plan_trains * train_time_consume/60,
+                                     'equip_no': int(equip_no[-2:]),
+                                     'wait_time': int(train_time_consume/60 * sps.scheduling_interval_trains),
+                                     'plan_trains': plan_trains,
+                                     'main_equip_flag': 1 if equip_main_standby == '主' else 0
+                                     }]}
+                    }
+                else:
+                    if stage not in job_list_data[pb_version_name]:
+                        job_list_data[pb_version_name][stage] = {
+                            'project_name': pb_version_name,
+                            'serial_no': need_stages.index(stage) + 1,
+                            'job_name': recipe_name,
+                            'job_type': 'STANDARD',
+                            'weight_qty': weight,
+                            'model_size': 1,
+                            'details': [{'time_consume': plan_trains * train_time_consume/60,
+                                         'equip_no': int(equip_no[-2:]),
+                                         'wait_time': int(train_time_consume/60 * sps.scheduling_interval_trains),
+                                         'plan_trains': plan_trains,
+                                         'main_equip_flag': 1 if equip_main_standby == '主' else 0
+                                         }]}
+                    else:
+                        job_list_data[pb_version_name][stage]['model_size'] += 1
+                        job_list_data[pb_version_name][stage]['details'].append(
+                            {'time_consume': plan_trains * train_time_consume / 60,
+                             'equip_no': int(equip_no[-2:]),
+                             'wait_time': int(train_time_consume / 60 * sps.scheduling_interval_trains),
+                             'plan_trains': plan_trains,
+                             'main_equip_flag': 1 if equip_main_standby == '主' else 0
+                             }
+                        )
+
+            # sheet1.cell(data_row, 6).value = len(need_stages)
+            sheet1.cell(data_row, 6).value = len(job_list_data[pb_version_name])
+            data_row += 1
+
+        # write excel
+        id_st = 1
+        for item in job_list_data.values():
+            for _, data in item.items():
+                sheet2.cell(data_row1, 1).value = id_st
+                sheet2.cell(data_row1, 2).value = data['project_name']
+                sheet2.cell(data_row1, 3).value = data['serial_no']
+                sheet2.cell(data_row1, 4).value = data['job_name']
+                sheet2.cell(data_row1, 5).value = data['job_type']
+                sheet2.cell(data_row1, 6).value = data['weight_qty']
+                sheet2.cell(data_row1, 7).value = data['model_size']
+                details = sorted(data['details'], key=lambda x: x['main_equip_flag'], reverse=True)
+                data_col1 = 8
+                for d in details:
+                    sheet2.cell(data_row1, data_col1).value = int(d['time_consume'])
+                    sheet2.cell(data_row1, data_col1+1).value = int(d['equip_no'])
+                    sheet2.cell(data_row1, data_col1+2).value = int(d['wait_time'])
+                    sheet2.cell(data_row1, data_col1+3).value = int(d['plan_trains'])
+                    data_col1 += 4
+                data_row1 += 1
+            id_st += 1
+
+        # machine stop plan sheet
+        sheet3 = wb.worksheets[3]
+        data_row2 = 2
+        for j in equip_stop_plan:
+            sheet3.cell(data_row2, 1).value = int(j.equip_no[-2:])
+            sheet3.cell(data_row2, 2).value = j.begin_time
+            sheet3.cell(data_row2, 3).value = j.duration * 60
+            data_row2 += 1
+
+        output = BytesIO()
+        wb.save(output)
+        # 重新定位到开始
+        output.seek(0)
+        response = HttpResponse(content_type='application/vnd.ms-excel')
+        filename = 'aps_import'
+        response['Content-Disposition'] = u'attachment;filename= ' + filename.encode('gbk').decode(
+            'ISO-8859-1') + '.xlsx'
+        response.write(output.getvalue())
+        return response
