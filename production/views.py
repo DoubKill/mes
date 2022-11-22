@@ -2913,7 +2913,7 @@ class DailyProductionCompletionReport(APIView):
             elif item['name'] == '吨耗时（分钟/吨）':
                 length = len(results['name_14']) - 2
                 item['avg'] = '' if not length else round(item['weight'] / length, 2)
-            elif item['name'] == '吨耗能（KWH/吨）':
+            elif item['name'] == '吨胶密炼耗能（KWH/吨）':
                 length = len(results['name_15']) - 2
                 item['avg'] = '' if not length else round(item['weight'] / length, 2)
             else:
