@@ -5819,27 +5819,34 @@ class GroupClockDetailView(APIView):
                 clock_types = group_sets.values_list('type', flat=True).distinct()
             else:
                 clock_types = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='绩效计算岗位类别').values_list('global_name', flat=True).distinct()
-            records = EmployeeAttendanceRecords.objects.filter(~Q(is_use='废弃'), clock_type__in=clock_types, factory_date=select_date, group=group).order_by('clock_type', 'section', 'user__username', 'status')
+            records = EmployeeAttendanceRecords.objects.filter(~Q(is_use='废弃'), clock_type__in=clock_types, factory_date=select_date, group=group).order_by('clock_type', 'section', 'user__username', 'status', 'equip')
             exist_r = []
             for s in records:
-                name, section, status, clock_type, end_date = s.user.username, s.section, s.status, s.clock_type, s.end_date
+                name, section, status, clock_type, end_date, equip = s.user.username, s.section, s.status, s.clock_type, s.end_date, s.equip
                 _key = f"{select_date}-{name}-{section}"
-                if _key in exist_r:
-                    continue
-                exist_r.append(_key)
                 real_name = name if status != '调岗' else f"{name}[{status}]"
                 color = '' if not end_date else 'orange'
                 s_type = results.get(clock_type)
-                _s_info = {'name': real_name, 'color': color}
+                _s_info = {'name': real_name, 'color': color, 'equip': equip}
                 if s_type:
                     s_section = s_type.get(section)
                     if s_section:
-                        names = [i['name'] for i in s_section]
-                        s_section += ([_s_info] if real_name not in names else [])
+                        names = [i for i in s_section if i['name'] == real_name]
+                        if _key in exist_r:
+                            if names:
+                                _equip = names[0]['equip'] + f'/{equip}'
+                                if len(_equip.split('/')) >= 15:
+                                    _equip = 'Z01~Z15'
+                                names[0]['equip'] = _equip
+                            else:
+                                s_section += [_s_info]
+                        else:
+                            s_section += [_s_info]
                     else:
                         s_type[section] = [_s_info]
                 else:
                     results[clock_type] = {section: [_s_info]}
+                exist_r.append(_key)
         else:  # 某位员工当班组打卡明细
             clock_type = self.request.query_params.get('clock_type')
             section = self.request.query_params.get('section')
