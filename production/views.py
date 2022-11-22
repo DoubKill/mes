@@ -5822,21 +5822,24 @@ class GroupClockDetailView(APIView):
             records = EmployeeAttendanceRecords.objects.filter(~Q(is_use='废弃'), clock_type__in=clock_types, factory_date=select_date, group=group).order_by('clock_type', 'section', 'user__username', 'status')
             exist_r = []
             for s in records:
-                name, section, status, clock_type = s.user.username, s.section, s.status, s.clock_type
+                name, section, status, clock_type, end_date = s.user.username, s.section, s.status, s.clock_type, s.end_date
                 _key = f"{select_date}-{name}-{section}"
                 if _key in exist_r:
                     continue
                 exist_r.append(_key)
                 real_name = name if status != '调岗' else f"{name}[{status}]"
+                color = '' if not end_date else 'orange'
                 s_type = results.get(clock_type)
+                _s_info = {'name': real_name, 'color': color}
                 if s_type:
                     s_section = s_type.get(section)
                     if s_section:
-                        s_section += ([real_name] if real_name not in s_section else [])
+                        names = [i['name'] for i in s_section]
+                        s_section += ([_s_info] if real_name not in names else [])
                     else:
-                        s_type[section] = [real_name]
+                        s_type[section] = [_s_info]
                 else:
-                    results[clock_type] = {section: [real_name]}
+                    results[clock_type] = {section: [_s_info]}
         else:  # 某位员工当班组打卡明细
             clock_type = self.request.query_params.get('clock_type')
             section = self.request.query_params.get('section')
