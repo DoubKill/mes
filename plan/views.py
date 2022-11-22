@@ -1772,7 +1772,9 @@ class APSExportDataView(APIView):
                         )
 
             # sheet1.cell(data_row, 6).value = len(need_stages)
-            sheet1.cell(data_row, 6).value = len(job_list_data.get(pb_version_name, 0))
+            if pb_version_name not in job_list_data:
+                raise ValidationError('该规格启用配方未找到:{}'.format(pb_version_name))
+            sheet1.cell(data_row, 6).value = len(job_list_data[pb_version_name])
             data_row += 1
 
         # write excel
