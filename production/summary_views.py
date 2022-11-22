@@ -665,9 +665,13 @@ class IndexOverview(APIView):
         # 日合格率
         qualified_count = MaterialTestOrder.objects.filter(production_factory_date=factory_date,
                                                            product_no__icontains='-FM',
-                                                           is_qualified=True).count()
+                                                           is_qualified=True,
+                                                           is_experiment=False
+                                                           ).count()
         total_test_count = MaterialTestOrder.objects.filter(production_factory_date=factory_date,
-                                                            product_no__icontains='-FM',).count()
+                                                            product_no__icontains='-FM',
+                                                            is_experiment=False
+                                                            ).count()
         try:
             qualified_rate = round(qualified_count / total_test_count * 100, 2)
         except ZeroDivisionError:
