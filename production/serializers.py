@@ -263,15 +263,15 @@ class TrainsFeedbacksSerializer2(BaseModelSerializer):
         actual_weight = data['actual_weight']
         try:
             if equip_no == 'Z01':
-                data['evacuation_energy'] = int(evacuation_energy / 10)
+                data['evacuation_energy'] = round(evacuation_energy / 10, 1)
             if equip_no == 'Z02':
-                data['evacuation_energy'] = int(evacuation_energy / 0.6)
+                data['evacuation_energy'] = round(evacuation_energy / 0.6)
             if equip_no == 'Z04':
-                data['evacuation_energy'] = int(evacuation_energy * 0.28 * float(actual_weight) / 1000)
+                data['evacuation_energy'] = round(evacuation_energy * 0.28 * float(actual_weight) / 1000, 1)
             if equip_no == 'Z12':
-                data['evacuation_energy'] = int(evacuation_energy / 5.3)
+                data['evacuation_energy'] = round(evacuation_energy / 5.3, 1)
             if equip_no == 'Z13':
-                data['evacuation_energy'] = int(evacuation_energy / 31.7)
+                data['evacuation_energy'] = round(evacuation_energy / 31.7, 1)
         except Exception:
             pass
         return data
