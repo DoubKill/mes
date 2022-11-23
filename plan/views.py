@@ -1613,7 +1613,7 @@ class APSExportDataView(APIView):
             sheet1.cell(data_row, 2).value = pb_version_name  # 规格名称（带版本号）
             sheet1.cell(data_row, 3).value = 0  # 胶料代码开始时间(暂时无用)
             sheet1.cell(data_row, 4).value = 0  # 关键路径持续时间（暂时无用）
-            sheet1.cell(data_row, 5).value = int(i.available_time * 60 * 24)  # 最晚完成时间
+            sheet1.cell(data_row, 5).value = 720 if i.available_time == 0 else int(i.available_time * 60 * 24)  # 最晚完成时间
 
             # write job list sheet
             pbs = ProductBatching.objects.using('SFJ').filter(
