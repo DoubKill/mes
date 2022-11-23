@@ -3391,7 +3391,7 @@ class SummaryOfWeighingOutput(APIView):
                 raise ValidationError('导出实际考勤数据异常')
             if not export_data:
                 raise ValidationError('无考勤数据可以导出')
-            EXPORT_FIELDS_DICT = {'姓名': 'username', '岗位': 'section', '班组': 'group'}
+            EXPORT_FIELDS_DICT = {'姓名': 'username', '岗位': 'section', '班组': 'group', '机台': 'equip'}
             add_key = {'/'.join(i.split('-')[1:]): i for i in days}
             EXPORT_FIELDS_DICT.update(add_key)
             return gen_template_response(EXPORT_FIELDS_DICT, export_data.values(), f'{factory_date}配料间实际考勤数据', sheet_name=factory_date, handle_str=True)
@@ -3996,7 +3996,7 @@ class PerformanceSummaryView(APIView):
                 raise ValidationError('导出实际考勤数据异常')
             if not export_data:
                 raise ValidationError('无考勤数据可以导出')
-            EXPORT_FIELDS_DICT = {'姓名': 'username', '岗位': 'section', '班组': 'group'}
+            EXPORT_FIELDS_DICT = {'姓名': 'username', '岗位': 'section', '班组': 'group', '机台': 'equip'}
             add_key = {'/'.join(i.split('-')[1:]): i for i in days}
             EXPORT_FIELDS_DICT.update(add_key)
             return gen_template_response(EXPORT_FIELDS_DICT, export_data.values(), f'{date}密炼实际考勤数据', sheet_name=date, handle_str=True)
