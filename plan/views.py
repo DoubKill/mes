@@ -1898,7 +1898,7 @@ class APSPlanImport(APIView):
         data = get_sheet_data(cur_sheet, start_row=3)
         i = 0
         ret = []
-        aps_st = datetime.datetime(year=int(date_splits[0]), month=int(date_splits[1]), day=int(date_splits[1]), hour=8)
+        aps_st = datetime.datetime(year=int(date_splits[0]), month=int(date_splits[1]), day=int(date_splits[2]), hour=8)
         for idx, item in enumerate(data):
             if idx < 20:
                 equip_nos = ['Z01', 'Z02', 'Z03', 'Z04', 'Z05', 'Z06', 'Z07', 'Z08']
