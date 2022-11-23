@@ -1843,7 +1843,8 @@ class APSGanttView(APIView):
                                         'parent': ret[product_no][0]['id'],
                                         'text': '{}/{}/{}'.format(item['equip_no'], item['recipe_name'], str(item['plan_trains'])),
                                         'start_date': item['start_time'].strftime('%Y-%m-%d %H:%M:%S'),
-                                        'end_date': item['end_time'].strftime('%Y-%m-%d %H:%M:%S')})
+                                        'end_date': item['end_time'].strftime('%Y-%m-%d %H:%M:%S'),
+                                        'equip_no': item['equip_no']})
                 st_idx += 1
         else:
             for idx, equip_no in enumerate(list(Equip.objects.filter(
@@ -1860,7 +1861,8 @@ class APSGanttView(APIView):
                                       'parent': ret[equip_no][0]['id'],
                                       'text': item['recipe_name'] + '/' + str(item['plan_trains']),
                                       'start_date': item['start_time'].strftime('%Y-%m-%d %H:%M:%S'),
-                                      'end_date': item['end_time'].strftime('%Y-%m-%d %H:%M:%S')})
+                                      'end_date': item['end_time'].strftime('%Y-%m-%d %H:%M:%S'),
+                                      'equip_no': equip_no})
                 st_idx += 1
         results = []
         for i in list(ret.values()):
