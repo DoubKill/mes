@@ -1877,7 +1877,6 @@ class APSPlanImport(APIView):
         if not factory_date:
             raise ValidationError('请选择日期！')
         date_splits = factory_date.split('-')
-        schedule_no = 'APS1{}'.format(datetime.datetime.now().strftime('%Y%m%d%H%M%S'))
         excel_file = request.FILES.get('file', None)
         if not excel_file:
             raise ValidationError('文件不可为空！')
@@ -1891,6 +1890,10 @@ class APSPlanImport(APIView):
             cur_sheet = data.sheet_by_index(0)
         except Exception:
             raise ValidationError('文件错误！')
+        schedule_no = cur_sheet.cell(0, 0).value
+        if not schedule_no:
+            schedule_no = 'APS1{}'.format(datetime.datetime.now().strftime('%Y%m%d%H%M%S'))
+
         data = get_sheet_data(cur_sheet, start_row=3)
         i = 0
         ret = []
