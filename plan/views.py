@@ -1893,7 +1893,7 @@ class APSPlanImport(APIView):
         schedule_no = cur_sheet.cell(0, 0).value
         if not schedule_no:
             schedule_no = 'APS1{}'.format(datetime.datetime.now().strftime('%Y%m%d%H%M%S'))
-
+        SchedulingResult.objects.filter(schedule_no=schedule_no).delete()
         data = get_sheet_data(cur_sheet, start_row=3)
         i = 0
         ret = []
