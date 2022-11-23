@@ -1929,7 +1929,7 @@ class APSPlanImport(APIView):
                                                     'recipe_name': product_no,
                                                     'plan_trains': plan_trains,
                                                     'time_consume': time_consume,
-                                                    'desc': item[j * 4 + 4],
+                                                    'desc': item[j * 6 + 3],
                                                     'start_time': aps_st + datetime.timedelta(minutes=st),
                                                     'end_time': aps_st + datetime.timedelta(minutes=et)}))
                 except Exception:
