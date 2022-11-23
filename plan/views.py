@@ -935,7 +935,7 @@ class SchedulingResultViewSet(ModelViewSet):
                     raise ValidationError('导入数据有误，请检查后重试!')
             i += 1
         SchedulingResult.objects.bulk_create(ret)
-        return Response('ok')
+        return Response('导入排程结果成功!')
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -1932,4 +1932,4 @@ class APSPlanImport(APIView):
                     raise ValidationError('导入数据有误，请检查后重试!')
             i += 1
         SchedulingResult.objects.bulk_create(ret)
-        return Response('ok')
+        return Response('导入排程结果成功!')
