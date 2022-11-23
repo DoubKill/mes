@@ -1917,10 +1917,10 @@ class APSPlanImport(APIView):
                         et = int(item[j * 6 + 5])
                     except Exception:
                         raise ValidationError('数据错误，请检查后重试！')
-                    pb = ProductBatching.objects.using('SFJ').exclude(used_type=6).filter(
-                        stage_product_batch_no__icontains='-{}'.format(product_no)).first()
-                    if pb:
-                        product_no = pb.stage_product_batch_no
+                    # pb = ProductBatching.objects.using('SFJ').exclude(used_type=6).filter(
+                    #     stage_product_batch_no__icontains='-{}'.format(product_no)).first()
+                    # if pb:
+                    #     product_no = pb.stage_product_batch_no
                     ret.append(SchedulingResult(**{'factory_date': factory_date,
                                                     'schedule_no': schedule_no,
                                                     'equip_no': equip_no,
