@@ -5877,7 +5877,6 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         clock_type = self.request.query_params.get('clock_type')
-        query_set = self.get_queryset().filter(clock_type=clock_type)
         work_time = self.request.query_params.get('work_time')  # 获取当天的班次和时间信息
         if work_time:
             username = self.request.query_params.get('name')  # 获取上下班时间
@@ -5885,7 +5884,7 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
             return Response(res)
         classes_handle = self.request.query_params.get('classes_handle')  # 班次提交过滤数据
         if classes_handle:
-            filter_kwargs = {}
+            filter_kwargs = {'clock_type': clock_type}
             date = self.request.query_params.get('date')
             classes = self.request.query_params.get('classes')
             equip = self.request.query_params.get('equip')
@@ -5902,7 +5901,7 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
             if equip:
                 filter_kwargs['equip__in'] = equip.split(',')
             else:  # 所有机台
-                equip_type = '密炼设备' if clock_type == '密炼' else '生产配料'
+                equip_type = '密炼设备' if clock_type == '密炼' else '称量设备'
                 equip_info = list(Equip.objects.filter(category__equip_type__global_name=equip_type, use_flag=True).values_list('equip_no', flat=True))
                 filter_kwargs['equip__in'] = equip_info
             if section:
@@ -5910,7 +5909,7 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
             else:
                 section_list = list(PerformanceJobLadder.objects.filter(delete_flag=False, type=clock_type).values_list('name', flat=True))
                 filter_kwargs['section__in'] = section_list
-            queryset = query_set.exclude(is_use='废弃').filter(**filter_kwargs)
+            queryset = self.get_queryset().filter(~Q(is_use='废弃'), **filter_kwargs)
             data = self.get_serializer(queryset, many=True).data
             records = {}
             # 处理多机台
@@ -5927,7 +5926,7 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
             name = self.request.query_params.get('name')
             date = self.request.query_params.get('date')
             year, month = int(date.split('-')[0]), int(date.split('-')[-1])
-            queryset = query_set.filter(factory_date__year=year, factory_date__month=month, user__username=name, clock_type=clock_type)
+            queryset = self.get_queryset().filter(factory_date__year=year, factory_date__month=month, user__username=name, clock_type=clock_type)
             data = self.get_serializer(queryset, many=True).data
             principal, id_card_num = None, None
             if data:
