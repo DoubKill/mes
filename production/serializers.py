@@ -353,7 +353,7 @@ class ProductPlanRealViewSerializer(serializers.ModelSerializer):
     begin_time = serializers.SerializerMethodField(read_only=True, help_text='开始时间')
 
     def get_begin_time(self, obj):
-        tfb_obj = TrainsFeedbacks.objects.filter(plan_classes_uid=obj.plan_classes_uid).order_by('id').first()
+        tfb_obj = TrainsFeedbacks.objects.filter(plan_classes_uid=obj.plan_classes_uid).order_by('actual_trains').first()
         if tfb_obj:
             return tfb_obj.begin_time.strftime("%Y-%m-%d %H:%M:%S")
         else:
