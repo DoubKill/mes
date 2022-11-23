@@ -852,7 +852,8 @@ class SchedulingResultViewSet(ModelViewSet):
         query_set = SchedulingResult.objects.all()
         if factory_date:
             query_set = query_set.filter(factory_date=factory_date)
-        return Response(sorted(list(set(query_set.values_list('schedule_no', flat=True))), reverse=True))
+        return Response(query_set.values('schedule_no').annotate(a=Max('id')).order_by('-a').values_list('schedule_no', flat=True))
+        # return Response(sorted(list(set(query_set.values_list('schedule_no', flat=True))), reverse=True))
 
     def list(self, request, *args, **kwargs):
         schedule_no = self.request.query_params.get('schedule_no')
