@@ -6239,7 +6239,7 @@ class ShiftTimeSummaryView(APIView):
             results[key][f'{equip_no}_time_abnormal'] = time_consuming if abs(time_consuming) > 20 else None
             results[key]['consuming'] += time_consuming if abs(time_consuming) <= 20 else 0
             results[key]['abnormal'] += time_consuming if abs(time_consuming) > 20 else 0
-            results[key][f'{equip_no}_rate'] = None if not standard_time else round((standard_time / 60 / time_consuming) * 100, 2)
+            results[key][f'{equip_no}_rate'] = None if not time_consuming else round((standard_time / 60 / time_consuming) * 100, 2)
         res = list(results.values())
         for item in res:
             equip_count = (len(item) - 5) // 2
