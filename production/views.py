@@ -2618,7 +2618,7 @@ class DailyProductionCompletionReport(APIView):
             'name_12': {'name': '单机台效率-2（吨/台）', 'weight': 0},
             'name_13': {'name': '每日段数', 'weight': 0},
             'name_14': {'name': '吨耗时（分钟/吨）', 'weight': 0},
-            'name_15': {'name': '吨耗能（KWH/吨）', 'weight': 0}
+            'name_15': {'name': '吨胶密炼耗能（KWH/吨）', 'weight': 0}
         }
 
         # 除去洗车胶的总车次报表数据
@@ -2913,7 +2913,7 @@ class DailyProductionCompletionReport(APIView):
             elif item['name'] == '吨耗时（分钟/吨）':
                 length = len(results['name_14']) - 2
                 item['avg'] = '' if not length else round(item['weight'] / length, 2)
-            elif item['name'] == '吨耗能（KWH/吨）':
+            elif item['name'] == '吨胶密炼耗能（KWH/吨）':
                 length = len(results['name_15']) - 2
                 item['avg'] = '' if not length else round(item['weight'] / length, 2)
             else:
@@ -3391,7 +3391,7 @@ class SummaryOfWeighingOutput(APIView):
                 raise ValidationError('导出实际考勤数据异常')
             if not export_data:
                 raise ValidationError('无考勤数据可以导出')
-            EXPORT_FIELDS_DICT = {'姓名': 'username', '岗位': 'section', '班组': 'group'}
+            EXPORT_FIELDS_DICT = {'姓名': 'username', '岗位': 'section', '班组': 'group', '机台': 'equip'}
             add_key = {'/'.join(i.split('-')[1:]): i for i in days}
             EXPORT_FIELDS_DICT.update(add_key)
             return gen_template_response(EXPORT_FIELDS_DICT, export_data.values(), f'{factory_date}配料间实际考勤数据', sheet_name=factory_date, handle_str=True)
@@ -3996,7 +3996,7 @@ class PerformanceSummaryView(APIView):
                 raise ValidationError('导出实际考勤数据异常')
             if not export_data:
                 raise ValidationError('无考勤数据可以导出')
-            EXPORT_FIELDS_DICT = {'姓名': 'username', '岗位': 'section', '班组': 'group'}
+            EXPORT_FIELDS_DICT = {'姓名': 'username', '岗位': 'section', '班组': 'group', '机台': 'equip'}
             add_key = {'/'.join(i.split('-')[1:]): i for i in days}
             EXPORT_FIELDS_DICT.update(add_key)
             return gen_template_response(EXPORT_FIELDS_DICT, export_data.values(), f'{date}密炼实际考勤数据', sheet_name=date, handle_str=True)
@@ -5885,24 +5885,34 @@ class GroupClockDetailView(APIView):
                 clock_types = group_sets.values_list('type', flat=True).distinct()
             else:
                 clock_types = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='绩效计算岗位类别').values_list('global_name', flat=True).distinct()
-            records = EmployeeAttendanceRecords.objects.filter(~Q(is_use='废弃'), clock_type__in=clock_types, factory_date=select_date, group=group).order_by('clock_type', 'section', 'user__username', 'status')
+            records = EmployeeAttendanceRecords.objects.filter(~Q(is_use='废弃'), clock_type__in=clock_types, factory_date=select_date, group=group).order_by('clock_type', 'section', 'user__username', 'status', 'equip')
             exist_r = []
             for s in records:
-                name, section, status, clock_type = s.user.username, s.section, s.status, s.clock_type
+                name, section, status, clock_type, end_date, equip = s.user.username, s.section, s.status, s.clock_type, s.end_date, s.equip
                 _key = f"{select_date}-{name}-{section}"
-                if _key in exist_r:
-                    continue
-                exist_r.append(_key)
                 real_name = name if status != '调岗' else f"{name}[{status}]"
+                color = '' if not end_date else 'orange'
                 s_type = results.get(clock_type)
+                _s_info = {'name': real_name, 'color': color, 'equip': equip}
                 if s_type:
                     s_section = s_type.get(section)
                     if s_section:
-                        s_section += ([real_name] if real_name not in s_section else [])
+                        names = [i for i in s_section if i['name'] == real_name]
+                        if _key in exist_r:
+                            if names:
+                                _equip = names[0]['equip'] + f'/{equip}'
+                                if len(_equip.split('/')) >= 15:
+                                    _equip = 'Z01~Z15'
+                                names[0]['equip'] = _equip
+                            else:
+                                s_section += [_s_info]
+                        else:
+                            s_section += [_s_info]
                     else:
-                        s_type[section] = [real_name]
+                        s_type[section] = [_s_info]
                 else:
-                    results[clock_type] = {section: [real_name]}
+                    results[clock_type] = {section: [_s_info]}
+                exist_r.append(_key)
         else:  # 某位员工当班组打卡明细
             clock_type = self.request.query_params.get('clock_type')
             section = self.request.query_params.get('section')
@@ -5933,7 +5943,6 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         clock_type = self.request.query_params.get('clock_type')
-        query_set = self.get_queryset().filter(clock_type=clock_type)
         work_time = self.request.query_params.get('work_time')  # 获取当天的班次和时间信息
         if work_time:
             username = self.request.query_params.get('name')  # 获取上下班时间
@@ -5941,7 +5950,7 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
             return Response(res)
         classes_handle = self.request.query_params.get('classes_handle')  # 班次提交过滤数据
         if classes_handle:
-            filter_kwargs = {}
+            filter_kwargs = {'clock_type': clock_type}
             date = self.request.query_params.get('date')
             classes = self.request.query_params.get('classes')
             equip = self.request.query_params.get('equip')
@@ -5958,7 +5967,7 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
             if equip:
                 filter_kwargs['equip__in'] = equip.split(',')
             else:  # 所有机台
-                equip_type = '密炼设备' if clock_type == '密炼' else '生产配料'
+                equip_type = '密炼设备' if clock_type == '密炼' else '称量设备'
                 equip_info = list(Equip.objects.filter(category__equip_type__global_name=equip_type, use_flag=True).values_list('equip_no', flat=True))
                 filter_kwargs['equip__in'] = equip_info
             if section:
@@ -5966,7 +5975,7 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
             else:
                 section_list = list(PerformanceJobLadder.objects.filter(delete_flag=False, type=clock_type).values_list('name', flat=True))
                 filter_kwargs['section__in'] = section_list
-            queryset = query_set.exclude(is_use='废弃').filter(**filter_kwargs)
+            queryset = self.get_queryset().filter(~Q(is_use='废弃'), **filter_kwargs)
             data = self.get_serializer(queryset, many=True).data
             records = {}
             # 处理多机台
@@ -5983,7 +5992,7 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
             name = self.request.query_params.get('name')
             date = self.request.query_params.get('date')
             year, month = int(date.split('-')[0]), int(date.split('-')[-1])
-            queryset = query_set.filter(factory_date__year=year, factory_date__month=month, user__username=name, clock_type=clock_type)
+            queryset = self.get_queryset().filter(factory_date__year=year, factory_date__month=month, user__username=name, clock_type=clock_type)
             data = self.get_serializer(queryset, many=True).data
             principal, id_card_num = None, None
             if data:
@@ -6305,7 +6314,7 @@ class ShiftTimeSummaryView(APIView):
             results[key][f'{equip_no}_time_abnormal'] = time_consuming if abs(time_consuming) > 20 else None
             results[key]['consuming'] += time_consuming if abs(time_consuming) <= 20 else 0
             results[key]['abnormal'] += time_consuming if abs(time_consuming) > 20 else 0
-            results[key][f'{equip_no}_rate'] = None if not standard_time else round((standard_time / 60 / time_consuming) * 100, 2)
+            results[key][f'{equip_no}_rate'] = None if not time_consuming else round((standard_time / 60 / time_consuming) * 100, 2)
         res = list(results.values())
         for item in res:
             equip_count = (len(item) - 5) // 2

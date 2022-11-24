@@ -423,6 +423,13 @@ class LoadMaterialLogViewSet(TerminalCreateAPIView,
         if batch_material.unit == '包' and int(left_weight) != left_weight:
             return response(success=False, message='包数应为整数')
         update_records = last_bra_code_info.filter(plan_classes_uid=batch_material.plan_classes_uid)
+        # 获取限定包数与重量
+        limit_para = GlobalCode.objects.filter(global_type__use_flag=True, global_type__type_name='密炼投料物料可变重量', use_flag=True).values_list('global_name', flat=True)
+        try:
+            h_limit_para = {i.split('-')[0]: float(i.split('-')[1]) for i in limit_para}
+        except:
+            h_limit_para = {}
+        l_weight, l_package = h_limit_para.get('重量', 400), h_limit_para.get('包数', 30)
         for records in update_records:
             serializer = self.get_serializer(records, data=request.data)
             if not serializer.is_valid():
@@ -431,7 +438,7 @@ class LoadMaterialLogViewSet(TerminalCreateAPIView,
             change_num = float(records.adjust_left_weight) - left_weight
             variety = float(records.variety) - change_num
             # 数量变换取值[累加](包数：[负整框:10], 重量：[负整框:100])
-            beyond = 30 if records.unit == '包' else 400
+            beyond = l_package if records.unit == '包' else l_weight
             if variety > beyond or variety + float(records.init_weight) < 0:
                 return response(success=False, message='修改值达到上限,不可修改')
             records.variety = float(records.variety) - change_num
