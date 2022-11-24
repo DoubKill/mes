@@ -5641,7 +5641,7 @@ class OverTimeView(APIView):
         serializer = ApplyForExtraWorkSerializer(data, many=True)
         count = len(serializer.data)
         result = serializer.data[st:et]
-        return Response({'results': result, 'count': count})
+        return Response({'results': result, 'count': count, 'level': level})
 
     @atomic
     def post(self, request):  # 处理加班申请
