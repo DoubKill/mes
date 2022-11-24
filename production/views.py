@@ -75,7 +75,7 @@ from rest_framework.generics import ListAPIView, UpdateAPIView, \
     get_object_or_404
 from datetime import timedelta
 
-from production.utils import get_standard_time, get_classes_plan, get_user_group, get_user_weight_flag, get_work_time, actual_clock_data
+from production.utils import get_standard_time, get_classes_plan, get_user_group, get_user_weight_flag, get_work_time, actual_clock_data, get_user_level
 from quality.models import MaterialTestOrder, MaterialDealResult, MaterialTestResult, MaterialDataPointIndicator
 from quality.utils import get_cur_sheet, get_sheet_data
 from system.models import Section
@@ -4926,6 +4926,10 @@ class AttendanceClockViewSet(ModelViewSet):
         flag, clock_type = get_user_weight_flag(user)
         # 标准上下班时间
         date_now, group, classes = date_now, data['group'], data['classes']
+        a_f = ApplyForExtraWork.objects.filter(Q(~Q(handling_result=1) | ~Q(f_handling_result=1) | ~Q(s_handling_result=1)), clock_type=clock_type,
+                                               factory_date=date_now, user=user, group=group, classes=classes, section=data.get('section'))
+        if a_f:
+            raise ValidationError('加班申请尚未审批通过')
         last_record = EmployeeAttendanceRecords.objects.filter(user=user, end_date__isnull=True, clock_type=clock_type).order_by('factory_date').last()
         if last_record:
             key_second = (last_record.standard_end_date - last_record.standard_begin_date).total_seconds()
@@ -4942,6 +4946,7 @@ class AttendanceClockViewSet(ModelViewSet):
             #                                               handling_result=True, clock_type=clock_type).last()
             # if extra_work:
             #     standard_begin_time, standard_end_time = extra_work.begin_date, extra_work.end_date
+            # 加班被拒绝的不可以打卡
             if status == '上岗':
                 begin_date = time_now
                 lead_time = datetime.timedelta(minutes=attendance_group_obj.lead_time)
@@ -5393,52 +5398,81 @@ class ReissueCardView(APIView):
 
     def get(self, request):
         # 分页
+        user = self.request.user
         page = self.request.query_params.get("page", 1)
         page_size = self.request.query_params.get("page_size", 10)
         state = self.request.query_params.get('state', 0)
-        name = self.request.query_params.get('name', None)
-        flag, clock_type = get_user_weight_flag(self.request.user)
         try:
             st = (int(page) - 1) * int(page_size)
             et = int(page) * int(page_size)
         except:
             raise ValidationError("page/page_size异常，请修正后重试")
-        group_setup = AttendanceGroupSetup.objects.filter(principal__icontains=self.request.user.username, type=clock_type)
+        level = None
         if self.request.query_params.get('apply'):  # 查看自己的补卡申请
-            user_list = [self.request.user.username]
-            if group_setup:
-                user_list += list(group_setup.last().users.all().values_list('username', flat=True))
-            data = self.queryset.filter(user__username__in=user_list).order_by('-id')
+            section = Section.objects.filter(in_charge_user=user, name__startswith='生产').last()
+            all_user = list(section.section_users.filter(is_active=True).values_list('username', flat=True)) if section else [user.username]
+            data = self.queryset.filter(user__username__in=all_user).order_by('-id')
             data2 = None
         else:  # 审批补卡申请
-            if not group_setup:
-                raise ValidationError('当前用户非考勤负责人')
-            attendance_users_list = []
-            for i in group_setup:
-                attendance_users_list.extend(list(i.users.all().values_list('username', flat=True)))
-                attendance_users_list.extend(i.principal.split(','))
-                # 列表中找出和name想象的
-            if name:
-                attendance_users_list = [user for user in attendance_users_list if name in user]
-            data = self.queryset.filter(user__username__in=attendance_users_list)
-            data2 = self.queryset2.filter(user__username__in=attendance_users_list)
+            res = get_user_level()
+            detail = res.get(user.username)
+            if not detail:
+                raise ValidationError('该用户不是相关生产部门负责人')
+            users, level = detail['users'], detail['level']
+            # 补卡申请(未审批 + 已审批)
+            filter_kwargs = {}
+            if level == 1:
+                filter_kwargs['user__username__in'] = users
+            elif level == 2:
+                filter_kwargs.update({'f_approver__in': users, 'f_handling_result': 1})
+            else:
+                filter_kwargs.update({'s_approver__in': users, 's_handling_result': 1})
+            data = self.queryset.filter(**filter_kwargs)
+            # 加班申请(未审批 + 已审批)
+            data2 = self.queryset2.filter(**filter_kwargs)
         serializer = FillCardApplySerializer(data, many=True)
         serializer2 = ApplyForExtraWorkSerializer(data2, many=True)
         res = serializer.data + serializer2.data
         if int(state) == 1:  # 未审批
-            res = [item for item in res if item.get('handling_result') == None]
+            if level == 1:
+                res = [item for item in res if item.get('f_handling_result') == None]
+            elif level == 2:
+                res = [item for item in res if item.get('s_handling_result') == None]
+            else:
+                res = [item for item in res if item.get('handling_result') == None]
         elif int(state) == 2:
-            res = [item for item in res if item.get('handling_result') != None]
+            if level == 1:
+                res = [item for item in res if item.get('handling_result') != None or item.get('f_handling_result') != None]
+            elif level == 2:
+                res = [item for item in res if item.get('handling_result') != None or item.get('s_handling_result') != None]
+            else:
+                res = [item for item in res if item.get('handling_result') != None]
         count = len(res)
         results = sorted(list(res), key=lambda x: x['apply_date'], reverse=True)
-        return Response({'results': results[st:et], 'count': count})
+        return Response({'results': results[st:et], 'count': count, 'level': level})
 
     @atomic
     def post(self, request):  # 处理补卡申请
         data = self.request.data
+        user_name = self.request.user.username
         obj = FillCardApply.objects.filter(id=data.get('id')).first()
-        obj.handling_suggestion = data.get('handling_suggestion')
-        obj.handling_result = data.get('handling_result')
+        flag, now_time = False, datetime.datetime.now()
+        f_handling_suggestion, f_handling_result, s_handling_suggestion, s_handling_result = data.get('f_handling_suggestion'), data.get('f_handling_result'), data.get('s_handling_suggestion'), data.get('s_handling_result')
+        if isinstance(f_handling_result, int):
+            obj.f_handling_suggestion = f_handling_suggestion
+            obj.f_handling_result = f_handling_result
+            obj.f_approver = user_name
+            obj.f_approver_time = now_time
+        if isinstance(s_handling_result, int):
+            obj.s_handling_suggestion = s_handling_suggestion
+            obj.s_handling_result = s_handling_result
+            obj.s_approver = user_name
+            obj.s_approver_time = now_time
+            obj.handling_suggestion = s_handling_suggestion
+            obj.handling_result = s_handling_result
+            obj.approver_time = now_time
+            obj.approver = user_name
+            flag = True
         obj.save()
         serializer_data = FillCardApplySerializer(obj).data
         user = obj.user
@@ -5459,7 +5493,7 @@ class ReissueCardView(APIView):
             ],
         }
         self.send_message(user, content)
-        if data.get('handling_result'):  # 审批通过
+        if flag and s_handling_result == 1:  # 审批通过
             status = obj.status
             equips = serializer_data.get('equip')
             equip_list = equips.split(',')
@@ -5575,6 +5609,7 @@ class OverTimeView(APIView):
 
     def get(self, request):
         # 分页
+        user = self.request.user
         page = self.request.query_params.get("page", 1)
         page_size = self.request.query_params.get("page_size", 10)
         try:
@@ -5582,15 +5617,27 @@ class OverTimeView(APIView):
             et = int(page) * int(page_size)
         except:
             raise ValidationError("page/page_size异常，请修正后重试")
-        group_setup = AttendanceGroupSetup.objects.filter(principal__icontains=self.request.user.username).first()
+        level = None
         if self.request.query_params.get('apply'):  # 查看自己的加班申请
-            user_list = [self.request.user.username]
-            if group_setup:
-                user_list += list(group_setup.users.all().values_list('username', flat=True))
-            data = self.queryset.filter(user__username__in=user_list).order_by('-id')
+            section = Section.objects.filter(in_charge_user=user, name__startswith='生产').last()
+            all_user = list(section.section_users.filter(is_active=True).values_list('username', flat=True)) if section else [user.username]
+            data = self.queryset.filter(user__username__in=all_user).order_by('-id')
         else:  # 审批加班申请
-            attendance_users_list = list(group_setup.users.all().values_list('username', flat=True))
-            data = self.queryset.filter(user__username__in=attendance_users_list)
+            res = get_user_level()
+            detail = res.get(user.username)
+            if not detail:
+                raise ValidationError('该用户不是相关生产部门负责人')
+            users, level = detail['users'], detail['level']
+            # 补卡申请(未审批 + 已审批)
+            filter_kwargs = {}
+            if level == 1:
+                filter_kwargs['user__username__in'] = users
+            elif level == 2:
+                filter_kwargs.update({'f_approver__in': users, 'f_handling_result': 1})
+            else:
+                filter_kwargs.update({'s_approver__in': users, 's_handling_result': 1})
+            # 加班申请(未审批 + 已审批)
+            data = self.queryset.filter(**filter_kwargs)
         serializer = ApplyForExtraWorkSerializer(data, many=True)
         count = len(serializer.data)
         result = serializer.data[st:et]
@@ -5599,29 +5646,48 @@ class OverTimeView(APIView):
     @atomic
     def post(self, request):  # 处理加班申请
         data = self.request.data
+        user_name = self.request.user.username
         obj = ApplyForExtraWork.objects.filter(id=data.get('id')).first()
-        obj.handling_suggestion = data.get('handling_suggestion')
-        obj.handling_result = data.get('handling_result')
+        flag, now_time = False, datetime.datetime.now()
+        f_handling_suggestion, f_handling_result, s_handling_suggestion, s_handling_result, handling_suggestion, handling_result = \
+            data.get('f_handling_suggestion'), data.get('f_handling_result'), data.get('s_handling_suggestion'), data.get('s_handling_result'), \
+            data.get('handling_suggestion'), data.get('handling_result')
+        if isinstance(f_handling_result, int):
+            obj.f_handling_suggestion = f_handling_suggestion
+            obj.f_handling_result = f_handling_result
+            obj.f_approver = user_name
+            obj.f_approver_time = now_time
+        if isinstance(s_handling_result, int):
+            obj.s_handling_suggestion = s_handling_suggestion
+            obj.s_handling_result = s_handling_result
+            obj.s_approver = user_name
+            obj.s_approver_time = now_time
+        if isinstance(handling_result, int):
+            obj.handling_suggestion = handling_suggestion
+            obj.handling_result = handling_result
+            obj.approver_time = now_time
+            obj.approver = user_name
+            flag = True
         obj.save()
         serializer_data = ApplyForExtraWorkSerializer(obj).data
-        user = obj.user
-        date_time = obj.begin_date
-        content = {
-            "title": "加班申请",
-            "form": [
-                {"key": "姓名:", "value": user.username},
-                {"key": "班组:", "value": serializer_data.get('group')},
-                {"key": "班次:", "value": serializer_data.get('classes')},
-                {"key": "岗位:", "value": serializer_data.get('section')},
-                {"key": "机台:", "value": serializer_data.get('equip')},
-                {"key": "加班开始时间:", "value": serializer_data.get('begin_date')},
-                {"key": "加班结束时间:", "value": serializer_data.get('end_date')},
-                {"key": "加班理由:", "value": serializer_data.get('desc')},
-                {"key": "处理意见:", "value": serializer_data.get('handling_suggestion')},
-                {"key": "处理结果:", "value": serializer_data.get('handling_result')}
-            ],
-        }
-        self.send_message(user, content)
+        if flag:
+            user = obj.user
+            content = {
+                "title": "加班申请",
+                "form": [
+                    {"key": "姓名:", "value": user.username},
+                    {"key": "班组:", "value": serializer_data.get('group')},
+                    {"key": "班次:", "value": serializer_data.get('classes')},
+                    {"key": "岗位:", "value": serializer_data.get('section')},
+                    {"key": "机台:", "value": serializer_data.get('equip')},
+                    {"key": "加班开始时间:", "value": serializer_data.get('begin_date')},
+                    {"key": "加班结束时间:", "value": serializer_data.get('end_date')},
+                    {"key": "加班理由:", "value": serializer_data.get('desc')},
+                    {"key": "处理意见:", "value": serializer_data.get('handling_suggestion')},
+                    {"key": "处理结果:", "value": serializer_data.get('handling_result')}
+                ],
+            }
+            self.send_message(user, content)
         # if data.get('handling_result'):  # 申请通过
         #     begin_date = obj.begin_date
         #     end_date = obj.end_date
