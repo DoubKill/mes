@@ -2725,8 +2725,12 @@ class ProductDetailsView(APIView):
         stock_data_dict = {}
         for x in total_inventory_data:
             m_split_data = x['material_no'].strip().split('-')
-            stage = m_split_data[1]
-            product_no = m_split_data[2]
+            try:
+                stage = m_split_data[1]
+                product_no = m_split_data[2]
+            except Exception:
+                stage = m_split_data[0]
+                product_no = m_split_data[1]
             weight = x['weight'] / 1000
             qty = x['qty']
             quality_level = x['quality_level']
