@@ -263,15 +263,15 @@ class TrainsFeedbacksSerializer2(BaseModelSerializer):
         actual_weight = data['actual_weight']
         try:
             if equip_no == 'Z01':
-                data['evacuation_energy'] = int(evacuation_energy / 10)
+                data['evacuation_energy'] = round(evacuation_energy / 10, 1)
             if equip_no == 'Z02':
-                data['evacuation_energy'] = int(evacuation_energy / 0.6)
+                data['evacuation_energy'] = round(evacuation_energy / 0.6)
             if equip_no == 'Z04':
-                data['evacuation_energy'] = int(evacuation_energy * 0.28 * float(actual_weight) / 1000)
+                data['evacuation_energy'] = round(evacuation_energy * 0.28 * float(actual_weight) / 1000, 1)
             if equip_no == 'Z12':
-                data['evacuation_energy'] = int(evacuation_energy / 5.3)
+                data['evacuation_energy'] = round(evacuation_energy / 5.3, 1)
             if equip_no == 'Z13':
-                data['evacuation_energy'] = int(evacuation_energy / 31.7)
+                data['evacuation_energy'] = round(evacuation_energy / 31.7, 1)
         except Exception:
             pass
         return data
@@ -353,14 +353,14 @@ class ProductPlanRealViewSerializer(serializers.ModelSerializer):
     begin_time = serializers.SerializerMethodField(read_only=True, help_text='开始时间')
 
     def get_begin_time(self, obj):
-        tfb_obj = TrainsFeedbacks.objects.filter(plan_classes_uid=obj.plan_classes_uid).order_by('id').first()
+        tfb_obj = TrainsFeedbacks.objects.filter(plan_classes_uid=obj.plan_classes_uid).order_by('actual_trains').first()
         if tfb_obj:
             return tfb_obj.begin_time.strftime("%Y-%m-%d %H:%M:%S")
         else:
             return None
 
     def get_actual_trains(self, obj):
-        tfb_obj = TrainsFeedbacks.objects.filter(plan_classes_uid=obj.plan_classes_uid).order_by('created_date').last()
+        tfb_obj = TrainsFeedbacks.objects.filter(plan_classes_uid=obj.plan_classes_uid).order_by('actual_trains').last()
         if tfb_obj:
             return tfb_obj.actual_trains
         else:

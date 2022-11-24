@@ -386,6 +386,8 @@ class SchedulingResult(models.Model):
     desc = models.CharField(max_length=64, help_text='备注', null=True, blank=True)
     created_time = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
     status = models.CharField(max_length=8, help_text='下发状态（未下发/已下发）', default='未下发')
+    start_time = models.DateTimeField(blank=True, null=True)
+    end_time = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         db_table = 'aps_result'

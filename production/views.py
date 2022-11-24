@@ -2618,7 +2618,7 @@ class DailyProductionCompletionReport(APIView):
             'name_12': {'name': '单机台效率-2（吨/台）', 'weight': 0},
             'name_13': {'name': '每日段数', 'weight': 0},
             'name_14': {'name': '吨耗时（分钟/吨）', 'weight': 0},
-            'name_15': {'name': '吨耗能（KWH/吨）', 'weight': 0}
+            'name_15': {'name': '吨胶密炼耗能（KWH/吨）', 'weight': 0}
         }
 
         # 除去洗车胶的总车次报表数据
@@ -2913,7 +2913,7 @@ class DailyProductionCompletionReport(APIView):
             elif item['name'] == '吨耗时（分钟/吨）':
                 length = len(results['name_14']) - 2
                 item['avg'] = '' if not length else round(item['weight'] / length, 2)
-            elif item['name'] == '吨耗能（KWH/吨）':
+            elif item['name'] == '吨胶密炼耗能（KWH/吨）':
                 length = len(results['name_15']) - 2
                 item['avg'] = '' if not length else round(item['weight'] / length, 2)
             else:
