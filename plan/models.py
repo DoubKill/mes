@@ -358,6 +358,7 @@ class SchedulingProductDemandedDeclareSummary(models.Model):
     sn = models.IntegerField(help_text='顺序')
     factory_date = models.DateField(help_text='工厂日期', verbose_name='工厂日期')
     product_no = models.CharField(max_length=64, help_text='胶料代码')
+    version = models.CharField(max_length=32, help_text='版本号', default='')
     plan_weight = models.FloatField(help_text='计划总用量（吨）', default=0)
     workshop_weight = models.FloatField(help_text='车间总库存（吨）', default=0)
     current_stock = models.FloatField(help_text='立体库总库存（吨）', default=0)

@@ -215,7 +215,7 @@ class MaterialTestIndicatorMethods(APIView):
             data_points = method.mat_indicators.filter(
                 level=1, delete_flag=False).values(name=F('data_point__name'),
                                                    judge_upper_limit=F('upper_limit'),
-                                                   judge_lower_limit=F('lower_limit'))
+                                                   judge_lower_limit=F('lower_limit')).order_by('name')
             if not data_points:
                 continue
             if indicator_name not in ret:
