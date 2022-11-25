@@ -2001,7 +2001,7 @@ class OutBoundDeliveryOrderSerializer(BaseModelSerializer):
             created_date__date=datetime.datetime.now().date()
         ).order_by('created_date').last()
         if last_order:
-            last_ordering = str(int(last_order.order_no[12:])+1)
+            last_ordering = str(int(last_order.order_no[18:])+1)
             if len(last_ordering) <= 5:
                 ordering = last_ordering.zfill(5)
             else:
@@ -2009,7 +2009,7 @@ class OutBoundDeliveryOrderSerializer(BaseModelSerializer):
         else:
             ordering = '00001'
         validated_data['order_no'] = 'MES{}{}{}'.format('Z' if warehouse == '终炼胶库' else 'H',
-                                                         datetime.datetime.now().date().strftime('%Y%m%d'),
+                                                         datetime.datetime.now().date().strftime('%Y%m%d%H%M%S'),
                                                          ordering)
         return super(OutBoundDeliveryOrderSerializer, self).create(validated_data)
 
@@ -2032,7 +2032,7 @@ class OutBoundDeliveryOrderDetailSerializer(BaseModelSerializer):
                 created_date__date=datetime.datetime.now().date()
             ).order_by('id').last()
             if last_order:
-                last_ordering = str(int(last_order.order_no[12:]) + 1)
+                last_ordering = str(int(last_order.order_no[18:]) + 1)
                 if len(last_ordering) <= 5:
                     ordering = last_ordering.zfill(5)
                 else:
@@ -2040,7 +2040,7 @@ class OutBoundDeliveryOrderDetailSerializer(BaseModelSerializer):
             else:
                 ordering = '00001'
             order_no = 'CHD{}{}{}'.format('Z' if warehouse == '终炼胶库' else 'H',
-                                          datetime.datetime.now().date().strftime('%Y%m%d'),
+                                          datetime.datetime.now().strftime('%Y%m%d%H%M%S'),
                                           ordering)
             validated_data['order_no'] = order_no
             validated_data['created_user'] = self.context['request'].user

@@ -505,7 +505,7 @@ class CutTimeCollect(APIView):
             data['plan_classes_uid_age'] = item['plan_classes_uid']
             data['plan_classes_uid_later'] = query_set[idx + 1]['plan_classes_uid']
             data['standard_time'] = standard_time
-            rate = None if not standard_time else round((standard_time / time_consuming) * 100, 2)
+            rate = None if not time_consuming else round((standard_time / time_consuming) * 100, 2)
             data['rate'] = None if not standard_time else '{}%'.format(rate)
             sum_rate += 0 if not rate else rate
             return_list.append(data)
