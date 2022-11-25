@@ -532,7 +532,9 @@ class SchedulingRecipeMachineSettingView(ModelViewSet):
                 raise ValidationError('必填数据缺失')
             try:
                 SchedulingRecipeMachineSetting.objects.update_or_create(
-                    defaults={"stages": item[3],
+                    defaults={
+                              "rubber_type": item[0],
+                              "stages": item[3],
                               "main_machine_HMB": item[4],
                               "vice_machine_HMB": item[5],
                               "main_machine_CMB": item[6],
@@ -548,7 +550,7 @@ class SchedulingRecipeMachineSettingView(ModelViewSet):
                               "main_machine_FM": item[16],
                               "vice_machine_FM": item[17],
                               },
-                    **{"rubber_type": item[0], "product_no": item[1], "version": item[2]}
+                    **{"product_no": item[1], "version": item[2]}
                 )
             except Exception:
                 raise
@@ -777,15 +779,16 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
         sn = c + 1
         for idx, item in enumerate(data):
             try:
-                product_no = re.sub(r'[\u4e00-\u9fa5]+', '', item[1])
-                if not product_no or not item[2]:
+                product_no = re.sub(r'[\u4e00-\u9fa5]+', '', item[4])
+                if not product_no or not item[5] or not item[6]:
                     continue
                 area_list.append({'factory_date': factory_date,
                                   'sn': sn,
                                   'product_no': product_no,
-                                  'plan_weight': item[2] if item[2] else 0,
-                                  'workshop_weight': round(item[11], 1) if item[11] else 0,
-                                  'current_stock': round(item[12], 1) if item[12] else 0,
+                                  'version': item[5],
+                                  'plan_weight': item[6],
+                                  'workshop_weight': round(item[17], 1) if item[17] else 0,
+                                  'current_stock': round(item[18], 1) if item[18] else 0,
                                   'desc': '',
                                   # 'target_stock': float(item[1]) * 1.5,
                                   # 'demanded_weight': float(item[1]) * 1.5 - float(item[2]) - float(item[3])
@@ -1604,9 +1607,9 @@ class APSExportDataView(APIView):
         data_row1 = 2
         for i in demanded_data:
             pd_ms = SchedulingRecipeMachineSetting.objects.filter(
-                product_no=i.product_no).first()
+                product_no=i.product_no, version=i.version).first()
             if not pd_ms:
-                raise ValidationError('未找到该规格：{}定机表数据！'.format(i.product_no))
+                raise ValidationError('未找到该规格：{}-{}定机表数据！'.format(i.product_no, i.version))
             pd_stages = pd_ms.stages.split('/')
             need_stages = copy.deepcopy(pd_stages)
             pb_version_name = '{}-{}'.format(pd_ms.product_no, pd_ms.version)

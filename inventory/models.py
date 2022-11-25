@@ -842,8 +842,8 @@ class MaterialInHistoryOther(models.Model):
     initiator = models.CharField(max_length=64, db_column='LastUserId')
     start_time = models.DateTimeField(verbose_name='发起时间', help_text='发起时间', blank=True, null=True,
                                       db_column='CreaterTime')
-    last_time = models.DateTimeField(verbose_name='开始时间', help_text='开始时间', blank=True, null=True, db_column='LastTime')
-    fin_time = models.DateTimeField(verbose_name='完成时间', help_text='完成时间', blank=True, null=True, db_column='CompleteTime')
+    last_time = models.DateTimeField(verbose_name='单据开始时间', help_text='开始时间', blank=True, null=True, db_column='LastTime')
+    fin_time = models.DateTimeField(verbose_name='单据完成时间', help_text='完成时间', blank=True, null=True, db_column='CompleteTime')
 
     class Meta:
         db_table = 't_stock_in_task'
@@ -870,6 +870,8 @@ class MaterialInHistory(models.Model):
     sl = models.DecimalField(max_digits=18, decimal_places=4, db_column='SL')
     zl = models.DecimalField(max_digits=18, decimal_places=4, db_column='ZL')
     task_status = models.IntegerField(db_column='TaskState', help_text='入库状态')
+    last_time = models.DateTimeField(help_text='任务开始时间',  db_column='TaskStartTime')
+    fin_time = models.DateTimeField(help_text='任务完成时间', db_column='TaskEndTime')
 
     class Meta:
         db_table = 't_stock_in_task_upper'
@@ -937,10 +939,10 @@ class MaterialOutHistoryOther(models.Model):
     initiator = models.CharField(max_length=64, db_column='LastUserId',help_text='创建人')
     start_time = models.DateTimeField(verbose_name='创建时间', help_text='创建时间', blank=True, null=True,
                                       db_column='CreaterTime')
-    last_time = models.DateTimeField(verbose_name='开始时间', help_text='开始时间', blank=True, null=True, db_column='LastTime')
     task_type = models.IntegerField(db_column='StockOutTaskType', help_text='出库类型', choices=TASK_TYPE_CHOICE)
     task_status = models.IntegerField(db_column='StockOutTaskState', help_text='出库状态', choices=TASK_STATUS_CHOICE)
-    fin_time = models.DateTimeField(verbose_name='完成时间', help_text='完成时间', blank=True, null=True, db_column='CompleteTime')
+    last_time = models.DateTimeField(verbose_name='单据开始时间', help_text='开始时间', blank=True, null=True, db_column='LastTime')
+    fin_time = models.DateTimeField(verbose_name='单据完成时间', help_text='完成时间', blank=True, null=True, db_column='CompleteTime')
 
     class Meta:
         db_table = 't_stock_out_task'
@@ -971,6 +973,8 @@ class MaterialOutHistory(models.Model):
     zc_num = models.CharField(max_length=64, db_column='ZcdNumber')
     sl = models.DecimalField(max_digits=18, decimal_places=4, db_column='SL')
     zl = models.DecimalField(max_digits=18, decimal_places=4, db_column='ZL')
+    last_time = models.DateTimeField(help_text='任务开始时间', blank=True, null=True, db_column='TaskStartTime')
+    fin_time = models.DateTimeField(help_text='任务完成时间', blank=True, null=True, db_column='TaskEndTime')
 
     class Meta:
         db_table = 't_stock_out_task_down'

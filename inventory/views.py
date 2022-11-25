@@ -566,13 +566,13 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
             if end_time:
                 filter_dict.update(task__start_time__lte=end_time)
             if task_start_st:
-                filter_dict.update(task__last_time__gte=task_start_st)
+                filter_dict.update(last_time__gte=task_start_st)
             if task_start_et:
-                filter_dict.update(task__last_time__lte=task_start_et)
+                filter_dict.update(last_time__lte=task_start_et)
             if task_end_st:
-                filter_dict.update(task__fin_time__gte=task_end_st)
+                filter_dict.update(fin_time__gte=task_end_st)
             if task_end_et:
-                filter_dict.update(task__fin_time__lte=task_end_et)
+                filter_dict.update(fin_time__lte=task_end_et)
             if material_name:
                 filter_dict.update(material_name__icontains=material_name)
             if batch_no:
