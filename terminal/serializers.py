@@ -136,8 +136,9 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 common_code.update(status=True, scan_time=now_date)
                 save_scan_log(scan_data, scan_result='成功', scan_material='通用料包', scan_material_type='通用料包', unit='包')
                 if not b_instance:
+                    p_time = common_code.last().apply_datetime if common_code else now_date
                     BarCodeTraceDetail.objects.create(
-                        bra_code=bra_code, scan_material_record='通用料包', product_time=common_code.last().apply_datetime, material_name_record=xl_recipe[0]
+                        bra_code=bra_code, scan_material_record='通用料包', product_time=p_time, material_name_record=xl_recipe[0]
                     )
                 raise serializers.ValidationError('通用料包扫码成功')
             else:
