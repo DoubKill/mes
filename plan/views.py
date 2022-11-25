@@ -532,7 +532,9 @@ class SchedulingRecipeMachineSettingView(ModelViewSet):
                 raise ValidationError('必填数据缺失')
             try:
                 SchedulingRecipeMachineSetting.objects.update_or_create(
-                    defaults={"stages": item[3],
+                    defaults={
+                              "rubber_type": item[0],
+                              "stages": item[3],
                               "main_machine_HMB": item[4],
                               "vice_machine_HMB": item[5],
                               "main_machine_CMB": item[6],
@@ -548,7 +550,7 @@ class SchedulingRecipeMachineSettingView(ModelViewSet):
                               "main_machine_FM": item[16],
                               "vice_machine_FM": item[17],
                               },
-                    **{"rubber_type": item[0], "product_no": item[1], "version": item[2]}
+                    **{"product_no": item[1], "version": item[2]}
                 )
             except Exception:
                 raise
