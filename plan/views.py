@@ -778,15 +778,13 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
         for idx, item in enumerate(data):
             try:
                 product_no = re.sub(r'[\u4e00-\u9fa5]+', '', item[4])
-                if not product_no or not item[2]:
-                    continue
-                if not item[6]:
+                if not product_no or not item[5] or not item[6]:
                     continue
                 area_list.append({'factory_date': factory_date,
                                   'sn': sn,
                                   'product_no': product_no,
                                   'version': item[5],
-                                  'plan_weight': item[6] if item[6] else 0,
+                                  'plan_weight': item[6],
                                   'workshop_weight': round(item[17], 1) if item[17] else 0,
                                   'current_stock': round(item[18], 1) if item[18] else 0,
                                   'desc': '',
