@@ -13,7 +13,7 @@ from django.db.utils import ConnectionDoesNotExist
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
-from basics.models import WorkSchedulePlan, GlobalCode
+from basics.models import WorkSchedulePlan, GlobalCode, GlobalCodeType
 from equipment.models import XLCommonCode
 from inventory.models import MixGumOutInventoryLog, DepotPallt
 from mes import settings
@@ -79,7 +79,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         # 非胶皮、不加硫、抛出正常扫码信息
         scan_material_type, add_s, scan_material_msg = '胶块', False, ''
         # 是否走进物料在配方里的判断、是否发送到群控, 物料是否走入在配方中的判断
-        flag, send_flag, material_in_flag = True, True, True
+        flag, send_flag, material_in_flag, is_release = True, True, True, True
         # 物料编码、物料名称、物料重量、单位、扫码物料
         material_no, material_name, total_weight, unit, scan_material = None, None, 0, 'KG', ''
         now_date = datetime.now()
@@ -136,8 +136,9 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 common_code.update(status=True, scan_time=now_date)
                 save_scan_log(scan_data, scan_result='成功', scan_material='通用料包', scan_material_type='通用料包', unit='包')
                 if not b_instance:
+                    p_time = common_code.last().apply_datetime if common_code else now_date
                     BarCodeTraceDetail.objects.create(
-                        bra_code=bra_code, scan_material_record='通用料包', product_time=common_code.last().apply_datetime, material_name_record=xl_recipe[0]
+                        bra_code=bra_code, scan_material_record='通用料包', product_time=p_time, material_name_record=xl_recipe[0]
                     )
                 raise serializers.ValidationError('通用料包扫码成功')
             else:
@@ -395,10 +396,10 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                 if add_s:
                                     other_type, status, scan_material_msg = recipe_material_name, True, f'物料:{scan_material} 扫码成功'
                                 else:
-                                    other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入加硫料'
+                                    other_type, scan_material_msg, is_release = recipe_material_name, '扫码失败: 请投入加硫料', False
                             else:
                                 if add_s:
-                                    other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入无硫料'
+                                    other_type, scan_material_msg, is_release = recipe_material_name, '扫码失败: 请投入无硫料', False
                                 else:
                                     other_type, status, scan_material_msg = recipe_material_name, True, f'物料:{scan_material} 扫码成功'
                         else:
@@ -414,17 +415,17 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                             if add_s:
                                                 other_type, status, scan_material_msg = recipe_material_name, True, f'掺料:{scan_material} 扫码成功'
                                             else:
-                                                other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入加硫料'
+                                                other_type, scan_material_msg, is_release = recipe_material_name, '扫码失败: 请投入加硫料', False
                                         else:
                                             if add_s:
-                                                other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入无硫料'
+                                                other_type, scan_material_msg, is_release = recipe_material_name, '扫码失败: 请投入无硫料', False
                                             else:
                                                 other_type, status, scan_material_msg = recipe_material_name, True, f'掺料:{scan_material} 扫码成功'
                                     else:  # 有掺料无硫磺
                                         if add_s:
                                             other_type, status, scan_material_msg = recipe_material_name, True, f'掺料:{scan_material} 扫码成功'
                                         else:
-                                            other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入加硫料'
+                                            other_type, scan_material_msg, is_release = recipe_material_name, '扫码失败: 请投入加硫料', False
                                 else:  # 加硫待处理料、无硫待处理料、前两者都有
                                     add_s_wait_s = query_set.filter(material_name__icontains='加硫待处理料')
                                     no_s_wait_s = query_set.filter(material_name__icontains='无硫待处理料')
@@ -432,10 +433,10 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                         if add_s:
                                             other_type, status, scan_material_msg = recipe_material_name, True, f'待处理物料:{scan_material}扫码成功'
                                         else:
-                                            other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入加硫料'
+                                            other_type, scan_material_msg, is_release = recipe_material_name, '扫码失败: 请投入加硫料', False
                                     elif no_s_wait_s and not add_s_wait_s:
                                         if add_s:
-                                            other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入无硫料'
+                                            other_type, scan_material_msg, is_release = recipe_material_name, '扫码失败: 请投入无硫料', False
                                         else:
                                             other_type, status, scan_material_msg = recipe_material_name, True, f'待处理物料:{scan_material}扫码成功'
                                     else:
@@ -443,11 +444,11 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                             else:
                                 # 加硫禁止投料
                                 if add_s:
-                                    other_type, scan_material_msg = recipe_material_name, '扫码失败: 请投入无硫料'
+                                    other_type, scan_material_msg, is_release = recipe_material_name, '扫码失败: 请投入无硫料', False
                                 else:
                                     other_type, status, scan_material_msg = recipe_material_name, True, f'物料:{scan_material} 扫码成功'
                 else:
-                    save_scan_log(scan_data, scan_message='配方中无掺料, 所投物料不在配方中')
+                    save_scan_log(scan_data, scan_message='配方中无掺料, 所投物料不在配方中', is_release=False)
                     scan_material_msg = '配方中无掺料, 所投物料不在配方中'
                 if not OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code, status=status, other_type=other_type):
                     record_data.update({'other_type': other_type, 'status': status})
@@ -459,7 +460,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 if scan_material_type == '胶块':
                     res = self.material_pass(plan_classes_uid, scan_material, material_type=scan_material_type)
                     if not res[0]:
-                        scan_material_msg = '胶块不在配方中, 请工艺确认'
+                        scan_material_msg, is_release = '胶块不在配方中, 请工艺确认', False
                         if not ReplaceMaterial.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code):
                             ReplaceMaterial.objects.create(**replace_material_data)
                         if not OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code, status=status, other_type=scan_material_type):
@@ -494,7 +495,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                         merge_flag = weight_package.merge_flag
                         product_no_dev = re.split(r'\(|\（|\[', material_name)[0]
                         if 'ONLY' in weight_package.product_no and weight_package.product_no.split('-')[-2] != plan_equip_no:
-                            save_scan_log(scan_data, scan_message=f"物料为{weight_package.product_no}, 无法在当前机台使用投料")
+                            save_scan_log(scan_data, scan_message=f"物料为{weight_package.product_no}, 无法在当前机台使用投料", is_release=False)
                             raise serializers.ValidationError(f"物料为{weight_package.product_no}, 无法在当前机台使用投料")
                         if (already_y and not merge_flag) or (already_n and merge_flag):
                             save_scan_log(scan_data, scan_message='扫码合包配置冲突')
@@ -503,7 +504,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                             save_scan_log(scan_data, scan_message='分包数与之前扫入不一致')
                             raise serializers.ValidationError('分包数与之前扫入不一致')
                         if weight_package.dev_type != scan_dev:
-                            save_scan_log(scan_data, scan_message='投料与生产机型不一致, 无法投料')
+                            save_scan_log(scan_data, scan_message='投料与生产机型不一致, 无法投料', is_release=False)
                             raise serializers.ValidationError('投料与生产机型不一致, 无法投料')
                         if product_no_dev != plan_product_no:
                             # 试验配方会使用正常配方料包 ex: C-1MB-C590-07(正常) K-1MB-TC590-45(试验[版本可能不同])
@@ -513,7 +514,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                 if not plan_product_no.startswith(test_name_prefix):
                                     res = self.material_pass(plan_classes_uid, scan_material, material_type=scan_material_type)
                                     if not res[0]:
-                                        scan_material_msg = '配方名不一致, 请工艺确认'
+                                        scan_material_msg, is_release = '配方名不一致, 请工艺确认', False
                                         if not ReplaceMaterial.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code, reason_type='物料名不一致'):
                                             ReplaceMaterial.objects.create(**replace_material_data)
                                         flag, send_flag = False, False
@@ -531,7 +532,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                             material_no = material_name = '细料' if '细料' in materials else '硫磺'
                             res = self.material_pass(plan_classes_uid, scan_material, reason_type='重量不匹配', material_type=scan_material_type)
                             if not res[0]:
-                                scan_material_msg = '料包重量与配方不一致, 请工艺确认'
+                                scan_material_msg, is_release = '料包重量与配方不一致, 请工艺确认', False
                                 if not ReplaceMaterial.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code, reason_type='重量不匹配'):
                                     replace_material_data.update({'reason_type': '重量不匹配', 'material_type': scan_material_type})
                                     ReplaceMaterial.objects.create(**replace_material_data)
@@ -586,7 +587,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                                        'scan_material_type': scan_material_type if not merge_flag else ('硫磺' if '硫磺' in materials else '细料')})
                     else:  # 两种场景(全人工配、机配+人工配)
                         if 'ONLY' in manual.product_no and manual.product_no.split('-')[-2] != plan_equip_no:
-                            save_scan_log(scan_data, scan_message=f"物料为{manual.product_no.split('-')[-2]}, 无法在当前机台使用投料")
+                            save_scan_log(scan_data, scan_message=f"物料为{manual.product_no.split('-')[-2]}, 无法在当前机台使用投料", is_release=False)
                             raise serializers.ValidationError(f"物料为{manual.product_no.split('-')[-2]}, 无法在当前机台使用投料")
                         if already_y:
                             save_scan_log(scan_data, scan_message='扫码合包配置冲突')
@@ -594,7 +595,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                         replace_material_data.update({'material_type': '人工配'})
                         product_no_dev = re.split(r'\(|\（|\[', manual.product_no)[0]
                         if manual.dev_type != scan_dev:
-                            save_scan_log(scan_data, scan_message='投料与生产机型不一致, 无法投料')
+                            save_scan_log(scan_data, scan_message='投料与生产机型不一致, 无法投料', is_release=False)
                             raise serializers.ValidationError('投料与生产机型不一致, 无法投料')
                         if product_no_dev != plan_product_no:
                             # 试验配方会使用正常配方料包 ex: C-1MB-C590-07(正常) K-1MB-TC590-45(试验[版本可能不同])
@@ -604,7 +605,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                 if not plan_product_no.startswith(test_name_prefix):
                                     res = self.material_pass(plan_classes_uid, scan_material, material_type=scan_material_type)
                                     if not res[0]:
-                                        scan_material_msg = '配方名不一致, 请工艺确认'
+                                        scan_material_msg, is_release = '配方名不一致, 请工艺确认', False
                                         if not ReplaceMaterial.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code):
                                             ReplaceMaterial.objects.create(**replace_material_data)
                                         flag, send_flag = False, False
@@ -628,7 +629,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                 if abs(s_weight - i['actual_weight']) > i['standard_error']:
                                     res = self.material_pass(plan_classes_uid, i['material__material_name'], reason_type='重量不匹配', material_type=scan_material_type)
                                     if not res[0]:
-                                        scan_material_msg = '料包重量与配方不一致, 请工艺确认'
+                                        scan_material_msg, is_release = '料包重量与配方不一致, 请工艺确认', False
                                         if not ReplaceMaterial.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code, reason_type='重量不匹配'):
                                             replace_material_data.update({'real_material': i['material__material_name'], 'reason_type': '重量不匹配'})
                                             ReplaceMaterial.objects.create(**replace_material_data)
@@ -687,16 +688,19 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             scan_message = None if '成功' in scan_material_msg else scan_material_msg
             if scan_material_type == '胶皮' and dk_equip:
                 dk_control = 'Start' if '成功' in scan_material_msg else 'Stop'
-                status, text = send_dk(plan_equip_no, dk_control)
-                if not status:  # 发送导开机启停信号异常
-                    logger.error(f'发送导开机信号异常, 计划号: {plan_classes_uid}, 机台: {plan_equip_no}, 错误:{text}')
-                    save_scan_log(scan_data, scan_result=scan_result, scan_message=f'发送导开机信号异常:{text}')
-                    raise serializers.ValidationError(f'发送导开机信号异常:{text}')
-                else:  # 失败信号发送成功需要终端阻断进程
-                    if dk_control == 'Stop':
-                        save_scan_log(scan_data, scan_result='成功', scan_message=f'发送导开机停止信号成功')
-                        raise serializers.ValidationError('发送导开机停止信号成功')
-            save_scan_log(scan_data, scan_result=scan_result, scan_message=scan_message)
+                # 传送带阻断开关
+                switch_flag = GlobalCodeType.objects.filter(use_flag=True, type_name='密炼扫码异常锁定开关')
+                if (switch_flag and dk_control == 'Stop') or not switch_flag:
+                    status, text = send_dk(plan_equip_no, dk_control)
+                    if not status:  # 发送导开机启停信号异常
+                        logger.error(f'发送导开机信号异常, 计划号: {plan_classes_uid}, 机台: {plan_equip_no}, 错误:{text}')
+                        save_scan_log(scan_data, scan_result=scan_result, scan_message=f'发送导开机信号异常:{text}')
+                        raise serializers.ValidationError(f'发送导开机信号异常:{text}')
+                    else:  # 失败信号发送成功需要终端阻断进程
+                        if dk_control == 'Stop':
+                            save_scan_log(scan_data, scan_result='成功', scan_message=f'发送导开机停止信号成功')
+                            raise serializers.ValidationError('发送导开机停止信号成功')
+            save_scan_log(scan_data, scan_result=scan_result, scan_message=scan_message, is_release=is_release)
             raise serializers.ValidationError(scan_material_msg)
         for i in details:
             msg = i['tank_data'].pop('msg')
@@ -843,14 +847,16 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                     .update(**{'actual_weight': pre_material.init_weight, 'adjust_left_weight': 0, 'real_weight': 0,
                                'useup_time': datetime.now()})
             instance = LoadTankMaterialLog.objects.create(**tank_data)
-        # 胶皮扫码正确发送消息给导开机
-        dk_equip = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='导开机控制机台', global_name=equip_no)
-        if scan_material_type == '胶皮' and dk_equip:
-            status, text = send_dk(equip_no, 'Start')
-            if not status:  # 发送导开机启停信号异常只记录
-                logger.error(f'发送导开机信号异常, 计划号: {plan_classes_uid}, 机台: {equip_no}, 错误:{text}')
-                save_scan_log(scan_data, scan_result='成功', scan_message=f'导开机启动信号发送失败:{text}')
-                raise serializers.ValidationError(f'导开机启动信号发送失败: {text}')
+        # 胶皮扫码正确发送消息给导开机(扫码只控制导开机停止)
+        switch_flag = GlobalCodeType.objects.filter(use_flag=True, type_name='密炼扫码异常锁定开关')
+        if not switch_flag:
+            dk_equip = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='导开机控制机台', global_name=equip_no)
+            if scan_material_type == '胶皮' and dk_equip:
+                status, text = send_dk(equip_no, 'Start')
+                if not status:  # 发送导开机启停信号异常只记录
+                    logger.error(f'发送导开机信号异常, 计划号: {plan_classes_uid}, 机台: {equip_no}, 错误:{text}')
+                    save_scan_log(scan_data, scan_result='成功', scan_message=f'导开机启动信号发送失败:{text}')
+                    raise serializers.ValidationError(f'导开机启动信号发送失败: {text}')
         # 判断补充进料后是否能进上辅机
         fml = FeedingMaterialLog.objects.using('SFJ').filter(plan_classes_uid=plan_classes_uid, trains=int(trains)).last()
         if fml and fml.add_feed_result == 1:
