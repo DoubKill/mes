@@ -2716,6 +2716,7 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
                                                 equip_spare=instance.equip_spare,
                                                 quantity=out_quantity,
                                                 equip_warehouse_order_detail=instance,
+                                                receive_user=receive_user,
                                                 created_user=self.request.user,
                                                 real_time=outer_time,
                                                 purpose=purpose
