@@ -5420,16 +5420,15 @@ class ReissueCardView(APIView):
                 raise ValidationError('该用户不是相关生产部门负责人')
             users, level = set(detail['users']), detail['level']
             # 补卡申请(未审批 + 已审批)
-            filter_kwargs = {}
             if level == 1:
-                filter_kwargs['user__username__in'] = users
+                data = self.queryset.filter(user__username__in=users)
+                data2 = self.queryset2.filter(user__username__in=users)
             elif level == 2:
-                filter_kwargs.update({'f_approver__in': users, 'f_handling_result': 1})
+                data = self.queryset.filter(Q(f_approver__in=users, f_handling_result=1) | Q(user__username__in=users))
+                data2 = self.queryset2.filter(Q(f_approver__in=users, f_handling_result=1) | Q(user__username__in=users))
             else:
-                filter_kwargs.update({'s_approver__in': users, 's_handling_result': 1})
-            data = self.queryset.filter(**filter_kwargs)
-            # 加班申请(未审批 + 已审批)
-            data2 = self.queryset2.filter(**filter_kwargs)
+                data = self.queryset.filter(user__in=[])  # 补卡无第三级审批
+                data2 = self.queryset2.filter(Q(s_approver__in=users, s_handling_result=1) | Q(user__username__in=users))
         serializer = FillCardApplySerializer(data, many=True)
         serializer2 = ApplyForExtraWorkSerializer(data2, many=True)
         res = serializer.data + serializer2.data
@@ -5629,15 +5628,12 @@ class OverTimeView(APIView):
                 raise ValidationError('该用户不是相关生产部门负责人')
             users, level = set(detail['users']), detail['level']
             # 补卡申请(未审批 + 已审批)
-            filter_kwargs = {}
             if level == 1:
-                filter_kwargs['user__username__in'] = users
+                data = self.queryset.filter(user__username__in=users)
             elif level == 2:
-                filter_kwargs.update({'f_approver__in': users, 'f_handling_result': 1})
+                data = self.queryset.filter(Q(f_approver__in=users, f_handling_result=1) | Q(user__username__in=users))
             else:
-                filter_kwargs.update({'s_approver__in': users, 's_handling_result': 1})
-            # 加班申请(未审批 + 已审批)
-            data = self.queryset.filter(**filter_kwargs)
+                data = self.queryset.filter(Q(s_approver__in=users, s_handling_result=1) | Q(user__username__in=users))
         serializer = ApplyForExtraWorkSerializer(data, many=True)
         count = len(serializer.data)
         result = serializer.data[st:et]
