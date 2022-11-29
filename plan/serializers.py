@@ -711,7 +711,7 @@ class SchedulingRecipeMachineSettingSerializer(BaseModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
         validators = [UniqueTogetherValidator(
             queryset=SchedulingRecipeMachineSetting.objects.filter(delete_flag=False).all(),
-            fields=('rubber_type', 'product_no', 'version'), message='该规格定级表数据已存在！')]
+            fields=('product_no', 'version'), message='该规格定级表数据已存在！')]
 
 
 class RecipeMachineWeightSerializer(serializers.ModelSerializer):

@@ -1508,8 +1508,8 @@ class InOutCommonSerializer(serializers.Serializer):
     material_name = serializers.CharField(max_length=64, read_only=True)
     initiator = serializers.SerializerMethodField()
     start_time = serializers.DateTimeField(source='task.start_time', read_only=True)
-    fin_time = serializers.DateTimeField(source='task.fin_time', read_only=True)
-    last_time = serializers.DateTimeField(source='task.last_time', read_only=True)
+    fin_time = serializers.DateTimeField(read_only=True)
+    last_time = serializers.DateTimeField(read_only=True)
     task_no = serializers.CharField(source='task.order_no', read_only=True)
     order_type = serializers.SerializerMethodField()
     batch_no = serializers.CharField(max_length=64, read_only=True)
@@ -1997,19 +1997,20 @@ class OutBoundDeliveryOrderSerializer(BaseModelSerializer):
 
     def create(self, validated_data):
         warehouse = validated_data.get('warehouse')
-        last_order = OutBoundDeliveryOrder.objects.filter(
-            created_date__date=datetime.datetime.now().date()
-        ).order_by('created_date').last()
-        if last_order:
-            last_ordering = str(int(last_order.order_no[18:])+1)
-            if len(last_ordering) <= 5:
-                ordering = last_ordering.zfill(5)
-            else:
-                ordering = last_ordering.zfill(len(last_ordering))
+        last_order = OutBoundDeliveryOrder.objects.order_by('id').last()
+        if last_order.created_date.date() == datetime.datetime.now().date():
+            try:
+                last_ordering = str(int(last_order.order_no[-5:])+1)
+                if len(last_ordering) <= 5:
+                    ordering = last_ordering.zfill(5)
+                else:
+                    ordering = last_ordering.zfill(len(last_ordering))
+            except Exception:
+                ordering = '00001'
         else:
             ordering = '00001'
         validated_data['order_no'] = 'MES{}{}{}'.format('Z' if warehouse == '终炼胶库' else 'H',
-                                                         datetime.datetime.now().date().strftime('%Y%m%d%H%M%S'),
+                                                         datetime.datetime.now().strftime('%Y%m%d%H%M%S'),
                                                          ordering)
         return super(OutBoundDeliveryOrderSerializer, self).create(validated_data)
 
@@ -2028,15 +2029,16 @@ class OutBoundDeliveryOrderDetailSerializer(BaseModelSerializer):
     def create(self, validated_data):
         warehouse = validated_data['outbound_delivery_order'].warehouse
         while 1:
-            last_order = OutBoundDeliveryOrderDetail.objects.filter(
-                created_date__date=datetime.datetime.now().date()
-            ).order_by('id').last()
-            if last_order:
-                last_ordering = str(int(last_order.order_no[18:]) + 1)
-                if len(last_ordering) <= 5:
-                    ordering = last_ordering.zfill(5)
-                else:
-                    ordering = last_ordering.zfill(len(last_ordering))
+            last_order = OutBoundDeliveryOrderDetail.objects.order_by('id').last()
+            if last_order.created_date.date() == datetime.datetime.now().date():
+                try:
+                    last_ordering = str(int(last_order.order_no[18:]) + 1)
+                    if len(last_ordering) <= 5:
+                        ordering = last_ordering.zfill(5)
+                    else:
+                        ordering = last_ordering.zfill(len(last_ordering))
+                except Exception:
+                    ordering = '00001'
             else:
                 ordering = '00001'
             order_no = 'CHD{}{}{}'.format('Z' if warehouse == '终炼胶库' else 'H',
