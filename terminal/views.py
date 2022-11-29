@@ -1640,7 +1640,7 @@ class BatchScanLogViewSet(ListAPIView):
                 if not status:  # 发送导开机启停信号异常只记录
                     logger.error(f'发送导开机信号异常, 计划号: {plan_classes_uid}, 机台: {equip_no}, 错误:{text}')
                     raise ValidationError(f'导开机启动信号发送失败: {text}')
-            records.update(is_release=True, release_msg=release_msg)
+            records.update(is_release=True, release_msg=release_msg, release_user=self.request.user.username)
             send_records = self.get_queryset().filter(id__in=ids)
             if send_records.filter(aux_tag=True):
                 validated_data = {'plan_classes_uid': plan_classes_uid, 'trains': scan_train, 'equip_no': equip_no, 'feed_status': '处理'}
@@ -1658,7 +1658,7 @@ class BatchScanLogViewSet(ListAPIView):
                     logger.error(f'群控服务器错误！')
                     release_msg, msg = '放行失败', f'群控服务器错误！'
                 if release_msg != '已放行':
-                    send_records.update(is_release=False, release_msg=None)
+                    send_records.update(is_release=False, release_msg=None, release_user=None)
                     raise ValidationError(msg)
         return Response(msg)
 

@@ -321,6 +321,7 @@ class BatchScanLog(AbstractEntity):
     scan_message = models.CharField(max_length=128, help_text='扫码返回信息', null=True, blank=True)
     is_release = models.BooleanField(default=True, help_text='错误扫码是否阻断投料秤[默认放行]')
     release_msg = models.CharField(max_length=256, help_text='空或放行', null=True, blank=True)
+    release_user = models.CharField(max_length=256, help_text='放行处理人', null=True, blank=True)
     aux_tag = models.BooleanField(default=False, help_text='群控阻断以后更新此标志: 1 放行后请求进料 0 不调用接口')
 
     class Meta:
