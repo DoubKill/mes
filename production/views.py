@@ -5266,16 +5266,15 @@ class AttendanceClockViewSet(ModelViewSet):
             **data
         )
         # 钉钉提醒
-        u = User.objects.filter(username=self.request.user.username, section__name__startswith='生产').last()
+        u = User.objects.filter(username=self.request.user.username, section__name__startswith='生产', section__isnull=False).last()
         if u:
-            if u.section.in_charge_user == u:
-                principal_obj = [u.section.parent_section.in_charge_user]
+            in_charge_user = u.section.in_charge_user
+            if in_charge_user == u:
+                principal_obj = [u.section.parent_section.in_charge_user] if u.section.parent_section and u.section.parent_section.in_charge_user else []
             else:
-                principal_obj = [u.section.in_charge_user]
+                principal_obj = [in_charge_user]
         else:
             principal_obj = User.objects.filter(username__in=principal.split(','))
-            if not principal_obj:
-                raise ValidationError('考勤负责人不存在')
         serializer_data = FillCardApplySerializer(apply).data
         content = {
             "title": f"{username}的补卡申请",
@@ -5312,16 +5311,15 @@ class AttendanceClockViewSet(ModelViewSet):
             **data
         )
         # 钉钉提醒
-        u = User.objects.filter(username=self.request.user.username, section__name__startswith='生产').last()
+        u = User.objects.filter(username=self.request.user.username, section__name__startswith='生产', section__isnull=False).last()
         if u:
-            if u.section.in_charge_user == u:
-                principal_obj = [u.section.parent_section.in_charge_user]
+            in_charge_user = u.section.in_charge_user
+            if in_charge_user == u:
+                principal_obj = [u.section.parent_section.in_charge_user] if u.section.parent_section and u.section.parent_section.in_charge_user else []
             else:
-                principal_obj = [u.section.in_charge_user]
+                principal_obj = [in_charge_user]
         else:
             principal_obj = User.objects.filter(username__in=principal.split(','))
-            if not principal_obj:
-                raise ValidationError('考勤负责人不存在')
         serializer_data = ApplyForExtraWorkSerializer(apply).data
         content = {
             "title": f"{user.username}的补卡申请",
