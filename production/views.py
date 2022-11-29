@@ -5925,7 +5925,7 @@ class GroupClockDetailView(APIView):
         else:  # 某位员工当班组打卡明细
             clock_type = self.request.query_params.get('clock_type')
             section = self.request.query_params.get('section')
-            user_name = query_name.split('[')[0]
+            user_name = re.split('\[|-', query_name)[0]
             records = EmployeeAttendanceRecords.objects.filter(~Q(is_use='废弃'), user__username=user_name, factory_date=select_date,
                                                                group=group, clock_type=clock_type, section=section).order_by('begin_date', 'equip')
             for s in records:
