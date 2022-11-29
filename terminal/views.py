@@ -30,7 +30,7 @@ from basics.models import WorkSchedulePlan, Equip, GlobalCode
 from equipment.models import EquipMachineHaltType, XLCommonCode
 from equipment.serializers import EquipApplyRepairSerializer
 from equipment.utils import gen_template_response
-from inventory.models import MaterialOutHistory, THOutHistory
+from inventory.models import MaterialOutHistory
 from mes.common_code import CommonDeleteMixin, TerminalCreateAPIView, response, SqlClient
 from mes.conf import TH_CONF, JZ_EQUIP_NO
 from mes.derorators import api_recorder
@@ -3138,7 +3138,7 @@ class FeedingErrorLampForCarbonView(APIView):
                 'feeding_material_name': material_name, 'feeding_username': self.request.user.username,
                 'feed_reason': '', 'feeding_classes': feeding_class, 'feed_result': 'N'}
         # 通过物料条码获取炭黑数量与重量
-        carbon_out_info = THOutHistory.objects.using('cb').filter(order_no=task_id).first()
+        carbon_out_info = MaterialOutHistory.objects.using('cb').filter(order_no=task_id).first()
         if not carbon_out_info:
             data.update({'feed_reason': f'任务信息未找到{task_id}'})
             FeedingOperationLog.objects.create(**data)
@@ -3198,7 +3198,7 @@ class FeedingOperateResultForCarbonView(APIView):
         line_port = {6: '白炭黑', 5: '炭黑', 4: '掺混2-2号口', 3: '掺混2-1号口', 2: '掺混1-2号口', 1: '掺混1-1号口'}
         feed_port = line_port.get(line)
         # 通过物料条码获取炭黑数量与重量
-        carbon_out_info = THOutHistory.objects.using('cb').filter(order_no=task_id).first()
+        carbon_out_info = MaterialOutHistory.objects.using('cb').filter(order_no=task_id).first()
         material_code = carbon_out_info.lot_no if carbon_out_info.lot_no else '99999999'
         # 更新任务状态
         CarbonTankFeedingPrompt.objects.filter(wlxxid=carbon_out_info.material_no,
