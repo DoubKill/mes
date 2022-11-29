@@ -5410,15 +5410,15 @@ class ReissueCardView(APIView):
         level = None
         if self.request.query_params.get('apply'):  # 查看自己的补卡申请
             section = Section.objects.filter(in_charge_user=user, name__startswith='生产').last()
-            all_user = list(section.section_users.filter(is_active=True).values_list('username', flat=True)) if section else [user.username]
-            data = self.queryset.filter(user__username__in=all_user).order_by('-id')
+            all_user = [user.username] + (list(section.section_users.filter(is_active=True).values_list('username', flat=True)) if section else [])
+            data = self.queryset.filter(user__username__in=set(all_user)).order_by('-id')
             data2 = None
         else:  # 审批补卡申请
             res = get_user_level()
             detail = res.get(user.username)
             if not detail:
                 raise ValidationError('该用户不是相关生产部门负责人')
-            users, level = detail['users'], detail['level']
+            users, level = set(detail['users']), detail['level']
             # 补卡申请(未审批 + 已审批)
             filter_kwargs = {}
             if level == 1:
@@ -5620,14 +5620,14 @@ class OverTimeView(APIView):
         level = None
         if self.request.query_params.get('apply'):  # 查看自己的加班申请
             section = Section.objects.filter(in_charge_user=user, name__startswith='生产').last()
-            all_user = list(section.section_users.filter(is_active=True).values_list('username', flat=True)) if section else [user.username]
-            data = self.queryset.filter(user__username__in=all_user).order_by('-id')
+            all_user = [user.username] + (list(section.section_users.filter(is_active=True).values_list('username', flat=True)) if section else [])
+            data = self.queryset.filter(user__username__in=set(all_user)).order_by('-id')
         else:  # 审批加班申请
             res = get_user_level()
             detail = res.get(user.username)
             if not detail:
                 raise ValidationError('该用户不是相关生产部门负责人')
-            users, level = detail['users'], detail['level']
+            users, level = set(detail['users']), detail['level']
             # 补卡申请(未审批 + 已审批)
             filter_kwargs = {}
             if level == 1:

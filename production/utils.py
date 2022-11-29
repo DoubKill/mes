@@ -215,7 +215,12 @@ def get_user_level():
         in_charge_user = i.in_charge_user.username
         if in_charge_user not in res:
             users = list(i.section_users.filter(~Q(username=in_charge_user), is_active=True).values_list('username', flat=True))
-            level = 2 if i.children_sections.all() else 1
+            children_section = i.children_sections.all()
+            if children_section:
+                level = 2
+                users += list(children_section.values_list('in_charge_user__username', flat=True))
+            else:
+                level = 1
             if level == 2 and not level2_user:
                 level2_user = in_charge_user
             if level == 1 and level2_user:
