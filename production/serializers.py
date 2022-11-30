@@ -42,9 +42,15 @@ class TrainsFeedbacksBatchSerializer(BaseModelSerializer):
                 ps = ProductClassesPlan.objects.filter(plan_classes_uid=validated_data['plan_classes_uid']).first()
                 if ps:
                     validated_data['classes'] = ps.work_schedule_plan.classes.global_name
-        if TrainsFeedbacks.objects.filter(plan_classes_uid=validated_data['plan_classes_uid'],
-                                          actual_trains=validated_data['actual_trains']).exists():
-            return validated_data
+        if validated_data['equip_no'] != 'Z04':
+            if TrainsFeedbacks.objects.filter(plan_classes_uid=validated_data['plan_classes_uid'],
+                                              actual_trains=validated_data['actual_trains']).exists():
+                return validated_data
+        else:
+            if TrainsFeedbacks.objects.filter(plan_classes_uid=validated_data['plan_classes_uid'],
+                                              actual_trains=validated_data['actual_trains'],
+                                              operation_user=validated_data.get('operation_user')).exists():
+                return validated_data
         return super().create(validated_data)
 
     class Meta:
