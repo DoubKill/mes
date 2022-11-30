@@ -6864,9 +6864,16 @@ class TimeEnergyConsuming(APIView):
             sheet.cell(data_row, 2).value = data_row - 3
             sheet.cell(data_row, 4).value = pn_split[0]
             sheet.cell(data_row, 5).value = pn_split[1]
-            sheet.cell(data_row, 6).value = len(stage_data)
+            stage_length = 0
             for k, v in stage_data.items():
                 equip_no = v['equip_no']
+                if equip_no == 'Z04':
+                    if k in ('CMB', 'HMB'):
+                        stage_length += 0.5
+                    else:
+                        stage_length += 2
+                else:
+                    stage_length += 1
                 #  查询配方数据，如果查到配方则补充收皮重量为配方重量，以及补充每个段次所投入上段次的重量
                 product_batching = ProductBatching.objects.filter(
                     batching_type=2,
@@ -6900,6 +6907,7 @@ class TimeEnergyConsuming(APIView):
                         sheet.cell(data_row, idx).value = evacuation_energy
                     else:
                         sheet.cell(data_row, idx).value = v[field_name]
+            sheet.cell(data_row, 6).value = stage_length
             data_row += 1
         output = BytesIO()
         wb.save(output)
