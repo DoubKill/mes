@@ -49,8 +49,7 @@ from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMate
     CarbonOutPlan, FinalRubberyOutBoundOrder, MixinRubberyOutBoundOrder, FinalGumInInventoryLog, OutBoundDeliveryOrder, \
     OutBoundDeliveryOrderDetail, WMSReleaseLog, WmsInventoryMaterial, WMSMaterialSafetySettings, WmsNucleinManagement, \
     WMSExceptHandle, MaterialOutHistoryOther, MaterialOutboundOrder, MaterialEntrance, HfBakeMaterialSet, HfBakeLog, \
-    WMSOutboundHistory, CancelTask, ProductInventoryLocked, ProductStockDailySummary, THOutHistory, THInHistory, \
-    THOutHistoryOther
+    WMSOutboundHistory, CancelTask, ProductInventoryLocked, ProductStockDailySummary
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
@@ -65,8 +64,7 @@ from inventory.serializers import PutPlanManagementSerializer, \
     OutBoundTasksSerializer, WmsInventoryMaterialSerializer, WmsNucleinManagementSerializer, \
     MaterialOutHistoryOtherSerializer, MaterialOutHistorySerializer, WMSExceptHandleSerializer, \
     BzMixingRubberInventorySearchSerializer, BzFinalRubberInventorySearchSerializer, \
-    OutBoundDeliveryOrderUpdateSerializer, ProductInOutHistorySerializer, OutBoundDeliveryOrderDetailListSerializer, \
-    THInOutCommonSerializer, THOutHistoryOtherSerializer, THOutHistorySerializer
+    OutBoundDeliveryOrderUpdateSerializer, ProductInOutHistorySerializer, OutBoundDeliveryOrderDetailListSerializer
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
@@ -552,15 +550,9 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         elif store_name in ("原材料库", '炭黑库'):
             database = 'wms' if store_name == '原材料库' else 'cb'
             if order_type == "出库":
-                if database == 'wms':
-                    queryset = MaterialOutHistory.objects.using(database).order_by('id')
-                else:
-                    queryset = THOutHistory.objects.using(database).order_by('id')
+                queryset = MaterialOutHistory.objects.using(database).order_by('id')
             else:
-                if database == 'wms':
-                    queryset = MaterialInHistory.objects.using(database).order_by('id')
-                else:
-                    queryset = THInHistory.objects.using(database).order_by('id')
+                queryset = MaterialInHistory.objects.using(database).order_by('id')
             if start_time:
                 filter_dict.update(task__start_time__gte=start_time)
             if end_time:
@@ -604,7 +596,7 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
             "混炼胶库": InventoryLogSerializer,
             "终炼胶库": InventoryLogSerializer,
             "原材料库": InOutCommonSerializer,
-            "炭黑库": THInOutCommonSerializer,
+            "炭黑库": InOutCommonSerializer,
             "帘布库": InventoryLogSerializer
         }
         return serializer_dispatch.get(store_name)
@@ -6163,8 +6155,6 @@ class WMSOutTaskView(ListAPIView):
 @method_decorator([api_recorder], name="dispatch")
 class THOutTaskView(WMSOutTaskView):
     DB = 'cb'
-    serializer_class = THOutHistoryOtherSerializer
-    db_model = THOutHistoryOther
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -6266,8 +6256,6 @@ class WMSOutTaskDetailView(ListAPIView):
 @method_decorator([api_recorder], name="dispatch")
 class THOutTaskDetailView(WMSOutTaskDetailView):
     DB = 'cb'
-    serializer_class = THOutHistorySerializer
-    db_model = THOutHistory
 
 
 @method_decorator([api_recorder], name="dispatch")
