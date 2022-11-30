@@ -6838,7 +6838,7 @@ class TimeEnergyConsuming(APIView):
         # 写入excel表格
         wb = load_workbook('xlsx_template/energy_consume.xlsx')
         sheet = wb.worksheets[0]
-        sheet.title = '吨耗时(吨耗能)'
+        sheet.title = '吨耗时(吨耗能){}-{}'.format('.'.join(st.split('-')[1:]), '.'.join(et.split('-')[1:]))
         data_row = 4
         stage_idx = {'CMB': {7: 'equip_no', 8: 'devoted_weight', 9: 'actual_weight', 10: 'evacuation_energy', 11: 'consum_time'},
                      'HMB': {14: 'equip_no', 15: 'devoted_weight', 16: 'actual_weight', 17: 'evacuation_energy', 18: 'consum_time'},
