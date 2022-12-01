@@ -73,6 +73,7 @@ from terminal.utils import TankStatusSync, CarbonDeliverySystem, out_task_carbon
     get_current_factory_date, send_dk
 
 logger = logging.getLogger('sync_log')
+error_logger = logging.getLogger('error_log')
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -1638,7 +1639,7 @@ class BatchScanLogViewSet(ListAPIView):
             if dk_equip and records.filter(scan_material_type='胶皮'):
                 status, text = send_dk(equip_no, 'Start')
                 if not status:  # 发送导开机启停信号异常只记录
-                    logger.error(f'发送导开机信号异常, 计划号: {plan_classes_uid}, 机台: {equip_no}, 错误:{text}')
+                    error_logger.error(f'发送导开机信号异常, 计划号: {plan_classes_uid}, 机台: {equip_no}, 错误:{text}')
                     raise ValidationError(f'导开机启动信号发送失败: {text}')
             records.update(is_release=True, release_msg=release_msg, release_user=self.request.user.username)
             send_records = self.get_queryset().filter(id__in=ids)
@@ -1649,13 +1650,13 @@ class BatchScanLogViewSet(ListAPIView):
                     resp = requests.post(url=settings.AUXILIARY_URL + 'api/v1/production/handle_feed/', timeout=5, json=validated_data)
                     content = json.loads(resp.content.decode())
                     if content.get('success'):
-                        logger.info(f'计划[{plan_classes_uid}] 第{scan_train}车放行成功')
+                        error_logger.info(f'计划[{plan_classes_uid}] 第{scan_train}车放行成功')
                         msg = f'计划[{plan_classes_uid}] 第{scan_train}车放行成功'
                     else:
-                        logger.error(f'计划[{plan_classes_uid}] 第{scan_train}车放行后不可进料')
+                        error_logger.error(f'计划[{plan_classes_uid}] 第{scan_train}车放行后不可进料:{content}')
                         release_msg, msg = '放行失败', f'计划[{plan_classes_uid}] 第{scan_train}车放行后不可进料'
                 except:
-                    logger.error(f'群控服务器错误！')
+                    error_logger.error(f'群控服务器错误！')
                     release_msg, msg = '放行失败', f'群控服务器错误！'
                 if release_msg != '已放行':
                     send_records.update(is_release=False, release_msg=None, release_user=None)

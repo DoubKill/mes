@@ -448,8 +448,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                 else:
                                     other_type, status, scan_material_msg = recipe_material_name, True, f'物料:{scan_material} 扫码成功'
                 else:
-                    save_scan_log(scan_data, scan_message='配方中无掺料, 所投物料不在配方中', is_release=False)
-                    scan_material_msg = '配方中无掺料, 所投物料不在配方中'
+                    scan_material_msg, is_release = '配方中无掺料, 所投物料不在配方中', False
                 if not OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code, status=status, other_type=other_type):
                     record_data.update({'other_type': other_type, 'status': status})
                     OtherMaterialLog.objects.create(**record_data)
@@ -848,6 +847,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                'useup_time': datetime.now()})
             instance = LoadTankMaterialLog.objects.create(**tank_data)
         # 胶皮扫码正确发送消息给导开机(扫码只控制导开机停止)
+        save_scan_log_flag = False
         switch_flag = GlobalCodeType.objects.filter(use_flag=True, type_name='密炼扫码异常锁定开关')
         if not switch_flag:
             dk_equip = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='导开机控制机台', global_name=equip_no)
@@ -856,7 +856,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 if not status:  # 发送导开机启停信号异常只记录
                     logger.error(f'发送导开机信号异常, 计划号: {plan_classes_uid}, 机台: {equip_no}, 错误:{text}')
                     save_scan_log(scan_data, scan_result='成功', scan_message=f'导开机启动信号发送失败:{text}')
-                    raise serializers.ValidationError(f'导开机启动信号发送失败: {text}')
+                    save_scan_log_flag = True
         # 判断补充进料后是否能进上辅机
         fml = FeedingMaterialLog.objects.using('SFJ').filter(plan_classes_uid=plan_classes_uid, trains=int(trains)).last()
         if fml and fml.add_feed_result == 1:
@@ -871,7 +871,8 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                     logger.error(f'{trains}车扫码补料后调用接口时不可进料')
             except:
                 logger.error(f'{trains}车扫码补料后调用接口时群控服务器错误！')
-        save_scan_log(scan_data)
+        if not save_scan_log_flag:
+            save_scan_log(scan_data)
         return validated_data
 
     class Meta:
