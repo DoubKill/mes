@@ -1598,6 +1598,7 @@ class APSExportDataView(APIView):
         sheet.cell(6, 2).value = sps.scheduling_during_time  # 排程持续时间
         sheet.cell(7, 2).value = len(set(equip_stop_plan.values_list('equip_no', flat=True)))  # 停机机台数量
         sheet.cell(8, 2).value = demanded_data.count()  # 需要排程的规格数量
+        sheet.cell(9, 2).value = sps.lock_durations  # 排程时间点之后的锁定计划期间
 
         # project list sheet
         sheet1 = wb.worksheets[1]
