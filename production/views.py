@@ -2254,13 +2254,15 @@ class MonthlyOutputStatisticsReport(APIView):
             factory_date__lte=et
         ).values('equip_no', 'factory_date', 'classes'
                  ).annotate(w=Sum('plan_weight')/1000, t=Count('id')).order_by('equip_no', 'w', 't')
-        equip_max_classes_dict = {}
+        equip_max_classes_dict, equip_max = {}, {}
         for item in equip_max_output_data:
             equip_no = item['equip_no']
             factory_date = item['factory_date']
             classes = item['classes']
             w = item['w']
-            t = item['t']
+            _max_num = equip_max.get(item['equip_no'], item['t'])
+            t = item['t'] if _max_num < item['t'] else _max_num
+            equip_max[item['equip_no']] = t
             equip_max_classes_dict[equip_no] = {'factory_date': factory_date, 'weight': w, 'classes': classes, 'trains': t}
 
         sql = """
