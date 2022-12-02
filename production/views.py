@@ -3473,6 +3473,12 @@ class SummaryOfWeighingOutput(APIView):
             pool.apply_async(self.concat_user_package, args=(equip_no, result, factory_date, users, work_times, user_result, qty_data))
         pool.close()
         pool.join()
+        sort_res = sorted(result, key=lambda x: x['equip_no'])
+        # 普通员工
+        permissions_list = self.request.user.permissions_list
+        xl_permission = permissions_list.get('summary_of_weighing_output', [])
+        if 'save' not in xl_permission:
+            return Response({'results': sort_res})
         for key, value in user_result.items():
             """
             key: test_1_早班_主控
@@ -3512,7 +3518,6 @@ class SummaryOfWeighingOutput(APIView):
                 result1[name]['lh'] = round(result1[name].get('lh', 0) + lh, 2)
             else:
                 result1[name] = {'name': name, f"{day}{classes}": price, f"{day}{classes}_count": count_, 'xl': round(xl, 2), 'lh': round(lh, 2)}
-        sort_res = sorted(result, key=lambda x: x['equip_no'])
         return Response({'results': sort_res, 'users': result1.values()})
 
 
