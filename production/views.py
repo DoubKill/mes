@@ -3409,6 +3409,9 @@ class SummaryOfWeighingOutput(APIView):
         work_times = {}
         user_result = {}
         user_package = {}
+        price_obj = SetThePrice.objects.first()
+        if not price_obj:
+            raise ValidationError('请先去添加细料/硫磺单价')
         # 查询称量分类下当前月上班的所有员工
         user_list = EmployeeAttendanceRecords.objects.filter(
             Q(factory_date__year=year, factory_date__month=month, equip__in=equip_list) &
@@ -3424,11 +3427,12 @@ class SummaryOfWeighingOutput(APIView):
                 if not num:
                     continue
                 key = f"{equip_no}-{section}"
+                unit = price_obj.xl if equip_no.startswith('F') else price_obj.lh
                 equip_data = user_package.get(key)
                 if equip_data:
                     equip_data['num'] += num
                 else:
-                    user_package[key] = {'section': section, 'num': num, 'equip_no': equip_no}
+                    user_package[key] = {'section': section, 'num': num, 'equip_no': equip_no, 'unit': unit}
                 user_total[equip_no] = user_total.get(equip_no, 0) + num
             return Response({'detail': user_package.values(), 'user_total': user_total})
         # 岗位系数
@@ -3464,9 +3468,6 @@ class SummaryOfWeighingOutput(APIView):
                     users[key]['status'] = '调岗'
 
         # 机台产量统计
-        price_obj = SetThePrice.objects.first()
-        if not price_obj:
-            raise ValidationError('请先去添加细料/硫磺单价')
         qty_data, t_num = {}, 32
         pool = ThreadPool(t_num)
         for equip_no in equip_list:
