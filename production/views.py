@@ -2253,14 +2253,15 @@ class MonthlyOutputStatisticsReport(APIView):
             factory_date__gte=st,
             factory_date__lte=et
         ).values('equip_no', 'factory_date', 'classes'
-                 ).annotate(w=Sum('plan_weight')/1000).order_by('equip_no', 'w')
+                 ).annotate(w=Sum('plan_weight')/1000, t=Count('id')).order_by('equip_no', 'w', 't')
         equip_max_classes_dict = {}
         for item in equip_max_output_data:
             equip_no = item['equip_no']
             factory_date = item['factory_date']
             classes = item['classes']
             w = item['w']
-            equip_max_classes_dict[equip_no] = {'factory_date': factory_date, 'weight': w, 'classes': classes}
+            t = item['t']
+            equip_max_classes_dict[equip_no] = {'factory_date': factory_date, 'weight': w, 'classes': classes, 'trains': t}
 
         sql = """
         select temp2.EQUIP_NO, w2/1000, FACTORY_DATE, CLASSES from(
@@ -2298,16 +2299,27 @@ on temp2.EQUIP_NO=temp3.EQUIP_NO and temp2.w2=temp3.w3;"""
             factory_date__lte=et
         ).values('equip_no').annotate(total_weight=Sum('plan_weight')/1000,
                                       total_trains=Count('id')).order_by('equip_no')
+        # 历史最高车次(班组)
+        equip_history_data = TrainsFeedbacks.objects.filter(factory_date__isnull=False).values('equip_no', 'factory_date', 'classes')\
+            .annotate(trains=Count('id')).values('equip_no', 'trains')
+        classes_equip_history_data = {}
+        for i in equip_history_data:
+            qty = classes_equip_history_data.get(i['equip_no'], 0)
+            if qty < i['trains']:
+                classes_equip_history_data[i['equip_no']] = i['trains']
 
         # 补充机台所选时间内的产量最大值
         for item in queryset:
             group = ""
             max_weight = ""
+            max_classes_trains = ""
             history_group = ""
             history_max_weight = ""
+            history_max_trains = ""
             equip_max_classes_data = equip_max_classes_dict.get(item['equip_no'])
             if equip_max_classes_data:
                 max_weight = round(equip_max_classes_data['weight'], 2)
+                max_classes_trains = equip_max_classes_data.get('trains', '')
                 work_schedule_plan = WorkSchedulePlan.objects.filter(
                     plan_schedule__work_schedule__work_procedure__global_name='密炼',
                     plan_schedule__day_time=equip_max_classes_data['factory_date'],
@@ -2318,6 +2330,7 @@ on temp2.EQUIP_NO=temp3.EQUIP_NO and temp2.w2=temp3.w3;"""
             equip_history_max_classes_data = equip_history_max_classes_dict.get(item['equip_no'])
             if equip_history_max_classes_data:
                 history_max_weight = round(equip_history_max_classes_data['weight'], 2)
+                history_max_trains = classes_equip_history_data.get(item['equip_no'])
                 work_schedule_plan = WorkSchedulePlan.objects.filter(
                     plan_schedule__work_schedule__work_procedure__global_name='密炼',
                     plan_schedule__day_time=equip_history_max_classes_data['factory_date'],
@@ -2327,9 +2340,11 @@ on temp2.EQUIP_NO=temp3.EQUIP_NO and temp2.w2=temp3.w3;"""
                     history_group = work_schedule_plan.group.global_name
             item['target'] = equip_target.get(item['equip_no'], 0)
             item['group'] = group
+            item['max_classes_trains'] = max_classes_trains
             item['max_weight'] = max_weight
             item['history_group'] = history_group
             item['history_max_weight'] = history_max_weight
+            item['history_max_trains'] = history_max_trains
             item['total_weight'] = round(item['total_weight'], 2)
 
         wl_stage_output = {'wl': {'name': "wl", 'value': 0}}
