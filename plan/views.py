@@ -1913,21 +1913,24 @@ class APSPlanImport(APIView):
             else:
                 continue
             for j, equip_no in enumerate(equip_nos):
+                product_no = item[j * 6]
+                if not product_no:
+                    continue
                 try:
-                    product_no = item[j * 6]
-                    if not product_no:
-                        continue
-                    try:
-                        plan_trains = int(item[j * 6 + 1])
-                        time_consume = round(item[j * 6 + 2]/60, 1)
-                        st = int(item[j * 6 + 4])
-                        et = int(item[j * 6 + 5])
-                    except Exception:
-                        raise ValidationError('数据错误，请检查后重试！')
-                    # pb = ProductBatching.objects.using('SFJ').exclude(used_type=6).filter(
-                    #     stage_product_batch_no__icontains='-{}'.format(product_no)).first()
-                    # if pb:
-                    #     product_no = pb.stage_product_batch_no
+                    plan_trains = int(item[j * 6 + 1])
+                    time_consume = round(item[j * 6 + 2]/60, 1)
+                    st = int(item[j * 6 + 4])
+                    et = int(item[j * 6 + 5])
+                except Exception:
+                    raise ValidationError('数据错误，请检查后重试！')
+                pb = ProductBatching.objects.using('SFJ').filter(
+                    stage_product_batch_no=product_no,
+                    used_type=4,
+                    equip__equip_no=equip_no
+                ).first()
+                if not pb:
+                    raise ValidationError('{}机台未找到此启用配方：{}'.format(equip_no, product_no))
+                try:
                     ret.append(SchedulingResult(**{'factory_date': factory_date,
                                                     'schedule_no': schedule_no,
                                                     'equip_no': equip_no,
