@@ -6861,7 +6861,7 @@ class TimeEnergyConsuming(APIView):
         # 写入excel表格
         wb = load_workbook('xlsx_template/energy_consume.xlsx')
         sheet = wb.worksheets[0]
-        sheet.title = '吨耗时(吨耗能)'
+        sheet.title = '吨耗时(吨耗能){}-{}'.format('.'.join(st.split('-')[1:]), '.'.join(et.split('-')[1:]))
         data_row = 4
         stage_idx = {'CMB': {7: 'equip_no', 8: 'devoted_weight', 9: 'actual_weight', 10: 'evacuation_energy', 11: 'consum_time'},
                      'HMB': {14: 'equip_no', 15: 'devoted_weight', 16: 'actual_weight', 17: 'evacuation_energy', 18: 'consum_time'},
@@ -6887,9 +6887,16 @@ class TimeEnergyConsuming(APIView):
             sheet.cell(data_row, 2).value = data_row - 3
             sheet.cell(data_row, 4).value = pn_split[0]
             sheet.cell(data_row, 5).value = pn_split[1]
-            sheet.cell(data_row, 6).value = len(stage_data)
+            stage_length = 0
             for k, v in stage_data.items():
                 equip_no = v['equip_no']
+                if equip_no == 'Z04':
+                    if k in ('CMB', 'HMB'):
+                        stage_length += 0.5
+                    else:
+                        stage_length += 2
+                else:
+                    stage_length += 1
                 #  查询配方数据，如果查到配方则补充收皮重量为配方重量，以及补充每个段次所投入上段次的重量
                 product_batching = ProductBatching.objects.filter(
                     batching_type=2,
@@ -6923,6 +6930,7 @@ class TimeEnergyConsuming(APIView):
                         sheet.cell(data_row, idx).value = evacuation_energy
                     else:
                         sheet.cell(data_row, idx).value = v[field_name]
+            sheet.cell(data_row, 6).value = stage_length
             data_row += 1
         output = BytesIO()
         wb.save(output)
