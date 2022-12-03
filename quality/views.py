@@ -4591,7 +4591,9 @@ class ProductMaterials(APIView):
         sfj_used_recipes = set(ProductBatching.objects.using('SFJ').filter(used_type=4, batching_type=1)
                                .order_by('-used_time').values_list('stage_product_batch_no', flat=True))
         # mes启用
-        mes_used_recipes = set(ProductBatching.objects.filter(~Q(stage_product_batch_no__in=sfj_used_recipes), used_type=4, batching_type=2)
+        mes_used_recipes = set(ProductBatching.objects.filter(~Q(stage_product_batch_no__in=sfj_used_recipes),
+                                                              ~Q(stage_product_batch_no__endswith='_NEW'),
+                                                              used_type=4, batching_type=2)
                                .order_by('-used_time').values_list('stage_product_batch_no', flat=True))
         used_recipes = sfj_used_recipes | mes_used_recipes
         unused_products = all_product_nos - used_recipes
