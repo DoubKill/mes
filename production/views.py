@@ -4964,7 +4964,7 @@ class AttendanceClockViewSet(ModelViewSet):
                 for i in factory_records:
                     calculate_end_date = time_now if i.standard_begin_date < time_now < i.standard_end_date else i.standard_end_date
                     i.end_date = time_now
-                    i.actual_end_date = time_now
+                    i.actual_end_date = calculate_end_date
                     i.calculate_end_date = calculate_end_date
                     i.save()
                 for equip in equip_list:
@@ -4973,7 +4973,7 @@ class AttendanceClockViewSet(ModelViewSet):
                         user=user,
                         equip=equip,
                         begin_date=begin_date,
-                        actual_begin_date=begin_date,
+                        actual_begin_date=calculate_begin_date,
                         factory_date=date_now,
                         standard_begin_date=standard_begin_time,
                         standard_end_date=standard_end_time,
@@ -5001,7 +5001,7 @@ class AttendanceClockViewSet(ModelViewSet):
                 #     actual_end_time = actual_end_time if actual_end_time < extra_work.end_date else extra_work.end_date
                 work_time = round((actual_end_time - actual_begin_time).seconds / 3600, 2)
                 EmployeeAttendanceRecords.objects.filter(id__in=ids).update(
-                    end_date=end_date, actual_end_date=end_date, work_time=work_time, actual_time=work_time,
+                    end_date=end_date, actual_end_date=actual_end_time, work_time=work_time, actual_time=work_time,
                     calculate_end_date=actual_end_time
                 )
                 results['ids'] = ids
@@ -5015,9 +5015,10 @@ class AttendanceClockViewSet(ModelViewSet):
                     if time_now >= obj_r.standard_end_date - timedelta(minutes=attendance_group_obj.lead_time):
                         raise ValidationError('超出可调岗时间范围')
                     work_time = round((end_date - begin_date).seconds / 3600, 2)
+                    calculate_end_date = end_date if before_begin_time < end_date < before_end_time else before_end_time
                     EmployeeAttendanceRecords.objects.filter(id__in=ids).update(
-                        end_date=end_date, actual_end_date=end_date, work_time=work_time, actual_time=work_time,
-                        calculate_end_date=end_date if before_begin_time < end_date < before_end_time else before_end_time
+                        end_date=end_date, actual_end_date=calculate_end_date, work_time=work_time, actual_time=work_time,
+                        calculate_end_date=calculate_end_date
                     )
                 else:
                     raise ValidationError('已打下班卡不可调岗')
@@ -5027,7 +5028,7 @@ class AttendanceClockViewSet(ModelViewSet):
                         user=user,
                         equip=equip,
                         begin_date=time_now,
-                        actual_begin_date=time_now,
+                        actual_begin_date=calculate_begin_date,
                         factory_date=date_now,
                         standard_begin_date=standard_begin_time,
                         standard_end_date=standard_end_time,
@@ -5073,7 +5074,7 @@ class AttendanceClockViewSet(ModelViewSet):
                 for i in factory_records:
                     calculate_end_date = time_now if i.standard_begin_date < time_now < i.standard_end_date else i.standard_end_date
                     i.end_date = end_date
-                    i.actual_end_date = end_date
+                    i.actual_end_date = calculate_end_date
                     i.calculate_end_date = calculate_end_date
                     i.save()
                 for equip in equip_list:
@@ -5082,7 +5083,7 @@ class AttendanceClockViewSet(ModelViewSet):
                         user=user,
                         equip=equip,
                         begin_date=begin_date,
-                        actual_begin_date=begin_date,
+                        actual_begin_date=calculate_begin_date,
                         factory_date=date_now,
                         clock_type=clock_type,
                         standard_begin_date=standard_begin_time,
@@ -5111,7 +5112,7 @@ class AttendanceClockViewSet(ModelViewSet):
                 #     actual_end_time = actual_end_time if actual_end_time < extra_work.end_date else extra_work.end_date
                 work_time = round((actual_end_time - actual_begin_time).seconds / 3600, 2)
                 EmployeeAttendanceRecords.objects.filter(id__in=ids).update(
-                    end_date=end_date, actual_end_date=end_date, work_time=work_time, actual_time=work_time,
+                    end_date=end_date, actual_end_date=actual_end_time, work_time=work_time, actual_time=work_time,
                     calculate_end_date=actual_end_time
                 )
                 results['ids'] = ids
@@ -5127,7 +5128,7 @@ class AttendanceClockViewSet(ModelViewSet):
                     calculate_end_date = end_date if before_begin_time < end_date < before_end_time else before_end_time
                     work_time = round((calculate_end_date - obj_r.calculate_begin_date).seconds / 3600, 2)
                     EmployeeAttendanceRecords.objects.filter(id__in=ids).update(
-                        end_date=end_date, actual_end_date=end_date, work_time=work_time, actual_time=work_time,
+                        end_date=end_date, actual_end_date=calculate_end_date, work_time=work_time, actual_time=work_time,
                         calculate_end_date=calculate_end_date
                     )
                 else:
@@ -5138,7 +5139,7 @@ class AttendanceClockViewSet(ModelViewSet):
                         user=user,
                         equip=equip,
                         begin_date=time_now,
-                        actual_begin_date=time_now,
+                        actual_begin_date=calculate_begin_date,
                         factory_date=date_now,
                         clock_type=clock_type,
                         standard_begin_date=standard_begin_time,
@@ -5532,7 +5533,7 @@ class ReissueCardView(APIView):
                             section=serializer_data.get('section'),
                             factory_date=serializer_data.get('factory_date'),
                             begin_date=serializer_data.get('bk_date'),
-                            actual_begin_date=serializer_data.get('bk_date'),
+                            actual_begin_date=calculate_begin_date,
                             classes=serializer_data.get('classes'),
                             group=serializer_data.get('group'),
                             equip=equip,
@@ -5572,7 +5573,7 @@ class ReissueCardView(APIView):
                             section=serializer_data.get('section'),
                             factory_date=serializer_data.get('factory_date'),
                             begin_date=serializer_data.get('bk_date'),
-                            actual_begin_date=serializer_data.get('bk_date'),
+                            actual_begin_date=calculate_begin_date,
                             classes=serializer_data.get('classes'),
                             group=serializer_data.get('group'),
                             equip=equip,
