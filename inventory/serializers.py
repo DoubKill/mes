@@ -29,7 +29,7 @@ from .models import MaterialInventory, BzFinalMixingRubberInventory, WmsInventor
     BarcodeQuality, CarbonOutPlan, MixinRubberyOutBoundOrder, FinalRubberyOutBoundOrder, Depot, DepotSite, DepotPallt, \
     SulfurDepotSite, Sulfur, SulfurDepot, OutBoundDeliveryOrder, OutBoundDeliveryOrderDetail, WMSMaterialSafetySettings, \
     WmsNucleinManagement, WMSExceptHandle, MaterialOutboundOrder, MaterialOutHistoryOther, MaterialOutHistory, \
-    FinalGumOutInventoryLog, FinalGumInInventoryLog, THOutHistory, THOutHistoryOther
+    FinalGumOutInventoryLog, FinalGumInInventoryLog
 
 from inventory.models import DeliveryPlan, DeliveryPlanStatus, InventoryLog, MaterialInventory
 from inventory.utils import OUTWORKUploader, OUTWORKUploaderLB, wms_out
@@ -1555,68 +1555,6 @@ class InOutCommonSerializer(serializers.Serializer):
             return ""
 
 
-class THInOutCommonSerializer(serializers.Serializer):
-    """库存库表均不统一,只读序列化器"""
-    id = serializers.IntegerField(read_only=True)
-    order_no = serializers.CharField(max_length=64, read_only=True)
-    pallet_no = serializers.CharField(max_length=64, read_only=True)
-    location = serializers.CharField(max_length=64, read_only=True)
-    qty = serializers.DecimalField(max_digits=18, decimal_places=2, read_only=True)
-    weight = serializers.DecimalField(max_digits=18, decimal_places=2, read_only=True)
-    unit = serializers.CharField(read_only=True, max_length=50)
-    lot_no = serializers.CharField(max_length=64, read_only=True)
-    inout_type = serializers.IntegerField(read_only=True)
-    material_no = serializers.CharField(max_length=64, read_only=True)
-    material_name = serializers.CharField(max_length=64, read_only=True)
-    initiator = serializers.SerializerMethodField()
-    start_time = serializers.DateTimeField(source='task.start_time', read_only=True)
-    # fin_time = serializers.DateTimeField(source='task.fin_time', read_only=True)
-    last_time = serializers.DateTimeField(source='task.last_time', read_only=True)
-    task_no = serializers.CharField(source='task.order_no', read_only=True)
-    order_type = serializers.SerializerMethodField()
-    batch_no = serializers.CharField(max_length=64, read_only=True)
-    is_entering = serializers.SerializerMethodField()
-    sl = serializers.DecimalField(max_digits=18, decimal_places=4, read_only=True)
-    zl = serializers.DecimalField(max_digits=18, decimal_places=4, read_only=True)
-    task_status_name = serializers.SerializerMethodField()
-
-    def get_initiator(self, obj):
-        try:
-            if obj.task.initiator == 'MES':
-                order = MaterialOutboundOrder.objects.filter(order_no=obj.task.order_no).first()
-                if order:
-                    return order.created_username
-                return obj.task.initiator
-            return obj.task.initiator
-        except Exception:
-            return ""
-
-    def get_is_entering(self, object):
-        if object.pallet_no.startswith('5'):
-            return 'Y'
-        else:
-            return 'N'
-
-    def get_order_type(self, obj):
-        if obj.inout_type == 1:
-            return "入库"
-        else:
-            return "出库"
-
-    def get_task_status_name(self, obj):
-        status_dict = {1: '待处理',
-                       2: '处理中',
-                       3: '完成',
-                       4: '已解绑',
-                       5: '取消',
-                       6: '异常',
-                       12: '强制完成'}
-        try:
-            return status_dict.get(obj.task_status, '未知')
-        except Exception:
-            return ""
-
-
 class DepotModelSerializer(serializers.ModelSerializer):
     """线边库 库区"""
     depot_name = serializers.CharField(max_length=64, help_text='库区',
@@ -2192,41 +2130,6 @@ class MaterialOutHistoryOtherSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class THOutHistoryOtherSerializer(serializers.ModelSerializer):
-    initiator = serializers.SerializerMethodField()
-    qty = serializers.SerializerMethodField()
-    task_type_name = serializers.SerializerMethodField()
-    task_status_name = serializers.SerializerMethodField()
-
-    def get_initiator(self, obj):
-        db = self.context['db']
-        order_type = 1 if db == 'wms' else 2
-        if obj.initiator == 'MES':
-            order = MaterialOutboundOrder.objects.filter(order_no=obj.order_no,
-                                                         order_type=order_type).first()
-            if order:
-                return order.created_username
-            return obj.initiator
-        return obj.initiator
-
-    def get_qty(self, obj):
-        try:
-            qty = obj.moh.aggregate(qty=Sum('qty'))['qty']
-            return qty if qty else 0
-        except Exception:
-            return 0
-
-    def get_task_status_name(self, obj):
-        return obj.get_task_status_display()
-
-    def get_task_type_name(self, obj):
-        return obj.get_task_type_display()
-
-    class Meta:
-        model = THOutHistoryOther
-        fields = '__all__'
-
-
 class MaterialOutHistorySerializer(serializers.ModelSerializer):
     created_time = serializers.CharField(source='task.start_time')
     initiator = serializers.SerializerMethodField()
@@ -2264,46 +2167,6 @@ class MaterialOutHistorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = MaterialOutHistory
-        fields = '__all__'
-
-
-class THOutHistorySerializer(serializers.ModelSerializer):
-    created_time = serializers.CharField(source='task.start_time')
-    initiator = serializers.SerializerMethodField()
-    task_order_no = serializers.CharField(source='task.order_no')
-    entrance_name = serializers.SerializerMethodField()
-    tunnel = serializers.SerializerMethodField()
-    status = serializers.SerializerMethodField()
-
-    def get_initiator(self, obj):
-        db = self.context['db']
-        order_type = 1 if db == 'wms' else 2
-        if obj.task.initiator == 'MES':
-            order = MaterialOutboundOrder.objects.filter(order_no=obj.task.order_no,
-                                                         order_type=order_type).first()
-            if order:
-                return order.created_username
-            return obj.task.initiator
-        return obj.task.initiator
-
-    def get_entrance_name(self, obj):
-        return self.context['entrance_data'].get(obj.entrance)
-
-    def get_tunnel(self, obj):
-        return obj.location.split('-')[1]
-
-    def get_status(self, obj):
-        status_dict = {1: '待处理',
-                       2: '处理中',
-                       3: '完成',
-                       4: '已解绑',
-                       5: '取消',
-                       6: '异常',
-                       12: '强制完成'}
-        return status_dict.get(obj.task_status)
-
-    class Meta:
-        model = THOutHistory
         fields = '__all__'
 
 
