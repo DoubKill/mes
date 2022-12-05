@@ -15,7 +15,7 @@ from mes.common_code import get_virtual_time, days_cur_month_dates
 from production.models import OperationLog, EmployeeAttendanceRecords, AttendanceGroupSetup, WeightClassPlan, \
     WeightClassPlanDetail
 from production.serializers import OperationLogSerializer
-from system.models import User
+from system.models import User, Section
 from terminal.utils import get_current_factory_date
 
 
@@ -206,4 +206,31 @@ def actual_clock_data(date, choice_type):
             equip = max_equip
         export_data[u].update({'section': section, 'group': group, 'equip': equip})
     return days, export_data
+
+
+def get_user_level():
+    res, level2_user = {}, ''
+    section = Section.objects.filter(name__startswith='生产').order_by('id')
+    for i in section:
+        in_charge_user = i.in_charge_user.username
+        if in_charge_user not in res:
+            users = list(i.section_users.filter(~Q(username=in_charge_user), is_active=True).values_list('username', flat=True))
+            children_section = i.children_sections.all()
+            if children_section:
+                level = 2
+                users += list(children_section.values_list('in_charge_user__username', flat=True))
+            else:
+                level = 1
+            if level == 2 and not level2_user:
+                level2_user = in_charge_user
+            if level == 1 and level2_user:
+                res[level2_user]['users'].append(in_charge_user)
+            res[in_charge_user] = {'users': users, 'level': level}
+    # 补充三级审批人
+    third = GlobalCode.objects.filter(global_type__type_name='钉钉三级审批', global_type__use_flag=True, use_flag=True).last()
+    _third = third.global_name if third else '黄成松'
+    res.update({_third: {'users': [level2_user], 'level': 3}})
+    return res
+
+
 

@@ -1598,6 +1598,7 @@ class APSExportDataView(APIView):
         sheet.cell(6, 2).value = sps.scheduling_during_time  # 排程持续时间
         sheet.cell(7, 2).value = len(set(equip_stop_plan.values_list('equip_no', flat=True)))  # 停机机台数量
         sheet.cell(8, 2).value = demanded_data.count()  # 需要排程的规格数量
+        sheet.cell(9, 2).value = sps.lock_durations  # 排程时间点之后的锁定计划期间
 
         # project list sheet
         sheet1 = wb.worksheets[1]
@@ -1912,21 +1913,24 @@ class APSPlanImport(APIView):
             else:
                 continue
             for j, equip_no in enumerate(equip_nos):
+                product_no = item[j * 6]
+                if not product_no:
+                    continue
                 try:
-                    product_no = item[j * 6]
-                    if not product_no:
-                        continue
-                    try:
-                        plan_trains = int(item[j * 6 + 1])
-                        time_consume = round(item[j * 6 + 2]/60, 1)
-                        st = int(item[j * 6 + 4])
-                        et = int(item[j * 6 + 5])
-                    except Exception:
-                        raise ValidationError('数据错误，请检查后重试！')
-                    # pb = ProductBatching.objects.using('SFJ').exclude(used_type=6).filter(
-                    #     stage_product_batch_no__icontains='-{}'.format(product_no)).first()
-                    # if pb:
-                    #     product_no = pb.stage_product_batch_no
+                    plan_trains = int(item[j * 6 + 1])
+                    time_consume = round(item[j * 6 + 2]/60, 1)
+                    st = int(item[j * 6 + 4])
+                    et = int(item[j * 6 + 5])
+                except Exception:
+                    raise ValidationError('数据错误，请检查后重试！')
+                pb = ProductBatching.objects.using('SFJ').filter(
+                    stage_product_batch_no=product_no,
+                    used_type=4,
+                    equip__equip_no=equip_no
+                ).first()
+                if not pb:
+                    raise ValidationError('{}机台未找到此启用配方：{}'.format(equip_no, product_no))
+                try:
                     ret.append(SchedulingResult(**{'factory_date': factory_date,
                                                     'schedule_no': schedule_no,
                                                     'equip_no': equip_no,

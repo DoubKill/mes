@@ -231,6 +231,7 @@ class SchedulingParamsSetting(models.Model):
     small_ton_stock_days = models.DecimalField(help_text='小吨位目标库存天数', decimal_places=1, max_digits=8, default=0)
     middle_ton_stock_days = models.DecimalField(help_text='中吨位目标库存天数', decimal_places=1, max_digits=8, default=0)
     big_ton_stock_days = models.DecimalField(help_text='大吨位目标库存天数', decimal_places=1, max_digits=8, default=0)
+    lock_durations = models.DecimalField(help_text='排程时间点之后的锁定计划期间（小时）', decimal_places=1, max_digits=8, default=0)
 
     class Meta:
         db_table = 'aps_params_setting'

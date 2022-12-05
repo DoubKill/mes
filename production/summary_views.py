@@ -22,7 +22,7 @@ from mes.derorators import api_recorder
 from plan.models import ProductClassesPlan, SchedulingEquipCapacity
 from mes.permissions import PermissionClass
 from production.filters import CollectTrainsFeedbacksFilter
-from production.models import TrainsFeedbacks
+from production.models import TrainsFeedbacks, EquipDownDetails
 from production.serializers import CollectTrainsFeedbacksSerializer
 import datetime
 from rest_framework.response import Response
@@ -442,15 +442,15 @@ class CutTimeCollect(APIView):
         page = int(self.request.query_params.get('page', 1))
         page_size = int(self.request.query_params.get('page_size', 10))
         try:
-            s_time = datetime.datetime.strptime(st, '%Y-%m-%d')
-            e_time = datetime.datetime.strptime(et, '%Y-%m-%d')
+            s_time = datetime.datetime.strptime(st, '%Y-%m-%d %H:%M:%S')
+            e_time = datetime.datetime.strptime(et, '%Y-%m-%d %H:%M:%S')
         except Exception:
             raise ValidationError('日期错误！')
         filter_kwargs = {'classes__isnull': False}
         if st:
-            filter_kwargs['factory_date__gte'] = s_time
+            filter_kwargs['begin_time__gte'] = s_time
         if et:
-            filter_kwargs['factory_date__lte'] = e_time
+            filter_kwargs['end_time__lte'] = e_time
         if equip_no:
             filter_kwargs['equip_no'] = equip_no
         query_set = list(TrainsFeedbacks.objects.filter(**filter_kwargs).values(
@@ -910,58 +910,17 @@ class IndexEquipMaintenanceAnalyze(IndexOverview):
         if st and et:
             filter_kwargs = {'factory_date__gte': st, 'factory_date__lte': et}
 
-        # 整合设备生产能力数据
-        product_limit_ids = list(SchedulingEquipCapacity.objects.values('equip_no', 'product_no').annotate(m_id=Max('id')).values_list('id', flat=True))
-        product_limit = SchedulingEquipCapacity.objects.filter(id__in=product_limit_ids).values('equip_no', 'product_no', 'avg_mixing_time', 'avg_interval_time')
-        product_info = {}
-        for i in product_limit:
-            keyword = f"{i['equip_no']}_{i['product_no']}"
-            product_info[keyword] = [i['avg_mixing_time'], i['avg_interval_time']]
-
         equip_data = [equip.equip_no for equip in Equip.objects.filter(category__equip_type__global_name='密炼设备').order_by('equip_no')]
+        init_data = EquipDownDetails.objects.filter(**filter_kwargs).values('equip_no').annotate(total_time=Sum('times')).values('equip_no', 'total_time')
+        time_data = {i['equip_no']: round(i['total_time'], 2) for i in init_data}
+
         maintenance_data = {}
         # 当日超过平均工作时间、平均间隔时间数据
         for equip_no in equip_data:
-            data = TrainsFeedbacks.objects.filter(equip_no=equip_no, **filter_kwargs).filter(delete_flag=False).order_by('product_no', 'actual_trains').values('equip_no', 'product_no', 'plan_classes_uid', 'actual_trains', 'mixer_time', 'interval_time')
-            res = self.handle_equip_no(equip_no, data, product_info)
-            maintenance_data.update(res)
+            s_minute = time_data.get(equip_no, 0)
+            maintenance_data.update({equip_no: {'minutes': s_minute}})
 
         return Response({'maintenance_data': maintenance_data, 'equip_data': equip_data})
-
-    def handle_equip_no(self, equip_no, data, product_info):
-        minutes = 0
-        # 处理4号机数据
-        if equip_no == 'Z04':
-            data = self.special_equip_no(data)
-        for j in data:
-            keyword = f"{j['equip_no']}_{j['product_no']}"
-            if not product_info.get(keyword):
-                continue
-            avg_mixing_time, avg_interval_time = product_info[keyword]
-            mixer_time = j['mixer_time'] if j['mixer_time'] else 0
-            interval_time = j['interval_time'] if j['interval_time'] else 0
-            # 超平均
-            if mixer_time > avg_mixing_time:
-                minutes += mixer_time - avg_mixing_time
-            # 超间隔
-            elif interval_time > avg_interval_time:
-                minutes += interval_time - avg_interval_time
-            else:
-                continue
-        return {equip_no: {'minutes': round(minutes / 60, 2)}}
-
-    def special_equip_no(self, special_data):
-        data = {}
-        for j in special_data:
-            keyword = f"{j['equip_no']}_{j['product_no']}_{j['plan_classes_uid']}_{j['actual_trains']}"
-            mixer_time = j['mixer_time'] if j['mixer_time'] else 0
-            interval_time = j['interval_time'] if j['interval_time'] else 0
-            if keyword not in data:
-                data[keyword] = {'equip_no': j['equip_no'], 'product_no': j['product_no'], 'actual_trains': j['actual_trains'],
-                                 'mixer_time': mixer_time, 'interval_time': interval_time}
-            else:
-                data[keyword].update({'mixer_time': mixer_time + data[keyword]['mixer_time'], 'interval_time': interval_time + data[keyword]['interval_time']})
-        return data.values()
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -974,15 +933,15 @@ class CutTimeCollectSummary(APIView):
         classes = self.request.query_params.get('classes')
         group = self.request.query_params.get('group')
         try:
-            s_time = datetime.datetime.strptime(st, '%Y-%m-%d')
-            e_time = datetime.datetime.strptime(et, '%Y-%m-%d')
+            s_time = datetime.datetime.strptime(st, '%Y-%m-%d %H:%M:%S')
+            e_time = datetime.datetime.strptime(et, '%Y-%m-%d %H:%M:%S')
         except Exception:
             raise ValidationError('日期错误！')
         filter_kwargs = {'classes__isnull': False}
         if st:
-            filter_kwargs['factory_date__gte'] = s_time
+            filter_kwargs['begin_time__gte'] = s_time
         if et:
-            filter_kwargs['factory_date__lte'] = e_time
+            filter_kwargs['end_time__lte'] = e_time
         query_set = list(TrainsFeedbacks.objects.filter(**filter_kwargs).values(
             'plan_classes_uid', 'factory_date', 'classes', 'equip_no'
         ).annotate(st_time=Min('begin_time'), et_time=Max('end_time')

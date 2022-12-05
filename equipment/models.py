@@ -806,6 +806,7 @@ class EquipWarehouseRecord(AbstractEntity):
     revocation = models.CharField(max_length=64, help_text='是否撤销(Y/N)', default='N')
     equip_warehouse_order_detail = models.ForeignKey(EquipWarehouseOrderDetail, help_text='出入库单据明细',
                                                      on_delete=models.CASCADE, null=True, blank=True)
+    receive_user = models.CharField(max_length=16, help_text='领用人', null=True, blank=True)
     status = models.CharField(max_length=64, help_text='入库/出库/盘库/撤销/移库', default='入库')
     real_time = models.DateTimeField(help_text='出库时间', null=True, blank=True)
     purpose = models.CharField(max_length=128, help_text='领用用途', null=True, blank=True)
