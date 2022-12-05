@@ -1,5 +1,6 @@
 import copy
 import datetime
+import json
 import math
 import re
 import time
@@ -9,6 +10,7 @@ from datetime import timedelta
 from decimal import Decimal
 from io import BytesIO
 
+import requests
 from django.contrib.auth.models import Permission
 from django.db.models import Max, Sum, Q, Prefetch, Count, F, Value, CharField
 from django.db.transaction import atomic
@@ -26,11 +28,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
-from basics.models import WorkSchedulePlan, Equip, GlobalCode
+from basics.models import WorkSchedulePlan, Equip, GlobalCode, GlobalCodeType
 from equipment.models import EquipMachineHaltType, XLCommonCode
 from equipment.serializers import EquipApplyRepairSerializer
 from equipment.utils import gen_template_response
 from inventory.models import MaterialOutHistory
+from mes import settings
 from mes.common_code import CommonDeleteMixin, TerminalCreateAPIView, response, SqlClient
 from mes.conf import TH_CONF, JZ_EQUIP_NO
 from mes.derorators import api_recorder
@@ -67,9 +70,10 @@ from terminal.serializers import LoadMaterialLogCreateSerializer, \
     JZPlanSerializer, JZPlanUpdateSerializer, WeightPackageManualUpdateSerializer, BatchScanLogSerializer
 from terminal.utils import TankStatusSync, CarbonDeliverySystem, out_task_carbon, get_tolerance, material_out_barcode, \
     get_manual_materials, CLSystem, get_common_equip, xl_c_calculate, JZCLSystem, JZTankStatusSync, \
-    get_current_factory_date
+    get_current_factory_date, send_dk
 
 logger = logging.getLogger('sync_log')
+error_logger = logging.getLogger('error_log')
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -1621,6 +1625,54 @@ class BatchScanLogViewSet(ListAPIView):
     permission_classes = (IsAuthenticated,)
     filter_backends = [DjangoFilterBackend]
     filter_class = BatchScanLogFilter
+
+    def post(self, request):
+        r_id = self.request.data.get('id')
+        equip_no = self.request.data.get('equip_no')
+        switch_flag = GlobalCode.objects.filter(global_type__use_flag=True, global_type__type_name='密炼扫码异常锁定开关', use_flag=True, global_name=equip_no)
+        if not switch_flag:
+            raise ValidationError('密炼扫码异常锁定开关未打开')
+        release_msg = self.request.data.get('release_msg', '已放行')
+        scan_train = self.request.data.get('scan_train')
+        plan_classes_uid = self.request.data.get('plan_classes_uid')
+        if not all([equip_no, scan_train, plan_classes_uid]):
+            raise ValidationError('参数不全')
+        filter_kwargs = {'plan_classes_uid': plan_classes_uid, 'scan_train': scan_train, 'is_release': False, 'equip_no': equip_no}
+        if r_id:
+            filter_kwargs['id'] = r_id
+        msg = f'计划[{plan_classes_uid}] 第{scan_train}车无异常记录需要放行'
+        records = self.get_queryset().filter(**filter_kwargs)
+        if records:
+            ids = list(records.values_list('id', flat=True))
+            msg = '放行成功'
+            # 有胶皮类别启动导开机
+            dk_equip = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='导开机控制机台', global_name=equip_no)
+            if dk_equip and records.filter(scan_material_type='胶皮'):
+                status, text = send_dk(equip_no, 'Start')
+                if not status:  # 发送导开机启停信号异常只记录
+                    error_logger.error(f'发送导开机信号异常, 计划号: {plan_classes_uid}, 机台: {equip_no}, 错误:{text}')
+                    raise ValidationError(f'导开机启动信号发送失败: {text}')
+            records.update(is_release=True, release_msg=release_msg, release_user=self.request.user.username)
+            send_records = self.get_queryset().filter(id__in=ids)
+            if send_records.filter(aux_tag=True):
+                validated_data = {'plan_classes_uid': plan_classes_uid, 'trains': scan_train, 'equip_no': equip_no, 'feed_status': '处理'}
+                # 请求进料判断接口
+                try:
+                    resp = requests.post(url=settings.AUXILIARY_URL + 'api/v1/production/handle_feed/', timeout=5, json=validated_data)
+                    content = json.loads(resp.content.decode())
+                    if content.get('success'):
+                        error_logger.info(f'计划[{plan_classes_uid}] 第{scan_train}车放行成功')
+                        msg = f'计划[{plan_classes_uid}] 第{scan_train}车放行成功'
+                    else:
+                        error_logger.error(f'计划[{plan_classes_uid}] 第{scan_train}车放行后不可进料:{content}')
+                        release_msg, msg = '放行失败', f'计划[{plan_classes_uid}] 第{scan_train}车放行后不可进料'
+                except:
+                    error_logger.error(f'群控服务器错误！')
+                    release_msg, msg = '放行失败', f'群控服务器错误！'
+                if release_msg != '已放行':
+                    send_records.update(is_release=False, release_msg=None, release_user=None)
+                    raise ValidationError(msg)
+        return Response(msg)
 
 
 @method_decorator([api_recorder], name="dispatch")
