@@ -2716,6 +2716,7 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
                                                 equip_spare=instance.equip_spare,
                                                 quantity=out_quantity,
                                                 equip_warehouse_order_detail=instance,
+                                                receive_user=receive_user,
                                                 created_user=self.request.user,
                                                 real_time=outer_time,
                                                 purpose=purpose
@@ -3076,7 +3077,7 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
         equip_spare = self.request.data.get('equip_spare')
         instance = self.get_object()
         quantity = round(float(instance.quantity), 1)
-        inventory = EquipWarehouseInventory.objects.filter(equip_spare_id=equip_spare,
+        inventory = EquipWarehouseInventory.objects.filter(equip_spare_id=equip_spare, delete_flag=False,
                                                            equip_warehouse_location_id=equip_warehouse_location).first()
         if instance.created_user == self.request.user:
             order_detail = instance.equip_warehouse_order_detail
