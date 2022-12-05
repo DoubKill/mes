@@ -7161,3 +7161,16 @@ class RubberLogView(APIView):
                 _temp = {day: {'day': day} for day in days}
                 _temp['add'] = True
         return title, _temp, max_times
+
+
+@method_decorator([api_recorder], name='dispatch')
+class RecentRecipeName(APIView):
+
+    def get(self, request):
+        product_no = self.request.query_params.get('product_no')
+        recent_recipe = ProductBatching.objects.filter(
+            used_type=4,
+            stage_product_batch_no__icontains='-FM-{}-'.format(product_no)).order_by('used_time').last()
+        if not recent_recipe:
+            return Response('改规格启用FM段次配方未找到！')
+        return Response(recent_recipe.stage_product_batch_no)
