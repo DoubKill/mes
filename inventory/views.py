@@ -7698,7 +7698,8 @@ class BZInventoryWorkingTasksView(APIView):
                 continue
             i['task_status'] = '进行中'
             tunnel_task_num_dict[tunnel] = tunnel_task_num_dict.get(tunnel, 0) + 1
-        return Response(s_data)
+        sort_data = sorted(s_data, key=lambda x: x['task_status'], reverse=True)
+        return Response(sort_data)
 
 
 @method_decorator([api_recorder], name="dispatch")

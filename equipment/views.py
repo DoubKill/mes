@@ -2716,6 +2716,7 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
                                                 equip_spare=instance.equip_spare,
                                                 quantity=out_quantity,
                                                 equip_warehouse_order_detail=instance,
+                                                receive_user=receive_user,
                                                 created_user=self.request.user,
                                                 real_time=outer_time,
                                                 purpose=purpose
@@ -3076,7 +3077,7 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
         equip_spare = self.request.data.get('equip_spare')
         instance = self.get_object()
         quantity = round(float(instance.quantity), 1)
-        inventory = EquipWarehouseInventory.objects.filter(equip_spare_id=equip_spare,
+        inventory = EquipWarehouseInventory.objects.filter(equip_spare_id=equip_spare, delete_flag=False,
                                                            equip_warehouse_location_id=equip_warehouse_location).first()
         if instance.created_user == self.request.user:
             order_detail = instance.equip_warehouse_order_detail
@@ -5474,12 +5475,15 @@ class DailyCleanTableViewSet(ModelViewSet):
     @action(methods=['post'], detail=False, url_path='handle-table', url_name='handle_table')
     def handle_table(self, request):
         opera_type = self.request.data.pop('opera_type')
-        ids = self.request.data.pop('ids')
-        if not all([opera_type, ids]):
-            raise ValidationError('参数异常')
-        records = self.get_queryset().filter(id__in=ids)
+        ids = self.request.data.pop('ids', [])
+        if opera_type == 3:
+            st = self.request.data.get('st', datetime.now().strftime('%Y-%m-%d'))
+            et = self.request.data.get('et', datetime.now().strftime('%Y-%m-%d'))
+            records = self.get_queryset().filter(select_date__gte=st, select_date__lte=et, standard_type='日清扫')
+        else:
+            records = self.get_queryset().filter(id__in=ids)
         if not records:
-            raise ValidationError('未找到数据行,刷新后重试')
+            raise ValidationError('未找到有效数据, 刷新后重试')
         key_word = '检查' if opera_type == 1 else ('确认' if opera_type == 2 else '导出')
         try:
             if opera_type == 1:  # 编辑日清扫检查
@@ -5670,12 +5674,15 @@ class CheckPointTableViewSet(ModelViewSet):
     @action(methods=['post'], detail=False, url_path='handle-table', url_name='handle_table')
     def handle_table(self, request):
         opera_type = self.request.data.pop('opera_type')
-        ids = self.request.data.pop('ids')
-        if not all([opera_type, ids]):
-            raise ValidationError('参数异常')
-        records = self.get_queryset().filter(id__in=ids)
+        ids = self.request.data.pop('ids', [])
+        if opera_type == 3:
+            st = self.request.data.get('st', datetime.now().strftime('%Y-%m-%d'))
+            et = self.request.data.get('et', datetime.now().strftime('%Y-%m-%d'))
+            records = self.get_queryset().filter(select_date__gte=st, select_date__lte=et, standard_type='点检')
+        else:
+            records = self.get_queryset().filter(id__in=ids)
         if not records:
-            raise ValidationError('未找到数据行,刷新后重试')
+            raise ValidationError('未找到有效数据, 刷新后重试')
         key_word = '检查' if opera_type == 1 else ('确认' if opera_type == 2 else '导出')
         try:
             if opera_type == 1:  # 编辑点检检查表
@@ -5834,7 +5841,7 @@ class CheckTemperatureTableViewSet(ModelViewSet):
             raise ValidationError('参数异常')
         records = self.get_queryset().filter(id__in=ids)
         if not records:
-            raise ValidationError('未找到数据行,刷新后重试')
+            raise ValidationError('未找到有效数据, 刷新后重试')
         key_word = '检查' if opera_type == 1 else ('确认' if opera_type == 2 else '导出')
         try:
             if opera_type == 1:  # 编辑温度检查表

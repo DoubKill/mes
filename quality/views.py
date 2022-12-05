@@ -4586,9 +4586,16 @@ class ProductIndicatorStandard(APIView):
 class ProductMaterials(APIView):
 
     def get(self, request):
-        all_product_nos = set(ProductBatching.objects.values_list('stage_product_batch_no', flat=True))
-        used_recipes = set(ProductBatching.objects.using('SFJ').filter(
-            used_type=4, batching_type=1).order_by('-used_time').values_list('stage_product_batch_no', flat=True))
+        all_product_nos = set(ProductBatching.objects.exclude(stage_product_batch_no__endswith='_NEW').values_list('stage_product_batch_no', flat=True))
+        # 群控启用
+        sfj_used_recipes = set(ProductBatching.objects.using('SFJ').filter(used_type=4, batching_type=1)
+                               .order_by('-used_time').values_list('stage_product_batch_no', flat=True))
+        # mes启用
+        mes_used_recipes = set(ProductBatching.objects.filter(~Q(stage_product_batch_no__in=sfj_used_recipes),
+                                                              ~Q(stage_product_batch_no__endswith='_NEW'),
+                                                              used_type=4, batching_type=2)
+                               .order_by('-used_time').values_list('stage_product_batch_no', flat=True))
+        used_recipes = sfj_used_recipes | mes_used_recipes
         unused_products = all_product_nos - used_recipes
         ret = [{'product_no': j, 'used': True} for j in used_recipes] + [{'product_no': i, 'used': False} for i in unused_products]
         return Response(ret)

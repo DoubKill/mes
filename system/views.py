@@ -685,7 +685,7 @@ class DingDingBind(APIView):
         try:
             user = User.objects.get(username=username)
         except Exception:
-            raise ValidationError('改用户不存在！')
+            raise ValidationError('该用户不存在！')
         if not user.check_password(password):
             raise ValidationError('密码错误，请修改后重试！')
         if not user.is_active:

@@ -319,6 +319,10 @@ class BatchScanLog(AbstractEntity):
     init_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='初始重量/包数', null=True, blank=True)
     scan_result = models.CharField(max_length=8, help_text='扫码结果', default='失败')
     scan_message = models.CharField(max_length=128, help_text='扫码返回信息', null=True, blank=True)
+    is_release = models.BooleanField(default=True, help_text='错误扫码是否阻断投料秤[默认放行]')
+    release_msg = models.CharField(max_length=256, help_text='空或放行', null=True, blank=True)
+    release_user = models.CharField(max_length=256, help_text='放行处理人', null=True, blank=True)
+    aux_tag = models.BooleanField(default=False, help_text='群控阻断以后更新此标志: 1 放行后请求进料 0 不调用接口')
 
     class Meta:
         db_table = 'batch_scan_log'
