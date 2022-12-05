@@ -231,6 +231,7 @@ class SchedulingParamsSetting(models.Model):
     small_ton_stock_days = models.DecimalField(help_text='小吨位目标库存天数', decimal_places=1, max_digits=8, default=0)
     middle_ton_stock_days = models.DecimalField(help_text='中吨位目标库存天数', decimal_places=1, max_digits=8, default=0)
     big_ton_stock_days = models.DecimalField(help_text='大吨位目标库存天数', decimal_places=1, max_digits=8, default=0)
+    lock_durations = models.DecimalField(help_text='排程时间点之后的锁定计划期间（小时）', decimal_places=1, max_digits=8, default=0)
 
     class Meta:
         db_table = 'aps_params_setting'
@@ -358,6 +359,7 @@ class SchedulingProductDemandedDeclareSummary(models.Model):
     sn = models.IntegerField(help_text='顺序')
     factory_date = models.DateField(help_text='工厂日期', verbose_name='工厂日期')
     product_no = models.CharField(max_length=64, help_text='胶料代码')
+    version = models.CharField(max_length=32, help_text='版本号', default='')
     plan_weight = models.FloatField(help_text='计划总用量（吨）', default=0)
     workshop_weight = models.FloatField(help_text='车间总库存（吨）', default=0)
     current_stock = models.FloatField(help_text='立体库总库存（吨）', default=0)
@@ -386,6 +388,8 @@ class SchedulingResult(models.Model):
     desc = models.CharField(max_length=64, help_text='备注', null=True, blank=True)
     created_time = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
     status = models.CharField(max_length=8, help_text='下发状态（未下发/已下发）', default='未下发')
+    start_time = models.DateTimeField(blank=True, null=True)
+    end_time = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         db_table = 'aps_result'
