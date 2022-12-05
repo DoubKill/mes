@@ -2253,14 +2253,17 @@ class MonthlyOutputStatisticsReport(APIView):
             factory_date__gte=st,
             factory_date__lte=et
         ).values('equip_no', 'factory_date', 'classes'
-                 ).annotate(w=Sum('plan_weight')/1000).order_by('equip_no', 'w')
-        equip_max_classes_dict = {}
+                 ).annotate(w=Sum('plan_weight')/1000, t=Count('id')).order_by('equip_no', 'w', 't')
+        equip_max_classes_dict, equip_max = {}, {}
         for item in equip_max_output_data:
             equip_no = item['equip_no']
             factory_date = item['factory_date']
             classes = item['classes']
             w = item['w']
-            equip_max_classes_dict[equip_no] = {'factory_date': factory_date, 'weight': w, 'classes': classes}
+            _max_num = equip_max.get(item['equip_no'], item['t'])
+            t = item['t'] if _max_num < item['t'] else _max_num
+            equip_max[item['equip_no']] = t
+            equip_max_classes_dict[equip_no] = {'factory_date': factory_date, 'weight': w, 'classes': classes, 'trains': t}
 
         sql = """
         select temp2.EQUIP_NO, w2/1000, FACTORY_DATE, CLASSES from(
@@ -2298,16 +2301,27 @@ on temp2.EQUIP_NO=temp3.EQUIP_NO and temp2.w2=temp3.w3;"""
             factory_date__lte=et
         ).values('equip_no').annotate(total_weight=Sum('plan_weight')/1000,
                                       total_trains=Count('id')).order_by('equip_no')
+        # 历史最高车次(班组)
+        equip_history_data = TrainsFeedbacks.objects.filter(factory_date__isnull=False).values('equip_no', 'factory_date', 'classes')\
+            .annotate(trains=Count('id')).values('equip_no', 'trains')
+        classes_equip_history_data = {}
+        for i in equip_history_data:
+            qty = classes_equip_history_data.get(i['equip_no'], 0)
+            if qty < i['trains']:
+                classes_equip_history_data[i['equip_no']] = i['trains']
 
         # 补充机台所选时间内的产量最大值
         for item in queryset:
             group = ""
             max_weight = ""
+            max_classes_trains = ""
             history_group = ""
             history_max_weight = ""
+            history_max_trains = ""
             equip_max_classes_data = equip_max_classes_dict.get(item['equip_no'])
             if equip_max_classes_data:
                 max_weight = round(equip_max_classes_data['weight'], 2)
+                max_classes_trains = equip_max_classes_data.get('trains', '')
                 work_schedule_plan = WorkSchedulePlan.objects.filter(
                     plan_schedule__work_schedule__work_procedure__global_name='密炼',
                     plan_schedule__day_time=equip_max_classes_data['factory_date'],
@@ -2318,6 +2332,7 @@ on temp2.EQUIP_NO=temp3.EQUIP_NO and temp2.w2=temp3.w3;"""
             equip_history_max_classes_data = equip_history_max_classes_dict.get(item['equip_no'])
             if equip_history_max_classes_data:
                 history_max_weight = round(equip_history_max_classes_data['weight'], 2)
+                history_max_trains = classes_equip_history_data.get(item['equip_no'])
                 work_schedule_plan = WorkSchedulePlan.objects.filter(
                     plan_schedule__work_schedule__work_procedure__global_name='密炼',
                     plan_schedule__day_time=equip_history_max_classes_data['factory_date'],
@@ -2327,9 +2342,11 @@ on temp2.EQUIP_NO=temp3.EQUIP_NO and temp2.w2=temp3.w3;"""
                     history_group = work_schedule_plan.group.global_name
             item['target'] = equip_target.get(item['equip_no'], 0)
             item['group'] = group
+            item['max_classes_trains'] = max_classes_trains
             item['max_weight'] = max_weight
             item['history_group'] = history_group
             item['history_max_weight'] = history_max_weight
+            item['history_max_trains'] = history_max_trains
             item['total_weight'] = round(item['total_weight'], 2)
 
         wl_stage_output = {'wl': {'name': "wl", 'value': 0}}
@@ -3409,6 +3426,9 @@ class SummaryOfWeighingOutput(APIView):
         work_times = {}
         user_result = {}
         user_package = {}
+        price_obj = SetThePrice.objects.first()
+        if not price_obj:
+            raise ValidationError('请先去添加细料/硫磺单价')
         # 查询称量分类下当前月上班的所有员工
         user_list = EmployeeAttendanceRecords.objects.filter(
             Q(factory_date__year=year, factory_date__month=month, equip__in=equip_list) &
@@ -3424,11 +3444,12 @@ class SummaryOfWeighingOutput(APIView):
                 if not num:
                     continue
                 key = f"{equip_no}-{section}"
+                unit = price_obj.xl if equip_no.startswith('F') else price_obj.lh
                 equip_data = user_package.get(key)
                 if equip_data:
                     equip_data['num'] += num
                 else:
-                    user_package[key] = {'section': section, 'num': num, 'equip_no': equip_no}
+                    user_package[key] = {'section': section, 'num': num, 'equip_no': equip_no, 'unit': unit}
                 user_total[equip_no] = user_total.get(equip_no, 0) + num
             return Response({'detail': user_package.values(), 'user_total': user_total})
         # 岗位系数
@@ -3464,15 +3485,18 @@ class SummaryOfWeighingOutput(APIView):
                     users[key]['status'] = '调岗'
 
         # 机台产量统计
-        price_obj = SetThePrice.objects.first()
-        if not price_obj:
-            raise ValidationError('请先去添加细料/硫磺单价')
         qty_data, t_num = {}, 32
         pool = ThreadPool(t_num)
         for equip_no in equip_list:
             pool.apply_async(self.concat_user_package, args=(equip_no, result, factory_date, users, work_times, user_result, qty_data))
         pool.close()
         pool.join()
+        sort_res = sorted(result, key=lambda x: x['equip_no'])
+        # 普通员工
+        permissions_list = self.request.user.permissions_list
+        xl_permission = permissions_list.get('summary_of_weighing_output', [])
+        if 'save' not in xl_permission:
+            return Response({'results': sort_res})
         for key, value in user_result.items():
             """
             key: test_1_早班_主控
@@ -3512,7 +3536,6 @@ class SummaryOfWeighingOutput(APIView):
                 result1[name]['lh'] = round(result1[name].get('lh', 0) + lh, 2)
             else:
                 result1[name] = {'name': name, f"{day}{classes}": price, f"{day}{classes}_count": count_, 'xl': round(xl, 2), 'lh': round(lh, 2)}
-        sort_res = sorted(result, key=lambda x: x['equip_no'])
         return Response({'results': sort_res, 'users': result1.values()})
 
 

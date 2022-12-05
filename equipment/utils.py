@@ -24,6 +24,18 @@ from system.models import User, Section
 logger = logging.getLogger('error_log')
 
 
+def len_byte(value):
+    if value is None or value == "":
+        return 10
+    if type(value) != int:
+        length = len(value)
+        utf8_length = len(value.encode('utf-8'))
+        length = (utf8_length - length) / 2 + length
+    else:
+        length = len(str(value))
+    return int(length)
+
+
 def gen_template_response(export_fields_dict, data, file_name, sheet_name=None, handle_str=False):
     export_fields = list(export_fields_dict.values())
     sheet_heads = list(export_fields_dict.keys())
@@ -75,8 +87,11 @@ def gen_excels_response(export_fields_dict, data_list, file_name, sheet_keyword,
                 sheet_name = f"{words}"
                 sheet_name_used.append(words)
         sheet = wb.add_sheet(sheet_name, cell_overwrite_ok=True)
+        col_width = {}
         for idx, sheet_head in enumerate(sheet_heads):
             sheet.write(0, idx, sheet_head)
+            h_w = 256 * (len_byte(sheet_head) + 2)
+            col_width[sheet_head] = h_w if h_w <= 65536 else 65536
 
         data_row = 1
         for data in s_data.get('table_details'):
@@ -85,7 +100,14 @@ def gen_excels_response(export_fields_dict, data_list, file_name, sheet_keyword,
                 if handle_str and isinstance(set_value, str):
                     set_value = cell.cell.ILLEGAL_CHARACTERS_RE.sub(r'', set_value)
                 sheet.write(data_row, col_num, set_value)
+                # 设置宽度
+                c_width = 256 * (len_byte(set_value) + 2) if 256 * (len_byte(set_value) + 2) <= 65536 else 65536
+                if col_width[sheet_heads[col_num]] < c_width:
+                    col_width[sheet_heads[col_num]] = c_width
             data_row += 1
+        # 设置宽度
+        for col_num, data_key in enumerate(sheet_heads):
+            sheet.col(col_num).width = col_width[data_key]
     wb.save(output)
     # 重新定位到开始
     output.seek(0)

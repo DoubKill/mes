@@ -1337,6 +1337,17 @@ class WeightPackageCViewSet(ListModelMixin, UpdateModelMixin, GenericViewSet):
             serializer = WeightPackageLogSerializer(print_data, many=True).data
             # display_manual_info(人工配信息统一格式给终端处理[字符串->[], []不变])
             for i in serializer:
+                # 日期更新
+                now = i.get('batch_time', '')
+                if now:
+                    current_plan = WorkSchedulePlan.objects.filter(start_time__lte=now, end_time__gte=now, plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
+                    if current_plan:
+                        n_time = current_plan.plan_schedule.day_time.strftime('%Y-%m-%d')
+                    else:
+                        n_time = now
+                else:
+                    n_time = now
+                i['factory_date'] = n_time
                 display_manual_info = i.get('display_manual_info')
                 if display_manual_info and isinstance(display_manual_info, str):
                     i.update({'display_manual_info': []})
@@ -1689,7 +1700,7 @@ class WeightBatchingLogListViewSet(ListAPIView):
         elif opera_type == '2':  # 点击物料名获取投料详情
             data = queryset.filter(status=1).values('material_name', 'bra_code', 'batch_classes')\
                 .annotate(batch_time=Max('batch_time'), total_num=Count('id'), max_id=Max('id'))\
-                .values('max_id', 'material_name', 'bra_code', 'total_num', 'batch_classes', 'batch_time')
+                .values('max_id', 'material_name', 'bra_code', 'total_num', 'batch_classes', 'batch_time').order_by('-created_date')
             for i in data:  # 补齐开门时间、操作人
                 s_info = self.get_queryset().filter(id=i['max_id']).values('created_user__username', 'open_time')
                 u_data = s_info[0] if s_info else {'created_user__username': '', 'open_time': ''}
@@ -2336,7 +2347,7 @@ class ReportBasicView(ListAPIView):
             filter_kwargs['recipe__icontains'] = recipe
 
         basic_model = JZReportBasic if equip_no in JZ_EQUIP_NO else ReportBasic
-        queryset = basic_model.objects.using(equip_no).filter(**filter_kwargs)
+        queryset = basic_model.objects.using(equip_no).filter(**filter_kwargs).order_by('-id')
         try:
             page = self.paginate_queryset(queryset)
             serializer = self.get_serializer(page, many=True)
@@ -2518,7 +2529,7 @@ class ReportWeightView(ListAPIView):
             e_st = ''.join(et2.split('-')) if equip_no in JZ_EQUIP_NO else ''.join(et2.split('-'))[2:]
             filter_kwargs['planid__lte'] = e_st
         try:
-            queryset = weight_model.objects.using(equip_no).filter(**filter_kwargs)
+            queryset = weight_model.objects.using(equip_no).filter(**filter_kwargs).order_by('-id')
             page = self.paginate_queryset(queryset)
             serializer = self.get_serializer(page, many=True)
         except ConnectionDoesNotExist:
