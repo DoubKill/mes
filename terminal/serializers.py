@@ -688,7 +688,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             if scan_material_type == '胶皮' and dk_equip:
                 dk_control = 'Start' if '成功' in scan_material_msg else 'Stop'
                 # 传送带阻断开关
-                switch_flag = GlobalCodeType.objects.filter(use_flag=True, type_name='密炼扫码异常锁定开关')
+                switch_flag = GlobalCode.objects.filter(global_type__use_flag=True, global_type__type_name='密炼扫码异常锁定开关', use_flag=True, global_name=plan_equip_no)
                 if (switch_flag and dk_control == 'Stop') or not switch_flag:
                     status, text = send_dk(plan_equip_no, dk_control)
                     if not status:  # 发送导开机启停信号异常
@@ -848,7 +848,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             instance = LoadTankMaterialLog.objects.create(**tank_data)
         # 胶皮扫码正确发送消息给导开机(扫码只控制导开机停止)
         save_scan_log_flag = False
-        switch_flag = GlobalCodeType.objects.filter(use_flag=True, type_name='密炼扫码异常锁定开关')
+        switch_flag = GlobalCode.objects.filter(global_type__use_flag=True, global_type__type_name='密炼扫码异常锁定开关', use_flag=True, global_name=equip_no)
         if not switch_flag:
             dk_equip = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='导开机控制机台', global_name=equip_no)
             if scan_material_type == '胶皮' and dk_equip:

@@ -1616,11 +1616,11 @@ class BatchScanLogViewSet(ListAPIView):
     filter_class = BatchScanLogFilter
 
     def post(self, request):
-        switch_flag = GlobalCodeType.objects.filter(use_flag=True, type_name='密炼扫码异常锁定开关')
-        if not switch_flag:
-            raise ValidationError('密炼扫码异常锁定开关未打开')
         r_id = self.request.data.get('id')
         equip_no = self.request.data.get('equip_no')
+        switch_flag = GlobalCode.objects.filter(global_type__use_flag=True, global_type__type_name='密炼扫码异常锁定开关', use_flag=True, global_name=equip_no)
+        if not switch_flag:
+            raise ValidationError('密炼扫码异常锁定开关未打开')
         release_msg = self.request.data.get('release_msg', '已放行')
         scan_train = self.request.data.get('scan_train')
         plan_classes_uid = self.request.data.get('plan_classes_uid')
