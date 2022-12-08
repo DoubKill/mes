@@ -7003,6 +7003,8 @@ class EquipDownSummaryTableView(APIView):
                 .values('group', 'down_reason').annotate(total_times=Sum('times')).order_by('group').values('group', 'down_reason', 'total_times')
             if queryset:
                 titles = list(set(queryset.values_list('down_reason', flat=True)))
+                groups = list(set(queryset.values_list('group', flat=True)))
+                groups.sort()
                 data = {}
                 for i in queryset:
                     group, down_reason, total_times = i['group'], i['down_reason'], i['total_times']
@@ -7017,7 +7019,7 @@ class EquipDownSummaryTableView(APIView):
                     group = s_data.pop('group')
                     results.update({group: s_data.values()})
                 # 表格数据
-                execl_data, reason, ratio, total_times, temp = data.values(), {}, {}, 0, {}
+                execl_data, reason, ratio, total_times, temp = deepcopy(list(data.values())), {}, {}, 0, {}
                 for j in execl_data:
                     group, all_times = j.pop('group'), sum(j.values())
                     for down_reason, times in j.items():
@@ -7038,7 +7040,7 @@ class EquipDownSummaryTableView(APIView):
                             reason['总计']['总计'] = reason['总计']['总计'] + times
                 for m in ratio:
                     ratio[m]['总计'] = round(temp[m] / total_times * 100, 2) if total_times else 0
-                results.update({'reason': reason.values(), 'ratio': ratio.values(), 'titles': titles})
+                results.update({'reason': reason.values(), 'ratio': ratio.values(), 'titles': titles, 'groups': groups, 'details': data.values()})
             return Response({'results': results})
         if export:
             equips_data = EquipDownDetails.objects.filter(delete_flag=False, factory_date__gte=st, factory_date__lte=et) \
