@@ -911,7 +911,7 @@ class IndexEquipMaintenanceAnalyze(IndexOverview):
             filter_kwargs = {'factory_date__gte': st, 'factory_date__lte': et}
 
         equip_data = [equip.equip_no for equip in Equip.objects.filter(category__equip_type__global_name='密炼设备').order_by('equip_no')]
-        init_data = EquipDownDetails.objects.filter(**filter_kwargs).values('equip_no').annotate(total_time=Sum('times')).values('equip_no', 'total_time')
+        init_data = EquipDownDetails.objects.filter(delete_flag=False, **filter_kwargs).values('equip_no').annotate(total_time=Sum('times')).values('equip_no', 'total_time')
         time_data = {i['equip_no']: round(i['total_time'], 2) for i in init_data}
 
         maintenance_data = {}

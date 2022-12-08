@@ -6656,6 +6656,7 @@ class ShiftProductionSummaryView(APIView):
             factory_date__year=year, factory_date__month=month).aggregate(days=Sum('num'))['days']
         working_days = 0 if not working_days else working_days
         down_days_dict = dict(EquipDownDetails.objects.filter(
+            delete_flag=False,
             factory_date__year=year,
             factory_date__month=month
         ).values('equip_no').annotate(days=Sum('times')/60/24).values_list('equip_no', 'days'))
@@ -6676,6 +6677,7 @@ class ShiftProductionSummaryView(APIView):
                 group__global_name=group_name
             ).count()
         group_down_days_dict = dict(EquipDownDetails.objects.filter(
+            delete_flag=False,
             factory_date__year=year,
             factory_date__month=month,
             group=group_name
@@ -6758,6 +6760,7 @@ class EquipDownDetailView(APIView):
             k = '{}-{}'.format(i['plan_schedule__day_time'].strftime("%m/%d"), i['classes__global_name'][0])
             schedule_dict[k] = i['group__global_name'][0]
         down_data = EquipDownDetails.objects.filter(
+            delete_flag=False,
             factory_date__year=year,
             factory_date__month=month
         ).values('factory_date', 'classes', 'equip_no').annotate(t=Sum('times')).order_by('equip_no', 'factory_date')
@@ -7135,6 +7138,7 @@ class GroupProductionSummary(APIView):
         group_schedule_data = schedule_queryset.values('group__global_name').annotate(cnt=Count('id'))
         date_classes_dict = {'{}-{}'.format(i.plan_schedule.day_time.strftime("%m-%d"), i.classes.global_name): i.group.global_name for i in schedule_queryset}
         down_data = EquipDownDetails.objects.filter(
+            delete_flag=False,
             factory_date__year=year,
             factory_date__month=month
         ).values('group', 'equip_no').annotate(s=Sum('times'))
