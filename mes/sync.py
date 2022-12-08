@@ -11,6 +11,7 @@
 import json
 import logging
 from datetime import datetime
+from decimal import Decimal
 from doctest import master
 
 import requests
@@ -136,6 +137,12 @@ class ProductBatchingSyncInterface(serializers.ModelSerializer, BaseInterface):
                 total_weight = weight_cnt_type.cnt_total_weight(i.equip_no)
                 batching_equip = 'S' if weight_cnt_type.weigh_type == 1 else 'F'
                 tolerance = get_tolerance(batching_equip, total_weight, project_name='整包', only_num=True)
+                if batching_equip == 'F' and total_weight and total_weight > 30 and tolerance:
+                    try:
+                        n = round(tolerance, 1)
+                        tolerance = n if n >= tolerance else (n + Decimal(0.1))
+                    except:
+                        pass
                 if i.equip_no not in weight_details:
                     weight_details[i.equip_no] = [{'material_name': weight_cnt_type.name,
                                                    'actual_weight': total_weight, 'standard_error': tolerance,
