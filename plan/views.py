@@ -1743,7 +1743,7 @@ class APSExportDataView(APIView):
                     continue
 
                 plan_trains = weight//float(batching_weight)
-                train_time_consume = calculate_equip_recipe_avg_mixin_time(equip_no, pd_ms.product_no)
+                train_time_consume = calculate_equip_recipe_avg_mixin_time(equip_no, recipe_name)
                 if pb_version_name not in job_list_data:
                     job_list_data[pb_version_name] = {stage: {
                         'project_name': pb_version_name,
