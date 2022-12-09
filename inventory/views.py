@@ -5510,14 +5510,16 @@ class LIBRARYINVENTORYView(APIView):
         if export:
             return self.export_xls(result)
 
+        gcs = dict(GlobalCode.objects.filter(
+            global_type__type_name='北自立体库货位数').values_list('global_name', 'description'))
         if warehouse_name == '终炼胶库':
-            total_goods_num = 1952
+            total_goods_num = int(gcs.get('终炼胶库', '1984'))
             used_goods_num = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(store_name='炼胶库').count()
         elif warehouse_name == '混炼胶库':
-            total_goods_num = 1428
+            total_goods_num = int(gcs.get('混炼胶库', '1596'))
             used_goods_num = BzFinalMixingRubberInventory.objects.using('bz').all().count()
         else:
-            total_goods_num = 1428 + 1952
+            total_goods_num = int(gcs.get('终炼胶库', '1984')) + int(gcs.get('混炼胶库', '1596'))
             used_goods_num = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(store_name='炼胶库').count() \
                              + BzFinalMixingRubberInventory.objects.using('bz').all().count()
 
@@ -7679,9 +7681,24 @@ class BZInventoryWorkingTasksView(APIView):
         product_no = self.request.query_params.get('product_no')
         station = self.request.query_params.get('station')
         tunnel = self.request.query_params.get('tunnel')
-        filter_kwargs = {'status': 2}
-        if warehouse:
-            filter_kwargs['outbound_delivery_order__warehouse'] = warehouse
+        # 获取工作货位托盘信息
+        if warehouse == '混炼胶库':
+            out_pallet_nos = BzFinalMixingRubberInventory.objects.using('bz').filter(
+                location_status='工作货位').values_list('container_no', flat=True)
+        else:
+            out_pallet_nos = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(
+                location_status='工作货位', store_name='炼胶库').values_list('container_no', flat=True)
+
+        order_detail_ids = []
+        for pallet_no in out_pallet_nos:
+            outbound_order = OutBoundDeliveryOrderDetail.objects.filter(
+                outbound_delivery_order__warehouse=warehouse,
+                pallet_no=pallet_no,
+                status=2
+            ).order_by('id').last()
+            if outbound_order and (datetime.datetime.now() - outbound_order.created_date).total_seconds()/3600 <= 2:
+                order_detail_ids.append(outbound_order.id)
+        filter_kwargs = {'id__in': order_detail_ids}
         if product_no:
             filter_kwargs['outbound_delivery_order__product_no'] = product_no
         if station:
