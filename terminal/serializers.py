@@ -448,7 +448,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                 else:
                                     other_type, status, scan_material_msg = recipe_material_name, True, f'物料:{scan_material} 扫码成功'
                 else:
-                    scan_material_msg, is_release = '配方中无掺料, 所投物料不在配方中', False
+                    scan_material_msg, is_release = '扫码错误, 所投物料不在配方中', False
                 if not OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code, status=status, other_type=other_type):
                     record_data.update({'other_type': other_type, 'status': status})
                     OtherMaterialLog.objects.create(**record_data)
