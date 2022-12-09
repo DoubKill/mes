@@ -6934,7 +6934,7 @@ class EquipDownSummaryView(APIView):
                     k['super'] = True
                 # 产量统计
                 product_dict, begin_time, end_time, total_spends, record_equip = {}, None, None, 0, []
-                product_info = TrainsFeedbacks.objects.filter(**filter_kwargs).order_by('equip_no', 'factory_date', 'plan_classes_uid', 'actual_trains')
+                product_info = TrainsFeedbacks.objects.filter(~Q(operation_user='Mixer2'), **filter_kwargs).order_by('equip_no', 'factory_date', 'created_date', 'actual_trains')
                 equips = len(set(product_info.values_list('equip_no', flat=True)))
                 days = (datetime.datetime.strptime(et, '%Y-%m-%d') - datetime.datetime.strptime(st, '%Y-%m-%d')).days + 1
                 # days = len(set(product_info.values_list('factory_date', flat=True)))
@@ -6945,7 +6945,8 @@ class EquipDownSummaryView(APIView):
                         begin_time, end_time = j.begin_time, j.end_time
                         record_equip.append(equip_no)
                         continue
-                    interval_time = (j.begin_time - end_time).total_seconds()
+                    _interval_time = (j.begin_time - end_time).total_seconds()
+                    interval_time = _interval_time if _interval_time > 0 else 20
                     mixer_time = (j.end_time - j.begin_time).total_seconds()
                     begin_time, end_time = j.begin_time, j.end_time
                     if interval_time >= 20:
