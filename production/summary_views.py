@@ -442,15 +442,15 @@ class CutTimeCollect(APIView):
         page = int(self.request.query_params.get('page', 1))
         page_size = int(self.request.query_params.get('page_size', 10))
         try:
-            s_time = datetime.datetime.strptime(st, '%Y-%m-%d')
-            e_time = datetime.datetime.strptime(et, '%Y-%m-%d')
+            s_time = datetime.datetime.strptime(st, '%Y-%m-%d %H:%M:%S')
+            e_time = datetime.datetime.strptime(et, '%Y-%m-%d %H:%M:%S')
         except Exception:
             raise ValidationError('日期错误！')
         filter_kwargs = {'classes__isnull': False}
         if st:
-            filter_kwargs['factory_date__gte'] = s_time
+            filter_kwargs['begin_time__gte'] = s_time
         if et:
-            filter_kwargs['factory_date__lte'] = e_time
+            filter_kwargs['end_time__lte'] = e_time
         if equip_no:
             filter_kwargs['equip_no'] = equip_no
         query_set = list(TrainsFeedbacks.objects.filter(**filter_kwargs).values(
@@ -933,15 +933,15 @@ class CutTimeCollectSummary(APIView):
         classes = self.request.query_params.get('classes')
         group = self.request.query_params.get('group')
         try:
-            s_time = datetime.datetime.strptime(st, '%Y-%m-%d')
-            e_time = datetime.datetime.strptime(et, '%Y-%m-%d')
+            s_time = datetime.datetime.strptime(st, '%Y-%m-%d %H:%M:%S')
+            e_time = datetime.datetime.strptime(et, '%Y-%m-%d %H:%M:%S')
         except Exception:
             raise ValidationError('日期错误！')
         filter_kwargs = {'classes__isnull': False}
         if st:
-            filter_kwargs['factory_date__gte'] = s_time
+            filter_kwargs['begin_time__gte'] = s_time
         if et:
-            filter_kwargs['factory_date__lte'] = e_time
+            filter_kwargs['end_time__lte'] = e_time
         query_set = list(TrainsFeedbacks.objects.filter(**filter_kwargs).values(
             'plan_classes_uid', 'factory_date', 'classes', 'equip_no'
         ).annotate(st_time=Min('begin_time'), et_time=Max('end_time')
