@@ -7167,10 +7167,17 @@ class RubberLogView(APIView):
 class RecentRecipeName(APIView):
 
     def get(self, request):
+        st = self.request.query_params.get('st')
+        et = self.request.query_params.get('et')
         product_no = self.request.query_params.get('product_no')
-        recent_recipe = ProductBatching.objects.filter(
+        stage_product_batch_nos = ProductBatching.objects.filter(
             used_type=4,
-            stage_product_batch_no__icontains='-FM-{}-'.format(product_no)).order_by('used_time').last()
-        if not recent_recipe:
-            return Response('改规格启用FM段次配方未找到！')
-        return Response(recent_recipe.stage_product_batch_no)
+            stage_product_batch_no__icontains='-FM-{}-'.format(product_no)
+        ).order_by('used_time').values_list('stage_product_batch_no', flat=True)
+        for stage_product_batch_no in stage_product_batch_nos:
+            if PalletFeedbacks.objects.filter(
+                    factory_date__lte=et,
+                    factory_date__gte=st,
+                    product_no=stage_product_batch_no).exists():
+                return Response(stage_product_batch_no)
+        raise ValidationError('该规格启用FM段次配方未找到!')
