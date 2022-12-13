@@ -448,7 +448,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                 else:
                                     other_type, status, scan_material_msg = recipe_material_name, True, f'物料:{scan_material} 扫码成功'
                 else:
-                    scan_material_msg, is_release = '配方中无掺料, 所投物料不在配方中', False
+                    scan_material_msg, is_release = '扫码错误, 所投物料不在配方中', False
                 if not OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code, status=status, other_type=other_type):
                     record_data.update({'other_type': other_type, 'status': status})
                     OtherMaterialLog.objects.create(**record_data)
@@ -692,13 +692,14 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 if (switch_flag and dk_control == 'Stop') or not switch_flag:
                     status, text = send_dk(plan_equip_no, dk_control)
                     if not status:  # 发送导开机启停信号异常
-                        logger.error(f'发送导开机信号异常, 计划号: {plan_classes_uid}, 机台: {plan_equip_no}, 错误:{text}')
-                        save_scan_log(scan_data, scan_result=scan_result, scan_message=f'发送导开机信号异常:{text}')
-                        raise serializers.ValidationError(f'发送导开机信号异常:{text}')
+                        logger.error(f'发送导开机信号异常, 计划号: {plan_classes_uid}, 机台: {plan_equip_no}, 车次: {trains}, 错误:{text}')
+                        # save_scan_log(scan_data, scan_result=scan_result, scan_message=f'发送导开机信号异常:{text}', is_release=is_release)
+                        # raise serializers.ValidationError(f'发送导开机信号异常:{text}')
                     else:  # 失败信号发送成功需要终端阻断进程
                         if dk_control == 'Stop':
-                            save_scan_log(scan_data, scan_result='成功', scan_message=f'发送导开机停止信号成功')
-                            raise serializers.ValidationError('发送导开机停止信号成功')
+                            logger.error(f"发送导开机停止信号成功, 计划号: {plan_classes_uid}, 机台: {plan_equip_no}, 车次: {trains}")
+                            # save_scan_log(scan_data, scan_result=scan_result, scan_message=f'发送导开机停止信号成功', is_release=is_release)
+                            # raise serializers.ValidationError()
             save_scan_log(scan_data, scan_result=scan_result, scan_message=scan_message, is_release=is_release)
             raise serializers.ValidationError(scan_material_msg)
         for i in details:
