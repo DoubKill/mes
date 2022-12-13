@@ -49,8 +49,7 @@ from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMate
     CarbonOutPlan, FinalRubberyOutBoundOrder, MixinRubberyOutBoundOrder, FinalGumInInventoryLog, OutBoundDeliveryOrder, \
     OutBoundDeliveryOrderDetail, WMSReleaseLog, WmsInventoryMaterial, WMSMaterialSafetySettings, WmsNucleinManagement, \
     WMSExceptHandle, MaterialOutHistoryOther, MaterialOutboundOrder, MaterialEntrance, HfBakeMaterialSet, HfBakeLog, \
-    WMSOutboundHistory, CancelTask, ProductInventoryLocked, ProductStockDailySummary, THOutHistory, THInHistory, \
-    THOutHistoryOther
+    WMSOutboundHistory, CancelTask, ProductInventoryLocked, ProductStockDailySummary
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
@@ -65,8 +64,7 @@ from inventory.serializers import PutPlanManagementSerializer, \
     OutBoundTasksSerializer, WmsInventoryMaterialSerializer, WmsNucleinManagementSerializer, \
     MaterialOutHistoryOtherSerializer, MaterialOutHistorySerializer, WMSExceptHandleSerializer, \
     BzMixingRubberInventorySearchSerializer, BzFinalRubberInventorySearchSerializer, \
-    OutBoundDeliveryOrderUpdateSerializer, ProductInOutHistorySerializer, OutBoundDeliveryOrderDetailListSerializer, \
-    THInOutCommonSerializer, THOutHistoryOtherSerializer, THOutHistorySerializer
+    OutBoundDeliveryOrderUpdateSerializer, ProductInOutHistorySerializer, OutBoundDeliveryOrderDetailListSerializer
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
@@ -552,27 +550,21 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         elif store_name in ("原材料库", '炭黑库'):
             database = 'wms' if store_name == '原材料库' else 'cb'
             if order_type == "出库":
-                if database == 'wms':
-                    queryset = MaterialOutHistory.objects.using(database).order_by('id')
-                else:
-                    queryset = THOutHistory.objects.using(database).order_by('id')
+                queryset = MaterialOutHistory.objects.using(database).order_by('id')
             else:
-                if database == 'wms':
-                    queryset = MaterialInHistory.objects.using(database).order_by('id')
-                else:
-                    queryset = THInHistory.objects.using(database).order_by('id')
+                queryset = MaterialInHistory.objects.using(database).order_by('id')
             if start_time:
                 filter_dict.update(task__start_time__gte=start_time)
             if end_time:
                 filter_dict.update(task__start_time__lte=end_time)
             if task_start_st:
-                filter_dict.update(task__last_time__gte=task_start_st)
+                filter_dict.update(last_time__gte=task_start_st)
             if task_start_et:
-                filter_dict.update(task__last_time__lte=task_start_et)
+                filter_dict.update(last_time__lte=task_start_et)
             if task_end_st:
-                filter_dict.update(task__fin_time__gte=task_end_st)
+                filter_dict.update(fin_time__gte=task_end_st)
             if task_end_et:
-                filter_dict.update(task__fin_time__lte=task_end_et)
+                filter_dict.update(fin_time__lte=task_end_et)
             if material_name:
                 filter_dict.update(material_name__icontains=material_name)
             if batch_no:
@@ -604,7 +596,7 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
             "混炼胶库": InventoryLogSerializer,
             "终炼胶库": InventoryLogSerializer,
             "原材料库": InOutCommonSerializer,
-            "炭黑库": THInOutCommonSerializer,
+            "炭黑库": InOutCommonSerializer,
             "帘布库": InventoryLogSerializer
         }
         return serializer_dispatch.get(store_name)
@@ -5518,14 +5510,16 @@ class LIBRARYINVENTORYView(APIView):
         if export:
             return self.export_xls(result)
 
+        gcs = dict(GlobalCode.objects.filter(
+            global_type__type_name='北自立体库货位数').values_list('global_name', 'description'))
         if warehouse_name == '终炼胶库':
-            total_goods_num = 1952
+            total_goods_num = int(gcs.get('终炼胶库', '1984'))
             used_goods_num = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(store_name='炼胶库').count()
         elif warehouse_name == '混炼胶库':
-            total_goods_num = 1428
+            total_goods_num = int(gcs.get('混炼胶库', '1596'))
             used_goods_num = BzFinalMixingRubberInventory.objects.using('bz').all().count()
         else:
-            total_goods_num = 1428 + 1952
+            total_goods_num = int(gcs.get('终炼胶库', '1984')) + int(gcs.get('混炼胶库', '1596'))
             used_goods_num = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(store_name='炼胶库').count() \
                              + BzFinalMixingRubberInventory.objects.using('bz').all().count()
 
@@ -6163,8 +6157,6 @@ class WMSOutTaskView(ListAPIView):
 @method_decorator([api_recorder], name="dispatch")
 class THOutTaskView(WMSOutTaskView):
     DB = 'cb'
-    serializer_class = THOutHistoryOtherSerializer
-    db_model = THOutHistoryOther
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -6266,8 +6258,6 @@ class WMSOutTaskDetailView(ListAPIView):
 @method_decorator([api_recorder], name="dispatch")
 class THOutTaskDetailView(WMSOutTaskDetailView):
     DB = 'cb'
-    serializer_class = THOutHistorySerializer
-    db_model = THOutHistory
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -7691,9 +7681,24 @@ class BZInventoryWorkingTasksView(APIView):
         product_no = self.request.query_params.get('product_no')
         station = self.request.query_params.get('station')
         tunnel = self.request.query_params.get('tunnel')
-        filter_kwargs = {'status': 2}
-        if warehouse:
-            filter_kwargs['outbound_delivery_order__warehouse'] = warehouse
+        # 获取工作货位托盘信息
+        if warehouse == '混炼胶库':
+            out_pallet_nos = BzFinalMixingRubberInventory.objects.using('bz').filter(
+                location_status='工作货位').values_list('container_no', flat=True)
+        else:
+            out_pallet_nos = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(
+                location_status='工作货位', store_name='炼胶库').values_list('container_no', flat=True)
+
+        order_detail_ids = []
+        for pallet_no in out_pallet_nos:
+            outbound_order = OutBoundDeliveryOrderDetail.objects.filter(
+                outbound_delivery_order__warehouse=warehouse,
+                pallet_no=pallet_no,
+                status=2
+            ).order_by('id').last()
+            if outbound_order and (datetime.datetime.now() - outbound_order.created_date).total_seconds()/3600 <= 2:
+                order_detail_ids.append(outbound_order.id)
+        filter_kwargs = {'id__in': order_detail_ids}
         if product_no:
             filter_kwargs['outbound_delivery_order__product_no'] = product_no
         if station:
@@ -7710,7 +7715,8 @@ class BZInventoryWorkingTasksView(APIView):
                 continue
             i['task_status'] = '进行中'
             tunnel_task_num_dict[tunnel] = tunnel_task_num_dict.get(tunnel, 0) + 1
-        return Response(s_data)
+        sort_data = sorted(s_data, key=lambda x: x['task_status'], reverse=True)
+        return Response(sort_data)
 
 
 @method_decorator([api_recorder], name="dispatch")

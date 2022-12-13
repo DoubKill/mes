@@ -1,5 +1,6 @@
 import copy
 import datetime
+import json
 import math
 import re
 import time
@@ -9,6 +10,7 @@ from datetime import timedelta
 from decimal import Decimal
 from io import BytesIO
 
+import requests
 from django.contrib.auth.models import Permission
 from django.db.models import Max, Sum, Q, Prefetch, Count, F, Value, CharField
 from django.db.transaction import atomic
@@ -26,11 +28,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
-from basics.models import WorkSchedulePlan, Equip, GlobalCode
+from basics.models import WorkSchedulePlan, Equip, GlobalCode, GlobalCodeType
 from equipment.models import EquipMachineHaltType, XLCommonCode
 from equipment.serializers import EquipApplyRepairSerializer
 from equipment.utils import gen_template_response
 from inventory.models import MaterialOutHistory
+from mes import settings
 from mes.common_code import CommonDeleteMixin, TerminalCreateAPIView, response, SqlClient
 from mes.conf import TH_CONF, JZ_EQUIP_NO
 from mes.derorators import api_recorder
@@ -67,9 +70,10 @@ from terminal.serializers import LoadMaterialLogCreateSerializer, \
     JZPlanSerializer, JZPlanUpdateSerializer, WeightPackageManualUpdateSerializer, BatchScanLogSerializer
 from terminal.utils import TankStatusSync, CarbonDeliverySystem, out_task_carbon, get_tolerance, material_out_barcode, \
     get_manual_materials, CLSystem, get_common_equip, xl_c_calculate, JZCLSystem, JZTankStatusSync, \
-    get_current_factory_date
+    get_current_factory_date, send_dk
 
 logger = logging.getLogger('sync_log')
+error_logger = logging.getLogger('error_log')
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -423,6 +427,13 @@ class LoadMaterialLogViewSet(TerminalCreateAPIView,
         if batch_material.unit == '包' and int(left_weight) != left_weight:
             return response(success=False, message='包数应为整数')
         update_records = last_bra_code_info.filter(plan_classes_uid=batch_material.plan_classes_uid)
+        # 获取限定包数与重量
+        limit_para = GlobalCode.objects.filter(global_type__use_flag=True, global_type__type_name='密炼投料物料可变重量', use_flag=True).values_list('global_name', flat=True)
+        try:
+            h_limit_para = {i.split('-')[0]: float(i.split('-')[1]) for i in limit_para}
+        except:
+            h_limit_para = {}
+        l_weight, l_package = h_limit_para.get('重量', 400), h_limit_para.get('包数', 30)
         for records in update_records:
             serializer = self.get_serializer(records, data=request.data)
             if not serializer.is_valid():
@@ -431,7 +442,7 @@ class LoadMaterialLogViewSet(TerminalCreateAPIView,
             change_num = float(records.adjust_left_weight) - left_weight
             variety = float(records.variety) - change_num
             # 数量变换取值[累加](包数：[负整框:10], 重量：[负整框:100])
-            beyond = 30 if records.unit == '包' else 400
+            beyond = l_package if records.unit == '包' else l_weight
             if variety > beyond or variety + float(records.init_weight) < 0:
                 return response(success=False, message='修改值达到上限,不可修改')
             records.variety = float(records.variety) - change_num
@@ -1326,6 +1337,17 @@ class WeightPackageCViewSet(ListModelMixin, UpdateModelMixin, GenericViewSet):
             serializer = WeightPackageLogSerializer(print_data, many=True).data
             # display_manual_info(人工配信息统一格式给终端处理[字符串->[], []不变])
             for i in serializer:
+                # 日期更新
+                now = i.get('batch_time', '')
+                if now:
+                    current_plan = WorkSchedulePlan.objects.filter(start_time__lte=now, end_time__gte=now, plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
+                    if current_plan:
+                        n_time = current_plan.plan_schedule.day_time.strftime('%Y-%m-%d')
+                    else:
+                        n_time = now
+                else:
+                    n_time = now
+                i['factory_date'] = n_time
                 display_manual_info = i.get('display_manual_info')
                 if display_manual_info and isinstance(display_manual_info, str):
                     i.update({'display_manual_info': []})
@@ -1604,6 +1626,54 @@ class BatchScanLogViewSet(ListAPIView):
     filter_backends = [DjangoFilterBackend]
     filter_class = BatchScanLogFilter
 
+    def post(self, request):
+        r_id = self.request.data.get('id')
+        equip_no = self.request.data.get('equip_no')
+        switch_flag = GlobalCode.objects.filter(global_type__use_flag=True, global_type__type_name='密炼扫码异常锁定开关', use_flag=True, global_name=equip_no)
+        if not switch_flag:
+            raise ValidationError('密炼扫码异常锁定开关未打开')
+        release_msg = self.request.data.get('release_msg', '已放行')
+        scan_train = self.request.data.get('scan_train')
+        plan_classes_uid = self.request.data.get('plan_classes_uid')
+        if not all([equip_no, scan_train, plan_classes_uid]):
+            raise ValidationError('参数不全')
+        filter_kwargs = {'plan_classes_uid': plan_classes_uid, 'scan_train': scan_train, 'is_release': False, 'equip_no': equip_no}
+        if r_id:
+            filter_kwargs['id'] = r_id
+        msg = f'计划[{plan_classes_uid}] 第{scan_train}车无异常记录需要放行'
+        records = self.get_queryset().filter(**filter_kwargs)
+        if records:
+            ids = list(records.values_list('id', flat=True))
+            msg = '放行成功'
+            # 有胶皮类别启动导开机
+            dk_equip = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='导开机控制机台', global_name=equip_no)
+            if dk_equip and records.filter(scan_material_type='胶皮'):
+                status, text = send_dk(equip_no, 'Start')
+                if not status:  # 发送导开机启停信号异常只记录
+                    error_logger.error(f'发送导开机信号异常, 计划号: {plan_classes_uid}, 机台: {equip_no}, 错误:{text}')
+                    raise ValidationError(f'导开机启动信号发送失败: {text}')
+            records.update(is_release=True, release_msg=release_msg, release_user=self.request.user.username)
+            send_records = self.get_queryset().filter(id__in=ids)
+            if send_records.filter(aux_tag=True):
+                validated_data = {'plan_classes_uid': plan_classes_uid, 'trains': scan_train, 'equip_no': equip_no, 'feed_status': '处理'}
+                # 请求进料判断接口
+                try:
+                    resp = requests.post(url=settings.AUXILIARY_URL + 'api/v1/production/handle_feed/', timeout=5, json=validated_data)
+                    content = json.loads(resp.content.decode())
+                    if content.get('success'):
+                        error_logger.info(f'计划[{plan_classes_uid}] 第{scan_train}车放行成功')
+                        msg = f'计划[{plan_classes_uid}] 第{scan_train}车放行成功'
+                    else:
+                        error_logger.error(f'计划[{plan_classes_uid}] 第{scan_train}车放行后不可进料:{content}')
+                        release_msg, msg = '放行失败', f'计划[{plan_classes_uid}] 第{scan_train}车放行后不可进料'
+                except:
+                    error_logger.error(f'群控服务器错误！')
+                    release_msg, msg = '放行失败', f'群控服务器错误！'
+                if release_msg != '已放行':
+                    send_records.update(is_release=False, release_msg=None, release_user=None)
+                    raise ValidationError(msg)
+        return Response(msg)
+
 
 @method_decorator([api_recorder], name="dispatch")
 class WeightBatchingLogListViewSet(ListAPIView):
@@ -1630,7 +1700,7 @@ class WeightBatchingLogListViewSet(ListAPIView):
         elif opera_type == '2':  # 点击物料名获取投料详情
             data = queryset.filter(status=1).values('material_name', 'bra_code', 'batch_classes')\
                 .annotate(batch_time=Max('batch_time'), total_num=Count('id'), max_id=Max('id'))\
-                .values('max_id', 'material_name', 'bra_code', 'total_num', 'batch_classes', 'batch_time')
+                .values('max_id', 'material_name', 'bra_code', 'total_num', 'batch_classes', 'batch_time').order_by('-created_date')
             for i in data:  # 补齐开门时间、操作人
                 s_info = self.get_queryset().filter(id=i['max_id']).values('created_user__username', 'open_time')
                 u_data = s_info[0] if s_info else {'created_user__username': '', 'open_time': ''}
@@ -2277,7 +2347,7 @@ class ReportBasicView(ListAPIView):
             filter_kwargs['recipe__icontains'] = recipe
 
         basic_model = JZReportBasic if equip_no in JZ_EQUIP_NO else ReportBasic
-        queryset = basic_model.objects.using(equip_no).filter(**filter_kwargs)
+        queryset = basic_model.objects.using(equip_no).filter(**filter_kwargs).order_by('-id')
         try:
             page = self.paginate_queryset(queryset)
             serializer = self.get_serializer(page, many=True)
@@ -2459,7 +2529,7 @@ class ReportWeightView(ListAPIView):
             e_st = ''.join(et2.split('-')) if equip_no in JZ_EQUIP_NO else ''.join(et2.split('-'))[2:]
             filter_kwargs['planid__lte'] = e_st
         try:
-            queryset = weight_model.objects.using(equip_no).filter(**filter_kwargs)
+            queryset = weight_model.objects.using(equip_no).filter(**filter_kwargs).order_by('-id')
             page = self.paginate_queryset(queryset)
             serializer = self.get_serializer(page, many=True)
         except ConnectionDoesNotExist:

@@ -185,8 +185,10 @@ class UpdateTargetTrains(object):
             factory_date, classes = res.get('factory_date'), res.get('classes')
             # 获取最新一条记录(头一天或者当天)
             instance = MachineTargetYieldSettings.objects.filter(target_month=factory_date.strftime('%Y-%m'), day__lte=factory_date.day).order_by('id').last()
+            cross_flag = False
             if not instance:  # 跨月
                 instance = MachineTargetYieldSettings.objects.order_by('id').last()
+                cross_flag = True
             o_id = instance.id
             l_info = {
                 'Z01': instance.Z01, 'Z02': instance.Z02, 'Z03': instance.Z03, 'Z04': instance.Z04, 'Z05': instance.Z05, 'Z06': instance.Z06,
@@ -212,7 +214,7 @@ class UpdateTargetTrains(object):
                 if l_info['day'] == factory_date.day and l_info['classes'] == classes and l_info['target_month'] == factory_date.strftime('%Y-%m'):
                     MachineTargetYieldSettings.objects.filter(id=o_id).update(**l_info)
                 else:
-                    if not instance:
+                    if cross_flag:
                         l_info['target_month'] = factory_date.strftime('%Y-%m')
                     l_info.update(day=factory_date.day, classes=classes)
                     MachineTargetYieldSettings.objects.create(**l_info)

@@ -1623,7 +1623,6 @@ class EquipWarehouseRecordSerializer(BaseModelSerializer):
     location_name = serializers.ReadOnlyField(source='equip_warehouse_location.location_name', help_text='库位')
     work_order_no = serializers.ReadOnlyField(source='equip_warehouse_order_detail.equip_warehouse_order.work_order_no',
                                               help_text='工单编号')
-    receive_user = serializers.ReadOnlyField(source='equip_warehouse_order_detail.receive_user', help_text='领用人')
 
     class Meta:
         model = EquipWarehouseRecord

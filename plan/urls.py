@@ -12,7 +12,7 @@ from plan.views import ProductDayPlanViewSet, \
     SchedulingProductDemandedDeclareViewSet, ProductDeclareSummaryViewSet, SchedulingProductSafetyParamsViewSet, \
     SchedulingResultViewSet, SchedulingEquipShutDownPlanViewSet, SchedulingProceduresView, SchedulingStockSummary, \
     SchedulingMaterialDemanded, RecipeStages, MaterialPlanConsumeView, WeightPackageDailyTimeConsumeViewSet, \
-    APSExportDataView
+    APSExportDataView, APSGanttView, APSPlanImport
 
 router = DefaultRouter()
 
@@ -66,5 +66,7 @@ urlpatterns = [
     path('scheduling-material-demanded/', SchedulingMaterialDemanded.as_view()),
     path('scheduling-recipe-stages/', RecipeStages.as_view()),
     path('xl-plan-consume/', MaterialPlanConsumeView.as_view()),
-    path('aps-export-data/', APSExportDataView.as_view())
+    path('aps-export-data/', APSExportDataView.as_view()),  # 导出排程需要的基础数据
+    path('aps-gantt/', APSGanttView.as_view()),  # 排程甘特图显示
+    path('aps-plan-import/', APSPlanImport.as_view())  # 导入排程完后的计划数据
 ]

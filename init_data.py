@@ -948,7 +948,7 @@ permission_data = [
     {'id': 949, 'code': 'summary_of_weighing_output', 'name': '称量机台产量汇总表', 'parent_id': None, 'category_name': '生产管理'},
     {'id': 950, 'code': 'view_summary_of_weighing_output', 'name': '查看', 'parent_id': 949},
     {'id': 951, 'code': 'export_summary_of_weighing_output', 'name': '导出', 'parent_id': 949},
-    {'id': 952, 'code': 'save_summary_of_weighing_output', 'name': '保存', 'parent_id': 949},
+    {'id': 952, 'code': 'save_summary_of_weighing_output', 'name': '绩效', 'parent_id': 949},
 
     {'id': 953, 'code': 'material_hf_summary', 'name': '烘房胶料信息统计查询', 'parent_id': None, 'category_name': '库存管理'},
     {'id': 954, 'code': 'view_material_hf_summary', 'name': '查看', 'parent_id': 953},

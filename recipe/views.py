@@ -288,17 +288,24 @@ class ProductBatchingViewSet(ModelViewSet):
         if exclude_used_type:
             queryset = queryset.exclude(used_type=exclude_used_type)
         if self.request.query_params.get('all'):
-            data = queryset.values('id', 'stage_product_batch_no',
-                                   'batching_weight',
-                                   'production_time_interval',
-                                   'used_type',
-                                   'dev_type',
-                                   'dev_type__category_name')
-            if print_type:
-                data = list(set(data.filter(stage__global_name__in=['FM', 'RFM', 'RE'])
-                                .values_list('stage_product_batch_no', flat=True))) if print_type == '加硫' else \
-                    list(set(data.exclude(stage__global_name__in=['FM', 'RFM', 'RE'])
-                             .values_list('stage_product_batch_no', flat=True)))
+            if self.request.query_params.get('sfj_recipe'):
+                _equip = self.request.query_params.get('equip_no')
+                data = ProductBatching.objects.using('SFJ').filter(used_type=4, batching_type=1, equip__equip_no=_equip).values(
+                    'id', 'stage_product_batch_no', 'batching_weight', 'production_time_interval', 'used_type', 'dev_type',
+                    'dev_type__category_name'
+                )
+            else:
+                data = queryset.values('id', 'stage_product_batch_no',
+                                       'batching_weight',
+                                       'production_time_interval',
+                                       'used_type',
+                                       'dev_type',
+                                       'dev_type__category_name')
+                if print_type:
+                    data = list(set(data.filter(stage__global_name__in=['FM', 'RFM', 'RE'])
+                                    .values_list('stage_product_batch_no', flat=True))) if print_type == '加硫' else \
+                        list(set(data.exclude(stage__global_name__in=['FM', 'RFM', 'RE'])
+                                 .values_list('stage_product_batch_no', flat=True)))
             return Response({'results': data})
         else:
             if filter_type:
