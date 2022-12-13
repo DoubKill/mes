@@ -1019,7 +1019,7 @@ class TrainsFeedbacksAPIView(mixins.ListModelMixin,
             bio = BytesIO()
             writer = pd.ExcelWriter(bio, engine='xlsxwriter')  # 注意安装这个包 pip install xlsxwriter
             qs_df["mixer_time"] = round((qs_df["end_time"] - qs_df["begin_time"]).dt.seconds)
-            qs_df['factory_date'] = qs_df['factory_date'].apply(lambda x: x.strftime('%Y-%m-%d'))
+            # qs_df['factory_date'] = qs_df['factory_date'].apply(lambda x: x.strftime('%Y-%m-%d'))
             qs_df['begin_time'] = qs_df['begin_time'].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S'))
             qs_df['end_time'] = qs_df['end_time'].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S'))
             qs_df['actual_weight'] = qs_df['actual_weight'].apply(lambda x: x/100)
@@ -4090,7 +4090,7 @@ class PerformanceSummaryView(APIView):
         if not price_info:
             raise ValidationError(f'{date}单价设置异常')
         dj_list = ProductInfoDingJi.objects.filter(is_use=True).values_list('product_name', flat=True)
-        qty_data, t_num = {}, 32
+        qty_data, t_num = {}, 4
         pool = ThreadPool(t_num)
         for key, detail in user_dic.items():
             pool.apply_async(self.concat_user_train, args=(key, detail, equip_dic, price_info, index_list, dj_list, date, qty_data, r_time))
@@ -7478,10 +7478,17 @@ class RubberLogView(APIView):
 class RecentRecipeName(APIView):
 
     def get(self, request):
+        st = self.request.query_params.get('st')
+        et = self.request.query_params.get('et')
         product_no = self.request.query_params.get('product_no')
-        recent_recipe = ProductBatching.objects.filter(
+        stage_product_batch_nos = ProductBatching.objects.filter(
             used_type=4,
-            stage_product_batch_no__icontains='-FM-{}-'.format(product_no)).order_by('used_time').last()
-        if not recent_recipe:
-            return Response('改规格启用FM段次配方未找到！')
-        return Response(recent_recipe.stage_product_batch_no)
+            stage_product_batch_no__icontains='-FM-{}-'.format(product_no)
+        ).order_by('used_time').values_list('stage_product_batch_no', flat=True)
+        for stage_product_batch_no in stage_product_batch_nos:
+            if PalletFeedbacks.objects.filter(
+                    factory_date__lte=et,
+                    factory_date__gte=st,
+                    product_no=stage_product_batch_no).exists():
+                return Response(stage_product_batch_no)
+        raise ValidationError('该规格启用FM段次配方未找到!')
