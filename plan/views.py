@@ -833,10 +833,17 @@ class SchedulingResultViewSet(ModelViewSet):
         sr = SchedulingResult.objects.filter(schedule_no=schedule_no).first()
         factory_date = sr.factory_date
         SchedulingResult.objects.filter(schedule_no=schedule_no).delete()
+        equip_aps_st = {}
+        aps_st = datetime.datetime(year=factory_date.year, month=factory_date.month, day=factory_date.day, hour=8)
         for key, value in plan_data.items():
             for idx, item in enumerate(value):
                 if not item.get('recipe_name') or not item.get('plan_trains'):
                     continue
+                equip_st = equip_aps_st.get(key)
+                if not equip_st:
+                    equip_st = aps_st
+                equip_et = equip_st + datetime.timedelta(hours=float(item['time_consume']))
+                equip_aps_st[key] = equip_et
                 SchedulingResult.objects.create(
                     factory_date=factory_date,
                     schedule_no=schedule_no,
@@ -845,7 +852,9 @@ class SchedulingResultViewSet(ModelViewSet):
                     recipe_name=item['recipe_name'],
                     time_consume=item['time_consume'] if item['time_consume'] else 0,
                     plan_trains=item['plan_trains'],
-                    desc=item['desc']
+                    desc=item['desc'],
+                    start_time=equip_st,
+                    end_time=equip_et
                 )
         return Response('成功')
 
@@ -1734,7 +1743,7 @@ class APSExportDataView(APIView):
                     continue
 
                 plan_trains = weight//float(batching_weight)
-                train_time_consume = calculate_equip_recipe_avg_mixin_time(equip_no, pd_ms.product_no)
+                train_time_consume = calculate_equip_recipe_avg_mixin_time(equip_no, recipe_name)
                 if pb_version_name not in job_list_data:
                     job_list_data[pb_version_name] = {stage: {
                         'project_name': pb_version_name,
@@ -1809,7 +1818,7 @@ class APSExportDataView(APIView):
         data_row2 = 2
         for j in equip_stop_plan:
             sheet3.cell(data_row2, 1).value = int(j.equip_no[-2:])
-            sheet3.cell(data_row2, 2).value = j.begin_time
+            sheet3.cell(data_row2, 2).value = j.begin_time.strftime('%Y-%m-%d %H:%M:%S')
             sheet3.cell(data_row2, 3).value = j.duration * 60
             data_row2 += 1
 
