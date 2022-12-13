@@ -1019,7 +1019,7 @@ class TrainsFeedbacksAPIView(mixins.ListModelMixin,
             bio = BytesIO()
             writer = pd.ExcelWriter(bio, engine='xlsxwriter')  # 注意安装这个包 pip install xlsxwriter
             qs_df["mixer_time"] = round((qs_df["end_time"] - qs_df["begin_time"]).dt.seconds)
-            qs_df['factory_date'] = qs_df['factory_date'].apply(lambda x: x.strftime('%Y-%m-%d'))
+            # qs_df['factory_date'] = qs_df['factory_date'].apply(lambda x: x.strftime('%Y-%m-%d'))
             qs_df['begin_time'] = qs_df['begin_time'].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S'))
             qs_df['end_time'] = qs_df['end_time'].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S'))
             qs_df['actual_weight'] = qs_df['actual_weight'].apply(lambda x: x/100)
@@ -4090,7 +4090,7 @@ class PerformanceSummaryView(APIView):
         if not price_info:
             raise ValidationError(f'{date}单价设置异常')
         dj_list = ProductInfoDingJi.objects.filter(is_use=True).values_list('product_name', flat=True)
-        qty_data, t_num = {}, 32
+        qty_data, t_num = {}, 4
         pool = ThreadPool(t_num)
         for key, detail in user_dic.items():
             pool.apply_async(self.concat_user_train, args=(key, detail, equip_dic, price_info, index_list, dj_list, date, qty_data, r_time))
