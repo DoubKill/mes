@@ -7075,7 +7075,7 @@ class EquipDownSummaryTableView(APIView):
         if not equip_no:  # 所有密炼机TOP10停机原因汇总(总min)
             titles, details, ratios = [], [], []
             equips_data = EquipDownDetails.objects.filter(delete_flag=False, factory_date__gte=st, factory_date__lte=et).values('down_reason').annotate(total_times=Sum('times')).values('down_reason', 'total_times')
-            all_times = sum([i['total_times'] for i in equips_data])
+            all_times = sum([i['total_times'] for i in equips_data][:10])
             for i in equips_data[:10]:
                 titles.append(i['down_reason'])
                 details.append(i['total_times'])
