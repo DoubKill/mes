@@ -1584,6 +1584,79 @@ class WeightPackageDailyTimeConsumeViewSet(ModelViewSet):
 @method_decorator([api_recorder], name='dispatch')
 class APSExportDataView(APIView):
 
+    def extend_last_aps_result(self, factory_date):
+        """
+        继承前一天未打完的排程计划
+        @param factory_date: 日期
+        @return:
+        """
+        yesterday = factory_date - datetime.timedelta(1)
+        yesterday_last_res = SchedulingResult.objects.filter(factory_date=yesterday).order_by('id').last()
+        equip_plan_data = []
+        if yesterday_last_res:
+            for equip_no in Equip.objects.filter(
+                    category__equip_type__global_name='密炼设备').values_list('equip_no', flat=True).order_by('equip_no'):
+                query_set = SchedulingResult.objects.filter(
+                    schedule_no=yesterday_last_res.schedule_no,
+                    equip_no=equip_no)
+                if not query_set:
+                    continue
+                # 找到昨天夜班最后一条计划，与该机台昨天排程的计划对比。
+                yesterday_plan = ProductClassesPlan.objects.using('SFJ').filter(
+                    equip__equip_no=equip_no,
+                    work_schedule_plan__plan_schedule__day_time=yesterday,
+                    status__in=('运行中', '完成', '停止')
+                ).order_by('-id').values('product_batching__stage_product_batch_no', 'plan_classes_uid')
+                if yesterday_plan:
+                    recipe_name = yesterday_plan[0]['product_batching__stage_product_batch_no']  # 配方名称
+                    plan_classes_uid = yesterday_plan[0]['plan_classes_uid']  # 计划编号
+                    q = query_set.filter(recipe_name=recipe_name).order_by('sn').last()
+                    if q:
+                        # 获取计划完成车次
+                        tfb_obj = TrainsFeedbacks.objects.using('SFJ').filter(
+                            plan_classes_uid=plan_classes_uid).order_by('-id').values('actual_trains')
+                        if tfb_obj:
+                            finished_trains = tfb_obj[0]['actual_trains']
+                        else:
+                            finished_trains = 0
+
+                        if finished_trains < q.plan_trains:
+                            unfinished_plan = query_set.filter(id__gte=q.id)
+                        else:
+                            unfinished_plan = query_set.filter(id__gt=q.id)
+                        for plan in unfinished_plan:
+                            if plan.id == q.id:
+                                plan_trains = plan.plan_trains - finished_trains
+                                time_consume = round(
+                                    calculate_equip_recipe_avg_mixin_time(equip_no,
+                                                                          plan.recipe_name) * plan_trains / 3600,
+                                    2)
+                            else:
+                                plan_trains = plan.plan_trains
+                                time_consume = plan.time_consume
+                            equip_plan_data.append({'recipe_name': plan.recipe_name,
+                                                    'equip_no': equip_no,
+                                                    'plan_trains': plan_trains,
+                                                    'time_consume': time_consume})
+        # equip_plan_data = [{'recipe_name': 'K-1MB-K310-000',
+        #                     'equip_no': 'Z01',
+        #                     'plan_trains': 10,
+        #                     'time_consume': 0.3},
+        #                    {'recipe_name': 'C-2MB-K305-02',
+        #                     'equip_no': 'Z02',
+        #                     'plan_trains': 10,
+        #                     'time_consume': 0.3},
+        #                    {'recipe_name': 'K-2MB-K310-000',
+        #                     'equip_no': 'Z03',
+        #                     'plan_trains': 3,
+        #                     'time_consume': 0.3},
+        #                    {'recipe_name': 'K-FM-K310-000',
+        #                     'equip_no': 'Z05',
+        #                     'plan_trains': 5,
+        #                     'time_consume': 0.3},
+        #                    ]
+        return equip_plan_data
+
     def get(self, request):
         aps_start_time = self.request.query_params.get('start_time')
         factory_date = self.request.query_params.get('factory_date')
@@ -1606,15 +1679,16 @@ class APSExportDataView(APIView):
         sheet.cell(5, 2).value = aps_start_time  # 排程开始时间
         sheet.cell(6, 2).value = sps.scheduling_during_time  # 排程持续时间
         sheet.cell(7, 2).value = len(set(equip_stop_plan.values_list('equip_no', flat=True)))  # 停机机台数量
-        sheet.cell(8, 2).value = demanded_data.count()  # 需要排程的规格数量
         sheet.cell(9, 2).value = sps.lock_durations  # 排程时间点之后的锁定计划期间
-
         # project list sheet
         sheet1 = wb.worksheets[1]
         sheet2 = wb.worksheets[2]
-        job_list_data = {}
+        job_list_data = {}  # 待排程结果数据 格式：{'C590-01': {'1MB': {},'2MB': {}}}
+        pb_available_time_dict = {}  # 规格可用时间 格式： {'C590-01'：20, 'J290-01'：20}
         data_row = 2
         data_row1 = 2
+
+        # 构建job_list_data数据
         for i in demanded_data:
             pd_ms = SchedulingRecipeMachineSetting.objects.filter(
                 product_no=i.product_no, version=i.version).first()
@@ -1623,11 +1697,7 @@ class APSExportDataView(APIView):
             pd_stages = pd_ms.stages.split('/')
             need_stages = copy.deepcopy(pd_stages)
             pb_version_name = '{}-{}'.format(pd_ms.product_no, pd_ms.version)
-            sheet1.cell(data_row, 1).value = data_row - 1  # 序号
-            sheet1.cell(data_row, 2).value = pb_version_name  # 规格名称（带版本号）
-            sheet1.cell(data_row, 3).value = 0  # 胶料代码开始时间(暂时无用)
-            sheet1.cell(data_row, 4).value = 0  # 关键路径持续时间（暂时无用）
-            sheet1.cell(data_row, 5).value = 720 if i.available_time == 0 else int(i.available_time * 60 * 24)  # 最晚完成时间
+            pb_available_time_dict[pb_version_name] = 720 if i.available_time == 0 else int(i.available_time * 60 * 24)  # 最晚完成时间
 
             # write job list sheet
             pbs = ProductBatching.objects.using('SFJ').filter(
@@ -1747,11 +1817,12 @@ class APSExportDataView(APIView):
                 if pb_version_name not in job_list_data:
                     job_list_data[pb_version_name] = {stage: {
                         'project_name': pb_version_name,
-                        'serial_no': need_stages.index(stage) + 1,
+                        'stage': stage,
+                        # 'serial_no': need_stages.index(stage) + 1,
                         'job_name': recipe_name,
                         'job_type': 'STANDARD',
                         'weight_qty': weight,
-                        'model_size': 1,
+                        # 'model_size': 1,
                         'details': [{'time_consume': plan_trains * train_time_consume/60,
                                      'equip_no': int(equip_no[-2:]),
                                      'wait_time': int(train_time_consume/60 * sps.scheduling_interval_trains),
@@ -1763,11 +1834,12 @@ class APSExportDataView(APIView):
                     if stage not in job_list_data[pb_version_name]:
                         job_list_data[pb_version_name][stage] = {
                             'project_name': pb_version_name,
-                            'serial_no': need_stages.index(stage) + 1,
+                            'stage': stage,
+                            # 'serial_no': need_stages.index(stage) + 1,
                             'job_name': recipe_name,
                             'job_type': 'STANDARD',
                             'weight_qty': weight,
-                            'model_size': 1,
+                            # 'model_size': 1,
                             'details': [{'time_consume': plan_trains * train_time_consume/60,
                                          'equip_no': int(equip_no[-2:]),
                                          'wait_time': int(train_time_consume/60 * sps.scheduling_interval_trains),
@@ -1775,7 +1847,7 @@ class APSExportDataView(APIView):
                                          'main_equip_flag': 1 if equip_main_standby == '主' else 0
                                          }]}
                     else:
-                        job_list_data[pb_version_name][stage]['model_size'] += 1
+                        # job_list_data[pb_version_name][stage]['model_size'] += 1
                         job_list_data[pb_version_name][stage]['details'].append(
                             {'time_consume': plan_trains * train_time_consume / 60,
                              'equip_no': int(equip_no[-2:]),
@@ -1788,20 +1860,102 @@ class APSExportDataView(APIView):
             # sheet1.cell(data_row, 6).value = len(need_stages)
             if pb_version_name not in job_list_data:
                 raise ValidationError('该规格启用配方未找到:{}'.format(pb_version_name))
-            sheet1.cell(data_row, 6).value = len(job_list_data[pb_version_name])
-            data_row += 1
+
+        # 构建前一天未完成计划数据 格式：{'C590-01': {'1MB': [{}, {}],'2MB': [{}, {}]}}
+        job_left_list_data = {}
+        left_plans = self.extend_last_aps_result(datetime.datetime.strptime(factory_date, "%Y-%m-%d"))
+        for plan in left_plans:
+            recipe_name = plan['recipe_name']
+            plan_trains = plan['plan_trains']
+            time_consume = plan['time_consume']
+            equip_no = plan['equip_no']
+            try:
+                pb_version_name = '-'.join(recipe_name.split('-')[-2:])
+                stage = recipe_name.split('-')[1]
+            except Exception:
+                continue
+            if pb_version_name not in job_left_list_data:
+                job_left_list_data[pb_version_name] = {stage: [{
+                    'project_name': pb_version_name,
+                    'stage': stage,
+                    'job_name': recipe_name,
+                    'job_type': 'COMMITED',
+                    'weight_qty': 999,
+                    'model_size': 1,
+                    'details': [{'time_consume': time_consume * 60,
+                                 'equip_no': int(equip_no[-2:]),
+                                 'wait_time': int(time_consume / plan_trains * 60 * sps.scheduling_interval_trains),
+                                 'plan_trains': plan_trains,
+                                 'main_equip_flag': 1
+                                 }]}]
+                }
+            else:
+                if stage not in job_left_list_data[pb_version_name]:
+                    job_left_list_data[pb_version_name][stage] = [{
+                        'project_name': pb_version_name,
+                        'stage': stage,
+                        'job_name': recipe_name,
+                        'job_type': 'COMMITED',
+                        'weight_qty': 999,
+                        'model_size': 1,
+                        'details': [{'time_consume': time_consume * 60,
+                                     'equip_no': int(equip_no[-2:]),
+                                     'wait_time': int(time_consume / plan_trains * 60 * sps.scheduling_interval_trains),
+                                     'plan_trains': plan_trains,
+                                     'main_equip_flag': 1
+                                     }]}]
+                else:
+                    job_left_list_data[pb_version_name][stage].append(
+                        {
+                            'project_name': pb_version_name,
+                            'stage': stage,
+                            'job_name': recipe_name,
+                            'job_type': 'COMMITED',
+                            'weight_qty': 999,
+                            'model_size': 1,
+                            'details': [{'time_consume': time_consume * 60,
+                                         'equip_no': int(equip_no[-2:]),
+                                         'wait_time': int(
+                                             time_consume / plan_trains * 60 * sps.scheduling_interval_trains),
+                                         'plan_trains': plan_trains,
+                                         'main_equip_flag': 1
+                                         }]}
+                    )
 
         # write excel
         id_st = 1
-        for item in job_list_data.values():
-            for _, data in item.items():
+        # 待排程和前一天未完成的所有胶料规格数据 ['C590-01', 'J290-01']
+        pb_version_names = set(list(job_list_data.keys()) + list(job_left_list_data.keys()))
+        sheet.cell(8, 2).value = len(pb_version_names)  # 需要排程的规格数量
+
+        # 结合待排程和未完成计划，写入excel
+        for pb_name in pb_version_names:
+            sheet1.cell(data_row, 1).value = data_row - 1  # 序号
+            sheet1.cell(data_row, 2).value = pb_name  # 规格名称（带版本号）
+            sheet1.cell(data_row, 3).value = 0  # 胶料代码开始时间(暂时无用)
+            sheet1.cell(data_row, 4).value = 0  # 关键路径持续时间（暂时无用）
+            sheet1.cell(data_row, 5).value = pb_available_time_dict.get(pb_name, 720)
+            left_data = job_left_list_data.get(pb_name, {})
+            job_data = job_list_data.get(pb_name, {})
+            job_lists = []
+            stage_list = sorted(list(set(list(left_data.keys()) + list(job_data.keys()))),
+                                key=lambda x: idx_keys.get(x, 999))
+            sheet1.cell(data_row, 6).value = len(stage_list)  # job_list_size(总共需要打待段次数量)
+            data_row += 1
+            for s in stage_list:
+                if s in job_data:
+                    job_lists.append(job_data[s])
+                if s in left_data:
+                    job_lists += left_data[s]
+            for data in job_lists:
+                # 写入job_list sheet
                 sheet2.cell(data_row1, 1).value = id_st
                 sheet2.cell(data_row1, 2).value = data['project_name']
-                sheet2.cell(data_row1, 3).value = data['serial_no']
+                sheet2.cell(data_row1, 3).value = stage_list.index(data['stage']) + 1
                 sheet2.cell(data_row1, 4).value = data['job_name']
                 sheet2.cell(data_row1, 5).value = data['job_type']
                 sheet2.cell(data_row1, 6).value = data['weight_qty']
-                sheet2.cell(data_row1, 7).value = data['model_size']
+                sheet2.cell(data_row1, 7).value = len(data['details'])
                 details = sorted(data['details'], key=lambda x: x['main_equip_flag'], reverse=True)
                 data_col1 = 8
                 for d in details:
