@@ -7034,13 +7034,13 @@ class EquipDownSummaryTableView(APIView):
                             reason[down_reason].update({group: times, '总计': reason[down_reason]['总计'] + times})
                             ratio[down_reason].update({group: round(times / all_times * 100, 2) if all_times else 0})
                         temp[down_reason] = temp.get(down_reason, 0) + times
-                        # 数据
-                        if '总计' not in reason:
-                            reason['总计'] = {'down_reason': '总计', group: all_times, '总计': times}
-                        else:
-                            if group not in reason['总计']:
-                                reason['总计'].update({group: all_times})
-                            reason['总计']['总计'] = reason['总计']['总计'] + times
+                        # # 数据  12-15前端计算总计
+                        # if '总计' not in reason:
+                        #     reason['总计'] = {'down_reason': '总计', group: all_times, '总计': times}
+                        # else:
+                        #     if group not in reason['总计']:
+                        #         reason['总计'].update({group: all_times})
+                        #     reason['总计']['总计'] = reason['总计']['总计'] + times
                 for m in ratio:
                     ratio[m]['总计'] = round(temp[m] / total_times * 100, 2) if total_times else 0
                 results.update({'reason': reason.values(), 'ratio': ratio.values(), 'titles': titles, 'groups': groups, 'details': data.values()})
