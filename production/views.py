@@ -3440,6 +3440,8 @@ class SummaryOfWeighingOutput(APIView):
             for i in data:
                 section, equip_no, st, et, classes = i.get('section'), i.get('equip'), i.get('calculate_begin_date'), i.get('calculate_end_date'), i.get('classes')
                 plan_model, report_basic = [JZPlan, JZReportBasic] if equip_no in JZ_EQUIP_NO else [Plan, ReportBasic]
+                if equip_no in JZ_EQUIP_NO:
+                    classes = '早' if classes == '早班' else ('晚' if classes == '夜班' else '中')
                 num = report_basic.objects.using(equip_no).filter(starttime__gte=st, savetime__lte=et, grouptime=classes).aggregate(num=Count('id'))['num']
                 if not num:
                     continue
