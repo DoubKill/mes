@@ -4065,7 +4065,7 @@ class PerformanceSummaryView(APIView):
         equip_dic = {}
         equip_list = Equip.objects.filter(category__equip_type__global_name='密炼设备').values('category__category_no', 'equip_no')
         for item in equip_list:
-            equip_dic[item['equip_no']] = item['category__category_no']
+            equip_dic[item['equip_no']] = 'GK400' if item['category__category_no'].startswith('GK400') else item['category__category_no']
         for item in user_query:
             key = f"{item[2]}_{item[3]}_{item[1]}_{item[4]}_{item[6]}_{item[0]}"  # 1_A班_挤出_Z01_早班
             if user_dic.get(key):  # 可能出现调岗后又换回来的情况，两次时间累加
