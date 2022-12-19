@@ -3363,6 +3363,8 @@ class SummaryOfWeighingOutput(APIView):
             date = item['date_time']
             day = int(date.split('-')[2])    # 2  早班
             classes = item['grouptime']  # 早班/ 中班 / 夜班
+            if equip_no in JZ_EQUIP_NO:
+                classes = '早' if classes == '早班' else ('晚' if classes == '夜班' else '中')
             dic[f'{day}{classes}'] = item['count']
             dic['hj'] = dic.get('hj', 0) + item['count']
             names = users.get(f'{day}-{classes}-{equip_no}')
@@ -3379,7 +3381,7 @@ class SummaryOfWeighingOutput(APIView):
                         if f'{day}-{st}-{et}' in qty_data:
                             num = qty_data[f'{day}-{st}-{et}']
                         else:
-                            c_num = report_basic.objects.using(equip_no).filter(starttime__gte=work_time[0], savetime__lte=work_time[1]).aggregate(num=Count('id'))['num']
+                            c_num = report_basic.objects.using(equip_no).filter(starttime__gte=work_time[0], savetime__lte=work_time[1], grouptime=classes).aggregate(num=Count('id'))['num']
                             num = c_num if c_num else 0  # 是否需要去除为0的机台再取平均
                             qty_data[f'{day}-{st}-{et}'] = num
                         # 车数计算：当天产量 / 12小时 * 实际工作时间 -> 修改为根据考勤时间计算
@@ -3538,7 +3540,7 @@ class SummaryOfWeighingOutput(APIView):
                 result1[name]['lh'] = round(result1[name].get('lh', 0) + lh, 2)
             else:
                 result1[name] = {'name': name, f"{day}{classes}": price, f"{day}{classes}_count": count_, 'xl': round(xl, 2), 'lh': round(lh, 2)}
-        return Response({'results': sort_res, 'users': result1.values()})
+        return Response({'results': sort_res, 'users': result1.values(), 'user_result': user_result})
 
 
 @method_decorator([api_recorder], name="dispatch")
