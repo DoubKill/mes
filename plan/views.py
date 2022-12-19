@@ -1695,7 +1695,9 @@ class APSExportDataView(APIView):
             pd_stages = pd_ms.stages.split('/')
             need_stages = copy.deepcopy(pd_stages)
             pb_version_name = '{}-{}'.format(pd_ms.product_no, pd_ms.version)
-            pb_available_time_dict[pb_version_name] = 720 if i.available_time == 0 else int(i.available_time * 60 * 24)  # 最晚完成时间
+            pb_time_consume = 0
+            available_time = int(i.available_time * 60 * 24)  # 最晚完成时间
+            # pb_available_time_dict[pb_version_name] = 720 if i.available_time == 0 else int(i.available_time * 60 * 24)  # 最晚完成时间
 
             # write job list sheet
             pbs = ProductBatching.objects.using('SFJ').filter(
@@ -1812,7 +1814,9 @@ class APSExportDataView(APIView):
 
                 plan_trains = weight//float(batching_weight)
                 train_time_consume = calculate_equip_recipe_avg_mixin_time(equip_no, recipe_name)
+                time_consume = plan_trains * train_time_consume/60
                 if pb_version_name not in job_list_data:
+                    pb_time_consume += time_consume
                     job_list_data[pb_version_name] = {stage: {
                         'project_name': pb_version_name,
                         'stage': stage,
@@ -1821,7 +1825,7 @@ class APSExportDataView(APIView):
                         'job_type': 'STANDARD',
                         'weight_qty': weight,
                         # 'model_size': 1,
-                        'details': [{'time_consume': plan_trains * train_time_consume/60,
+                        'details': [{'time_consume': time_consume,
                                      'equip_no': int(equip_no[-2:]),
                                      'wait_time': int(train_time_consume/60 * sps.scheduling_interval_trains),
                                      'plan_trains': plan_trains,
@@ -1830,6 +1834,7 @@ class APSExportDataView(APIView):
                     }
                 else:
                     if stage not in job_list_data[pb_version_name]:
+                        pb_time_consume += time_consume
                         job_list_data[pb_version_name][stage] = {
                             'project_name': pb_version_name,
                             'stage': stage,
@@ -1838,7 +1843,7 @@ class APSExportDataView(APIView):
                             'job_type': 'STANDARD',
                             'weight_qty': weight,
                             # 'model_size': 1,
-                            'details': [{'time_consume': plan_trains * train_time_consume/60,
+                            'details': [{'time_consume': time_consume,
                                          'equip_no': int(equip_no[-2:]),
                                          'wait_time': int(train_time_consume/60 * sps.scheduling_interval_trains),
                                          'plan_trains': plan_trains,
@@ -1847,13 +1852,18 @@ class APSExportDataView(APIView):
                     else:
                         # job_list_data[pb_version_name][stage]['model_size'] += 1
                         job_list_data[pb_version_name][stage]['details'].append(
-                            {'time_consume': plan_trains * train_time_consume / 60,
+                            {'time_consume': time_consume,
                              'equip_no': int(equip_no[-2:]),
                              'wait_time': int(train_time_consume / 60 * sps.scheduling_interval_trains),
                              'plan_trains': plan_trains,
                              'main_equip_flag': 1 if equip_main_standby == '主' else 0
                              }
                         )
+
+            if available_time < pb_time_consume:
+                pb_available_time_dict[pb_version_name] = pb_time_consume
+            else:
+                pb_available_time_dict[pb_version_name] = available_time
 
             # sheet1.cell(data_row, 6).value = len(need_stages)
             if pb_version_name not in job_list_data:
