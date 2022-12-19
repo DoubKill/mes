@@ -6811,6 +6811,7 @@ class GroupProductionSummary(APIView):
         target_month = self.request.query_params.get('target_month')
         if not target_month:
             raise ValidationError('请选择月份！')
+        td_flag = self.request.query_params.get('td_flag')  # 是否包含当天
         month_split = target_month.split('-')
         year = int(month_split[0])
         month = int(month_split[1])
@@ -6820,11 +6821,12 @@ class GroupProductionSummary(APIView):
         ).values('equip_no', 'factory_date', 'classes').annotate(total_trains=Count('id'))
         if month == datetime.datetime.now().month and year == datetime.datetime.now().year:
             now_date = get_current_factory_date()['factory_date']
+            filter_kwargs = {'plan_schedule__day_time__lte': now_date} if td_flag else {'plan_schedule__day_time__lt': now_date}
             schedule_queryset = WorkSchedulePlan.objects.filter(
                 plan_schedule__work_schedule__work_procedure__global_name='密炼',
                 plan_schedule__day_time__year=year,
                 plan_schedule__day_time__month=month,
-                plan_schedule__day_time__lte=now_date,
+                **filter_kwargs
             )
         else:
             schedule_queryset = WorkSchedulePlan.objects.filter(
