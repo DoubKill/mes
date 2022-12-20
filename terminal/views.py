@@ -2090,7 +2090,7 @@ class XLPlanVIewSet(ModelViewSet):
             filter_kwargs['actno__gte'] = 1
         if batch_time:
             filter_kwargs['date_time'] = batch_time
-        queryset = plan_model.objects.using(equip_no).filter(**filter_kwargs).order_by('order_by')
+        queryset = plan_model.objects.using(equip_no).filter(**filter_kwargs).order_by('-order_by')
         if not state:
             try:
                 serializer = self.get_serializer(queryset, many=True)

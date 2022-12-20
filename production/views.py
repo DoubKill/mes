@@ -2,6 +2,7 @@ import calendar
 import decimal
 import json
 import datetime
+import math
 import re
 import logging
 from bisect import bisect
@@ -492,8 +493,8 @@ class ProductActualViewSet(mixins.ListModelMixin,
 @method_decorator([api_recorder], name="dispatch")
 class ProductionRecordViewSet(mixins.ListModelMixin,
                               GenericViewSet):
-    queryset = PalletFeedbacks.objects.filter(delete_flag=False).order_by("factory_date", 'equip_no', 'classes',
-                                                                          'product_no', 'begin_trains')
+    queryset = PalletFeedbacks.objects.filter(delete_flag=False).order_by("-factory_date", 'equip_no', 'classes', '-plan_classes_uid',
+                                                                          'product_no', '-begin_trains')
     permission_classes = (IsAuthenticatedOrReadOnly,)
     serializer_class = ProductionRecordSerializer
     filter_backends = [DjangoFilterBackend, ]
@@ -967,7 +968,7 @@ class IntervalOutputStatisticsView(APIView):
 class TrainsFeedbacksAPIView(mixins.ListModelMixin,
                              GenericViewSet):
     """车次报表展示接口"""
-    queryset = TrainsFeedbacks.objects.order_by('factory_date', 'equip_no', 'product_no', 'actual_trains')
+    queryset = TrainsFeedbacks.objects.order_by('factory_date', 'equip_no', '-plan_classes_uid', 'product_no', '-actual_trains')
     permission_classes = (IsAuthenticatedOrReadOnly,)
     serializer_class = TrainsFeedbacksSerializer2
     filter_backends = [DjangoFilterBackend, OrderingFilter]
@@ -6355,7 +6356,24 @@ class ShiftTimeSummaryView(APIView):
             equip_count = (len(item) - 5) // 2
             item['consuming'] = round(item['consuming'] / equip_count, 2)
             item['abnormal'] = round(item['abnormal'] / equip_count, 2)
-        return Response({'results': res, 'equip_sts_time': gcs})
+        # 增加分页
+        page = self.request.query_params.get('page', 1)
+        page_size = self.request.query_params.get('page_size', 10)
+        try:
+            begin = (int(page) - 1) * int(page_size)
+            end = int(page) * int(page_size)
+        except:
+            raise ValidationError("page/page_size异常，请修正后重试")
+        else:
+            if end >= 10000:
+                page_result, total_page = res[begin:], 1
+            else:
+                if begin not in range(0, 99999):
+                    raise ValidationError("page/page_size值异常")
+                if end not in range(0, 99999):
+                    raise ValidationError("page/page_size值异常")
+                page_result, total_page = res[begin: end], math.ceil(len(res) / int(page_size))
+        return Response({'results': page_result, 'equip_sts_time': gcs, 'total_data': len(res), 'total_page': total_page})
 
 
 @method_decorator([api_recorder], name="dispatch")

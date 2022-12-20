@@ -185,7 +185,17 @@ class ClassesBanBurySummaryView(ListAPIView):
         data = ret.values()
         if day_type == '2' and dimension == '1':
             data = self.get_class_dimension_page_data(ret.values())
-
+        # 增加排序
+        try:
+            if dimension == '1':
+                if equip_no:
+                    data = sorted(data, key=lambda x: (x['equip_no'], x['classes'], -x['total_time'] / x['classes_time']))
+                else:
+                    data = sorted(data, key=lambda x: (x['equip_no'], x['classes'], x['product_no']))
+            else:
+                data = sorted(data, key=lambda x: (x['equip_no'], x['date'], x['product_no']))
+        except:
+            pass
         return Response(data)
 
 
@@ -244,7 +254,7 @@ class EquipBanBurySummaryView(ClassesBanBurySummaryView):
             select_str += ' ,classes'
 
         if equip_no:
-            where_str += """and equip_no like '%{}%' """.format(equip_no)
+            where_str += """and equip_no like '%{}%' and operation_user != 'Mixer2' """.format(equip_no)
 
         if st:
             try:
@@ -283,7 +293,7 @@ class EquipBanBurySummaryView(ClassesBanBurySummaryView):
                 'equip_no': item[1],
                 'max_trains': item[3],
                 'min_trains': item[4],
-                'total_time': item[5] if item[1] != 'Z04' else int(item[5]/2),
+                'total_time': item[5],
                 'date': item[2]
             }
             if dimension == '1':

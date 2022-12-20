@@ -550,9 +550,9 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         elif store_name in ("原材料库", '炭黑库'):
             database = 'wms' if store_name == '原材料库' else 'cb'
             if order_type == "出库":
-                queryset = MaterialOutHistory.objects.using(database).order_by('id')
+                queryset = MaterialOutHistory.objects.using(database).order_by('-fin_time')
             else:
-                queryset = MaterialInHistory.objects.using(database).order_by('id')
+                queryset = MaterialInHistory.objects.using(database).order_by('-fin_time')
             if start_time:
                 filter_dict.update(task__start_time__gte=start_time)
             if end_time:
@@ -2680,24 +2680,43 @@ class InventoryStaticsView(APIView):
                     except:
                         pass
 
-        for i in results:
+        # 增加分页
+        page = self.request.query_params.get('page', 1)
+        page_size = self.request.query_params.get('page_size', 10)
+        try:
+            begin = (int(page) - 1) * int(page_size)
+            end = int(page) * int(page_size)
+        except:
+            raise ValidationError("page/page_size异常，请修正后重试")
+        else:
+            keys = list(results.keys())
+            if end >= 10000:
+                page_result, total_page = {i: results[i] for i in results if i in keys[begin:]}, 1
+            else:
+                if begin not in range(0, 99999):
+                    raise ValidationError("page/page_size值异常")
+                if end not in range(0, 99999):
+                    raise ValidationError("page/page_size值异常")
+                page_result, total_page = {i: results[i] for i in results if i in keys[begin: end]}, math.ceil(len(results) / int(page_size))
+
+        for i in page_result:
             lst = ["CMB", 'HMB', 'NF', 'RMB', '1MB', '2MB', '3MB', "FM", 'RE', 'RFM']
             for j in lst:
                 try:
-                    results[i]['subject'][j]['weight'] = round(results[i]['subject'][j]['weight'] / 1000, 3) if \
-                    results[i]['subject'].get(j) else None
+                    page_result[i]['subject'][j]['weight'] = round(page_result[i]['subject'][j]['weight'] / 1000, 3) if \
+                        page_result[i]['subject'].get(j) else None
                 except:
                     pass
                 try:
-                    results[i]['edge'][j]['weight'] = round(results[i]['edge'][j]['weight'] / 1000, 3) if results[i][
+                    page_result[i]['edge'][j]['weight'] = round(page_result[i]['edge'][j]['weight'] / 1000, 3) if page_result[i][
                         'edge'].get(j) else None
                 except:
                     pass
-            results[i]['error'] = round(results[i]['error'] / 1000, 3)
-            results[i]['fm_all'] = round(results[i]['fm_all'] / 1000, 3)
-            results[i]['ufm_all'] = round(results[i]['ufm_all'] / 1000, 3)
+            page_result[i]['error'] = round(page_result[i]['error'] / 1000, 3)
+            page_result[i]['fm_all'] = round(page_result[i]['fm_all'] / 1000, 3)
+            page_result[i]['ufm_all'] = round(page_result[i]['ufm_all'] / 1000, 3)
 
-        return Response({'results': results, 'count': len(results)})
+        return Response({'results': page_result, 'count': len(results), 'total_page': total_page})
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -2890,7 +2909,7 @@ class WmsStorageSummaryView(APIView):
                  'batch_no': item[7],
                  'quality_status': item[8],
                  'factory': re.findall(r'[(](.*?)[)]', item[0])[-1] if re.findall(r'[(](.*?)[)]', item[0]) else '',
-                 'creater_time': item[9].strftime('%Y-%m-%d %H:%M:%S') if isinstance(item[9], datetime.datetime) else item[9]
+                 'creater_time': item[9].strftime('%Y-%m-%d %H:%M:%S') if isinstance(item[9], datetime.datetime) else item[9][:19]
                  })
         sc.close()
         return Response({'results': result, "count": count})
@@ -2960,7 +2979,7 @@ class WmsStorageView(ListAPIView):
             filter_kwargs['in_storage_time__lte'] = et
         if tunnel:
             filter_kwargs['location__startswith'] = 'ZCM-{}'.format(tunnel)
-        queryset = WmsInventoryStock.objects.using(self.DATABASE_CONF).filter(**filter_kwargs).order_by('in_storage_time')
+        queryset = WmsInventoryStock.objects.using(self.DATABASE_CONF).filter(**filter_kwargs).order_by('-in_storage_time')
         if is_entering:
             if is_entering == 'Y':
                 queryset = queryset.filter(container_no__startswith=5)
@@ -3502,7 +3521,8 @@ class WmsInventoryWeightStockView(APIView):
         if not entrance_name:
             raise ValidationError('请选择出库口！')
         if material_name:
-            extra_where_str += "and c.Name like '%{}%'".format(material_name)
+            # extra_where_str += "and c.Name like '%{}%'".format(material_name)
+            extra_where_str += "and c.Name={}".format(material_name)
         if material_no:
             extra_where_str += "and c.MaterialCode like '%{}%'".format(material_no)
         if quality_status:
