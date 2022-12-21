@@ -1884,7 +1884,7 @@ class APSExportDataView(APIView):
             sheet1.cell(data_row, 2).value = pb_name  # 规格名称（带版本号）
             sheet1.cell(data_row, 3).value = 0  # 胶料代码开始时间(暂时无用)
             sheet1.cell(data_row, 4).value = 0  # 关键路径持续时间（暂时无用）
-            sheet1.cell(data_row, 5).value = pb_available_time_dict.get(pb_name, 720)
+            sheet1.cell(data_row, 5).value = int(pb_available_time_dict.get(pb_name, 720))
             sheet1.cell(data_row, 6).value = len(item)  # job_list_size(总共需要打待段次数量)
             for _, data in item.items():
                 # 写入job_list sheet
