@@ -1022,6 +1022,11 @@ class TrainsFeedbacksAPIView(mixins.ListModelMixin,
             # qs_df['factory_date'] = qs_df['factory_date'].apply(lambda x: x.strftime('%Y-%m-%d'))
             qs_df['begin_time'] = qs_df['begin_time'].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S'))
             qs_df['end_time'] = qs_df['end_time'].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S'))
+            try:
+                qs_df['actual_weight'] = qs_df['actual_weight'].astype(float)
+                qs_df['plan_weight'] = qs_df['plan_weight'].astype(float)
+            except:
+                pass
             qs_df['actual_weight'] = qs_df['actual_weight'].apply(lambda x: x/100)
             qs_df = qs_df.apply(self.calculate_energy, axis=1)
             order = ['equip_no', 'factory_date', 'product_no', 'classes', 'plan_classes_uid', 'begin_time', 'end_time',
