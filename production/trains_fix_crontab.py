@@ -8,7 +8,7 @@ import django
 import datetime
 import logging
 
-from django.db.models import Min, Max, Count
+from django.db.models import Min, Max, Count, Q
 from django.forms import model_to_dict
 
 logger = logging.getLogger('error_log')
@@ -19,7 +19,21 @@ sys.path.append(BASE_DIR)
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'mes.settings')
 django.setup()
 
-from production.models import TrainsFeedbacks
+from production.models import TrainsFeedbacks, ProcessFeedback
+
+
+def get_ai_value(obj):
+    irm_queryset = ProcessFeedback.objects.filter(
+        Q(plan_classes_uid=obj.plan_classes_uid,
+          equip_no=obj.equip_no,
+          product_no=obj.product_no,
+          current_trains=obj.actual_trains)
+        &
+        ~Q(Q(condition='') | Q(condition__isnull=True))
+    ).exclude(condition__in=('配方结束', '同时执行')).order_by('-sn').first()
+    if irm_queryset:
+        return irm_queryset.power
+    return None
 
 
 def main():
@@ -80,6 +94,14 @@ def main():
             #             actual_trains=j
             #         ).first()
             #         obj.delete()
+
+    # 补齐AI值
+    trains_data = TrainsFeedbacks.objects.exclude(equip_no='Z04').filter(factory_date=factory_date)
+    for i in trains_data:
+        ai_value = get_ai_value(i)
+        if ai_value:
+            i.ai_power = ai_value
+            i.save()
 
 
 if __name__ == '__main__':
