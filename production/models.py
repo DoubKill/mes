@@ -46,6 +46,7 @@ class TrainsFeedbacks(AbstractEntity):
     add_cb_time = models.IntegerField(blank=True, null=True, help_text='加炭黑时间', verbose_name='加炭黑时间')
     add_oil1_time = models.IntegerField(blank=True, null=True, help_text='加油1时间', verbose_name='加油1时间')
     add_oil2_time = models.IntegerField(blank=True, null=True, help_text='加油1时间', verbose_name='加油1时间')
+    ai_power = models.DecimalField(help_text='ai值', decimal_places=1, max_digits=5, null=True, blank=True)
 
     @property
     def time(self):

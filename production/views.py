@@ -1015,7 +1015,7 @@ class TrainsFeedbacksAPIView(mixins.ListModelMixin,
                                            'begin_time', 'end_time', 'plan_trains', 'actual_trains', 'control_mode',
                                            'operating_type', 'plan_weight', 'actual_weight', 'evacuation_time',
                                            'evacuation_temperature', 'evacuation_energy',  'operation_user',
-                                           'interval_time'])
+                                           'interval_time', 'ai_power'])
             bio = BytesIO()
             writer = pd.ExcelWriter(bio, engine='xlsxwriter')  # 注意安装这个包 pip install xlsxwriter
             qs_df["mixer_time"] = round((qs_df["end_time"] - qs_df["begin_time"]).dt.seconds)
@@ -1027,7 +1027,7 @@ class TrainsFeedbacksAPIView(mixins.ListModelMixin,
             order = ['equip_no', 'factory_date', 'product_no', 'classes', 'plan_classes_uid', 'begin_time', 'end_time',
                      'plan_trains', 'actual_trains', 'control_mode', 'operating_type', 'plan_weight', 'actual_weight',
                      'evacuation_time', 'evacuation_temperature', 'evacuation_energy',  'operation_user',
-                     'mixer_time', 'interval_time']
+                     'mixer_time', 'interval_time', 'ai_power']
             qs_df = qs_df[order]
             qs_df.rename(columns={'equip_no': '机台', 'factory_date': '工厂日期', 'product_no': '配方编号',
                                   'classes': '班次', 'plan_classes_uid': '计划编号', 'begin_time': '开始时间',
@@ -1035,7 +1035,8 @@ class TrainsFeedbacksAPIView(mixins.ListModelMixin,
                                   'control_mode': '本远控', 'operating_type': '手自动', 'plan_weight': '计划重量(kg)',
                                   'actual_weight': '实际重量(kg)', 'evacuation_time': '排胶时间(s)',
                                   'evacuation_temperature': '排胶温度', 'evacuation_energy': '排胶能量(kW.h)',
-                                  'operation_user': '操作人', 'mixer_time': '密炼时间(s)', 'interval_time': '间隔时间(s)'},
+                                  'operation_user': '操作人', 'mixer_time': '密炼时间(s)', 'interval_time': '间隔时间(s)',
+                                  'ai_power': 'AI值'},
                          inplace=True)
             qs_df.to_excel(writer, sheet_name='Sheet1', index=False)
             writer.save()
