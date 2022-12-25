@@ -6825,8 +6825,8 @@ class GroupProductionSummary(APIView):
             factory_date__year=year,
             factory_date__month=month
         ).values('equip_no', 'factory_date', 'classes').annotate(total_trains=Count('id'))
+        now_date = get_current_factory_date()['factory_date']
         if month == datetime.datetime.now().month and year == datetime.datetime.now().year:
-            now_date = get_current_factory_date()['factory_date']
             filter_kwargs = {'plan_schedule__day_time__lte': now_date} if td_flag else {'plan_schedule__day_time__lt': now_date}
             schedule_queryset = WorkSchedulePlan.objects.filter(
                 plan_schedule__work_schedule__work_procedure__global_name='密炼',
@@ -6842,10 +6842,17 @@ class GroupProductionSummary(APIView):
             )
         group_schedule_data = schedule_queryset.values('group__global_name').annotate(cnt=Count('id'))
         date_classes_dict = {'{}-{}'.format(i.plan_schedule.day_time.strftime("%m-%d"), i.classes.global_name): i.group.global_name for i in schedule_queryset}
-        down_data = EquipDownDetails.objects.filter(
-            factory_date__year=year,
-            factory_date__month=month
-        ).values('group', 'equip_no').annotate(s=Sum('times'))
+        if td_flag:
+            down_data = EquipDownDetails.objects.filter(
+                factory_date__year=year,
+                factory_date__month=month
+            ).values('group', 'equip_no').annotate(s=Sum('times'))
+        else:
+            down_data = EquipDownDetails.objects.filter(
+                ~Q(factory_date=now_date),
+                factory_date__year=year,
+                factory_date__month=month
+            ).values('group', 'equip_no').annotate(s=Sum('times'))
         equip_target_data = MachineTargetYieldSettings.objects.filter(target_month=target_month).order_by('-id').values()
         target_data = {}
         if equip_target_data:
