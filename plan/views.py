@@ -1625,9 +1625,9 @@ class APSExportDataView(APIView):
             equip_plan_data.append({'recipe_name': plan.product_batching.stage_product_batch_no,
                                     'equip_no': plan.equip.equip_no,
                                     'plan_trains': plan.plan_trains,
-                                    'time_consume': time_consume + begin_time if begin_time < 0 else time_consume,
+                                    'time_consume': time_consume + begin_time/60 if begin_time/60 < 0 else time_consume,
                                     'status': 'COMMITED',
-                                    'delivery_time': time_consume + begin_time if begin_time < 0 else time_consume,
+                                    'delivery_time': time_consume + begin_time/60 if begin_time/60 < 0 else time_consume,
                                     'begin_time': 0 if begin_time < 0 else begin_time,
                                     'weight': weight
                                     })
