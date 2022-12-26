@@ -1597,6 +1597,7 @@ class APSExportDataView(APIView):
         for plan in ProductClassesPlan.objects.filter(
                 work_schedule_plan__plan_schedule__day_time=factory_date,
                 delete_flag=False):
+            weight = plan.product_batching.batching_weight * plan.plan_trains
             if plan.status in ('完成', '停止'):
                 trains_st_et = TrainsFeedbacks.objects.filter(
                     plan_classes_uid=plan.plan_classes_uid
@@ -1605,18 +1606,30 @@ class APSExportDataView(APIView):
                 if not st:
                     continue
                 time_consume = round((et - st).total_seconds() / 3600, 2)
+                begin_time = (st - datetime.datetime(year=factory_date.year,
+                                                     month=factory_date.month,
+                                                     day=factory_date.day,
+                                                     hour=8, minute=0, second=0)
+                              ).total_seconds() // 60
             else:
                 time_consume = round(
                     calculate_equip_recipe_avg_mixin_time(
                         plan.equip.equip_no,
                         plan.product_batching.stage_product_batch_no
                     ) * plan.plan_trains / 3600, 2)
+                begin_time = (plan.created_date - datetime.datetime(year=factory_date.year,
+                                                                    month=factory_date.month,
+                                                                    day=factory_date.day,
+                                                                    hour=8, minute=0, second=0)
+                              ).total_seconds() // 60
             equip_plan_data.append({'recipe_name': plan.product_batching.stage_product_batch_no,
                                     'equip_no': plan.equip.equip_no,
                                     'plan_trains': plan.plan_trains,
                                     'time_consume': time_consume,
                                     'status': 'COMMITED',
                                     'delivery_time': time_consume,
+                                    'begin_time': begin_time,
+                                    'weight': weight
                                     })
 
         # 前一天未下达的计划，超过锁定时间以内的状态为COMMITED，其他为STANDARD
@@ -1633,6 +1646,12 @@ class APSExportDataView(APIView):
                 time_consume = result['time_consume']
                 equip_time_consume = equip_time_dict.get(equip_no, 0) + time_consume
                 equip_time_dict[equip_no] = equip_time_consume
+                pb = ProductBatching.objects.using('SFJ').filter(
+                    stage_product_batch_no=recipe_name, equip__equip_no=equip_no).order_by('id').last()
+                if pb:
+                    weight = pb.batching_weight * plan_trains
+                else:
+                    weight = '8.88'
                 if equip_time_consume <= 24:
                     continue
                 if result['status'] == '未下发':
@@ -1645,7 +1664,9 @@ class APSExportDataView(APIView):
                                                 'plan_trains': plan_trains,
                                                 'delivery_time': delivery_time,
                                                 'time_consume': time_consume,
-                                                'status': 'COMMITED'
+                                                'status': 'COMMITED',
+                                                'begin_time': delivery_time * 60,
+                                                'weight': weight
                                                 })
                     else:
                         equip_plan_data.append({'recipe_name': recipe_name,
@@ -1653,7 +1674,8 @@ class APSExportDataView(APIView):
                                                 'plan_trains': plan_trains,
                                                 'delivery_time': delivery_time,
                                                 'time_consume': time_consume,
-                                                'status': 'STANDARD'
+                                                'status': 'STANDARD',
+                                                'weight': weight
                                                 })
         return equip_plan_data
 
@@ -1920,11 +1942,11 @@ class APSExportDataView(APIView):
             sheet2.cell(data_row1, 3).value = 1
             sheet2.cell(data_row1, 4).value = j['recipe_name']
             sheet2.cell(data_row1, 5).value = j['status']
-            sheet2.cell(data_row1, 6).value = 8.88
+            sheet2.cell(data_row1, 6).value = round(j['weight'], 2)
             sheet2.cell(data_row1, 7).value = 1
             sheet2.cell(data_row1, 8).value = int(j['time_consume']*60)
             sheet2.cell(data_row1, 9).value = int(j['equip_no'][-2:])
-            sheet2.cell(data_row1, 10).value = int(j['time_consume']/j['plan_trains'] * 60 * sps.scheduling_interval_trains)
+            sheet2.cell(data_row1, 10).value = int(j.get('begin_time', 0)) if j['status'] == 'COMMITED' else int(j['time_consume']/j['plan_trains'] * 60 * sps.scheduling_interval_trains)
             sheet2.cell(data_row1, 11).value = int(j['plan_trains'])
             data_row1 += 1
             data_row += 1

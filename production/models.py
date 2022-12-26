@@ -46,6 +46,7 @@ class TrainsFeedbacks(AbstractEntity):
     add_cb_time = models.IntegerField(blank=True, null=True, help_text='加炭黑时间', verbose_name='加炭黑时间')
     add_oil1_time = models.IntegerField(blank=True, null=True, help_text='加油1时间', verbose_name='加油1时间')
     add_oil2_time = models.IntegerField(blank=True, null=True, help_text='加油1时间', verbose_name='加油1时间')
+    ai_power = models.DecimalField(help_text='ai值', decimal_places=1, max_digits=5, null=True, blank=True)
 
     @property
     def time(self):
@@ -774,8 +775,14 @@ class EquipDownDetails(models.Model):
     equip_no = models.CharField(max_length=10, help_text='机台')
     down_reason = models.CharField(max_length=128, help_text='停机原因', blank=True, null=True)
     down_type = models.CharField(max_length=128, help_text='停机类型', blank=True, null=True)
-    details = models.CharField(max_length=128, help_text='明细', blank=True, null=True)
+    begin_time = models.CharField(max_length=64, help_text='停机开始时间', null=True, blank=True)
+    end_time = models.CharField(max_length=64, help_text='停机结束时间', null=True, blank=True)
     times = models.FloatField(help_text='停机时间（分钟）')
+    delete_flag = models.BooleanField(default=False, help_text='是否删除')
+    save_user = models.CharField(max_length=64, help_text='录入人', null=True, blank=True)
+    save_time = models.DateTimeField(help_text='录入时间', auto_now_add=True)
+    update_user = models.CharField(max_length=64, help_text='修改人', null=True, blank=True)
+    update_time = models.DateTimeField(help_text='更新时间', auto_now=True)
 
     class Meta:
         db_table = 'equip_down_details'

@@ -1164,8 +1164,20 @@ permission_data = [
     {'id': 1143, 'code': 'view_barcode_trace1', 'name': '查看', 'parent_id': 1142},
     {'id': 1144, 'code': 'add_barcode_trace1', 'name': '导出', 'parent_id': 1142},
 
-    # 下一个 1147 开始
+    {'id': 1147, 'code': 'equip_down_analysis', 'name': '各机台停机原因分析', 'parent_id': None, 'category_name': '生产管理'},
+    {'id': 1148, 'code': 'view_equip_down_analysis', 'name': '查看', 'parent_id': 1147},
+    {'id': 1149, 'code': 'add_equip_down_analysis', 'name': '保存', 'parent_id': 1147},
+    {'id': 1150, 'code': 'delete_equip_down_analysis', 'name': '删除', 'parent_id': 1147},
 
+    {'id': 1151, 'code': 'equip_down_summary', 'name': '各机台停机时间汇总', 'parent_id': None, 'category_name': '生产管理'},
+    {'id': 1152, 'code': 'view_equip_down_summary', 'name': '查看', 'parent_id': 1151},
+    {'id': 1154, 'code': 'export_equip_down_summary', 'name': '导出', 'parent_id': 1151},
+
+    {'id': 1155, 'code': 'equip_down_summary_table', 'name': '各机台停机原因分析图表', 'parent_id': None, 'category_name': '生产管理'},
+    {'id': 1156, 'code': 'view_equip_down_summary_table', 'name': '查看', 'parent_id': 1155},
+    {'id': 1157, 'code': 'export_equip_down_summary_table', 'name': '导出', 'parent_id': 1155},
+
+    # 下一个 1158 开始
 ]
 
 

@@ -1015,19 +1015,24 @@ class TrainsFeedbacksAPIView(mixins.ListModelMixin,
                                            'begin_time', 'end_time', 'plan_trains', 'actual_trains', 'control_mode',
                                            'operating_type', 'plan_weight', 'actual_weight', 'evacuation_time',
                                            'evacuation_temperature', 'evacuation_energy',  'operation_user',
-                                           'interval_time'])
+                                           'interval_time', 'ai_power'])
             bio = BytesIO()
             writer = pd.ExcelWriter(bio, engine='xlsxwriter')  # 注意安装这个包 pip install xlsxwriter
             qs_df["mixer_time"] = round((qs_df["end_time"] - qs_df["begin_time"]).dt.seconds)
             # qs_df['factory_date'] = qs_df['factory_date'].apply(lambda x: x.strftime('%Y-%m-%d'))
             qs_df['begin_time'] = qs_df['begin_time'].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S'))
             qs_df['end_time'] = qs_df['end_time'].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S'))
+            try:
+                qs_df['actual_weight'] = qs_df['actual_weight'].astype(float)
+                qs_df['plan_weight'] = qs_df['plan_weight'].astype(float)
+            except:
+                pass
             qs_df['actual_weight'] = qs_df['actual_weight'].apply(lambda x: x/100)
             qs_df = qs_df.apply(self.calculate_energy, axis=1)
             order = ['equip_no', 'factory_date', 'product_no', 'classes', 'plan_classes_uid', 'begin_time', 'end_time',
                      'plan_trains', 'actual_trains', 'control_mode', 'operating_type', 'plan_weight', 'actual_weight',
                      'evacuation_time', 'evacuation_temperature', 'evacuation_energy',  'operation_user',
-                     'mixer_time', 'interval_time']
+                     'mixer_time', 'interval_time', 'ai_power']
             qs_df = qs_df[order]
             qs_df.rename(columns={'equip_no': '机台', 'factory_date': '工厂日期', 'product_no': '配方编号',
                                   'classes': '班次', 'plan_classes_uid': '计划编号', 'begin_time': '开始时间',
@@ -1035,7 +1040,8 @@ class TrainsFeedbacksAPIView(mixins.ListModelMixin,
                                   'control_mode': '本远控', 'operating_type': '手自动', 'plan_weight': '计划重量(kg)',
                                   'actual_weight': '实际重量(kg)', 'evacuation_time': '排胶时间(s)',
                                   'evacuation_temperature': '排胶温度', 'evacuation_energy': '排胶能量(kW.h)',
-                                  'operation_user': '操作人', 'mixer_time': '密炼时间(s)', 'interval_time': '间隔时间(s)'},
+                                  'operation_user': '操作人', 'mixer_time': '密炼时间(s)', 'interval_time': '间隔时间(s)',
+                                  'ai_power': 'AI值'},
                          inplace=True)
             qs_df.to_excel(writer, sheet_name='Sheet1', index=False)
             writer.save()
@@ -3363,6 +3369,8 @@ class SummaryOfWeighingOutput(APIView):
             date = item['date_time']
             day = int(date.split('-')[2])    # 2  早班
             classes = item['grouptime']  # 早班/ 中班 / 夜班
+            if equip_no in JZ_EQUIP_NO:
+                classes = '早' if classes == '早班' else ('晚' if classes == '夜班' else '中')
             dic[f'{day}{classes}'] = item['count']
             dic['hj'] = dic.get('hj', 0) + item['count']
             names = users.get(f'{day}-{classes}-{equip_no}')
@@ -3379,7 +3387,7 @@ class SummaryOfWeighingOutput(APIView):
                         if f'{day}-{st}-{et}' in qty_data:
                             num = qty_data[f'{day}-{st}-{et}']
                         else:
-                            c_num = report_basic.objects.using(equip_no).filter(starttime__gte=work_time[0], savetime__lte=work_time[1]).aggregate(num=Count('id'))['num']
+                            c_num = report_basic.objects.using(equip_no).filter(starttime__gte=work_time[0], savetime__lte=work_time[1], grouptime=classes).aggregate(num=Count('id'))['num']
                             num = c_num if c_num else 0  # 是否需要去除为0的机台再取平均
                             qty_data[f'{day}-{st}-{et}'] = num
                         # 车数计算：当天产量 / 12小时 * 实际工作时间 -> 修改为根据考勤时间计算
@@ -3538,7 +3546,7 @@ class SummaryOfWeighingOutput(APIView):
                 result1[name]['lh'] = round(result1[name].get('lh', 0) + lh, 2)
             else:
                 result1[name] = {'name': name, f"{day}{classes}": price, f"{day}{classes}_count": count_, 'xl': round(xl, 2), 'lh': round(lh, 2)}
-        return Response({'results': sort_res, 'users': result1.values()})
+        return Response({'results': sort_res, 'users': result1.values(), 'user_result': user_result})
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -4065,7 +4073,7 @@ class PerformanceSummaryView(APIView):
         equip_dic = {}
         equip_list = Equip.objects.filter(category__equip_type__global_name='密炼设备').values('category__category_no', 'equip_no')
         for item in equip_list:
-            equip_dic[item['equip_no']] = item['category__category_no']
+            equip_dic[item['equip_no']] = 'GK400' if item['category__category_no'].startswith('GK400') else item['category__category_no']
         for item in user_query:
             key = f"{item[2]}_{item[3]}_{item[1]}_{item[4]}_{item[6]}_{item[0]}"  # 1_A班_挤出_Z01_早班
             if user_dic.get(key):  # 可能出现调岗后又换回来的情况，两次时间累加
@@ -6658,6 +6666,7 @@ class ShiftProductionSummaryView(APIView):
             factory_date__year=year, factory_date__month=month).aggregate(days=Sum('num'))['days']
         working_days = 0 if not working_days else working_days
         down_days_dict = dict(EquipDownDetails.objects.filter(
+            delete_flag=False,
             factory_date__year=year,
             factory_date__month=month
         ).values('equip_no').annotate(days=Sum('times')/60/24).values_list('equip_no', 'days'))
@@ -6678,6 +6687,7 @@ class ShiftProductionSummaryView(APIView):
                 group__global_name=group_name
             ).count()
         group_down_days_dict = dict(EquipDownDetails.objects.filter(
+            delete_flag=False,
             factory_date__year=year,
             factory_date__month=month,
             group=group_name
@@ -6760,6 +6770,7 @@ class EquipDownDetailView(APIView):
             k = '{}-{}'.format(i['plan_schedule__day_time'].strftime("%m/%d"), i['classes__global_name'][0])
             schedule_dict[k] = i['group__global_name'][0]
         down_data = EquipDownDetails.objects.filter(
+            delete_flag=False,
             factory_date__year=year,
             factory_date__month=month
         ).values('factory_date', 'classes', 'equip_no').annotate(t=Sum('times')).order_by('equip_no', 'factory_date')
@@ -6802,6 +6813,313 @@ class EquipDownDetailView(APIView):
                          'data': data})
 
 
+@method_decorator([api_recorder], name="dispatch")
+class EquipDownAnalysisView(APIView):
+    """机台故障停机时间分析与汇总"""
+
+    # permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        all_equip = self.request.query_params.get('all_equip')
+        group_flag = self.request.query_params.get('group_flag')
+        select_date = self.request.query_params.get('select_date')  # 2022-12-06
+        if not all_equip:
+            equip_no = self.request.query_params.get('equip_no')  # Z01
+            group = self.request.query_params.get('group')
+            filter_kwargs = {}
+            if group:
+                filter_kwargs['group'] = group
+            queryset = EquipDownDetails.objects.filter(delete_flag=False, equip_no=equip_no, factory_date=select_date, **filter_kwargs).order_by('id')
+            data = {'results': queryset.values()}
+            if group_flag:
+                group_classes = WorkSchedulePlan.objects.filter(plan_schedule__day_time=select_date,
+                                                                plan_schedule__work_schedule__work_procedure__global_name='密炼') \
+                    .values('classes__global_name', 'group__global_name')
+                data.update({'group_classes': group_classes})
+        else:  # 查看所有机台设定值
+            equip_list, res, max_info, equip_info = all_equip.split(','), {}, {}, {}
+            queryset = EquipDownDetails.objects.filter(delete_flag=False, equip_no__in=equip_list, factory_date=select_date).order_by('equip_no', 'id').values()
+            for i in queryset:
+                equip_info[i['equip_no']] = equip_info.get(i['equip_no'], []) + [i]
+                max_info[i['equip_no']] = max_info.get(i['equip_no'], 0) + 1
+            if max_info:
+                max_num = max(max_info.values())
+                for equip_no in equip_list:
+                    _s_info = equip_info.get(equip_no, [])
+                    for i in range(max_num):
+                        _s_data = {f"{equip_no}-begin_time": _s_info[i]['begin_time'] if _s_info[i: i+1] else '',
+                                   f"{equip_no}-end_time": _s_info[i]['end_time'] if _s_info[i: i+1] else '',
+                                   f"{equip_no}-times": _s_info[i]['times'] if _s_info[i: i+1] else '',
+                                   f"{equip_no}-down_reason": _s_info[i]['down_reason'] if _s_info[i: i+1] else '',
+                                   f"{equip_no}-down_type": _s_info[i]['down_type'] if _s_info[i: i+1] else ''}
+                        index_data = res.get(i)
+                        if index_data:
+                            res[i].update(_s_data)
+                        else:
+                            res[i] = _s_data
+            data = {'results': res.values()}
+        return Response(data)
+
+    @atomic
+    def post(self, request):
+        data = self.request.data.get('set_data')
+        delete_id = self.request.data.get('delete_ids')
+        factory_date = self.request.data.get('factory_date')
+        equip_no = self.request.data.get('equip_no')
+        group = self.request.data.get('group')
+        classes = self.request.data.get('classes')
+        user_name = self.request.user.username
+        # 删除物料
+        if delete_id:
+            EquipDownDetails.objects.filter(id=delete_id).update(delete_flag=True, update_user=user_name)
+            return Response('删除成功')
+        if not data:
+            raise ValidationError('未录入数据')
+        for s_data in data:
+            rid, begin_time, end_time = s_data.get('id'), s_data.get('begin_time'), s_data.get('end_time')
+            # # 班次班组
+            _s_data = {'begin_time': begin_time, 'end_time': end_time, 'factory_date': factory_date, 'equip_no': equip_no,
+                       'down_reason': s_data.get('down_reason'), 'down_type': s_data.get('down_type'), 'times': round(s_data.get('times', 0), 2),
+                       'group': group, 'classes': classes}
+            if rid:
+                _s_data['update_user'] = user_name
+            else:
+                _s_data['save_user'] = user_name
+            EquipDownDetails.objects.update_or_create(defaults=_s_data, **{'id': rid})
+        return Response('录入成功')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class EquipDownSummaryView(APIView):
+    """机台故障停机时间分析与汇总"""
+
+    # permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        select_type = self.request.query_params.get('select_type', '1')
+        st = self.request.query_params.get('st')  # 2022-12-06
+        et = self.request.query_params.get('et')  # 2022-12-06
+        if not all([st, et]):
+            now_date = datetime.datetime.now().strftime('%Y-%m-%d')
+            st = et = now_date
+        equip_no = self.request.query_params.get('equip_no')  # Z01
+        group = self.request.query_params.get('group')
+        classes = self.request.query_params.get('classes')
+        filter_kwargs = {'factory_date__gte': st, 'factory_date__lte': et}
+        if equip_no:
+            filter_kwargs['equip_no'] = equip_no
+        if group:
+            filter_kwargs['group'] = group
+        if classes:
+            filter_kwargs['classes'] = classes
+        results = []
+        if select_type == '1':  # 各班机台停机时间汇总
+            queryset = EquipDownDetails.objects.filter(delete_flag=False, **filter_kwargs).order_by('factory_date', 'equip_no', 'begin_time', 'end_time').values()
+            total_times = list(set([i['times'] for i in queryset]))
+            sorted_times = sorted(total_times, key=lambda x: x, reverse=True)
+            for i in queryset:  # 更新排名
+                _index = sorted_times.index(i['times']) + 1
+                i.update(**{'index': _index})
+                results.append(i)
+        else:  # 生产分析汇总
+            detail = self.request.query_params.get('detail')
+            if detail:  # 停机时间汇总(详情)
+                down_type = self.request.query_params.get('down_type')
+                filter_kwargs['down_type'] = down_type
+                down_detail = EquipDownDetails.objects.filter(delete_flag=False, **filter_kwargs).values('down_reason').annotate(total_times=Sum('times')).values('down_reason', 'total_times').order_by('-total_times')
+                totals = sum([i['total_times'] for i in down_detail])
+                for j in down_detail:
+                    _s_data = {'down_reason': j.get('down_reason'), 'down_time': round(j.get('total_times'), 2), 'ratio': round((j.get('total_times', 0) / totals) * 100, 2)}
+                    results.append(_s_data)
+                if down_detail:
+                    results.append({'down_reason': '总计', 'down_time': totals, 'ratio': 100})
+            else:
+                # 统计停机类别时间
+                results = {}
+                all_info = list(EquipDownDetails.objects.filter(delete_flag=False, **filter_kwargs).values('down_type').annotate(all_times=Sum('times'), index=F('down_type')).values('index', 'all_times'))
+                stop_times = round(sum([i['all_times'] for i in all_info]), 2)
+                for k in all_info:
+                    k['index'] = k['index'] + '-' + '总时间/min'
+                    k['ratio'] = round(k['all_times'] / stop_times * 100, 2)
+                    k['super'] = True
+                # 产量统计
+                product_dict, begin_time, end_time, total_spends, record_equip = {}, None, None, 0, []
+                product_info = TrainsFeedbacks.objects.filter(~Q(operation_user='Mixer2'), **filter_kwargs).order_by('equip_no', 'factory_date', 'created_date', 'actual_trains')
+                equips = len(set(product_info.values_list('equip_no', flat=True)))
+                days = (datetime.datetime.strptime(et, '%Y-%m-%d') - datetime.datetime.strptime(st, '%Y-%m-%d')).days + 1
+                # days = len(set(product_info.values_list('factory_date', flat=True)))
+                for j in product_info:
+                    product_no, equip_no = j.product_no, j.equip_no
+                    _p = product_dict.get(product_no)
+                    if equip_no not in record_equip:
+                        begin_time, end_time = j.begin_time, j.end_time
+                        record_equip.append(equip_no)
+                        continue
+                    _interval_time = (j.begin_time - end_time).total_seconds()
+                    interval_time = _interval_time if _interval_time > 0 else 20
+                    mixer_time = (j.end_time - j.begin_time).total_seconds()
+                    begin_time, end_time = j.begin_time, j.end_time
+                    if interval_time >= 20:
+                        continue
+                    if not _p:
+                        actual_trains = 1
+                        origin_mixer = mixer_time
+                        origin_interval = interval_time
+                    else:
+                        actual_trains = _p.get('actual_trains', 0) + 1
+                        origin_mixer = _p.get('origin_mixer', 0) + mixer_time
+                        origin_interval = _p.get('origin_interval', 0) + interval_time
+                    s_mixer_time = round(origin_mixer / actual_trains, 2)
+                    s_interval_time = round(origin_interval / actual_trains, 2)
+                    all_time = round(origin_mixer + origin_interval, 2)
+                    total_spends = round(total_spends + mixer_time + interval_time, 2)
+                    product_dict[product_no] = {'product_no': product_no, 'actual_trains': actual_trains, 's_mixer_time': s_mixer_time,
+                                                's_interval_time': s_interval_time, 'origin_mixer': origin_mixer, 'origin_interval': origin_interval,
+                                                'all_times': all_time}
+                # 胶料时间占比
+                for k, v in product_dict.items():
+                    v.update(**{'ratio': round(v.get('all_times', 0) / total_spends * 100, 2)})
+                day_times = days * 2 * 12 * 60 * equips
+                m_total_spends = round(total_spends / 60, 2)
+                total_times = round(m_total_spends + stop_times, 2)
+                missing_time = round(day_times - total_times, 2)
+                summary_time = [{'index': '运行-总时间/min', 'all_times': m_total_spends, 'ratio': round(m_total_spends / total_times * 100, 2) if total_times else 0}]
+                stop_time = [{'index': '停机-总时间/min', 'all_times': stop_times, 'ratio': round(stop_times / total_times * 100, 2) if total_times else 0}]
+                all_times = [{'index': '总时间/min', 'all_times': total_times, 'ratio': round(total_times / day_times * 100, 2) if day_times else 0}]
+                miss_times = [{'index': '缺失时间/min', 'all_times': missing_time, 'ratio': round(missing_time / day_times * 100, 2) if day_times else 0}]
+                results = {'details': product_dict.values(), 'summary': summary_time + all_info + stop_time + all_times + miss_times}
+        return Response({'results': results})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class EquipDownSummaryTableView(APIView):
+    """机台故障停机时间分析与汇总"""
+
+    # permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        equip_no = self.request.query_params.get('equip_no')
+        table_flag = self.request.query_params.get('table_flag')  # 导出时展示的各个机台的数据
+        group_flag = self.request.query_params.get('group_flag')  # 传入表示班组停机类型汇总
+        st = self.request.query_params.get('st')  # 2022-12-06
+        et = self.request.query_params.get('et')  # 2022-12-06
+        export = self.request.query_params.get('export')
+        if not all([st, et]):
+            now_date = datetime.datetime.now().strftime('%Y-%m-%d')
+            st = et = now_date
+        results = {}
+        if group_flag:
+            equip_list = equip_no.split(',')
+            queryset = EquipDownDetails.objects.filter(delete_flag=False, factory_date__lte=et, factory_date__gte=st, equip_no__in=equip_list) \
+                .values('group', 'down_reason').annotate(total_times=Sum('times')).order_by('group').values('group', 'down_reason', 'total_times')
+            if queryset:
+                titles = list(set(queryset.values_list('down_reason', flat=True)))
+                groups = list(set(queryset.values_list('group', flat=True)))
+                groups.sort()
+                data = {}
+                for i in queryset:
+                    group, down_reason, total_times = i['group'], i['down_reason'], i['total_times']
+                    if f'{group}-data' not in data:
+                        data[f'{group}-data'] = {title: 0 for title in titles}
+                        data[f'{group}-data'].update({'group': group, down_reason: total_times})
+                    else:
+                        data[f'{group}-data'].update({down_reason: total_times})
+                # 图表数据
+                for k in data:
+                    s_data = deepcopy(data[k])
+                    group = s_data.pop('group')
+                    results.update({group: s_data.values()})
+                # 表格数据
+                execl_data, reason, ratio, total_times, temp = deepcopy(list(data.values())), {}, {}, 0, {}
+                for j in execl_data:
+                    group, all_times = j.pop('group'), sum(j.values())
+                    for down_reason, times in j.items():
+                        total_times += times
+                        if down_reason not in reason:
+                            reason[down_reason] = {'down_reason': down_reason, group: times, '总计': times}
+                            ratio[down_reason] = {'down_reason': down_reason, group: round(times / all_times * 100, 2) if all_times else 0}
+                        else:
+                            reason[down_reason].update({group: times, '总计': reason[down_reason]['总计'] + times})
+                            ratio[down_reason].update({group: round(times / all_times * 100, 2) if all_times else 0})
+                        temp[down_reason] = temp.get(down_reason, 0) + times
+                        # # 数据  12-15前端计算总计
+                        # if '总计' not in reason:
+                        #     reason['总计'] = {'down_reason': '总计', group: all_times, '总计': times}
+                        # else:
+                        #     if group not in reason['总计']:
+                        #         reason['总计'].update({group: all_times})
+                        #     reason['总计']['总计'] = reason['总计']['总计'] + times
+                for m in ratio:
+                    ratio[m]['总计'] = round(temp[m] / total_times * 100, 2) if total_times else 0
+                results.update({'reason': reason.values(), 'ratio': ratio.values(), 'titles': titles, 'groups': groups, 'details': data.values()})
+            return Response({'results': results})
+        if export:
+            equips_data = EquipDownDetails.objects.filter(delete_flag=False, factory_date__gte=st, factory_date__lte=et) \
+                .values('equip_no', 'down_reason').annotate(total_times=Sum('times')).values('equip_no', 'down_reason', 'total_times') \
+                .order_by('equip_no', '-total_times')
+            if not equips_data:
+                raise ValidationError('无数据可以导出')
+            res, temp_data = {}, {}
+            for i in equips_data:
+                equip_no, down_reason, total_times = i['equip_no'], i['down_reason'], i['total_times']
+                equip_info = res.get(equip_no)
+                if not equip_info:
+                    res[equip_no] = [{'down_reason': down_reason, 'times': total_times, 'equip_no': equip_no}]
+                    temp_data[f"{equip_no}_times"] = total_times
+                    temp_data[f"{equip_no}_cnt"] = 1
+                else:
+                    if temp_data[f"{equip_no}_cnt"] >= 10:
+                        continue
+                    res[equip_no] = equip_info + [{'down_reason': down_reason, 'times': total_times, 'equip_no': equip_no}]
+                    temp_data[f"{equip_no}_times"] += total_times
+                    temp_data[f"{equip_no}_cnt"] += 1
+            data = []
+            for k, v in res.items():  # 比例
+                s_times = temp_data.get(f"{equip_no}_times")
+                for j in v:
+                    j['ratio'] = round(j['times'] / s_times, 2)
+                    data.append(j)
+            file_name = '各机台图表(TOP10)'
+            export_fields_dict = {"机台": "equip_no", "异常原因": "down_reason", "分钟数": "times", "累计百分比": "ratio"}
+            return gen_template_response(export_fields_dict, data, file_name, handle_str=True)
+        if not equip_no:  # 所有密炼机TOP10停机原因汇总(总min)
+            titles, details, ratios = [], [], []
+            equips_data = EquipDownDetails.objects.filter(delete_flag=False, factory_date__gte=st, factory_date__lte=et).values('down_reason').annotate(total_times=Sum('times')).values('down_reason', 'total_times')
+            all_times = sum([i['total_times'] for i in equips_data][:10])
+            for i in equips_data[:10]:
+                titles.append(i['down_reason'])
+                details.append(i['total_times'])
+                ratios.append(round(i['total_times'] / all_times, 2))
+            results.update(**{'titles': titles, 'details': details, 'ratios': ratios, 'times': all_times})
+        else:  # 单机台密炼机TOP10停机原因汇总(总min)
+            filter_kwargs = {}
+            if not table_flag:
+                filter_kwargs['equip_no'] = equip_no
+            equips_data = EquipDownDetails.objects.filter(delete_flag=False, factory_date__gte=st, factory_date__lte=et, **filter_kwargs)\
+                .values('equip_no', 'down_reason').annotate(total_times=Sum('times')).values('equip_no', 'down_reason', 'total_times')\
+                .order_by('equip_no', 'total_times')
+            for i in equips_data:
+                equip_no, down_reason, total_times = i['equip_no'], i['down_reason'], i['total_times']
+                equip_info = results.get(equip_no)
+                if not equip_info:
+                    results[equip_no] = {'times': total_times, 'cnt': 1, 'titles': [down_reason], 'details': [total_times], 'equip_no': equip_no}
+                else:
+                    if equip_info['cnt'] >= 10:
+                        continue
+                    equip_info['times'] = equip_info['times'] + total_times
+                    equip_info['cnt'] = equip_info['cnt'] + 1
+                    equip_info['titles'].append(down_reason)
+                    equip_info['details'].append(total_times)
+            for k, v in results.items():  # 比例
+                v['ratios'] = list(map(lambda x: round(x / v['times'], 2), v['details']))
+            if table_flag:
+                results = results.values()
+            else:
+                if results:
+                    results = results.get(equip_no, {})
+        return Response({'results': results})
+
+
 @method_decorator([api_recorder], name='dispatch')
 class GroupProductionSummary(APIView):
 
@@ -6809,6 +7127,7 @@ class GroupProductionSummary(APIView):
         target_month = self.request.query_params.get('target_month')
         if not target_month:
             raise ValidationError('请选择月份！')
+        td_flag = self.request.query_params.get('td_flag')  # 是否包含当天
         month_split = target_month.split('-')
         year = int(month_split[0])
         month = int(month_split[1])
@@ -6816,13 +7135,14 @@ class GroupProductionSummary(APIView):
             factory_date__year=year,
             factory_date__month=month
         ).values('equip_no', 'factory_date', 'classes').annotate(total_trains=Count('id'))
+        now_date = get_current_factory_date()['factory_date']
         if month == datetime.datetime.now().month and year == datetime.datetime.now().year:
-            now_date = get_current_factory_date()['factory_date']
+            filter_kwargs = {'plan_schedule__day_time__lte': now_date} if td_flag else {'plan_schedule__day_time__lt': now_date}
             schedule_queryset = WorkSchedulePlan.objects.filter(
                 plan_schedule__work_schedule__work_procedure__global_name='密炼',
                 plan_schedule__day_time__year=year,
                 plan_schedule__day_time__month=month,
-                plan_schedule__day_time__lte=now_date,
+                **filter_kwargs
             )
         else:
             schedule_queryset = WorkSchedulePlan.objects.filter(
@@ -6832,10 +7152,17 @@ class GroupProductionSummary(APIView):
             )
         group_schedule_data = schedule_queryset.values('group__global_name').annotate(cnt=Count('id'))
         date_classes_dict = {'{}-{}'.format(i.plan_schedule.day_time.strftime("%m-%d"), i.classes.global_name): i.group.global_name for i in schedule_queryset}
-        down_data = EquipDownDetails.objects.filter(
-            factory_date__year=year,
-            factory_date__month=month
-        ).values('group', 'equip_no').annotate(s=Sum('times'))
+        if td_flag:
+            down_data = EquipDownDetails.objects.filter(
+                factory_date__year=year,
+                factory_date__month=month
+            ).values('group', 'equip_no').annotate(s=Sum('times'))
+        else:
+            down_data = EquipDownDetails.objects.filter(
+                ~Q(factory_date=now_date),
+                factory_date__year=year,
+                factory_date__month=month
+            ).values('group', 'equip_no').annotate(s=Sum('times'))
         equip_target_data = MachineTargetYieldSettings.objects.filter(target_month=target_month).order_by('-id').values()
         target_data = {}
         if equip_target_data:
