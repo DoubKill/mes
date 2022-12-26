@@ -1942,7 +1942,7 @@ class APSExportDataView(APIView):
             sheet2.cell(data_row1, 3).value = 1
             sheet2.cell(data_row1, 4).value = j['recipe_name']
             sheet2.cell(data_row1, 5).value = j['status']
-            sheet2.cell(data_row1, 6).value = 8.88
+            sheet2.cell(data_row1, 6).value = j['weight']
             sheet2.cell(data_row1, 7).value = 1
             sheet2.cell(data_row1, 8).value = int(j['time_consume']*60)
             sheet2.cell(data_row1, 9).value = int(j['equip_no'][-2:])
