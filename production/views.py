@@ -1025,6 +1025,7 @@ class TrainsFeedbacksAPIView(mixins.ListModelMixin,
             try:
                 qs_df['actual_weight'] = qs_df['actual_weight'].astype(float)
                 qs_df['plan_weight'] = qs_df['plan_weight'].astype(float)
+                qs_df['ai_power'] = qs_df['ai_power'].astype(float)
             except:
                 pass
             qs_df['actual_weight'] = qs_df['actual_weight'].apply(lambda x: x/100)
