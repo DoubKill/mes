@@ -53,6 +53,7 @@ class SaveFinishRatio(object):
         date_classes_dict = {'{}-{}'.format(i.plan_schedule.day_time.strftime("%m-%d"), i.classes.global_name): i.group.global_name for i in
                              schedule_queryset}
         down_data = EquipDownDetails.objects.filter(
+            delete_flag=False,
             factory_date__year=year,
             factory_date__month=month
         ).values('group', 'equip_no').annotate(s=Sum('times'))
