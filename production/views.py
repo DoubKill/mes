@@ -1015,19 +1015,24 @@ class TrainsFeedbacksAPIView(mixins.ListModelMixin,
                                            'begin_time', 'end_time', 'plan_trains', 'actual_trains', 'control_mode',
                                            'operating_type', 'plan_weight', 'actual_weight', 'evacuation_time',
                                            'evacuation_temperature', 'evacuation_energy',  'operation_user',
-                                           'interval_time'])
+                                           'interval_time', 'ai_power'])
             bio = BytesIO()
             writer = pd.ExcelWriter(bio, engine='xlsxwriter')  # 注意安装这个包 pip install xlsxwriter
             qs_df["mixer_time"] = round((qs_df["end_time"] - qs_df["begin_time"]).dt.seconds)
             # qs_df['factory_date'] = qs_df['factory_date'].apply(lambda x: x.strftime('%Y-%m-%d'))
             qs_df['begin_time'] = qs_df['begin_time'].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S'))
             qs_df['end_time'] = qs_df['end_time'].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S'))
+            try:
+                qs_df['actual_weight'] = qs_df['actual_weight'].astype(float)
+                qs_df['plan_weight'] = qs_df['plan_weight'].astype(float)
+            except:
+                pass
             qs_df['actual_weight'] = qs_df['actual_weight'].apply(lambda x: x/100)
             qs_df = qs_df.apply(self.calculate_energy, axis=1)
             order = ['equip_no', 'factory_date', 'product_no', 'classes', 'plan_classes_uid', 'begin_time', 'end_time',
                      'plan_trains', 'actual_trains', 'control_mode', 'operating_type', 'plan_weight', 'actual_weight',
                      'evacuation_time', 'evacuation_temperature', 'evacuation_energy',  'operation_user',
-                     'mixer_time', 'interval_time']
+                     'mixer_time', 'interval_time', 'ai_power']
             qs_df = qs_df[order]
             qs_df.rename(columns={'equip_no': '机台', 'factory_date': '工厂日期', 'product_no': '配方编号',
                                   'classes': '班次', 'plan_classes_uid': '计划编号', 'begin_time': '开始时间',
@@ -1035,7 +1040,8 @@ class TrainsFeedbacksAPIView(mixins.ListModelMixin,
                                   'control_mode': '本远控', 'operating_type': '手自动', 'plan_weight': '计划重量(kg)',
                                   'actual_weight': '实际重量(kg)', 'evacuation_time': '排胶时间(s)',
                                   'evacuation_temperature': '排胶温度', 'evacuation_energy': '排胶能量(kW.h)',
-                                  'operation_user': '操作人', 'mixer_time': '密炼时间(s)', 'interval_time': '间隔时间(s)'},
+                                  'operation_user': '操作人', 'mixer_time': '密炼时间(s)', 'interval_time': '间隔时间(s)',
+                                  'ai_power': 'AI值'},
                          inplace=True)
             qs_df.to_excel(writer, sheet_name='Sheet1', index=False)
             writer.save()
@@ -3363,6 +3369,8 @@ class SummaryOfWeighingOutput(APIView):
             date = item['date_time']
             day = int(date.split('-')[2])    # 2  早班
             classes = item['grouptime']  # 早班/ 中班 / 夜班
+            if equip_no in JZ_EQUIP_NO:
+                classes = '早' if classes == '早班' else ('晚' if classes == '夜班' else '中')
             dic[f'{day}{classes}'] = item['count']
             dic['hj'] = dic.get('hj', 0) + item['count']
             names = users.get(f'{day}-{classes}-{equip_no}')
@@ -3379,7 +3387,7 @@ class SummaryOfWeighingOutput(APIView):
                         if f'{day}-{st}-{et}' in qty_data:
                             num = qty_data[f'{day}-{st}-{et}']
                         else:
-                            c_num = report_basic.objects.using(equip_no).filter(starttime__gte=work_time[0], savetime__lte=work_time[1]).aggregate(num=Count('id'))['num']
+                            c_num = report_basic.objects.using(equip_no).filter(starttime__gte=work_time[0], savetime__lte=work_time[1], grouptime=classes).aggregate(num=Count('id'))['num']
                             num = c_num if c_num else 0  # 是否需要去除为0的机台再取平均
                             qty_data[f'{day}-{st}-{et}'] = num
                         # 车数计算：当天产量 / 12小时 * 实际工作时间 -> 修改为根据考勤时间计算
@@ -3538,7 +3546,7 @@ class SummaryOfWeighingOutput(APIView):
                 result1[name]['lh'] = round(result1[name].get('lh', 0) + lh, 2)
             else:
                 result1[name] = {'name': name, f"{day}{classes}": price, f"{day}{classes}_count": count_, 'xl': round(xl, 2), 'lh': round(lh, 2)}
-        return Response({'results': sort_res, 'users': result1.values()})
+        return Response({'results': sort_res, 'users': result1.values(), 'user_result': user_result})
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -4065,7 +4073,7 @@ class PerformanceSummaryView(APIView):
         equip_dic = {}
         equip_list = Equip.objects.filter(category__equip_type__global_name='密炼设备').values('category__category_no', 'equip_no')
         for item in equip_list:
-            equip_dic[item['equip_no']] = item['category__category_no']
+            equip_dic[item['equip_no']] = 'GK400' if item['category__category_no'].startswith('GK400') else item['category__category_no']
         for item in user_query:
             key = f"{item[2]}_{item[3]}_{item[1]}_{item[4]}_{item[6]}_{item[0]}"  # 1_A班_挤出_Z01_早班
             if user_dic.get(key):  # 可能出现调岗后又换回来的情况，两次时间累加
@@ -6809,6 +6817,7 @@ class GroupProductionSummary(APIView):
         target_month = self.request.query_params.get('target_month')
         if not target_month:
             raise ValidationError('请选择月份！')
+        td_flag = self.request.query_params.get('td_flag')  # 是否包含当天
         month_split = target_month.split('-')
         year = int(month_split[0])
         month = int(month_split[1])
@@ -6816,13 +6825,14 @@ class GroupProductionSummary(APIView):
             factory_date__year=year,
             factory_date__month=month
         ).values('equip_no', 'factory_date', 'classes').annotate(total_trains=Count('id'))
+        now_date = get_current_factory_date()['factory_date']
         if month == datetime.datetime.now().month and year == datetime.datetime.now().year:
-            now_date = get_current_factory_date()['factory_date']
+            filter_kwargs = {'plan_schedule__day_time__lte': now_date} if td_flag else {'plan_schedule__day_time__lt': now_date}
             schedule_queryset = WorkSchedulePlan.objects.filter(
                 plan_schedule__work_schedule__work_procedure__global_name='密炼',
                 plan_schedule__day_time__year=year,
                 plan_schedule__day_time__month=month,
-                plan_schedule__day_time__lte=now_date,
+                **filter_kwargs
             )
         else:
             schedule_queryset = WorkSchedulePlan.objects.filter(
@@ -6832,10 +6842,17 @@ class GroupProductionSummary(APIView):
             )
         group_schedule_data = schedule_queryset.values('group__global_name').annotate(cnt=Count('id'))
         date_classes_dict = {'{}-{}'.format(i.plan_schedule.day_time.strftime("%m-%d"), i.classes.global_name): i.group.global_name for i in schedule_queryset}
-        down_data = EquipDownDetails.objects.filter(
-            factory_date__year=year,
-            factory_date__month=month
-        ).values('group', 'equip_no').annotate(s=Sum('times'))
+        if td_flag:
+            down_data = EquipDownDetails.objects.filter(
+                factory_date__year=year,
+                factory_date__month=month
+            ).values('group', 'equip_no').annotate(s=Sum('times'))
+        else:
+            down_data = EquipDownDetails.objects.filter(
+                ~Q(factory_date=now_date),
+                factory_date__year=year,
+                factory_date__month=month
+            ).values('group', 'equip_no').annotate(s=Sum('times'))
         equip_target_data = MachineTargetYieldSettings.objects.filter(target_month=target_month).order_by('-id').values()
         target_data = {}
         if equip_target_data:
