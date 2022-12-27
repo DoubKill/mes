@@ -1025,6 +1025,7 @@ class TrainsFeedbacksAPIView(mixins.ListModelMixin,
             try:
                 qs_df['actual_weight'] = qs_df['actual_weight'].astype(float)
                 qs_df['plan_weight'] = qs_df['plan_weight'].astype(float)
+                qs_df['ai_power'] = qs_df['ai_power'].astype(float)
             except:
                 pass
             qs_df['actual_weight'] = qs_df['actual_weight'].apply(lambda x: x/100)
@@ -3369,8 +3370,7 @@ class SummaryOfWeighingOutput(APIView):
             date = item['date_time']
             day = int(date.split('-')[2])    # 2  早班
             classes = item['grouptime']  # 早班/ 中班 / 夜班
-            if equip_no in JZ_EQUIP_NO:
-                classes = '早' if classes == '早班' else ('晚' if classes == '夜班' else '中')
+            filter_classes = classes if equip_no not in JZ_EQUIP_NO else ('早' if classes == '早班' else ('晚' if classes == '夜班' else '中'))
             dic[f'{day}{classes}'] = item['count']
             dic['hj'] = dic.get('hj', 0) + item['count']
             names = users.get(f'{day}-{classes}-{equip_no}')
@@ -3387,7 +3387,7 @@ class SummaryOfWeighingOutput(APIView):
                         if f'{day}-{st}-{et}' in qty_data:
                             num = qty_data[f'{day}-{st}-{et}']
                         else:
-                            c_num = report_basic.objects.using(equip_no).filter(starttime__gte=work_time[0], savetime__lte=work_time[1], grouptime=classes).aggregate(num=Count('id'))['num']
+                            c_num = report_basic.objects.using(equip_no).filter(starttime__gte=work_time[0], savetime__lte=work_time[1], grouptime=filter_classes).aggregate(num=Count('id'))['num']
                             num = c_num if c_num else 0  # 是否需要去除为0的机台再取平均
                             qty_data[f'{day}-{st}-{et}'] = num
                         # 车数计算：当天产量 / 12小时 * 实际工作时间 -> 修改为根据考勤时间计算
