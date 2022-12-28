@@ -17,7 +17,7 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'mes.settings')
 django.setup()
 
 from django.db.transaction import atomic
-from production.models import RubberCannotPutinReason
+from production.models import RubberCannotPutinReason, RubberWrongMaskReason
 from mes.common_code import SqlClient
 
 EQUIP_CONFIG = {
@@ -35,13 +35,14 @@ EQUIP_CONFIG = {
     "Z12": {"HOST": "10.4.23.72", "USER": "gz", "NAME": "GZSFJ", "PASSWORD": "123456"},
     "Z13": {"HOST": "10.4.23.73", "USER": "gz", "NAME": "GZSFJ", "PASSWORD": "123456"},
     "Z14": {"HOST": "10.4.23.74", "USER": "gz", "NAME": "GZSFJ", "PASSWORD": "123456"},
-    "Z15": {"HOST": "10.4.23.75", "USER": "gz", "NAME": "GZSFJ", "PASSWORD": "123456"},
+    "Z15": {"HOST": "10.4.23.75", "USER": "gz", "NAME": "GZSFJ", "PASSWORD": "123456"}
 }
+
+equip_list = ['Z%.2d' % i for i in range(1, 16)]
 
 
 @atomic
 def main():
-    equip_list = ['Z%.2d' % i for i in range(1, 16)]
     for equip in equip_list:
         obj = RubberCannotPutinReason.objects.filter(machine_no=equip).order_by('id').last()
         if obj:
@@ -92,5 +93,59 @@ def main():
             )
 
 
+@atomic
+def main_cause():
+    for equip in equip_list:
+        obj = RubberWrongMaskReason.objects.filter(machine_no=equip).order_by('id').last()
+        if obj:
+            last_time = obj.input_datetime.strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            last_time = '2022-04-01 00:00:00'
+        sql = f"""
+                    SELECT
+                    a.cause,
+                    b.datetime,
+                    a.machineno,
+                    a.lotNO,
+                    b.palletno,
+                    b.producecode,
+                    b.actual_weight,
+                    a.lasttime,
+                    b.startno,
+                    b.finishno
+                FROM
+                    collect_ploy_reason AS a
+                    LEFT JOIN collect_ploy AS b ON a.LotNO = b.LotNO 
+                WHERE a.lasttime > '{last_time}'
+                """
+        equip_conf = dict(
+            host=EQUIP_CONFIG[equip]['HOST'],
+            user=EQUIP_CONFIG[equip]['USER'],
+            database=EQUIP_CONFIG[equip]['NAME'],
+            password=EQUIP_CONFIG[equip]['PASSWORD'])
+        try:
+            sc = SqlClient(sql=sql, **equip_conf)
+        except:
+            logger.error(msg=f'{equip}机台数据库连接失败{datetime.datetime.now()}')
+            continue
+        temp = sc.all()
+        sc.close()
+        for item in temp:
+            lot_no = item[3].strip() if item[3] else '99999999'
+            pallet_no = item[4].strip() if item[4] else '888888'
+            try:
+                instance, flag = RubberWrongMaskReason.objects.update_or_create(
+                    defaults={'reason_name': item[0].strip() if item[0] else '未知', 'machine_no': equip,
+                              'factory_date': item[1] if item[1] else datetime.datetime.now().date(),
+                              'pallet_no': pallet_no, 'lot_no': lot_no, 'actual_weight': item[6] if item[6] else 0,
+                              'production_no': item[5].strip() if item[5] else '未知', 'input_datetime': item[7],
+                              'begin_trains': item[8], 'end_trains': item[9]},
+                    **{'lot_no': lot_no, 'pallet_no': pallet_no})
+            except Exception as e:
+                logger.error(f'同步{equip}-{lot_no}挤出钢印打错原因失败:{e.args[0]}')
+                continue
+
+
 if __name__ == '__main__':
     main()
+    main_cause()
