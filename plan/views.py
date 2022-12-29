@@ -1625,10 +1625,10 @@ class APSExportDataView(APIView):
             equip_plan_data.append({'recipe_name': plan.product_batching.stage_product_batch_no,
                                     'equip_no': plan.equip.equip_no,
                                     'plan_trains': plan.plan_trains,
-                                    'time_consume': time_consume,
+                                    'time_consume': time_consume + begin_time/60 if begin_time/60 < 0 else time_consume,
                                     'status': 'COMMITED',
-                                    'delivery_time': time_consume,
-                                    'begin_time': begin_time,
+                                    'delivery_time': time_consume + begin_time/60 if begin_time/60 < 0 else time_consume,
+                                    'begin_time': 0 if begin_time < 0 else begin_time,
                                     'weight': weight
                                     })
 
@@ -1720,11 +1720,20 @@ class APSExportDataView(APIView):
             pb_time_consume = 0
             available_time = int(i.available_time * 60 * 24)  # 最晚完成时间
             # pb_available_time_dict[pb_version_name] = 720 if i.available_time == 0 else int(i.available_time * 60 * 24)  # 最晚完成时间
+            equip_nos = set()
+            for ps in pd_stages:
+                main_machine = getattr(pd_ms, 'main_machine_{}'.format(ps))
+                vice_machines = getattr(pd_ms, 'vice_machine_{}'.format(ps))
+                equip_nos.add(main_machine)
+                if vice_machines:
+                    for e in vice_machines.split('/'):
+                        equip_nos.add(e)
 
             # write job list sheet
             pbs = ProductBatching.objects.using('SFJ').filter(
                 used_type=4,
                 stage_product_batch_no__iendswith='-{}'.format(pb_version_name),
+                equip__equip_no__in=list(equip_nos)
             ).values('id', 'batching_weight', 'equip__equip_no', 'stage_product_batch_no',
                      'equip__category__category_name', 'stage__global_name').order_by('batching_weight')
             stage_devoted_weight = {}
