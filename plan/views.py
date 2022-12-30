@@ -5,6 +5,7 @@ import re
 from io import BytesIO
 from operator import itemgetter
 
+import pandas as pd
 import requests
 import xlrd
 from django.db import connection, IntegrityError
@@ -1103,6 +1104,53 @@ class SchedulingStockSummary(ModelViewSet):
                 ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
         return Response('ok')
 
+    @action(methods=['get'], detail=False)
+    def export(self, request):
+        data = self.request.query_params
+        st = data.get('st')
+        et = data.get('et')
+        queryset = self.get_queryset().filter(factory_date__gte=st, factory_date__lte=et).order_by('factory_date')
+        serializer = self.get_serializer(queryset, many=True)
+        data = serializer.data
+        ret = {}
+        for item in data:
+            if item['factory_date'] not in ret:
+                ret[item['factory_date']] = {item['product_no']: {'product_no': item['product_no'],
+                                                                 'stock_weight_{}'.format(item['stage']): item['stock_weight'],
+                                                                 'area_weight_{}'.format(item['stage']): item['area_weight']}}
+            else:
+                if item['product_no'] not in ret[item['factory_date']]:
+                    ret[item['factory_date']][item['product_no']] = {'product_no': item['product_no'],
+                                                                     'stock_weight_{}'.format(item['stage']): item['stock_weight'],
+                                                                     'area_weight_{}'.format(item['stage']): item['area_weight']}
+                else:
+                    ret[item['factory_date']][item['product_no']]['stock_weight_{}'.format(item['stage'])] = item['stock_weight']
+                    ret[item['factory_date']][item['product_no']]['area_weight_{}'.format(item['stage'])] = item['area_weight']
+        if not ret:
+            raise ValidationError('时间范围内无数据可以导出')
+        bio = BytesIO()
+        writer = pd.ExcelWriter(bio, engine='xlsxwriter')  # 注意安装这个包 pip install xlsxwriter
+        for k, v in ret.items():
+            df = pd.DataFrame(v.values())
+            try:
+                df = df.rename(columns={'product_no': '规格', 'stock_weight_HMB': 'HMB(库内)', 'area_weight_HMB': 'HMB(现场)',
+                                        'stock_weight_CMB': 'CMB(库内)', 'area_weight_CMB': 'CMB(现场)',
+                                        'stock_weight_1MB': '1MB(库内)', 'area_weight_1MB': '1MB(现场)',
+                                        'stock_weight_2MB': '2MB(库内)', 'area_weight_2MB': '2MB(现场)',
+                                        'stock_weight_3MB': '3MB(库内)', 'area_weight_3MB': '3MB(现场)'})
+            except:
+                pass
+            df.to_excel(writer, sheet_name=k, index=False, encoding='SIMPLIFIED CHINESE_CHINA.UTF8')
+            worksheet = writer.sheets[k]
+            worksheet.set_column(1, 10, 15)
+        writer.save()
+        bio.seek(0)
+        from django.http import FileResponse
+        response = FileResponse(bio)
+        response['Content-Type'] = 'application/octet-stream'
+        response['Content-Disposition'] = 'attachment;filename="mm.xlsx"'
+        return response
+
 
 @method_decorator([api_recorder], name="dispatch")
 class SchedulingMaterialDemanded(APIView):
@@ -1593,41 +1641,55 @@ class APSExportDataView(APIView):
         """
         yesterday = factory_date - datetime.timedelta(1)
         equip_plan_data = []
+        equip_end_time_dict = {}
+        aps_st_time = datetime.datetime(
+            year=factory_date.year,
+            month=factory_date.month,
+            day=factory_date.day,
+            hour=8, minute=0, second=0)
         # 当天已经下达的计划，状态为commited
         for plan in ProductClassesPlan.objects.filter(
                 work_schedule_plan__plan_schedule__day_time=factory_date,
                 delete_flag=False):
             weight = plan.product_batching.batching_weight * plan.plan_trains
+            equip_no = plan.equip.equip_no
             if plan.status in ('完成', '停止'):
-                trains_st_et = TrainsFeedbacks.objects.filter(
-                    plan_classes_uid=plan.plan_classes_uid
-                ).aggregate(st=Min('begin_time'), et=Max('end_time'))
+                if equip_no == 'Z04':
+                    trains_st_et = TrainsFeedbacks.objects.filter(
+                        plan_classes_uid=plan.plan_classes_uid,
+                        operation_user='Mixer1'
+                    ).aggregate(st=Min('begin_time'), et=Max('end_time'))
+                else:
+                    trains_st_et = TrainsFeedbacks.objects.filter(
+                        plan_classes_uid=plan.plan_classes_uid
+                    ).aggregate(st=Min('begin_time'), et=Max('end_time'))
                 st, et = trains_st_et['st'], trains_st_et['et']
                 if not st:
                     continue
-                time_consume = round((et - st).total_seconds() / 3600, 2)
-                begin_time = (st - datetime.datetime(year=factory_date.year,
-                                                     month=factory_date.month,
-                                                     day=factory_date.day,
-                                                     hour=8, minute=0, second=0)
-                              ).total_seconds() // 60
+                if equip_no in equip_end_time_dict:
+                    if equip_end_time_dict[equip_no] < et:
+                        equip_end_time_dict[equip_no] = et
+                else:
+                    equip_end_time_dict[equip_no] = et
+                time_consume = round((et - st).total_seconds() / 60, 2)
+                begin_time = round((st - aps_st_time).total_seconds() / 60, 2)
             else:
                 time_consume = round(
                     calculate_equip_recipe_avg_mixin_time(
-                        plan.equip.equip_no,
+                        equip_no,
                         plan.product_batching.stage_product_batch_no
-                    ) * plan.plan_trains / 3600, 2)
-                begin_time = (plan.created_date - datetime.datetime(year=factory_date.year,
-                                                                    month=factory_date.month,
-                                                                    day=factory_date.day,
-                                                                    hour=8, minute=0, second=0)
-                              ).total_seconds() // 60
+                    ) * plan.plan_trains / 60, 2)
+                tt = plan.created_date
+                if equip_end_time_dict.get(equip_no):
+                    if equip_end_time_dict[equip_no] > plan.created_date:
+                        tt = equip_end_time_dict[equip_no]
+                begin_time = round((tt - aps_st_time).total_seconds() / 60, 2)
             equip_plan_data.append({'recipe_name': plan.product_batching.stage_product_batch_no,
                                     'equip_no': plan.equip.equip_no,
                                     'plan_trains': plan.plan_trains,
-                                    'time_consume': time_consume + begin_time/60 if begin_time/60 < 0 else time_consume,
+                                    'time_consume': time_consume + begin_time if begin_time < 0 else time_consume,
                                     'status': 'COMMITED',
-                                    'delivery_time': time_consume + begin_time/60 if begin_time/60 < 0 else time_consume,
+                                    # 'delivery_time': time_consume + begin_time if begin_time < 0 else time_consume,
                                     'begin_time': 0 if begin_time < 0 else begin_time,
                                     'weight': weight
                                     })
@@ -1658,25 +1720,38 @@ class APSExportDataView(APIView):
                     delivery_time = round(equip_time_consume - 24, 2)
                     if delivery_time < time_consume:
                         delivery_time = time_consume
-                    if equip_time_consume <= 24 + lock_durations:
-                        equip_plan_data.append({'recipe_name': recipe_name,
-                                                'equip_no': equip_no,
-                                                'plan_trains': plan_trains,
-                                                'delivery_time': delivery_time,
-                                                'time_consume': time_consume,
-                                                'status': 'COMMITED',
-                                                'begin_time': delivery_time * 60,
-                                                'weight': weight
-                                                })
-                    else:
-                        equip_plan_data.append({'recipe_name': recipe_name,
-                                                'equip_no': equip_no,
-                                                'plan_trains': plan_trains,
-                                                'delivery_time': delivery_time,
-                                                'time_consume': time_consume,
-                                                'status': 'STANDARD',
-                                                'weight': weight
-                                                })
+                    # if equip_time_consume <= 24 + lock_durations:
+                    #     if equip_end_time_dict.get(equip_no):
+                    #         eet = round((equip_end_time_dict[equip_no] - aps_st_time).total_seconds / 3600, 2)
+                    #         if delivery_time < eet:
+                    #             delivery_time = eet
+                    #     equip_end_time_dict[equip_no] = aps_st_time + datetime.timedelta(minutes=int((delivery_time+time_consume)*60))
+                    #     equip_plan_data.append({'recipe_name': recipe_name,
+                    #                             'equip_no': equip_no,
+                    #                             'plan_trains': plan_trains,
+                    #                             # 'delivery_time': delivery_time * 60,
+                    #                             'time_consume': time_consume * 60,
+                    #                             'status': 'COMMITED',
+                    #                             'begin_time': delivery_time * 60,
+                    #                             'weight': weight
+                    #                             })
+                    # else:
+                    #     equip_plan_data.append({'recipe_name': recipe_name,
+                    #                             'equip_no': equip_no,
+                    #                             'plan_trains': plan_trains,
+                    #                             'delivery_time': delivery_time * 60,
+                    #                             'time_consume': time_consume * 60,
+                    #                             'status': 'STANDARD',
+                    #                             'weight': weight
+                    #                             })
+                    equip_plan_data.append({'recipe_name': recipe_name,
+                                            'equip_no': equip_no,
+                                            'plan_trains': plan_trains,
+                                            'delivery_time': delivery_time * 60,
+                                            'time_consume': time_consume * 60,
+                                            'status': 'STANDARD',
+                                            'weight': weight
+                                            })
         return equip_plan_data
 
     def get(self, request):
@@ -1943,7 +2018,7 @@ class APSExportDataView(APIView):
             sheet1.cell(data_row, 2).value = '-'.join(j['recipe_name'].split('-')[-2:])  # 规格名称（带版本号）
             sheet1.cell(data_row, 3).value = 0  # 胶料代码开始时间(暂时无用)
             sheet1.cell(data_row, 4).value = 0  # 关键路径持续时间（暂时无用）
-            sheet1.cell(data_row, 5).value = int(j['delivery_time'] * 60)
+            sheet1.cell(data_row, 5).value = int(j['time_consume'] + j['begin_time']) if j['status'] == 'COMMITED' else int(j['delivery_time'])
             sheet1.cell(data_row, 6).value = 1  # job_list_size(总共需要打待段次数量)
             # 写入job list
             sheet2.cell(data_row1, 1).value = data_row - 1
@@ -1953,9 +2028,9 @@ class APSExportDataView(APIView):
             sheet2.cell(data_row1, 5).value = j['status']
             sheet2.cell(data_row1, 6).value = round(j['weight'], 2)
             sheet2.cell(data_row1, 7).value = 1
-            sheet2.cell(data_row1, 8).value = int(j['time_consume']*60)
+            sheet2.cell(data_row1, 8).value = int(j['time_consume'])
             sheet2.cell(data_row1, 9).value = int(j['equip_no'][-2:])
-            sheet2.cell(data_row1, 10).value = int(j.get('begin_time', 0)) if j['status'] == 'COMMITED' else int(j['time_consume']/j['plan_trains'] * 60 * sps.scheduling_interval_trains)
+            sheet2.cell(data_row1, 10).value = int(j.get('begin_time', 0)) if j['status'] == 'COMMITED' else int(j['time_consume']/j['plan_trains'] * sps.scheduling_interval_trains)
             sheet2.cell(data_row1, 11).value = int(j['plan_trains'])
             data_row1 += 1
             data_row += 1
