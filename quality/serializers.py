@@ -16,7 +16,7 @@ from mes.base_serializer import BaseModelSerializer
 
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan
-from production.models import PalletFeedbacks
+from production.models import PalletFeedbacks, RubberWrongMaskReason
 from quality.models import TestMethod, MaterialTestOrder, \
     MaterialTestResult, MaterialDataPointIndicator, MaterialTestMethod, TestType, DataPoint, DealSuggestion, \
     MaterialDealResult, LevelResult, \
@@ -686,6 +686,10 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
         else:
             ret['valid_time'] = None
         ret['range_showed'] = QualifiedRangeDisplay.objects.first().is_showed
+        # 增加挤出钢印打错异常描述
+        w_instance = RubberWrongMaskReason.objects.filter(lot_no=instance.lot_no).order_by('id').last()
+        wrong_reason = '' if not w_instance else w_instance.reason_name
+        ret['wrong_reason'] = wrong_reason
         return ret
 
     def get_mtr_list(self, obj):
