@@ -2131,7 +2131,7 @@ class MaterialOutHistoryOtherSerializer(serializers.ModelSerializer):
 
 
 class MaterialOutHistorySerializer(serializers.ModelSerializer):
-    created_time = serializers.CharField(source='task.start_time')
+    created_time = serializers.SerializerMethodField()
     initiator = serializers.SerializerMethodField()
     task_order_no = serializers.CharField(source='task.order_no')
     entrance_name = serializers.SerializerMethodField()
@@ -2151,6 +2151,10 @@ class MaterialOutHistorySerializer(serializers.ModelSerializer):
 
     def get_entrance_name(self, obj):
         return self.context['entrance_data'].get(obj.entrance)
+
+    def get_created_time(self, obj):
+        _created_time = obj.task.start_time
+        return _created_time.strftime('%Y-%m-%d %H:%M:%S') if _created_time else _created_time
 
     def get_tunnel(self, obj):
         return obj.location.split('-')[1]
