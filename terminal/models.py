@@ -85,6 +85,7 @@ class LoadMaterialLog(models.Model):
     scan_material = models.CharField(max_length=64, help_text='扫码物料名称', null=True, blank=True)
     scan_material_type = models.CharField(max_length=64, help_text='投料类别:胶皮、胶块..', null=True, blank=True)
     stage = models.CharField(max_length=64, help_text='段次', null=True, blank=True)
+    scan_time = models.DateTimeField(help_text='扫码时间', auto_now_add=True)
 
     class Meta:
         db_table = 'load_material_log'

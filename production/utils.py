@@ -218,7 +218,8 @@ def get_user_level():
             children_section = i.children_sections.all()
             if children_section:
                 level = 2
-                users += list(children_section.values_list('in_charge_user__username', flat=True))
+                # 12-19 审批只能查看下一级负责人的单子(最后一级只能查看普通员工)
+                # users += list(children_section.values_list('in_charge_user__username', flat=True))
             else:
                 level = 1
             if level == 2 and not level2_user:

@@ -1882,7 +1882,7 @@ class BarcodeTraceView(APIView):
             if l_detail:
                 p_list = p.product_no.split('-')
                 s_stage = None if not p_list else (p_list[1] if len(p_list) > 2 else p_list[0])
-                results.update({s_stage: [{product_no: self.supplement_info(l_detail.values('scan_material_type', 'scan_material', 'bra_code', 'feed_log__trains', 'material_name', 'actual_weight')), 'behind': ''}]})
+                results.update({s_stage: [{product_no: self.supplement_info(l_detail.values('scan_material_type', 'scan_material', 'bra_code', 'feed_log__trains', 'material_name', 'actual_weight', 'scan_time')), 'behind': ''}]})
                 others = l_detail.filter(~Q(Q(bra_code__startswith='AAJZ20') | Q(bra_code__startswith='WMS')), scan_material_type='胶皮').order_by('-stage')
                 if others:
                     res = self.trace_down(others, behind=s_stage)
@@ -1938,12 +1938,13 @@ class BarcodeTraceView(APIView):
                 _k = f"{bra_code}_{scan_material}"
                 if _k not in temp:
                     _i = {'scan_material_type': scan_material_type, 'scan_material': scan_material, 'bra_code': bra_code, 'feed_log__trains': trains,
-                          'material_name': i.material_name, 'actual_weight': i.actual_weight}
+                          'material_name': i.material_name, 'actual_weight': i.actual_weight, 'scan_time': i.scan_time}
                     s_info = self.supplement_info([_i])[0]
                     temp[_k] = s_info
                 else:
                     s_info = copy.deepcopy(temp[_k])
                     s_info['feed_log__trains'] = trains
+                    s_info['scan_time'] = i.scan_time
                 if stage in res:
                     rubber_i = rubber_index.get(f'{stage}-{product_no}-{trains}')
                     if rubber_i is None:
@@ -1968,7 +1969,7 @@ class BarcodeTraceView(APIView):
             if l_detail:
                 p_list = p.product_no.split('-')
                 s_stage = None if not p_list else (p_list[1] if len(p_list) > 2 else p_list[0])
-                s_info = {p.product_no: self.supplement_info(l_detail.values('scan_material_type', 'scan_material', 'bra_code', 'feed_log__trains', 'material_name', 'stage', 'actual_weight')), 'behind': f'{behind}-{index + 1}'}
+                s_info = {p.product_no: self.supplement_info(l_detail.values('scan_material_type', 'scan_material', 'bra_code', 'feed_log__trains', 'material_name', 'stage', 'actual_weight', 'scan_time')), 'behind': f'{behind}-{index + 1}'}
                 if s_stage in res:
                     res[s_stage].append(s_info)
                 else:
@@ -1984,6 +1985,8 @@ class BarcodeTraceView(APIView):
         handle_info, temp = [], {}
         for i in query_set:
             key = f"{i['bra_code']}-{i['material_name']}"
+            if i['scan_material'].startswith('人工配') or i['scan_material'].startswith('机配'):
+                i['scan_material'] = re.split('-C|-X|\(', i['scan_material'])[1]
             if temp.get(key):
                 i.update(temp[key])
             else:
@@ -1994,7 +1997,7 @@ class BarcodeTraceView(APIView):
                                                 'pallet_no': None, 'equip_no': None, 'group': None, 'classes': None, 'trains': None,
                                                 'plan_classes_uid': None, 'begin_time': None, 'end_time': None, 'arrange_rubber_time': None}
                 add_data_temp['actual_weight'] = i.get('actual_weight', 0)
-                if i['bra_code'][0] in ['S', 'F']:  # 补充小料详情
+                if i['bra_code'][0] in ['S', 'F'] or (i['scan_material_type'] == '胶块' and not i['bra_code'].startswith('MC')):  # 补充小料详情
                     res = self.get_xl_info(i['bra_code'], i['material_name'])
                     add_data_temp.update(res)
                 i.update(add_data_temp)
@@ -2005,15 +2008,20 @@ class BarcodeTraceView(APIView):
     def get_xl_info(self, xl_code, material_name):
         """获取料包原材料对应信息"""
         s_data, lb_detail = [], {}
-        xl = WeightPackageLog.objects.filter(bra_code=xl_code).last()
-        w = WeightBatchingLog.objects.filter(material_name=material_name.rstrip('-C|-X'), batch_time__lte=xl.batch_time, status=1).order_by('batch_time').last()
-        if w:
-            detail = BarCodeTraceDetail.objects.filter(bra_code=w.bra_code, code_type='料罐').values('supplier', 'batch_no', 'erp_in_time', 'product_time', 'standard_weight')
-            if detail:
-                s = detail[0]
-                s['erp_in_time'] = s.get('erp_in_time') if not s.get('erp_in_time') else s.get('erp_in_time').strftime('%Y-%m-%d %H:%M:%S')
-                s['product_time'] = s.get('product_time') if not s.get('product_time') else s.get('product_time').strftime('%Y-%m-%d %H:%M:%S')
-                lb_detail.update(s)
+        if xl_code[0] in ['S', 'F']:
+            xl = WeightPackageLog.objects.filter(bra_code=xl_code).last()
+            w = WeightBatchingLog.objects.filter(material_name=material_name.rstrip('-C|-X'), batch_time__lte=xl.batch_time, status=1).order_by('batch_time').last()
+            if w:
+                detail = BarCodeTraceDetail.objects.filter(bra_code=w.bra_code, code_type='料罐').values('supplier', 'batch_no', 'erp_in_time', 'product_time', 'standard_weight')
+            else:
+                detail = None
+        else:
+            detail = BarCodeTraceDetail.objects.filter(bra_code=xl_code, code_type='密炼').values('supplier', 'batch_no', 'erp_in_time', 'product_time', 'standard_weight')
+        if detail:
+            s = detail[0]
+            s['erp_in_time'] = s.get('erp_in_time') if not s.get('erp_in_time') else s.get('erp_in_time').strftime('%Y-%m-%d %H:%M:%S')
+            s['product_time'] = s.get('product_time') if not s.get('product_time') else s.get('product_time').strftime('%Y-%m-%d %H:%M:%S')
+            lb_detail.update(s)
         if lb_detail:
             lb_detail['material_name'] = material_name.rstrip('-C|-X')
             s_data.append(lb_detail)
@@ -2078,7 +2086,7 @@ class BarcodeTraceView(APIView):
                          '生产日期': j['product_time'] if not j['product_time'] else j['product_time'].strftime('%Y-%m-%d'), '班次': j['classes'],
                          '班组': j['group'], '车次': j['trains'], '追溯码': j['bra_code'], '托盘号': j['pallet_no'], '重量': j['standard_weight'],
                          '密炼/配料 开始时间': j['begin_time'], '密炼/配料 结束时间': j['end_time'], '收皮时间': j['arrange_rubber_time'],
-                         '料包明细': xl_detail, '行关联': cont}
+                         '密炼车次': j['feed_log__trains'], '扫码时间': j['scan_time'], '原材料明细': xl_detail, '行关联': cont}
                 res.append(_data)
         return res
 

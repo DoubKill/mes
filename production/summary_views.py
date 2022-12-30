@@ -474,12 +474,18 @@ class CutTimeCollect(APIView):
             standard_time = int(gc.description)
         else:
             standard_time = None
-
+        # 12-15 修改为具体时间过滤
+        # factory_classes_group_map = WorkSchedulePlan.objects.filter(
+        #     plan_schedule__day_time__gte=s_time,
+        #     plan_schedule__day_time__lte=e_time,
+        #     plan_schedule__work_schedule__work_procedure__global_name='密炼'
+        # ).values('plan_schedule__day_time', 'classes__global_name', 'group__global_name')
         factory_classes_group_map = WorkSchedulePlan.objects.filter(
-            plan_schedule__day_time__gte=s_time,
-            plan_schedule__day_time__lte=e_time,
+            end_time__gte=s_time,
+            start_time__lte=e_time,
             plan_schedule__work_schedule__work_procedure__global_name='密炼'
         ).values('plan_schedule__day_time', 'classes__global_name', 'group__global_name')
+
         factory_classes_group_map_dict = {
             i['plan_schedule__day_time'].strftime('%Y-%m-%d') + '-' + i['classes__global_name']: i for i in
             factory_classes_group_map}
@@ -921,7 +927,7 @@ class IndexEquipMaintenanceAnalyze(IndexOverview):
             filter_kwargs = {'factory_date__gte': st, 'factory_date__lte': et}
 
         equip_data = [equip.equip_no for equip in Equip.objects.filter(category__equip_type__global_name='密炼设备').order_by('equip_no')]
-        init_data = EquipDownDetails.objects.filter(**filter_kwargs).values('equip_no').annotate(total_time=Sum('times')).values('equip_no', 'total_time')
+        init_data = EquipDownDetails.objects.filter(delete_flag=False, **filter_kwargs).values('equip_no').annotate(total_time=Sum('times')).values('equip_no', 'total_time')
         time_data = {i['equip_no']: round(i['total_time'], 2) for i in init_data}
 
         maintenance_data = {}
@@ -958,9 +964,15 @@ class CutTimeCollectSummary(APIView):
                    ).values(
             'plan_classes_uid', 'factory_date', 'classes', 'equip_no', 'st_time', 'et_time'
         ).order_by('factory_date', 'equip_no', 'st_time'))
+        # 12-15 修改为具体时间过滤
+        # factory_classes_group_map = WorkSchedulePlan.objects.filter(
+        #     plan_schedule__day_time__gte=s_time,
+        #     plan_schedule__day_time__lte=e_time,
+        #     plan_schedule__work_schedule__work_procedure__global_name='密炼'
+        # ).values('plan_schedule__day_time', 'classes__global_name', 'group__global_name')
         factory_classes_group_map = WorkSchedulePlan.objects.filter(
-            plan_schedule__day_time__gte=s_time,
-            plan_schedule__day_time__lte=e_time,
+            end_time__gte=s_time,
+            start_time__lte=e_time,
             plan_schedule__work_schedule__work_procedure__global_name='密炼'
         ).values('plan_schedule__day_time', 'classes__global_name', 'group__global_name')
         factory_classes_group_map_dict = {
