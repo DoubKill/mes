@@ -1618,6 +1618,8 @@ class APSExportDataView(APIView):
                 st, et = trains_st_et['st'], trains_st_et['et']
                 if not st:
                     continue
+                if et <= aps_st_time:  # 八点之前完成的计划不需要
+                    continue
                 if equip_no in equip_end_time_dict:
                     if equip_end_time_dict[equip_no] < et:
                         equip_end_time_dict[equip_no] = et
@@ -1946,7 +1948,9 @@ class APSExportDataView(APIView):
         for pb_name, item in job_list_data.items():
             sheet1.cell(data_row, 1).value = data_row - 1  # 序号
             sheet1.cell(data_row, 2).value = pb_name  # 规格名称（带版本号）
-            sheet1.cell(data_row, 3).value = 0  # 胶料代码开始时间(暂时无用)
+            sheet1.cell(data_row, 3).value = (datetime.datetime.now() -
+                                              datetime.datetime.strptime(aps_start_time, '%Y-%m-%d %H:%M')
+                                              ).total_seconds()//60  # 胶料代码开始时间
             sheet1.cell(data_row, 4).value = 0  # 关键路径持续时间（暂时无用）
             sheet1.cell(data_row, 5).value = int(pb_available_time_dict.get(pb_name, 720))
             sheet1.cell(data_row, 6).value = len(item)  # job_list_size(总共需要打待段次数量)
