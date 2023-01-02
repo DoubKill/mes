@@ -1944,13 +1944,14 @@ class APSExportDataView(APIView):
         # 待排程和前一天未完成的所有胶料规格数据 ['C590-01', 'J290-01']
         sheet.cell(8, 2).value = len(list(job_list_data.keys())) + len(left_plans)   # 需要排程的规格数量
 
+        release_date = (datetime.datetime.now() -
+                        datetime.datetime.strptime(aps_start_time, '%Y-%m-%d %H:%M:%S')
+                        ).total_seconds() // 60
         # 结合待排程和未完成计划，写入excel
         for pb_name, item in job_list_data.items():
             sheet1.cell(data_row, 1).value = data_row - 1  # 序号
             sheet1.cell(data_row, 2).value = pb_name  # 规格名称（带版本号）
-            sheet1.cell(data_row, 3).value = (datetime.datetime.now() -
-                                              datetime.datetime.strptime(aps_start_time, '%Y-%m-%d %H:%M')
-                                              ).total_seconds()//60  # 胶料代码开始时间
+            sheet1.cell(data_row, 3).value = 0 if release_date <=0 else release_date  # 胶料代码开始时间
             sheet1.cell(data_row, 4).value = 0  # 关键路径持续时间（暂时无用）
             sheet1.cell(data_row, 5).value = int(pb_available_time_dict.get(pb_name, 720))
             sheet1.cell(data_row, 6).value = len(item)  # job_list_size(总共需要打待段次数量)
