@@ -360,6 +360,22 @@ class RubberCannotPutinReason(models.Model):
         db_table = 'rubber_cannot_putin_reason'
 
 
+class RubberWrongMaskReason(models.Model):
+    reason_name = models.CharField(help_text='原因名称', max_length=64)
+    factory_date = models.DateTimeField(help_text='工厂时间')
+    machine_no = models.CharField(max_length=64, help_text='机台')
+    production_no = models.CharField(max_length=64, help_text='配方名')
+    lot_no = models.CharField(max_length=64, help_text='托盘号')
+    pallet_no = models.CharField(max_length=64, help_text='收皮条码')
+    actual_weight = models.FloatField(help_text='实际重量')
+    input_datetime = models.DateTimeField(help_text='录入时间')
+    begin_trains = models.IntegerField(help_text='开始车次', blank=True, null=True)
+    end_trains = models.IntegerField(help_text='结束车次', blank=True, null=True)
+
+    class Meta:
+        db_table = 'rubber_wrong_mask_reason'
+
+
 class MachineTargetYieldSettings(models.Model):
     Z01 = models.IntegerField(help_text='机台目标值')
     Z02 = models.IntegerField(help_text='机台目标值')

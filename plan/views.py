@@ -5,6 +5,7 @@ import re
 from io import BytesIO
 from operator import itemgetter
 
+import pandas as pd
 import requests
 import xlrd
 from django.db import connection, IntegrityError
@@ -1150,6 +1151,53 @@ class SchedulingStockSummary(ModelViewSet):
                 s_data = {'factory_date': factory_date, 'product_no': product_no}
                 ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
         return Response('ok')
+
+    @action(methods=['get'], detail=False)
+    def export(self, request):
+        data = self.request.query_params
+        st = data.get('st')
+        et = data.get('et')
+        queryset = self.get_queryset().filter(factory_date__gte=st, factory_date__lte=et).order_by('factory_date')
+        serializer = self.get_serializer(queryset, many=True)
+        data = serializer.data
+        ret = {}
+        for item in data:
+            if item['factory_date'] not in ret:
+                ret[item['factory_date']] = {item['product_no']: {'product_no': item['product_no'],
+                                                                 'stock_weight_{}'.format(item['stage']): item['stock_weight'],
+                                                                 'area_weight_{}'.format(item['stage']): item['area_weight']}}
+            else:
+                if item['product_no'] not in ret[item['factory_date']]:
+                    ret[item['factory_date']][item['product_no']] = {'product_no': item['product_no'],
+                                                                     'stock_weight_{}'.format(item['stage']): item['stock_weight'],
+                                                                     'area_weight_{}'.format(item['stage']): item['area_weight']}
+                else:
+                    ret[item['factory_date']][item['product_no']]['stock_weight_{}'.format(item['stage'])] = item['stock_weight']
+                    ret[item['factory_date']][item['product_no']]['area_weight_{}'.format(item['stage'])] = item['area_weight']
+        if not ret:
+            raise ValidationError('时间范围内无数据可以导出')
+        bio = BytesIO()
+        writer = pd.ExcelWriter(bio, engine='xlsxwriter')  # 注意安装这个包 pip install xlsxwriter
+        for k, v in ret.items():
+            df = pd.DataFrame(v.values())
+            try:
+                df = df.rename(columns={'product_no': '规格', 'stock_weight_HMB': 'HMB(库内)', 'area_weight_HMB': 'HMB(现场)',
+                                        'stock_weight_CMB': 'CMB(库内)', 'area_weight_CMB': 'CMB(现场)',
+                                        'stock_weight_1MB': '1MB(库内)', 'area_weight_1MB': '1MB(现场)',
+                                        'stock_weight_2MB': '2MB(库内)', 'area_weight_2MB': '2MB(现场)',
+                                        'stock_weight_3MB': '3MB(库内)', 'area_weight_3MB': '3MB(现场)'})
+            except:
+                pass
+            df.to_excel(writer, sheet_name=k, index=False, encoding='SIMPLIFIED CHINESE_CHINA.UTF8')
+            worksheet = writer.sheets[k]
+            worksheet.set_column(1, 10, 15)
+        writer.save()
+        bio.seek(0)
+        from django.http import FileResponse
+        response = FileResponse(bio)
+        response['Content-Type'] = 'application/octet-stream'
+        response['Content-Disposition'] = 'attachment;filename="mm.xlsx"'
+        return response
 
 
 @method_decorator([api_recorder], name="dispatch")
