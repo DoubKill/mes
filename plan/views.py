@@ -1951,7 +1951,7 @@ class APSExportDataView(APIView):
         for pb_name, item in job_list_data.items():
             sheet1.cell(data_row, 1).value = data_row - 1  # 序号
             sheet1.cell(data_row, 2).value = pb_name  # 规格名称（带版本号）
-            sheet1.cell(data_row, 3).value = 0 if release_date <=0 else release_date  # 胶料代码开始时间
+            sheet1.cell(data_row, 3).value = 0 if release_date <= 0 else release_date  # 胶料代码开始时间
             sheet1.cell(data_row, 4).value = 0  # 关键路径持续时间（暂时无用）
             sheet1.cell(data_row, 5).value = int(pb_available_time_dict.get(pb_name, 720))
             sheet1.cell(data_row, 6).value = len(item)  # job_list_size(总共需要打待段次数量)
@@ -1976,10 +1976,12 @@ class APSExportDataView(APIView):
             data_row += 1
 
         for j in left_plans:
+            if j['status'] == 'COMMITED' or release_date <= 0:
+                release_date = 0
             # 写入project list
             sheet1.cell(data_row, 1).value = data_row - 1  # 序号
             sheet1.cell(data_row, 2).value = '-'.join(j['recipe_name'].split('-')[-2:])  # 规格名称（带版本号）
-            sheet1.cell(data_row, 3).value = 0  # 胶料代码开始时间(暂时无用)
+            sheet1.cell(data_row, 3).value = release_date  # 胶料代码开始时间(暂时无用)
             sheet1.cell(data_row, 4).value = 0  # 关键路径持续时间（暂时无用）
             sheet1.cell(data_row, 5).value = int(j['time_consume'] + j['begin_time']) if j['status'] == 'COMMITED' else int(j['delivery_time'])
             sheet1.cell(data_row, 6).value = 1  # job_list_size(总共需要打待段次数量)
