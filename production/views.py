@@ -5929,7 +5929,7 @@ class GroupClockDetailView(APIView):
                 clock_types = group_sets.values_list('type', flat=True).distinct()
             else:
                 clock_types = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='绩效计算岗位类别').values_list('global_name', flat=True).distinct()
-            records = EmployeeAttendanceRecords.objects.filter(~Q(is_use='废弃'), clock_type__in=clock_types, factory_date=select_date, group=group).order_by('clock_type', 'section', 'user__username', 'status', 'equip')
+            records = EmployeeAttendanceRecords.objects.filter(~Q(is_use='废弃'), clock_type__in=clock_types, factory_date=select_date, group=group).order_by('clock_type', 'section', 'equip', 'user__username', 'status')
             exist_r = []
             for s in records:
                 name, section, status, clock_type, end_date, equip = s.user.username, s.section, s.status, s.clock_type, s.end_date, s.equip
