@@ -1103,6 +1103,54 @@ class SchedulingStockSummary(ModelViewSet):
                 ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
         return Response('ok')
 
+    @atomic()
+    @action(methods=['post'], detail=False, permission_classes=[], url_path='import-xlsx',
+            url_name='import-xlsx')
+    def import_xlx(self, request):
+        factory_date = self.request.data.get('factory_date', datetime.datetime.now().strftime('%Y-%m-%d'))
+        date_splits = factory_date.split('-')
+        m = date_splits[1] if not date_splits[1].startswith('0') else date_splits[1].lstrip('0')
+        d = date_splits[2]
+        excel_file = request.FILES.get('file', None)
+        if not excel_file:
+            raise ValidationError('文件不可为空！')
+        if not excel_file.name.split('.')[-1] in ['xls', 'xlsx', 'xlsm']:
+            raise ValidationError('文件格式错误,仅支持 xls、xlsx、xlsm文件')
+        try:
+            data = xlrd.open_workbook(filename=None, file_contents=excel_file.read())
+            cur_sheet = data.sheet_by_name(sheet_name='{}.({})'.format(m, d))
+        except Exception:
+            raise ValidationError('未找到{}.({})库存excel文档！'.format(m, d))
+        data = get_sheet_data(cur_sheet, start_row=7)
+        for item in data:
+            product_no = item[1]
+            stock_weight_hmb = item[3]
+            stock_weight_cmb = item[5]
+            stock_weight_1mb = item[7]
+            stock_weight_2mb = item[9]
+            stock_weight_3mb = item[11]
+            if stock_weight_hmb:
+                dt = {'area_weight': stock_weight_hmb, 'stage': 'HMB'}
+                s_data = {'factory_date': factory_date, 'product_no': product_no}
+                ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
+            if stock_weight_cmb:
+                dt = {'area_weight': stock_weight_cmb, 'stage': 'CMB'}
+                s_data = {'factory_date': factory_date, 'product_no': product_no}
+                ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
+            if stock_weight_1mb:
+                dt = {'area_weight': stock_weight_1mb, 'stage': '1MB'}
+                s_data = {'factory_date': factory_date, 'product_no': product_no}
+                ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
+            if stock_weight_2mb:
+                dt = {'area_weight': stock_weight_2mb, 'stage': '2MB'}
+                s_data = {'factory_date': factory_date, 'product_no': product_no}
+                ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
+            if stock_weight_3mb:
+                dt = {'area_weight': stock_weight_3mb, 'stage': '3MB'}
+                s_data = {'factory_date': factory_date, 'product_no': product_no}
+                ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
+        return Response('ok')
+
 
 @method_decorator([api_recorder], name="dispatch")
 class SchedulingMaterialDemanded(APIView):
