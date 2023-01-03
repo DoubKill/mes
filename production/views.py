@@ -7102,7 +7102,7 @@ class EquipDownSummaryTableView(APIView):
             return gen_template_response(export_fields_dict, data, file_name, handle_str=True)
         if not equip_no:  # 所有密炼机TOP10停机原因汇总(总min)
             titles, details, ratios = [], [], []
-            equips_data = EquipDownDetails.objects.filter(delete_flag=False, factory_date__gte=st, factory_date__lte=et).values('down_reason').annotate(total_times=Sum('times')).values('down_reason', 'total_times')
+            equips_data = EquipDownDetails.objects.filter(delete_flag=False, factory_date__gte=st, factory_date__lte=et).values('down_reason').annotate(total_times=Sum('times')).values('down_reason', 'total_times').order_by('-total_times')
             all_times = sum([i['total_times'] for i in equips_data][:10])
             for i in equips_data[:10]:
                 titles.append(i['down_reason'])
@@ -7115,7 +7115,7 @@ class EquipDownSummaryTableView(APIView):
                 filter_kwargs['equip_no'] = equip_no
             equips_data = EquipDownDetails.objects.filter(delete_flag=False, factory_date__gte=st, factory_date__lte=et, **filter_kwargs)\
                 .values('equip_no', 'down_reason').annotate(total_times=Sum('times')).values('equip_no', 'down_reason', 'total_times')\
-                .order_by('equip_no', 'total_times')
+                .order_by('equip_no', '-total_times')
             for i in equips_data:
                 equip_no, down_reason, total_times = i['equip_no'], i['down_reason'], i['total_times']
                 equip_info = results.get(equip_no)
