@@ -1131,24 +1131,24 @@ class SchedulingStockSummary(ModelViewSet):
             stock_weight_2mb = item[9]
             stock_weight_3mb = item[11]
             if stock_weight_hmb:
-                dt = {'area_weight': stock_weight_hmb, 'stage': 'HMB'}
-                s_data = {'factory_date': factory_date, 'product_no': product_no}
+                dt = {'area_weight': stock_weight_hmb}
+                s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': 'HMB'}
                 ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
             if stock_weight_cmb:
-                dt = {'area_weight': stock_weight_cmb, 'stage': 'CMB'}
-                s_data = {'factory_date': factory_date, 'product_no': product_no}
+                dt = {'area_weight': stock_weight_cmb}
+                s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': 'CMB'}
                 ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
             if stock_weight_1mb:
-                dt = {'area_weight': stock_weight_1mb, 'stage': '1MB'}
-                s_data = {'factory_date': factory_date, 'product_no': product_no}
+                dt = {'area_weight': stock_weight_1mb}
+                s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': '1MB'}
                 ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
             if stock_weight_2mb:
-                dt = {'area_weight': stock_weight_2mb, 'stage': '2MB'}
-                s_data = {'factory_date': factory_date, 'product_no': product_no}
+                dt = {'area_weight': stock_weight_2mb}
+                s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': '2MB'}
                 ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
             if stock_weight_3mb:
-                dt = {'area_weight': stock_weight_3mb, 'stage': '3MB'}
-                s_data = {'factory_date': factory_date, 'product_no': product_no}
+                dt = {'area_weight': stock_weight_3mb}
+                s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': '3MB'}
                 ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
         return Response('ok')
 
