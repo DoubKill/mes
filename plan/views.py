@@ -783,13 +783,18 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
                 product_no = re.sub(r'[\u4e00-\u9fa5]+', '', item[4])
                 if not product_no or not item[5]:
                     continue
-                pb = ProductBatching.objects.using('SFJ').filter(
+                pbs = list(ProductBatching.objects.using('SFJ').filter(
                     used_type=4,
-                    stage_product_batch_no__icontains='-{}-'.format(product_no)).values_list('stage_product_batch_no', flat=True)
+                    stage_product_batch_no__icontains='-FM-{}-'.format(product_no)
+                ).order_by('used_time').values_list('stage_product_batch_no', flat=True))
+                if not pbs:
+                    raise ValidationError('未找到该规格启用配方：{}'.format(product_no))
+                if len(pbs) == 1:  # 启用规格只有一种
+                    version = pbs[0].split('-')[-1]
                 area_list.append({'factory_date': factory_date,
                                   'sn': sn,
                                   'product_no': product_no,
-                                  # 'version': item[5],
+                                  'version': version,
                                   'plan_weight': item[5],
                                   'workshop_weight': round(item[16], 1) if item[16] else 0,
                                   'current_stock': round(item[17], 1) if item[17] else 0,
@@ -1136,8 +1141,8 @@ class SchedulingStockSummary(ModelViewSet):
             raise ValidationError('未找到{}.({})库存excel文档！'.format(m, d))
         data = get_sheet_data(cur_sheet, start_row=7)
         for item in data:
-            product_no = item[1]
-            version = item[2]
+            version = item[1]
+            product_no = item[2]
             stock_weight_hmb = item[4]
             stock_weight_cmb = item[6]
             stock_weight_1mb = item[8]
@@ -1195,9 +1200,9 @@ class SchedulingStockSummary(ModelViewSet):
         bio = BytesIO()
         writer = pd.ExcelWriter(bio, engine='xlsxwriter')  # 注意安装这个包 pip install xlsxwriter
         for k, v in ret.items():
-            df = pd.DataFrame(v.values(), columns=['product_no', 'version', 'stock_weight_HMB', 'area_weight_HMB', 'stock_weight_CMB', 'area_weight_CMB', 'stock_weight_1MB', 'area_weight_1MB', 'stock_weight_2MB', 'area_weight_2MB', 'stock_weight_3MB', 'area_weight_3MB'])
+            df = pd.DataFrame(v.values(), columns=['version', 'product_no', 'stock_weight_HMB', 'area_weight_HMB', 'stock_weight_CMB', 'area_weight_CMB', 'stock_weight_1MB', 'area_weight_1MB', 'stock_weight_2MB', 'area_weight_2MB', 'stock_weight_3MB', 'area_weight_3MB'])
             try:
-                df = df.rename(columns={'product_no': '规格', 'version': '版本号',
+                df = df.rename(columns={'version': '版本号', 'product_no': '规格',
                                         'stock_weight_HMB': 'HMB(库内)', 'area_weight_HMB': 'HMB(现场)',
                                         'stock_weight_CMB': 'CMB(库内)', 'area_weight_CMB': 'CMB(现场)',
                                         'stock_weight_1MB': '1MB(库内)', 'area_weight_1MB': '1MB(现场)',
