@@ -1148,6 +1148,8 @@ class SchedulingStockSummary(ModelViewSet):
             stock_weight_1mb = item[8]
             stock_weight_2mb = item[10]
             stock_weight_3mb = item[12]
+            if not all([version, product_no]):
+                continue
             if stock_weight_hmb:
                 dt = {'area_weight': stock_weight_hmb}
                 s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': 'HMB', 'version': version}
