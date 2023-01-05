@@ -755,6 +755,49 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
             next_instance.save()
         return Response('成功')
 
+    @staticmethod
+    def convert_fm_weight(pb_no, version, factory_date):
+        stages = ['CMB', 'HMB', '1MB', '2MB', '3MB', '4MB', 'FM']
+        stock_data = ProductStockDailySummary.objects.filter(
+            factory_date=factory_date,
+            product_no=pb_no,
+            version=version,
+            stage__in=stages
+        ).values('stage', 'stock_weight', 'area_weight')
+        stock_weight_data = {i['stage']: i['stock_weight'] + i['area_weight'] for i in stock_data}
+        if not stock_weight_data:
+            return 0
+        pb_no_stages = list(ProductBatching.objects.using('SFJ').filter(
+            used_type=4, stage_product_batch_no__endswith='-{}-{}'.format(pb_no, version)
+        ).values_list('stage__global_name', flat=True))
+        if 'FM' not in pb_no_stages:
+            raise ValidationError('未找到该规格FM段次配方数据:{}-{}'.format(pb_no, version))
+        pb_no_stages = list(set(stages) & set(pb_no_stages))
+        sorted_rules = {'HMB': 1, 'CMB': 2, '1MB': 3, '2MB': 4, '3MB': 5, '4MB': 6, 'FM': 7}
+        pb_no_stages = sorted(pb_no_stages, key=lambda x: sorted_rules[x])
+        stage_weight_data = {i: 0 for i in pb_no_stages}
+        for idx, s in enumerate(pb_no_stages):
+            if s == 'FM':
+                continue
+            s_stock_weight = stock_weight_data.get(s, 0) + stage_weight_data.get(s, 0)
+            if not s_stock_weight:
+                continue
+            out_put_stage = pb_no_stages[idx+1]
+            stage_recipe = ProductBatching.objects.using('SFJ').filter(
+                used_type=4,
+                stage_product_batch_no__endswith='-{}-{}-{}'.format(out_put_stage, pb_no, version)
+            ).order_by('-batching_weight').first()
+            if not stage_recipe:
+                raise ValidationError('未找到该规格{}段次配方数据:{}-{}'.format(out_put_stage, pb_no, version))
+            devoted_recipe = ProductBatchingDetail.objects.using('SFJ').filter(
+                product_batching_id=stage_recipe.id,
+                material__material_no__endswith='-{}-{}-{}'.format(s, pb_no, version)).first()
+            if not devoted_recipe:
+                raise ValidationError('未找到该规格投入{}段次配方数据:{}-{}'.format(out_put_stage, pb_no, version))
+            trains = s_stock_weight / float(devoted_recipe.actual_weight)
+            stage_weight_data[out_put_stage] = trains * float(stage_recipe.batching_weight)
+        return round(stage_weight_data['FM'] / 1000, 2)
+
     @action(methods=['post'], detail=False, permission_classes=[], url_path='import_xlsx',
             url_name='import_xlsx')
     def import_xlx(self, request):
@@ -789,19 +832,69 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
                 ).order_by('used_time').values_list('stage_product_batch_no', flat=True))
                 if not pbs:
                     raise ValidationError('未找到该规格启用配方：{}'.format(product_no))
-                if len(pbs) == 1:  # 启用规格只有一种
+                if len(set(pbs)) == 1:  # 启用规格只有一种
                     version = pbs[0].split('-')[-1]
-                area_list.append({'factory_date': factory_date,
-                                  'sn': sn,
-                                  'product_no': product_no,
-                                  'version': version,
-                                  'plan_weight': item[5],
-                                  'workshop_weight': round(item[16], 1) if item[16] else 0,
-                                  'current_stock': round(item[17], 1) if item[17] else 0,
-                                  'desc': '',
-                                  # 'target_stock': float(item[1]) * 1.5,
-                                  # 'demanded_weight': float(item[1]) * 1.5 - float(item[2]) - float(item[3])
-                                  })
+                    area_list.append({'factory_date': factory_date,
+                                      'sn': sn,
+                                      'product_no': product_no,
+                                      'version': version,
+                                      'plan_weight': item[5],
+                                      'workshop_weight': round(item[16], 1) if item[16] else 0,
+                                      'current_stock': round(item[17], 1) if item[17] else 0,
+                                      'desc': '',
+                                      # 'target_stock': float(item[1]) * 1.5,
+                                      # 'demanded_weight': float(item[1]) * 1.5 - float(item[2]) - float(item[3])
+                                      })
+                else:
+                    old_version_recipe = pbs[0]
+                    new_version_recipe = pbs[-1]
+                    old_version_recipe_split_data = old_version_recipe.split('-')
+                    new_version_recipe_split_data = new_version_recipe.split('-')
+                    old_pb_no, old_version = old_version_recipe_split_data[2], old_version_recipe_split_data[3]
+                    new_pb_no, new_version = new_version_recipe_split_data[2], new_version_recipe_split_data[3]
+                    old_recipe_weight = self.convert_fm_weight(old_pb_no, old_version, factory_date)
+                    if not old_recipe_weight:
+                        area_list.append({'factory_date': factory_date,
+                                          'sn': sn,
+                                          'product_no': product_no,
+                                          'version': new_version,
+                                          'plan_weight': item[5],
+                                          'workshop_weight': round(item[16], 1) if item[16] else 0,
+                                          'current_stock': round(item[17], 1) if item[17] else 0,
+                                          'desc': '',
+                                          })
+                    else:
+                        if item[5] <= old_recipe_weight:
+                            area_list.append({'factory_date': factory_date,
+                                              'sn': sn,
+                                              'product_no': product_no,
+                                              'version': old_version,
+                                              'plan_weight': old_recipe_weight,
+                                              'workshop_weight': round(item[16], 1) if item[16] else 0,
+                                              'current_stock': round(item[17], 1) if item[17] else 0,
+                                              'desc': '',
+                                              'demanded_weight': old_recipe_weight
+                                              })
+                        else:
+                            area_list.append({'factory_date': factory_date,
+                                              'sn': sn,
+                                              'product_no': product_no,
+                                              'version': old_version,
+                                              'plan_weight': old_recipe_weight,
+                                              'workshop_weight': 0,
+                                              'current_stock': 0,
+                                              'desc': '',
+                                              'demanded_weight': old_recipe_weight
+                                              })
+                            area_list.append({'factory_date': factory_date,
+                                              'sn': sn,
+                                              'product_no': product_no,
+                                              'version': new_version,
+                                              'plan_weight': round(item[5]-old_recipe_weight, 2),
+                                              'workshop_weight': 0,
+                                              'current_stock': 0,
+                                              'desc': '',
+                                              })
             except Exception:
                 raise ValidationError('第{}行数据有错，请检查后重试!'.format(6+idx))
             sn += 1
@@ -813,15 +906,16 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
         middle_ton_stock_days = ps.middle_ton_stock_days
         big_ton_stock_days = ps.big_ton_stock_days
         for item in s.validated_data:
-            if item['plan_weight'] < 5:
-                min_stock_day = float(small_ton_stock_days)
-            elif 5 <= item['plan_weight'] <= 10:
-                min_stock_day = float(middle_ton_stock_days)
-            else:
-                min_stock_day = float(big_ton_stock_days)
-            item['target_stock'] = round(item['plan_weight'] * min_stock_day, 1)
-            demanded_weight = round(item['plan_weight'] * min_stock_day - item['workshop_weight'] - item['current_stock'], 1)
-            item['demanded_weight'] = demanded_weight if demanded_weight >= 0 else 0
+            if 'demanded_weight' not in item:
+                if item['plan_weight'] < 5:
+                    min_stock_day = float(small_ton_stock_days)
+                elif 5 <= item['plan_weight'] <= 10:
+                    min_stock_day = float(middle_ton_stock_days)
+                else:
+                    min_stock_day = float(big_ton_stock_days)
+                item['target_stock'] = round(item['plan_weight'] * min_stock_day, 1)
+                demanded_weight = round(item['plan_weight'] * min_stock_day - item['workshop_weight'] - item['current_stock'], 1)
+                item['demanded_weight'] = demanded_weight if demanded_weight >= 0 else 0
         s.save()
         return Response('ok')
 
