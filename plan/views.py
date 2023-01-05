@@ -1143,33 +1143,33 @@ class SchedulingStockSummary(ModelViewSet):
         for item in data:
             version = item[1]
             product_no = item[2]
-            stock_weight_hmb = item[4]
-            stock_weight_cmb = item[6]
-            stock_weight_1mb = item[8]
-            stock_weight_2mb = item[10]
-            stock_weight_3mb = item[12]
+            stock_weight_hmb = 0 if not item[4] else item[4]
+            stock_weight_cmb = 0 if not item[6] else item[6]
+            stock_weight_1mb = 0 if not item[8] else item[8]
+            stock_weight_2mb = 0 if not item[10] else item[10]
+            stock_weight_3mb = 0 if not item[12] else item[12]
             if not all([version, product_no]):
                 continue
-            if stock_weight_hmb:
-                dt = {'area_weight': stock_weight_hmb}
-                s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': 'HMB', 'version': version}
-                ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
-            if stock_weight_cmb:
-                dt = {'area_weight': stock_weight_cmb}
-                s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': 'CMB', 'version': version}
-                ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
-            if stock_weight_1mb:
-                dt = {'area_weight': stock_weight_1mb}
-                s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': '1MB', 'version': version}
-                ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
-            if stock_weight_2mb:
-                dt = {'area_weight': stock_weight_2mb}
-                s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': '2MB', 'version': version}
-                ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
-            if stock_weight_3mb:
-                dt = {'area_weight': stock_weight_3mb}
-                s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': '3MB', 'version': version}
-                ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
+            # if stock_weight_hmb:
+            dt = {'area_weight': stock_weight_hmb}
+            s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': 'HMB', 'version': version}
+            ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
+            # if stock_weight_cmb:
+            dt = {'area_weight': stock_weight_cmb}
+            s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': 'CMB', 'version': version}
+            ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
+            # if stock_weight_1mb:
+            dt = {'area_weight': stock_weight_1mb}
+            s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': '1MB', 'version': version}
+            ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
+            # if stock_weight_2mb:
+            dt = {'area_weight': stock_weight_2mb}
+            s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': '2MB', 'version': version}
+            ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
+            # if stock_weight_3mb:
+            dt = {'area_weight': stock_weight_3mb}
+            s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': '3MB', 'version': version}
+            ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
         return Response('ok')
 
     @action(methods=['get'], detail=False)
