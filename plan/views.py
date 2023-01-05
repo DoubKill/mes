@@ -781,15 +781,18 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
         for idx, item in enumerate(data):
             try:
                 product_no = re.sub(r'[\u4e00-\u9fa5]+', '', item[4])
-                if not product_no or not item[5] or not item[6]:
+                if not product_no or not item[5]:
                     continue
+                pb = ProductBatching.objects.using('SFJ').filter(
+                    used_type=4,
+                    stage_product_batch_no__icontains='-{}-'.format(product_no)).values_list('stage_product_batch_no', flat=True)
                 area_list.append({'factory_date': factory_date,
                                   'sn': sn,
                                   'product_no': product_no,
-                                  'version': item[5],
-                                  'plan_weight': item[6],
-                                  'workshop_weight': round(item[17], 1) if item[17] else 0,
-                                  'current_stock': round(item[18], 1) if item[18] else 0,
+                                  # 'version': item[5],
+                                  'plan_weight': item[5],
+                                  'workshop_weight': round(item[16], 1) if item[16] else 0,
+                                  'current_stock': round(item[17], 1) if item[17] else 0,
                                   'desc': '',
                                   # 'target_stock': float(item[1]) * 1.5,
                                   # 'demanded_weight': float(item[1]) * 1.5 - float(item[2]) - float(item[3])
@@ -1172,28 +1175,30 @@ class SchedulingStockSummary(ModelViewSet):
         data = serializer.data
         ret = {}
         for item in data:
+            k = item['product_no'] + '-' + item['version']
             if item['factory_date'] not in ret:
-                ret[item['factory_date']] = {item['product_no']: {'product_no': item['product_no'],
-                                                                  'version': item['version'],
-                                                                  'stock_weight_{}'.format(item['stage']): item['stock_weight'],
-                                                                  'area_weight_{}'.format(item['stage']): item['area_weight']}}
+                ret[item['factory_date']] = {k: {'product_no': item['product_no'],
+                                                 'version': item['version'],
+                                                 'stock_weight_{}'.format(item['stage']): item['stock_weight'],
+                                                 'area_weight_{}'.format(item['stage']): item['area_weight']}}
             else:
-                if item['product_no'] not in ret[item['factory_date']]:
-                    ret[item['factory_date']][item['product_no']] = {'product_no': item['product_no'],
-                                                                     'version': item['version'],
-                                                                     'stock_weight_{}'.format(item['stage']): item['stock_weight'],
-                                                                     'area_weight_{}'.format(item['stage']): item['area_weight']}
+                if k not in ret[item['factory_date']]:
+                    ret[item['factory_date']][k] = {'product_no': item['product_no'],
+                                                    'version': item['version'],
+                                                    'stock_weight_{}'.format(item['stage']): item['stock_weight'],
+                                                    'area_weight_{}'.format(item['stage']): item['area_weight']}
                 else:
-                    ret[item['factory_date']][item['product_no']]['stock_weight_{}'.format(item['stage'])] = item['stock_weight']
-                    ret[item['factory_date']][item['product_no']]['area_weight_{}'.format(item['stage'])] = item['area_weight']
+                    ret[item['factory_date']][k]['stock_weight_{}'.format(item['stage'])] = item['stock_weight']
+                    ret[item['factory_date']][k]['area_weight_{}'.format(item['stage'])] = item['area_weight']
         if not ret:
             raise ValidationError('时间范围内无数据可以导出')
         bio = BytesIO()
         writer = pd.ExcelWriter(bio, engine='xlsxwriter')  # 注意安装这个包 pip install xlsxwriter
         for k, v in ret.items():
-            df = pd.DataFrame(v.values())
+            df = pd.DataFrame(v.values(), columns=['product_no', 'version', 'stock_weight_HMB', 'area_weight_HMB', 'stock_weight_CMB', 'area_weight_CMB', 'stock_weight_1MB', 'area_weight_1MB', 'stock_weight_2MB', 'area_weight_2MB', 'stock_weight_3MB', 'area_weight_3MB'])
             try:
-                df = df.rename(columns={'product_no': '规格', 'version': '版本号', 'stock_weight_HMB': 'HMB(库内)', 'area_weight_HMB': 'HMB(现场)',
+                df = df.rename(columns={'product_no': '规格', 'version': '版本号',
+                                        'stock_weight_HMB': 'HMB(库内)', 'area_weight_HMB': 'HMB(现场)',
                                         'stock_weight_CMB': 'CMB(库内)', 'area_weight_CMB': 'CMB(现场)',
                                         'stock_weight_1MB': '1MB(库内)', 'area_weight_1MB': '1MB(现场)',
                                         'stock_weight_2MB': '2MB(库内)', 'area_weight_2MB': '2MB(现场)',
