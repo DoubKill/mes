@@ -1057,13 +1057,15 @@ class SchedulingStockSummary(ModelViewSet):
         data = serializer.data
         ret = {}
         for item in data:
-            if item['product_no'] not in ret:
-                ret[item['product_no']] = {'product_no': item['product_no'],
-                                           'stock_weight_{}'.format(item['stage']): item['stock_weight'],
-                                           'area_weight_{}'.format(item['stage']): item['area_weight']}
+            k = item['product_no'] + '-' + item['version']
+            if k not in ret:
+                ret[k] = {'product_no': item['product_no'],
+                          'version': item['version'],
+                          'stock_weight_{}'.format(item['stage']): item['stock_weight'],
+                          'area_weight_{}'.format(item['stage']): item['area_weight']}
             else:
-                ret[item['product_no']]['stock_weight_{}'.format(item['stage'])] = item['stock_weight']
-                ret[item['product_no']]['area_weight_{}'.format(item['stage'])] = item['area_weight']
+                ret[k]['stock_weight_{}'.format(item['stage'])] = item['stock_weight']
+                ret[k]['area_weight_{}'.format(item['stage'])] = item['area_weight']
         return Response(ret.values())
 
     def create(self, request, *args, **kwargs):
@@ -1074,9 +1076,13 @@ class SchedulingStockSummary(ModelViewSet):
             raise ValidationError('data error!')
         for stock in stock_data:
             product_no = stock.pop('product_no')
-            if ProductStockDailySummary.objects.filter(factory_date=factory_date, product_no=product_no).exists():
+            version = stock.pop('version')
+            if not all([product_no, version]):
+                raise ValidationError('数据不全！')
+            if ProductStockDailySummary.objects.filter(
+                    factory_date=factory_date, product_no=product_no, version=version).exists():
                 raise ValidationError('该规格库存数据已存在，请勿重复添加！')
-            s_data = {'factory_date': factory_date, 'product_no': product_no}
+            s_data = {'factory_date': factory_date, 'product_no': product_no, 'version': version}
             for key, value in stock.items():
                 dt = dict()
                 split_data = key.split('_')
@@ -1095,7 +1101,10 @@ class SchedulingStockSummary(ModelViewSet):
         ProductStockDailySummary.objects.filter(factory_date=factory_date).delete()
         for stock in stock_data:
             product_no = stock.pop('product_no')
-            s_data = {'factory_date': factory_date, 'product_no': product_no}
+            version = stock.pop('version')
+            if not all([product_no, version]):
+                raise ValidationError('数据不全！')
+            s_data = {'factory_date': factory_date, 'product_no': product_no, 'version': version}
             for key, value in stock.items():
                 dt = dict()
                 split_data = key.split('_')
@@ -1125,30 +1134,31 @@ class SchedulingStockSummary(ModelViewSet):
         data = get_sheet_data(cur_sheet, start_row=7)
         for item in data:
             product_no = item[1]
-            stock_weight_hmb = item[3]
-            stock_weight_cmb = item[5]
-            stock_weight_1mb = item[7]
-            stock_weight_2mb = item[9]
-            stock_weight_3mb = item[11]
+            version = item[2]
+            stock_weight_hmb = item[4]
+            stock_weight_cmb = item[6]
+            stock_weight_1mb = item[8]
+            stock_weight_2mb = item[10]
+            stock_weight_3mb = item[12]
             if stock_weight_hmb:
                 dt = {'area_weight': stock_weight_hmb}
-                s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': 'HMB'}
+                s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': 'HMB', 'version': version}
                 ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
             if stock_weight_cmb:
                 dt = {'area_weight': stock_weight_cmb}
-                s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': 'CMB'}
+                s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': 'CMB', 'version': version}
                 ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
             if stock_weight_1mb:
                 dt = {'area_weight': stock_weight_1mb}
-                s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': '1MB'}
+                s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': '1MB', 'version': version}
                 ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
             if stock_weight_2mb:
                 dt = {'area_weight': stock_weight_2mb}
-                s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': '2MB'}
+                s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': '2MB', 'version': version}
                 ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
             if stock_weight_3mb:
                 dt = {'area_weight': stock_weight_3mb}
-                s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': '3MB'}
+                s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': '3MB', 'version': version}
                 ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
         return Response('ok')
 
@@ -1164,11 +1174,13 @@ class SchedulingStockSummary(ModelViewSet):
         for item in data:
             if item['factory_date'] not in ret:
                 ret[item['factory_date']] = {item['product_no']: {'product_no': item['product_no'],
-                                                                 'stock_weight_{}'.format(item['stage']): item['stock_weight'],
-                                                                 'area_weight_{}'.format(item['stage']): item['area_weight']}}
+                                                                  'version': item['version'],
+                                                                  'stock_weight_{}'.format(item['stage']): item['stock_weight'],
+                                                                  'area_weight_{}'.format(item['stage']): item['area_weight']}}
             else:
                 if item['product_no'] not in ret[item['factory_date']]:
                     ret[item['factory_date']][item['product_no']] = {'product_no': item['product_no'],
+                                                                     'version': item['version'],
                                                                      'stock_weight_{}'.format(item['stage']): item['stock_weight'],
                                                                      'area_weight_{}'.format(item['stage']): item['area_weight']}
                 else:
@@ -1181,7 +1193,7 @@ class SchedulingStockSummary(ModelViewSet):
         for k, v in ret.items():
             df = pd.DataFrame(v.values())
             try:
-                df = df.rename(columns={'product_no': '规格', 'stock_weight_HMB': 'HMB(库内)', 'area_weight_HMB': 'HMB(现场)',
+                df = df.rename(columns={'product_no': '规格', 'version': '版本号', 'stock_weight_HMB': 'HMB(库内)', 'area_weight_HMB': 'HMB(现场)',
                                         'stock_weight_CMB': 'CMB(库内)', 'area_weight_CMB': 'CMB(现场)',
                                         'stock_weight_1MB': '1MB(库内)', 'area_weight_1MB': '1MB(现场)',
                                         'stock_weight_2MB': '2MB(库内)', 'area_weight_2MB': '2MB(现场)',

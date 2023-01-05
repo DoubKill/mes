@@ -33,12 +33,13 @@ def product_stock_daily_summary():
     ret = {}
     for item in t1:
         try:
-            items = item['material_no'].split('-')
+            items = item['material_no'].strip().split('-')
             stage = items[1]
             product_no = items[2]
+            version = items[3]
         except Exception:
             continue
-        k = stage+'-'+product_no
+        k = stage+'-'+product_no+'-'+version
         if k not in ret:
             ret[k] = item['s']
         else:
@@ -48,13 +49,15 @@ def product_stock_daily_summary():
             items = key.split('-')
             stage = items[0]
             product_no = items[1]
+            version = items[2]
         except Exception:
             continue
         ProductStockDailySummary.objects.create(
             factory_date=datetime.datetime.now().date(),
             stock_weight=value,
             stage=stage,
-            product_no=product_no
+            product_no=product_no,
+            version=version
         )
 
 
