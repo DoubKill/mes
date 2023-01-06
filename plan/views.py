@@ -2097,6 +2097,7 @@ class APSExportDataView(APIView):
                 time_consume = plan_trains * train_time_consume/60
                 if pb_version_name not in job_list_data:
                     pb_time_consume += time_consume
+                    pb_time_consume += 30
                     job_list_data[pb_version_name] = {stage: {
                         'project_name': pb_version_name,
                         'stage': stage,
