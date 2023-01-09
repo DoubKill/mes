@@ -1944,8 +1944,8 @@ class APSExportDataView(APIView):
                      'equip__category__category_name', 'stage__global_name').order_by('batching_weight')
             stage_devoted_weight = {}
             weight_qty = i.demanded_weight * 1000
-            stock_trans_weight = convert_fm_weight(i.product_no, i.version, factory_date)
-            if weight_qty <= stock_trans_weight * 1.15:
+            stock_trans_weight = convert_fm_weight(i.product_no, i.version, factory_date) * 1000
+            if stock_trans_weight <= weight_qty <= stock_trans_weight * 1.15:
                 weight_qty = stock_trans_weight
 
             # 计算该规格每个段次所投入的重量
@@ -2129,7 +2129,7 @@ class APSExportDataView(APIView):
             sheet1.cell(data_row, 2).value = pb_name  # 规格名称（带版本号）
             sheet1.cell(data_row, 3).value = 0 if release_date <= 0 else release_date  # 胶料代码开始时间
             sheet1.cell(data_row, 4).value = 0  # 关键路径持续时间（暂时无用）
-            sheet1.cell(data_row, 5).value = int(pb_available_time_dict.get(pb_name, 720))
+            sheet1.cell(data_row, 5).value = int(pb_available_time_dict.get(pb_name, 720)) + release_date
             sheet1.cell(data_row, 6).value = len(item)  # job_list_size(总共需要打待段次数量)
             for _, data in item.items():
                 # 写入job_list sheet
