@@ -54,7 +54,7 @@ from plan.serializers import ProductDayPlanSerializer, ProductClassesPlanManyCre
     SchedulingResultSerializer, SchedulingEquipShutDownPlanSerializer, ProductStockDailySummarySerializer, \
     WeightPackageDailyTimeConsumeSerializer
 from plan.utils import calculate_product_plan_trains, extend_last_aps_result, APSLink, \
-    calculate_equip_recipe_avg_mixin_time, plan_sort, calculate_product_stock
+    calculate_equip_recipe_avg_mixin_time, plan_sort, calculate_product_stock, convert_fm_weight
 from production.models import PlanStatus, TrainsFeedbacks, MaterialTankStatus
 from quality.utils import get_cur_sheet, get_sheet_data
 from recipe.models import ProductBatching, ProductBatchingDetail, Material, MaterialAttribute, WeighBatchingDetail
@@ -755,49 +755,6 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
             next_instance.save()
         return Response('成功')
 
-    @staticmethod
-    def convert_fm_weight(pb_no, version, factory_date):
-        stages = ['CMB', 'HMB', '1MB', '2MB', '3MB', '4MB', 'FM']
-        stock_data = ProductStockDailySummary.objects.filter(
-            factory_date=factory_date,
-            product_no=pb_no,
-            version=version,
-            stage__in=stages
-        ).values('stage', 'stock_weight', 'area_weight')
-        stock_weight_data = {i['stage']: i['stock_weight'] + i['area_weight'] for i in stock_data}
-        if not stock_weight_data:
-            return 0
-        pb_no_stages = list(ProductBatching.objects.using('SFJ').filter(
-            used_type=4, stage_product_batch_no__endswith='-{}-{}'.format(pb_no, version)
-        ).values_list('stage__global_name', flat=True))
-        if 'FM' not in pb_no_stages:
-            raise ValidationError('未找到该规格FM段次配方数据:{}-{}'.format(pb_no, version))
-        pb_no_stages = list(set(stages) & set(pb_no_stages))
-        sorted_rules = {'HMB': 1, 'CMB': 2, '1MB': 3, '2MB': 4, '3MB': 5, '4MB': 6, 'FM': 7}
-        pb_no_stages = sorted(pb_no_stages, key=lambda x: sorted_rules[x])
-        stage_weight_data = {i: 0 for i in pb_no_stages}
-        for idx, s in enumerate(pb_no_stages):
-            if s == 'FM':
-                continue
-            s_stock_weight = stock_weight_data.get(s, 0) + stage_weight_data.get(s, 0)
-            if not s_stock_weight:
-                continue
-            out_put_stage = pb_no_stages[idx+1]
-            stage_recipe = ProductBatching.objects.using('SFJ').filter(
-                used_type=4,
-                stage_product_batch_no__endswith='-{}-{}-{}'.format(out_put_stage, pb_no, version)
-            ).order_by('-batching_weight').first()
-            if not stage_recipe:
-                raise ValidationError('未找到该规格{}段次配方数据:{}-{}'.format(out_put_stage, pb_no, version))
-            devoted_recipe = ProductBatchingDetail.objects.using('SFJ').filter(
-                product_batching_id=stage_recipe.id,
-                material__material_no__endswith='-{}-{}-{}'.format(s, pb_no, version)).first()
-            if not devoted_recipe:
-                raise ValidationError('未找到该规格投入{}段次配方数据:{}-{}'.format(out_put_stage, pb_no, version))
-            trains = s_stock_weight / float(devoted_recipe.actual_weight)
-            stage_weight_data[out_put_stage] = trains * float(stage_recipe.batching_weight)
-        return round(stage_weight_data['FM'] / 1000, 2)
-
     @action(methods=['post'], detail=False, permission_classes=[], url_path='import_xlsx',
             url_name='import_xlsx')
     def import_xlx(self, request):
@@ -852,7 +809,7 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
                     new_version_recipe_split_data = new_version_recipe.split('-')
                     old_pb_no, old_version = old_version_recipe_split_data[2], old_version_recipe_split_data[3]
                     new_pb_no, new_version = new_version_recipe_split_data[2], new_version_recipe_split_data[3]
-                    old_recipe_weight = self.convert_fm_weight(old_pb_no, old_version, factory_date)
+                    old_recipe_weight = convert_fm_weight(old_pb_no, old_version, factory_date)
                     if not old_recipe_weight:
                         area_list.append({'factory_date': factory_date,
                                           'sn': sn,
@@ -1987,6 +1944,9 @@ class APSExportDataView(APIView):
                      'equip__category__category_name', 'stage__global_name').order_by('batching_weight')
             stage_devoted_weight = {}
             weight_qty = i.demanded_weight * 1000
+            stock_trans_weight = convert_fm_weight(i.product_no, i.version, factory_date)
+            if weight_qty <= stock_trans_weight * 1.15:
+                weight_qty = stock_trans_weight
 
             # 计算该规格每个段次所投入的重量
             for s in pd_stages[1:][::-1]:
