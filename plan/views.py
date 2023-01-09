@@ -1947,7 +1947,7 @@ class APSExportDataView(APIView):
             stock_trans_weight = convert_fm_weight(i.product_no, i.version, factory_date) * 1000
             if stock_trans_weight <= weight_qty <= stock_trans_weight * 1.15:
                 weight_qty = stock_trans_weight
-
+            aps_fm_weight = weight_qty
             # 计算该规格每个段次所投入的重量
             for s in pd_stages[1:][::-1]:
                 stage_recipes = list(
@@ -2042,7 +2042,7 @@ class APSExportDataView(APIView):
                         continue
 
                 if stage == 'FM':
-                    weight = round(i.demanded_weight * 1000, 2)
+                    weight = round(aps_fm_weight, 2)
                 else:
                     try:
                         weight = round(stage_devoted_weight[stage], 2)
