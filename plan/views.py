@@ -1770,55 +1770,76 @@ class APSExportDataView(APIView):
             month=factory_date.month,
             day=factory_date.day,
             hour=8, minute=0, second=0)
-        # 当天已经下达的计划，状态为commited
-        for plan in ProductClassesPlan.objects.filter(
-                work_schedule_plan__plan_schedule__day_time=factory_date,
-                delete_flag=False):
+        # 当天已经生产的计划，状态为commited
+        started_plans = TrainsFeedbacks.objects.exclude(operation_user='Mixer2').filter(
+            factory_date=factory_date
+        ).values('plan_classes_uid').annotate(st=Min('begin_time'), et=Max('end_time')).order_by('st')
+        started_plan_classes_uid = []
+        for p in started_plans:
+            started_plan_classes_uid.append(p['plan_classes_uid'])
+            plan = ProductClassesPlan.objects.using('SFJ').filter(plan_classes_uid=p['plan_classes_uid']).first()
+            if not plan:
+                continue
             weight = plan.product_batching.batching_weight * plan.plan_trains
             equip_no = plan.equip.equip_no
+            recipe_name = plan.product_batching.stage_product_batch_no
+            st, et = p['st'], p['et']
+            if not st:
+                continue
+            if et <= aps_st_time:  # 八点之前完成的计划不需要
+                continue
             if plan.status in ('完成', '停止'):
-                if equip_no == 'Z04':
-                    trains_st_et = TrainsFeedbacks.objects.filter(
-                        plan_classes_uid=plan.plan_classes_uid,
-                        operation_user='Mixer1'
-                    ).aggregate(st=Min('begin_time'), et=Max('end_time'))
-                else:
-                    trains_st_et = TrainsFeedbacks.objects.filter(
-                        plan_classes_uid=plan.plan_classes_uid
-                    ).aggregate(st=Min('begin_time'), et=Max('end_time'))
-                st, et = trains_st_et['st'], trains_st_et['et']
-                if not st:
-                    continue
-                if et <= aps_st_time:  # 八点之前完成的计划不需要
-                    continue
-                if equip_no in equip_end_time_dict:
-                    if equip_end_time_dict[equip_no] < et:
-                        equip_end_time_dict[equip_no] = et
-                else:
-                    equip_end_time_dict[equip_no] = et
                 time_consume = round((et - st).total_seconds() / 60, 2)
-                begin_time = round((st - aps_st_time).total_seconds() / 60, 2)
             else:
                 time_consume = round(
                     calculate_equip_recipe_avg_mixin_time(
                         equip_no,
-                        plan.product_batching.stage_product_batch_no
+                        recipe_name
                     ) * plan.plan_trains / 60, 2)
-                trains_st = TrainsFeedbacks.objects.filter(
-                    plan_classes_uid=plan.plan_classes_uid
-                ).aggregate(st=Min('begin_time'))['st']
-                tt = plan.created_date
-                if trains_st:
-                    tt = trains_st
-                if equip_end_time_dict.get(equip_no):
-                    if equip_end_time_dict[equip_no] > plan.created_date:
-                        tt = equip_end_time_dict[equip_no]
-                begin_time = round((tt - aps_st_time).total_seconds() / 60, 2)
+                et = st + datetime.timedelta(minutes=int(time_consume))
+            if equip_no in equip_end_time_dict:
+                if equip_end_time_dict[equip_no] < et:
+                    equip_end_time_dict[equip_no] = et
+            else:
+                equip_end_time_dict[equip_no] = et
+            begin_time = round((st - aps_st_time).total_seconds() / 60, 2)
             tc = time_consume + begin_time if begin_time < 0 else time_consume
-            equip_plan_data.append({'recipe_name': plan.product_batching.stage_product_batch_no,
-                                    'equip_no': plan.equip.equip_no,
+            equip_plan_data.append({'recipe_name': recipe_name,
+                                    'equip_no': equip_no,
                                     'plan_trains': plan.plan_trains,
                                     'time_consume': 0 if tc < 0 else tc,
+                                    'status': 'COMMITED',
+                                    # 'delivery_time': time_consume + begin_time if begin_time < 0 else time_consume,
+                                    'begin_time': 0 if begin_time < 0 else begin_time,
+                                    'weight': weight
+                                    })
+
+        # 当天已新建，未生产的计划，状态为commited
+        for plan in ProductClassesPlan.objects.using('SFJ').exclude(
+                plan_classes_uid__in=started_plan_classes_uid).filter(
+                work_schedule_plan__plan_schedule__day_time=factory_date,
+                delete_flag=False).order_by('id'):
+            recipe_name = plan.product_batching.stage_product_batch_no
+            weight = plan.product_batching.batching_weight * plan.plan_trains
+            equip_no = plan.equip.equip_no
+            time_consume = round(
+                calculate_equip_recipe_avg_mixin_time(
+                    equip_no,
+                    plan.product_batching.stage_product_batch_no
+                ) * plan.plan_trains / 60, 2)
+            if equip_end_time_dict.get(equip_no):
+                tt = equip_end_time_dict[equip_no]
+            else:
+                tt = plan.created_date
+            equip_end_time_dict[equip_no] = tt + datetime.timedelta(minutes=int(time_consume))
+            begin_time = round((tt - aps_st_time).total_seconds() / 60, 2)
+            tc = time_consume + begin_time if begin_time < 0 else time_consume
+            if tc <= 0:  # 八点之前完成的计划不需要
+                continue
+            equip_plan_data.append({'recipe_name': recipe_name,
+                                    'equip_no': equip_no,
+                                    'plan_trains': plan.plan_trains,
+                                    'time_consume': tc,
                                     'status': 'COMMITED',
                                     # 'delivery_time': time_consume + begin_time if begin_time < 0 else time_consume,
                                     'begin_time': 0 if begin_time < 0 else begin_time,
