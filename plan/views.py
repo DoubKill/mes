@@ -1758,13 +1758,14 @@ class APSExportDataView(APIView):
     def extend_last_aps_result(self, factory_date, lock_durations):
         """
         继承前一天未打完的排程计划
-        @param lock_durations:
+        @param lock_durations: 锁定时间
         @param factory_date: 日期
         @return:
         """
-        yesterday = factory_date - datetime.timedelta(1)
+        yesterday = factory_date - datetime.timedelta(days=1)
         equip_plan_data = []
         equip_end_time_dict = {}
+        now_time = datetime.datetime.now()
         aps_st_time = datetime.datetime(
             year=factory_date.year,
             month=factory_date.month,
@@ -1846,64 +1847,54 @@ class APSExportDataView(APIView):
                                     'weight': weight
                                     })
 
-        # 前一天未下达的计划，超过锁定时间以内的状态为COMMITED，其他为STANDARD
+        # 前一天未下达的计划，锁定时间以内的状态为COMMITED，其他为STANDARD
         yesterday_last_res = SchedulingResult.objects.filter(
             factory_date=yesterday).order_by('id').last()
         if yesterday_last_res:
             equip_time_dict = {}
             last_aps_results = SchedulingResult.objects.filter(
-                schedule_no=yesterday_last_res.schedule_no).order_by('equip_no', 'sn').values()
+                schedule_no=yesterday_last_res.schedule_no,
+                status='未下发').order_by('equip_no', 'sn').values()
             for result in last_aps_results:
                 equip_no = result['equip_no']
                 recipe_name = result['recipe_name']
                 plan_trains = result['plan_trains']
                 time_consume = result['time_consume']
-                equip_time_consume = equip_time_dict.get(equip_no, 0) + time_consume
-                equip_time_dict[equip_no] = equip_time_consume
+                equip_time_consume = equip_time_dict.get(equip_no, 0)
                 pb = ProductBatching.objects.using('SFJ').filter(
                     stage_product_batch_no=recipe_name, equip__equip_no=equip_no).order_by('id').last()
                 if pb:
                     weight = pb.batching_weight * plan_trains
                 else:
-                    weight = '8.88'
-                if equip_time_consume <= 24:
-                    continue
-                if result['status'] == '未下发':
-                    delivery_time = round(equip_time_consume - 24, 2)
-                    if delivery_time < time_consume:
-                        delivery_time = time_consume
-                    # if equip_time_consume <= 24 + lock_durations:
-                    #     if equip_end_time_dict.get(equip_no):
-                    #         eet = round((equip_end_time_dict[equip_no] - aps_st_time).total_seconds / 3600, 2)
-                    #         if delivery_time < eet:
-                    #             delivery_time = eet
-                    #     equip_end_time_dict[equip_no] = aps_st_time + datetime.timedelta(minutes=int((delivery_time+time_consume)*60))
-                    #     equip_plan_data.append({'recipe_name': recipe_name,
-                    #                             'equip_no': equip_no,
-                    #                             'plan_trains': plan_trains,
-                    #                             # 'delivery_time': delivery_time * 60,
-                    #                             'time_consume': time_consume * 60,
-                    #                             'status': 'COMMITED',
-                    #                             'begin_time': delivery_time * 60,
-                    #                             'weight': weight
-                    #                             })
-                    # else:
-                    #     equip_plan_data.append({'recipe_name': recipe_name,
-                    #                             'equip_no': equip_no,
-                    #                             'plan_trains': plan_trains,
-                    #                             'delivery_time': delivery_time * 60,
-                    #                             'time_consume': time_consume * 60,
-                    #                             'status': 'STANDARD',
-                    #                             'weight': weight
-                    #                             })
+                    weight = 0
+                if equip_end_time_dict.get(equip_no):
+                    tt = equip_end_time_dict[equip_no]
+                else:
+                    tt = now_time
+                # 锁定时间范围之内的为committed
+                locked_end_time = now_time + datetime.timedelta(hours=float(lock_durations))
+                if equip_time_consume <= lock_durations and tt < locked_end_time:
+                    equip_end_time_dict[equip_no] = tt + datetime.timedelta(hours=time_consume)
+                    begin_time = round((tt - aps_st_time).total_seconds() / 60, 2)
                     equip_plan_data.append({'recipe_name': recipe_name,
                                             'equip_no': equip_no,
                                             'plan_trains': plan_trains,
-                                            'delivery_time': delivery_time * 60,
+                                            # 'delivery_time': delivery_time * 60,
+                                            'time_consume': time_consume * 60,
+                                            'status': 'COMMITED',
+                                            'begin_time': 0 if begin_time < 0 else begin_time,
+                                            'weight': weight
+                                            })
+                else:
+                    equip_plan_data.append({'recipe_name': recipe_name,
+                                            'equip_no': equip_no,
+                                            'plan_trains': plan_trains,
+                                            'delivery_time': time_consume * 60,
                                             'time_consume': time_consume * 60,
                                             'status': 'STANDARD',
                                             'weight': weight
                                             })
+                equip_time_dict[equip_no] = equip_time_consume + time_consume
         return equip_plan_data
 
     def get(self, request):
