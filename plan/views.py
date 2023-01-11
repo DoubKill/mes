@@ -2174,7 +2174,9 @@ class APSExportDataView(APIView):
 
         for j in left_plans:
             if j['status'] == 'COMMITED' or release_date <= 0:
-                release_date = 0
+                res_date = 0
+            else:
+                res_date = release_date
             if j['status'] == 'COMMITED':
                 d_time = int(j['time_consume'] + j['begin_time'])
             else:
@@ -2182,7 +2184,7 @@ class APSExportDataView(APIView):
             # 写入project list
             sheet1.cell(data_row, 1).value = data_row - 1  # 序号
             sheet1.cell(data_row, 2).value = '-'.join(j['recipe_name'].split('-')[-2:])  # 规格名称（带版本号）
-            sheet1.cell(data_row, 3).value = release_date  # 胶料代码开始时间(暂时无用)
+            sheet1.cell(data_row, 3).value = res_date  # 胶料代码开始时间(暂时无用)
             sheet1.cell(data_row, 4).value = 0  # 关键路径持续时间（暂时无用）
             sheet1.cell(data_row, 5).value = d_time
             sheet1.cell(data_row, 6).value = 1  # job_list_size(总共需要打待段次数量)
