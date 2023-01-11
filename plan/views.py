@@ -54,7 +54,7 @@ from plan.serializers import ProductDayPlanSerializer, ProductClassesPlanManyCre
     SchedulingResultSerializer, SchedulingEquipShutDownPlanSerializer, ProductStockDailySummarySerializer, \
     WeightPackageDailyTimeConsumeSerializer
 from plan.utils import calculate_product_plan_trains, extend_last_aps_result, APSLink, \
-    calculate_equip_recipe_avg_mixin_time, plan_sort, calculate_product_stock
+    calculate_equip_recipe_avg_mixin_time, plan_sort, calculate_product_stock, convert_fm_weight
 from production.models import PlanStatus, TrainsFeedbacks, MaterialTankStatus
 from quality.utils import get_cur_sheet, get_sheet_data
 from recipe.models import ProductBatching, ProductBatchingDetail, Material, MaterialAttribute, WeighBatchingDetail
@@ -781,19 +781,77 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
         for idx, item in enumerate(data):
             try:
                 product_no = re.sub(r'[\u4e00-\u9fa5]+', '', item[4])
-                if not product_no or not item[5] or not item[6]:
+                if not product_no or not item[5]:
                     continue
-                area_list.append({'factory_date': factory_date,
-                                  'sn': sn,
-                                  'product_no': product_no,
-                                  'version': item[5],
-                                  'plan_weight': item[6],
-                                  'workshop_weight': round(item[17], 1) if item[17] else 0,
-                                  'current_stock': round(item[18], 1) if item[18] else 0,
-                                  'desc': '',
-                                  # 'target_stock': float(item[1]) * 1.5,
-                                  # 'demanded_weight': float(item[1]) * 1.5 - float(item[2]) - float(item[3])
-                                  })
+                pbs = list(ProductBatching.objects.using('SFJ').filter(
+                    used_type=4,
+                    stage_product_batch_no__icontains='-FM-{}-'.format(product_no)
+                ).order_by('used_time').values_list('stage_product_batch_no', flat=True))
+                if not pbs:
+                    raise ValidationError('未找到该规格启用配方：{}'.format(product_no))
+                if len(set(pbs)) == 1:  # 启用规格只有一种
+                    version = pbs[0].split('-')[-1]
+                    area_list.append({'factory_date': factory_date,
+                                      'sn': sn,
+                                      'product_no': product_no,
+                                      'version': version,
+                                      'plan_weight': item[5],
+                                      'workshop_weight': round(item[16], 1) if item[16] else 0,
+                                      'current_stock': round(item[17], 1) if item[17] else 0,
+                                      'desc': '',
+                                      # 'target_stock': float(item[1]) * 1.5,
+                                      # 'demanded_weight': float(item[1]) * 1.5 - float(item[2]) - float(item[3])
+                                      })
+                else:
+                    old_version_recipe = pbs[0]
+                    new_version_recipe = pbs[-1]
+                    old_version_recipe_split_data = old_version_recipe.split('-')
+                    new_version_recipe_split_data = new_version_recipe.split('-')
+                    old_pb_no, old_version = old_version_recipe_split_data[2], old_version_recipe_split_data[3]
+                    new_pb_no, new_version = new_version_recipe_split_data[2], new_version_recipe_split_data[3]
+                    old_recipe_weight = convert_fm_weight(old_pb_no, old_version, factory_date)
+                    if not old_recipe_weight:
+                        area_list.append({'factory_date': factory_date,
+                                          'sn': sn,
+                                          'product_no': product_no,
+                                          'version': new_version,
+                                          'plan_weight': item[5],
+                                          'workshop_weight': round(item[16], 1) if item[16] else 0,
+                                          'current_stock': round(item[17], 1) if item[17] else 0,
+                                          'desc': '',
+                                          })
+                    else:
+                        if item[5] <= old_recipe_weight:
+                            area_list.append({'factory_date': factory_date,
+                                              'sn': sn,
+                                              'product_no': product_no,
+                                              'version': old_version,
+                                              'plan_weight': old_recipe_weight,
+                                              'workshop_weight': round(item[16], 1) if item[16] else 0,
+                                              'current_stock': round(item[17], 1) if item[17] else 0,
+                                              'desc': '',
+                                              'demanded_weight': old_recipe_weight
+                                              })
+                        else:
+                            area_list.append({'factory_date': factory_date,
+                                              'sn': sn,
+                                              'product_no': product_no,
+                                              'version': old_version,
+                                              'plan_weight': old_recipe_weight,
+                                              'workshop_weight': 0,
+                                              'current_stock': 0,
+                                              'desc': '',
+                                              'demanded_weight': old_recipe_weight
+                                              })
+                            area_list.append({'factory_date': factory_date,
+                                              'sn': sn,
+                                              'product_no': product_no,
+                                              'version': new_version,
+                                              'plan_weight': round(item[5]-old_recipe_weight, 2),
+                                              'workshop_weight': 0,
+                                              'current_stock': 0,
+                                              'desc': '',
+                                              })
             except Exception:
                 raise ValidationError('第{}行数据有错，请检查后重试!'.format(6+idx))
             sn += 1
@@ -805,15 +863,16 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
         middle_ton_stock_days = ps.middle_ton_stock_days
         big_ton_stock_days = ps.big_ton_stock_days
         for item in s.validated_data:
-            if item['plan_weight'] < 5:
-                min_stock_day = float(small_ton_stock_days)
-            elif 5 <= item['plan_weight'] <= 10:
-                min_stock_day = float(middle_ton_stock_days)
-            else:
-                min_stock_day = float(big_ton_stock_days)
-            item['target_stock'] = round(item['plan_weight'] * min_stock_day, 1)
-            demanded_weight = round(item['plan_weight'] * min_stock_day - item['workshop_weight'] - item['current_stock'], 1)
-            item['demanded_weight'] = demanded_weight if demanded_weight >= 0 else 0
+            if 'demanded_weight' not in item:
+                if item['plan_weight'] < 5:
+                    min_stock_day = float(small_ton_stock_days)
+                elif 5 <= item['plan_weight'] <= 10:
+                    min_stock_day = float(middle_ton_stock_days)
+                else:
+                    min_stock_day = float(big_ton_stock_days)
+                item['target_stock'] = round(item['plan_weight'] * min_stock_day, 1)
+                demanded_weight = round(item['plan_weight'] * min_stock_day - item['workshop_weight'] - item['current_stock'], 1)
+                item['demanded_weight'] = demanded_weight if demanded_weight >= 0 else 0
         s.save()
         return Response('ok')
 
@@ -1057,13 +1116,15 @@ class SchedulingStockSummary(ModelViewSet):
         data = serializer.data
         ret = {}
         for item in data:
-            if item['product_no'] not in ret:
-                ret[item['product_no']] = {'product_no': item['product_no'],
-                                           'stock_weight_{}'.format(item['stage']): item['stock_weight'],
-                                           'area_weight_{}'.format(item['stage']): item['area_weight']}
+            k = item['product_no'] + '-' + item['version']
+            if k not in ret:
+                ret[k] = {'product_no': item['product_no'],
+                          'version': item['version'],
+                          'stock_weight_{}'.format(item['stage']): item['stock_weight'],
+                          'area_weight_{}'.format(item['stage']): item['area_weight']}
             else:
-                ret[item['product_no']]['stock_weight_{}'.format(item['stage'])] = item['stock_weight']
-                ret[item['product_no']]['area_weight_{}'.format(item['stage'])] = item['area_weight']
+                ret[k]['stock_weight_{}'.format(item['stage'])] = item['stock_weight']
+                ret[k]['area_weight_{}'.format(item['stage'])] = item['area_weight']
         return Response(ret.values())
 
     def create(self, request, *args, **kwargs):
@@ -1074,9 +1135,13 @@ class SchedulingStockSummary(ModelViewSet):
             raise ValidationError('data error!')
         for stock in stock_data:
             product_no = stock.pop('product_no')
-            if ProductStockDailySummary.objects.filter(factory_date=factory_date, product_no=product_no).exists():
+            version = stock.pop('version')
+            if not all([product_no, version]):
+                raise ValidationError('数据不全！')
+            if ProductStockDailySummary.objects.filter(
+                    factory_date=factory_date, product_no=product_no, version=version).exists():
                 raise ValidationError('该规格库存数据已存在，请勿重复添加！')
-            s_data = {'factory_date': factory_date, 'product_no': product_no}
+            s_data = {'factory_date': factory_date, 'product_no': product_no, 'version': version}
             for key, value in stock.items():
                 dt = dict()
                 split_data = key.split('_')
@@ -1095,13 +1160,67 @@ class SchedulingStockSummary(ModelViewSet):
         ProductStockDailySummary.objects.filter(factory_date=factory_date).delete()
         for stock in stock_data:
             product_no = stock.pop('product_no')
-            s_data = {'factory_date': factory_date, 'product_no': product_no}
+            version = stock.pop('version')
+            if not all([product_no, version]):
+                raise ValidationError('数据不全！')
+            s_data = {'factory_date': factory_date, 'product_no': product_no, 'version': version}
             for key, value in stock.items():
                 dt = dict()
                 split_data = key.split('_')
                 s_data['stage'] = split_data[2]
                 dt['_'.join([split_data[0], split_data[1]])] = value
                 ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
+        return Response('ok')
+
+    @atomic()
+    @action(methods=['post'], detail=False, permission_classes=[], url_path='import-xlsx',
+            url_name='import-xlsx')
+    def import_xlx(self, request):
+        factory_date = self.request.data.get('factory_date', datetime.datetime.now().strftime('%Y-%m-%d'))
+        date_splits = factory_date.split('-')
+        m = date_splits[1] if not date_splits[1].startswith('0') else date_splits[1].lstrip('0')
+        d = date_splits[2]
+        excel_file = request.FILES.get('file', None)
+        if not excel_file:
+            raise ValidationError('文件不可为空！')
+        if not excel_file.name.split('.')[-1] in ['xls', 'xlsx', 'xlsm']:
+            raise ValidationError('文件格式错误,仅支持 xls、xlsx、xlsm文件')
+        try:
+            data = xlrd.open_workbook(filename=None, file_contents=excel_file.read())
+            cur_sheet = data.sheet_by_name(sheet_name='{}.({})'.format(m, d))
+        except Exception:
+            raise ValidationError('未找到{}.({})库存excel文档！'.format(m, d))
+        data = get_sheet_data(cur_sheet, start_row=7)
+        for item in data:
+            version = item[1]
+            product_no = item[2]
+            stock_weight_hmb = 0 if not item[4] else item[4]
+            stock_weight_cmb = 0 if not item[6] else item[6]
+            stock_weight_1mb = 0 if not item[8] else item[8]
+            stock_weight_2mb = 0 if not item[10] else item[10]
+            stock_weight_3mb = 0 if not item[12] else item[12]
+            if not all([version, product_no]):
+                continue
+            # if stock_weight_hmb:
+            dt = {'area_weight': stock_weight_hmb}
+            s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': 'HMB', 'version': version}
+            ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
+            # if stock_weight_cmb:
+            dt = {'area_weight': stock_weight_cmb}
+            s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': 'CMB', 'version': version}
+            ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
+            # if stock_weight_1mb:
+            dt = {'area_weight': stock_weight_1mb}
+            s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': '1MB', 'version': version}
+            ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
+            # if stock_weight_2mb:
+            dt = {'area_weight': stock_weight_2mb}
+            s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': '2MB', 'version': version}
+            ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
+            # if stock_weight_3mb:
+            dt = {'area_weight': stock_weight_3mb}
+            s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': '3MB', 'version': version}
+            ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
         return Response('ok')
 
     @action(methods=['get'], detail=False)
@@ -1114,26 +1233,30 @@ class SchedulingStockSummary(ModelViewSet):
         data = serializer.data
         ret = {}
         for item in data:
+            k = item['product_no'] + '-' + item['version']
             if item['factory_date'] not in ret:
-                ret[item['factory_date']] = {item['product_no']: {'product_no': item['product_no'],
-                                                                 'stock_weight_{}'.format(item['stage']): item['stock_weight'],
-                                                                 'area_weight_{}'.format(item['stage']): item['area_weight']}}
+                ret[item['factory_date']] = {k: {'product_no': item['product_no'],
+                                                 'version': item['version'],
+                                                 'stock_weight_{}'.format(item['stage']): item['stock_weight'],
+                                                 'area_weight_{}'.format(item['stage']): item['area_weight']}}
             else:
-                if item['product_no'] not in ret[item['factory_date']]:
-                    ret[item['factory_date']][item['product_no']] = {'product_no': item['product_no'],
-                                                                     'stock_weight_{}'.format(item['stage']): item['stock_weight'],
-                                                                     'area_weight_{}'.format(item['stage']): item['area_weight']}
+                if k not in ret[item['factory_date']]:
+                    ret[item['factory_date']][k] = {'product_no': item['product_no'],
+                                                    'version': item['version'],
+                                                    'stock_weight_{}'.format(item['stage']): item['stock_weight'],
+                                                    'area_weight_{}'.format(item['stage']): item['area_weight']}
                 else:
-                    ret[item['factory_date']][item['product_no']]['stock_weight_{}'.format(item['stage'])] = item['stock_weight']
-                    ret[item['factory_date']][item['product_no']]['area_weight_{}'.format(item['stage'])] = item['area_weight']
+                    ret[item['factory_date']][k]['stock_weight_{}'.format(item['stage'])] = item['stock_weight']
+                    ret[item['factory_date']][k]['area_weight_{}'.format(item['stage'])] = item['area_weight']
         if not ret:
             raise ValidationError('时间范围内无数据可以导出')
         bio = BytesIO()
         writer = pd.ExcelWriter(bio, engine='xlsxwriter')  # 注意安装这个包 pip install xlsxwriter
         for k, v in ret.items():
-            df = pd.DataFrame(v.values())
+            df = pd.DataFrame(v.values(), columns=['version', 'product_no', 'stock_weight_HMB', 'area_weight_HMB', 'stock_weight_CMB', 'area_weight_CMB', 'stock_weight_1MB', 'area_weight_1MB', 'stock_weight_2MB', 'area_weight_2MB', 'stock_weight_3MB', 'area_weight_3MB'])
             try:
-                df = df.rename(columns={'product_no': '规格', 'stock_weight_HMB': 'HMB(库内)', 'area_weight_HMB': 'HMB(现场)',
+                df = df.rename(columns={'version': '版本号', 'product_no': '规格',
+                                        'stock_weight_HMB': 'HMB(库内)', 'area_weight_HMB': 'HMB(现场)',
                                         'stock_weight_CMB': 'CMB(库内)', 'area_weight_CMB': 'CMB(现场)',
                                         'stock_weight_1MB': '1MB(库内)', 'area_weight_1MB': '1MB(现场)',
                                         'stock_weight_2MB': '2MB(库内)', 'area_weight_2MB': '2MB(现场)',
@@ -1647,53 +1770,76 @@ class APSExportDataView(APIView):
             month=factory_date.month,
             day=factory_date.day,
             hour=8, minute=0, second=0)
-        # 当天已经下达的计划，状态为commited
-        for plan in ProductClassesPlan.objects.filter(
-                work_schedule_plan__plan_schedule__day_time=factory_date,
-                delete_flag=False):
+        # 当天已经生产的计划，状态为commited
+        started_plans = TrainsFeedbacks.objects.exclude(operation_user='Mixer2').filter(
+            factory_date=factory_date
+        ).values('plan_classes_uid').annotate(st=Min('begin_time'), et=Max('end_time')).order_by('st')
+        started_plan_classes_uid = []
+        for p in started_plans:
+            started_plan_classes_uid.append(p['plan_classes_uid'])
+            plan = ProductClassesPlan.objects.using('SFJ').filter(plan_classes_uid=p['plan_classes_uid']).first()
+            if not plan:
+                continue
             weight = plan.product_batching.batching_weight * plan.plan_trains
             equip_no = plan.equip.equip_no
+            recipe_name = plan.product_batching.stage_product_batch_no
+            st, et = p['st'], p['et']
+            if not st:
+                continue
+            if et <= aps_st_time:  # 八点之前完成的计划不需要
+                continue
             if plan.status in ('完成', '停止'):
-                if equip_no == 'Z04':
-                    trains_st_et = TrainsFeedbacks.objects.filter(
-                        plan_classes_uid=plan.plan_classes_uid,
-                        operation_user='Mixer1'
-                    ).aggregate(st=Min('begin_time'), et=Max('end_time'))
-                else:
-                    trains_st_et = TrainsFeedbacks.objects.filter(
-                        plan_classes_uid=plan.plan_classes_uid
-                    ).aggregate(st=Min('begin_time'), et=Max('end_time'))
-                st, et = trains_st_et['st'], trains_st_et['et']
-                if not st:
-                    continue
-                if equip_no in equip_end_time_dict:
-                    if equip_end_time_dict[equip_no] < et:
-                        equip_end_time_dict[equip_no] = et
-                else:
-                    equip_end_time_dict[equip_no] = et
                 time_consume = round((et - st).total_seconds() / 60, 2)
-                begin_time = round((st - aps_st_time).total_seconds() / 60, 2)
             else:
                 time_consume = round(
                     calculate_equip_recipe_avg_mixin_time(
                         equip_no,
-                        plan.product_batching.stage_product_batch_no
+                        recipe_name
                     ) * plan.plan_trains / 60, 2)
-                trains_st = TrainsFeedbacks.objects.filter(
-                    plan_classes_uid=plan.plan_classes_uid
-                ).aggregate(st=Min('begin_time'))['st']
-                tt = plan.created_date
-                if trains_st:
-                    tt = trains_st
-                if equip_end_time_dict.get(equip_no):
-                    if equip_end_time_dict[equip_no] > plan.created_date:
-                        tt = equip_end_time_dict[equip_no]
-                begin_time = round((tt - aps_st_time).total_seconds() / 60, 2)
+                et = st + datetime.timedelta(minutes=int(time_consume))
+            if equip_no in equip_end_time_dict:
+                if equip_end_time_dict[equip_no] < et:
+                    equip_end_time_dict[equip_no] = et
+            else:
+                equip_end_time_dict[equip_no] = et
+            begin_time = round((st - aps_st_time).total_seconds() / 60, 2)
             tc = time_consume + begin_time if begin_time < 0 else time_consume
-            equip_plan_data.append({'recipe_name': plan.product_batching.stage_product_batch_no,
-                                    'equip_no': plan.equip.equip_no,
+            equip_plan_data.append({'recipe_name': recipe_name,
+                                    'equip_no': equip_no,
                                     'plan_trains': plan.plan_trains,
                                     'time_consume': 0 if tc < 0 else tc,
+                                    'status': 'COMMITED',
+                                    # 'delivery_time': time_consume + begin_time if begin_time < 0 else time_consume,
+                                    'begin_time': 0 if begin_time < 0 else begin_time,
+                                    'weight': weight
+                                    })
+
+        # 当天已新建，未生产的计划，状态为commited
+        for plan in ProductClassesPlan.objects.using('SFJ').exclude(
+                plan_classes_uid__in=started_plan_classes_uid).filter(
+                work_schedule_plan__plan_schedule__day_time=factory_date,
+                delete_flag=False).order_by('id'):
+            recipe_name = plan.product_batching.stage_product_batch_no
+            weight = plan.product_batching.batching_weight * plan.plan_trains
+            equip_no = plan.equip.equip_no
+            time_consume = round(
+                calculate_equip_recipe_avg_mixin_time(
+                    equip_no,
+                    plan.product_batching.stage_product_batch_no
+                ) * plan.plan_trains / 60, 2)
+            if equip_end_time_dict.get(equip_no):
+                tt = equip_end_time_dict[equip_no]
+            else:
+                tt = plan.created_date
+            equip_end_time_dict[equip_no] = tt + datetime.timedelta(minutes=int(time_consume))
+            begin_time = round((tt - aps_st_time).total_seconds() / 60, 2)
+            tc = time_consume + begin_time if begin_time < 0 else time_consume
+            if tc <= 0:  # 八点之前完成的计划不需要
+                continue
+            equip_plan_data.append({'recipe_name': recipe_name,
+                                    'equip_no': equip_no,
+                                    'plan_trains': plan.plan_trains,
+                                    'time_consume': tc,
                                     'status': 'COMMITED',
                                     # 'delivery_time': time_consume + begin_time if begin_time < 0 else time_consume,
                                     'begin_time': 0 if begin_time < 0 else begin_time,
@@ -1819,7 +1965,10 @@ class APSExportDataView(APIView):
                      'equip__category__category_name', 'stage__global_name').order_by('batching_weight')
             stage_devoted_weight = {}
             weight_qty = i.demanded_weight * 1000
-
+            stock_trans_weight = convert_fm_weight(i.product_no, i.version, factory_date) * 1000
+            if stock_trans_weight <= weight_qty <= stock_trans_weight * 1.15:
+                weight_qty = stock_trans_weight
+            aps_fm_weight = weight_qty
             # 计算该规格每个段次所投入的重量
             for s in pd_stages[1:][::-1]:
                 stage_recipes = list(
@@ -1914,7 +2063,7 @@ class APSExportDataView(APIView):
                         continue
 
                 if stage == 'FM':
-                    weight = round(i.demanded_weight * 1000, 2)
+                    weight = round(aps_fm_weight, 2)
                 else:
                     try:
                         weight = round(stage_devoted_weight[stage], 2)
@@ -1929,6 +2078,7 @@ class APSExportDataView(APIView):
                 time_consume = plan_trains * train_time_consume/60
                 if pb_version_name not in job_list_data:
                     pb_time_consume += time_consume
+                    pb_time_consume += int(sps.scheduling_interval_trains * train_time_consume/60)
                     job_list_data[pb_version_name] = {stage: {
                         'project_name': pb_version_name,
                         'stage': stage,
@@ -1947,6 +2097,7 @@ class APSExportDataView(APIView):
                 else:
                     if stage not in job_list_data[pb_version_name]:
                         pb_time_consume += time_consume
+                        pb_time_consume += int(sps.scheduling_interval_trains * train_time_consume / 60)
                         job_list_data[pb_version_name][stage] = {
                             'project_name': pb_version_name,
                             'stage': stage,
@@ -1990,13 +2141,16 @@ class APSExportDataView(APIView):
         # 待排程和前一天未完成的所有胶料规格数据 ['C590-01', 'J290-01']
         sheet.cell(8, 2).value = len(list(job_list_data.keys())) + len(left_plans)   # 需要排程的规格数量
 
+        release_date = (datetime.datetime.now() -
+                        datetime.datetime.strptime(aps_start_time, '%Y-%m-%d %H:%M:%S')
+                        ).total_seconds() // 60
         # 结合待排程和未完成计划，写入excel
         for pb_name, item in job_list_data.items():
             sheet1.cell(data_row, 1).value = data_row - 1  # 序号
             sheet1.cell(data_row, 2).value = pb_name  # 规格名称（带版本号）
-            sheet1.cell(data_row, 3).value = 0  # 胶料代码开始时间(暂时无用)
+            sheet1.cell(data_row, 3).value = 0 if release_date <= 0 else release_date  # 胶料代码开始时间
             sheet1.cell(data_row, 4).value = 0  # 关键路径持续时间（暂时无用）
-            sheet1.cell(data_row, 5).value = int(pb_available_time_dict.get(pb_name, 720))
+            sheet1.cell(data_row, 5).value = int(pb_available_time_dict.get(pb_name, 720)) + release_date
             sheet1.cell(data_row, 6).value = len(item)  # job_list_size(总共需要打待段次数量)
             for _, data in item.items():
                 # 写入job_list sheet
@@ -2019,12 +2173,18 @@ class APSExportDataView(APIView):
             data_row += 1
 
         for j in left_plans:
+            if j['status'] == 'COMMITED' or release_date <= 0:
+                release_date = 0
+            if j['status'] == 'COMMITED':
+                d_time = int(j['time_consume'] + j['begin_time'])
+            else:
+                d_time = int(j['delivery_time']) + release_date
             # 写入project list
             sheet1.cell(data_row, 1).value = data_row - 1  # 序号
             sheet1.cell(data_row, 2).value = '-'.join(j['recipe_name'].split('-')[-2:])  # 规格名称（带版本号）
-            sheet1.cell(data_row, 3).value = 0  # 胶料代码开始时间(暂时无用)
+            sheet1.cell(data_row, 3).value = release_date  # 胶料代码开始时间(暂时无用)
             sheet1.cell(data_row, 4).value = 0  # 关键路径持续时间（暂时无用）
-            sheet1.cell(data_row, 5).value = int(j['time_consume'] + j['begin_time']) if j['status'] == 'COMMITED' else int(j['delivery_time'])
+            sheet1.cell(data_row, 5).value = d_time
             sheet1.cell(data_row, 6).value = 1  # job_list_size(总共需要打待段次数量)
             # 写入job list
             sheet2.cell(data_row1, 1).value = data_row - 1

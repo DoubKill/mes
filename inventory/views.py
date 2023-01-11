@@ -3926,6 +3926,44 @@ class THInventoryView(WMSInventoryView):
 class THRelease(WMSRelease):
     REQUEST_URL = TH_URL
 
+    def post(self, request):
+        operation_type = self.request.data.get('operation_type')  # 1:放行 2: 不放行
+        tracking_nums = self.request.data.get('tracking_nums')
+        if not all([operation_type, tracking_nums]):
+            raise ValidationError('参数不足！')
+        if not isinstance(tracking_nums, list):
+            raise ValidationError('参数错误！')
+        data = {
+            "TestingType": 1,
+            "AllCheckDetailList": []
+        }
+        release_log_list = []
+        for tracking_num in tracking_nums:
+            if not tracking_num:
+                continue
+            check_result = 1
+            if operation_type == '不放行':
+                check_result = 2
+            data['AllCheckDetailList'].append({
+                "TrackingNumber": tracking_num,
+                "CheckResult": check_result
+            })
+            release_log_list.append(WMSReleaseLog(**{'tracking_num': tracking_num,
+                                                     'operation_type': '放行' if check_result == 1 else '不放行',
+                                                     'created_user': self.request.user}))
+        headers = {"Content-Type": "application/json ;charset=utf-8"}
+        try:
+            r = requests.post(self.REQUEST_URL + '/MESApi/UpdateTestingResult', json=data, headers=headers,
+                              timeout=5)
+            r = r.json()
+        except Exception as e:
+            raise ValidationError('服务错误！')
+        resp_status = r.get('state')
+        if not resp_status == 1:
+            raise ValidationError('请求失败！{}'.format(r.get('msg')))
+        WMSReleaseLog.objects.bulk_create(release_log_list)
+        return Response('更新成功！')
+
 
 @method_decorator([api_recorder], name="dispatch")
 class THExpireListView(WMSExpireListView):
