@@ -7095,10 +7095,10 @@ class EquipDownSummaryTableView(APIView):
             for k, v in res.items():  # 比例
                 s_times = temp_data.get(f"{equip_no}_times")
                 for j in v:
-                    j['ratio'] = round(j['times'] / s_times, 2)
+                    j['ratio'] = round(j['times'] / s_times * 100, 2)
                     data.append(j)
             file_name = '各机台图表(TOP10)'
-            export_fields_dict = {"机台": "equip_no", "异常原因": "down_reason", "分钟数": "times", "累计百分比": "ratio"}
+            export_fields_dict = {"机台": "equip_no", "异常原因": "down_reason", "分钟数": "times", "百分比": "ratio"}
             return gen_template_response(export_fields_dict, data, file_name, handle_str=True)
         if not equip_no:  # 所有密炼机TOP10停机原因汇总(总min)
             titles, details, ratios = [], [], []
@@ -7107,7 +7107,7 @@ class EquipDownSummaryTableView(APIView):
             for i in equips_data[:10]:
                 titles.append(i['down_reason'])
                 details.append(i['total_times'])
-                ratios.append(round(i['total_times'] / all_times, 2))
+                ratios.append(round(i['total_times'] / all_times * 100, 2))
             results.update(**{'titles': titles, 'details': details, 'ratios': ratios, 'times': all_times})
         else:  # 单机台密炼机TOP10停机原因汇总(总min)
             filter_kwargs = {}
@@ -7129,7 +7129,7 @@ class EquipDownSummaryTableView(APIView):
                     equip_info['titles'].append(down_reason)
                     equip_info['details'].append(total_times)
             for k, v in results.items():  # 比例
-                v['ratios'] = list(map(lambda x: round(x / v['times'], 2), v['details']))
+                v['ratios'] = list(map(lambda x: round(x / v['times'] * 100, 2), v['details']))
             if table_flag:
                 results = results.values()
             else:
