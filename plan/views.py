@@ -1873,7 +1873,7 @@ class APSExportDataView(APIView):
                     tt = now_time
                 # 锁定时间范围之内的为committed
                 locked_end_time = now_time + datetime.timedelta(hours=float(lock_durations))
-                if equip_time_consume <= lock_durations and tt < locked_end_time:
+                if lock_durations != 0 and equip_time_consume <= lock_durations and tt < locked_end_time:
                     equip_end_time_dict[equip_no] = tt + datetime.timedelta(hours=time_consume)
                     begin_time = round((tt - aps_st_time).total_seconds() / 60, 2)
                     equip_plan_data.append({'recipe_name': recipe_name,
