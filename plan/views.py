@@ -2312,6 +2312,7 @@ class APSPlanImport(APIView):
                 try:
                     plan_trains = int(item[j * 6 + 1])
                     time_consume = round(item[j * 6 + 2]/60, 1)
+                    desc = str(item[j * 6 + 3])
                     st = int(item[j * 6 + 4])
                     et = int(item[j * 6 + 5])
                 except Exception:
@@ -2331,9 +2332,10 @@ class APSPlanImport(APIView):
                                                     'recipe_name': product_no,
                                                     'plan_trains': plan_trains,
                                                     'time_consume': time_consume,
-                                                    'desc': item[j * 6 + 3],
                                                     'start_time': aps_st + datetime.timedelta(minutes=st),
-                                                    'end_time': aps_st + datetime.timedelta(minutes=et)}))
+                                                    'end_time': aps_st + datetime.timedelta(minutes=et),
+                                                    'is_locked': True if '锁定' in desc else False
+                                                   }))
                 except Exception:
                     raise ValidationError('导入数据有误，请检查后重试!')
             i += 1
