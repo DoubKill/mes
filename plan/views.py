@@ -2226,7 +2226,7 @@ class APSGanttView(APIView):
         if data_type == 'product':
             queryset = SchedulingResult.objects.filter(
                 schedule_no=schedule_no).order_by('equip_no', 'sn').values(
-                'id', 'equip_no', 'recipe_name', 'time_consume', 'start_time', 'end_time', 'plan_trains')
+                'id', 'equip_no', 'recipe_name', 'time_consume', 'start_time', 'end_time', 'plan_trains', 'is_locked')
             st_idx = len(ret) + 1111
             for item in queryset:
                 product_no = '-'.join(item['recipe_name'].split('-')[-2:])
@@ -2237,7 +2237,9 @@ class APSGanttView(APIView):
                                         'text': '{}/{}/{}'.format(item['equip_no'], item['recipe_name'], str(item['plan_trains'])),
                                         'start_date': item['start_time'].strftime('%Y-%m-%d %H:%M:%S'),
                                         'end_date': item['end_time'].strftime('%Y-%m-%d %H:%M:%S'),
-                                        'equip_no': item['equip_no']})
+                                        'equip_no': item['equip_no'],
+                                        'is_locked': item['is_locked']
+                                        })
                 st_idx += 1
         else:
             for idx, equip_no in enumerate(list(Equip.objects.filter(
@@ -2246,7 +2248,7 @@ class APSGanttView(APIView):
                 ret[equip_no] = [{'id': idx+1, 'render': 'split', 'owner': equip_no}]
             queryset = SchedulingResult.objects.filter(
                 schedule_no=schedule_no).order_by('equip_no', 'sn').values(
-                'id', 'equip_no', 'recipe_name', 'time_consume', 'start_time', 'end_time', 'plan_trains')
+                'id', 'equip_no', 'recipe_name', 'time_consume', 'start_time', 'end_time', 'plan_trains', 'is_locked')
             st_idx = len(ret) + 1
             for item in queryset:
                 equip_no = item['equip_no']
@@ -2255,7 +2257,9 @@ class APSGanttView(APIView):
                                       'text': item['recipe_name'] + '/' + str(item['plan_trains']),
                                       'start_date': item['start_time'].strftime('%Y-%m-%d %H:%M:%S'),
                                       'end_date': item['end_time'].strftime('%Y-%m-%d %H:%M:%S'),
-                                      'equip_no': equip_no})
+                                      'equip_no': equip_no,
+                                      'is_locked': item['is_locked']
+                                      })
                 st_idx += 1
         results = []
         for i in list(ret.values()):
