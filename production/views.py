@@ -6855,27 +6855,32 @@ class EquipDownAnalysisView(APIView):
                     .values('classes__global_name', 'group__global_name')
                 data.update({'group_classes': group_classes})
         else:  # 查看所有机台设定值
-            equip_list, res, max_info, equip_info = all_equip.split(','), {}, {}, {}
-            queryset = EquipDownDetails.objects.filter(delete_flag=False, equip_no__in=equip_list, factory_date=select_date).order_by('equip_no', 'id').values()
-            for i in queryset:
-                equip_info[i['equip_no']] = equip_info.get(i['equip_no'], []) + [i]
-                max_info[i['equip_no']] = max_info.get(i['equip_no'], 0) + 1
-            if max_info:
-                max_num = max(max_info.values())
-                for equip_no in equip_list:
-                    _s_info = equip_info.get(equip_no, [])
-                    for i in range(max_num):
-                        _s_data = {f"{equip_no}-begin_time": _s_info[i]['begin_time'] if _s_info[i: i+1] else '',
-                                   f"{equip_no}-end_time": _s_info[i]['end_time'] if _s_info[i: i+1] else '',
-                                   f"{equip_no}-times": _s_info[i]['times'] if _s_info[i: i+1] else '',
-                                   f"{equip_no}-down_reason": _s_info[i]['down_reason'] if _s_info[i: i+1] else '',
-                                   f"{equip_no}-down_type": _s_info[i]['down_type'] if _s_info[i: i+1] else ''}
-                        index_data = res.get(i)
-                        if index_data:
-                            res[i].update(_s_data)
-                        else:
-                            res[i] = _s_data
-            data = {'results': res.values()}
+            equip_list, _column, data = all_equip.split(','), 5, {'results': []}
+            tables = math.ceil(len(equip_list) / _column)
+            if tables:
+                for _i in range(tables):
+                    res, max_info, equip_info = {}, {}, {}
+                    _equip_title = equip_list[_i * 5:(_i + 1) * 5]
+                    queryset = EquipDownDetails.objects.filter(delete_flag=False, equip_no__in=_equip_title, factory_date=select_date).order_by('equip_no', 'id').values()
+                    for i in queryset:
+                        equip_info[i['equip_no']] = equip_info.get(i['equip_no'], []) + [i]
+                        max_info[i['equip_no']] = max_info.get(i['equip_no'], 0) + 1
+                    if max_info:
+                        max_num = max(max_info.values())
+                        for equip_no in _equip_title:
+                            _s_info = equip_info.get(equip_no, [])
+                            for i in range(max_num):
+                                _s_data = {f"{equip_no}-begin_time": _s_info[i]['begin_time'] if _s_info[i: i+1] else '',
+                                           f"{equip_no}-end_time": _s_info[i]['end_time'] if _s_info[i: i+1] else '',
+                                           f"{equip_no}-times": _s_info[i]['times'] if _s_info[i: i+1] else '',
+                                           f"{equip_no}-down_reason": _s_info[i]['down_reason'] if _s_info[i: i+1] else '',
+                                           f"{equip_no}-down_type": _s_info[i]['down_type'] if _s_info[i: i+1] else ''}
+                                index_data = res.get(i)
+                                if index_data:
+                                    res[i].update(_s_data)
+                                else:
+                                    res[i] = _s_data
+                        data['results'].append({'headers': _equip_title, 'values': res.values()})
         return Response(data)
 
     @atomic
