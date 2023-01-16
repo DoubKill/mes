@@ -1,6 +1,7 @@
 import datetime
 
 from django.db.models import Prefetch, Max
+from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
@@ -17,7 +18,8 @@ from basics.models import GlobalCodeType, GlobalCode, WorkSchedule, Equip, Sysba
 from basics.serializers import GlobalCodeTypeSerializer, GlobalCodeSerializer, WorkScheduleSerializer, \
     EquipSerializer, SysbaseEquipLevelSerializer, WorkSchedulePlanSerializer, WorkScheduleUpdateSerializer, \
     PlanScheduleSerializer, EquipCategoryAttributeSerializer, ClassesSimpleSerializer, LocationSerializer
-from mes.common_code import CommonDeleteMixin
+from mes import settings
+from mes.common_code import CommonDeleteMixin, MySqlClient
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
 from rest_framework.decorators import action
@@ -298,6 +300,34 @@ class PlanScheduleViewSet(CommonDeleteMixin, ModelViewSet):
             return Response({'results': data})
         else:
             return super().list(request, *args, **kwargs)
+
+    @atomic
+    @action(methods=['post'], detail=False, url_path='delete-plan', url_name='delete_plan')
+    def delete_plan(self, request, *args, **kwargs):
+        st = self.request.data.get('st')
+        et = self.request.data.get('et')
+        try:
+            c_st = datetime.datetime.strptime(st, '%Y-%m-%d')
+            c_et = datetime.datetime.strptime(et, '%Y-%m-%d')
+        except:
+            raise ValidationError('日期格式异常')
+        # 删除mes排班
+        self.get_queryset().filter(day_time__gte=st, day_time__lte=et, work_schedule__work_procedure__global_name='密炼').delete()
+        # 同步删除群控排班
+        DATABASE_CONF = {
+            'host': settings.DATABASES['SFJ']['HOST'], 'user': settings.DATABASES['SFJ']['USER'],
+            'password': settings.DATABASES['SFJ']['PASSWORD'], 'database': settings.DATABASES['SFJ']['NAME']
+        }
+        sql_w = """DELETE FROM work_schedule_plan WHERE plan_schedule_id in (select id from plan_schedule where day_time >= '{}' and day_time <= '{}')""".format(st, et)
+        sql_p = """DELETE FROM plan_schedule where day_time >= '{}' and day_time <= '{}'""".format(st, et)
+        try:
+            ms = MySqlClient(**DATABASE_CONF)
+            ms.delete(sql_w)
+            ms.delete(sql_p)
+            ms.close()
+        except Exception as e:
+            raise ValidationError('同步删除群控排班失败')
+        return Response('操作成功')
 
 
 @method_decorator([api_recorder], name="dispatch")
