@@ -2065,6 +2065,8 @@ class APSExportDataView(APIView):
                     continue
 
                 plan_trains = weight//float(batching_weight)
+                if int(plan_trains) == 0:
+                    continue
                 train_time_consume = calculate_equip_recipe_avg_mixin_time(equip_no, recipe_name)
                 time_consume = plan_trains * train_time_consume/60
                 if pb_version_name not in job_list_data:
