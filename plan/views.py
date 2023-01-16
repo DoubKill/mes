@@ -1866,7 +1866,7 @@ class APSExportDataView(APIView):
                 if pb:
                     weight = pb.batching_weight * plan_trains
                 else:
-                    weight = 0
+                    weight = 6.6
                 if equip_end_time_dict.get(equip_no):
                     tt = equip_end_time_dict[equip_no]
                 else:
@@ -2158,7 +2158,7 @@ class APSExportDataView(APIView):
                     sheet2.cell(data_row1, data_col1).value = int(d['time_consume'])
                     sheet2.cell(data_row1, data_col1+1).value = int(d['equip_no'])
                     sheet2.cell(data_row1, data_col1+2).value = int(d['wait_time'])
-                    sheet2.cell(data_row1, data_col1+3).value = int(d['plan_trains'])
+                    sheet2.cell(data_row1, data_col1+3).value = 1 if int(d['plan_trains']) <= 0 else int(d['plan_trains'])
                     data_col1 += 4
                 data_row1 += 1
             data_row += 1
