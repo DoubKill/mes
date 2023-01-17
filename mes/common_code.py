@@ -6,6 +6,7 @@ from calendar import timegm
 from io import BytesIO
 
 import pymssql
+import pymysql
 import requests
 import xlwt
 from DBUtils.PooledDB import PooledDB
@@ -194,6 +195,28 @@ class SqlClient(object):
         self.cursor.execute(sql)
         self.data = self.cursor.fetchone()
         return self.data[0]
+
+    def close(self):
+        self.conn.close()
+        self.cursor.close()
+
+
+class MySqlClient(object):
+    """默认是连接mysqlserver的客户端"""
+
+    def __init__(self, host=None, user=None, password=None, database=None, port=3306):
+        pool = PooledDB(pymysql, database=database,
+                        mincached=5, maxcached=10, maxshared=5, maxconnections=10, blocking=True,
+                        maxusage=100, setsession=None, reset=True, host=host,
+                        user=user, password=password, port=port)
+        conn = pool.connection()
+        cursor = conn.cursor()
+        self.conn = conn
+        self.cursor = cursor
+
+    def delete(self, sql):
+        self.cursor.execute(sql)
+        self.conn.commit()
 
     def close(self):
         self.conn.close()

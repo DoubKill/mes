@@ -1866,7 +1866,7 @@ class APSExportDataView(APIView):
                 if pb:
                     weight = pb.batching_weight * plan_trains
                 else:
-                    weight = 0
+                    weight = 6.6
                 if equip_end_time_dict.get(equip_no):
                     tt = equip_end_time_dict[equip_no]
                 else:
@@ -2065,6 +2065,8 @@ class APSExportDataView(APIView):
                     continue
 
                 plan_trains = weight//float(batching_weight)
+                if int(plan_trains) == 0:
+                    continue
                 train_time_consume = calculate_equip_recipe_avg_mixin_time(equip_no, recipe_name)
                 time_consume = plan_trains * train_time_consume/60
                 if pb_version_name not in job_list_data:
@@ -2158,7 +2160,7 @@ class APSExportDataView(APIView):
                     sheet2.cell(data_row1, data_col1).value = int(d['time_consume'])
                     sheet2.cell(data_row1, data_col1+1).value = int(d['equip_no'])
                     sheet2.cell(data_row1, data_col1+2).value = int(d['wait_time'])
-                    sheet2.cell(data_row1, data_col1+3).value = int(d['plan_trains'])
+                    sheet2.cell(data_row1, data_col1+3).value = d['plan_trains']
                     data_col1 += 4
                 data_row1 += 1
             data_row += 1
@@ -2226,7 +2228,7 @@ class APSGanttView(APIView):
         if data_type == 'product':
             queryset = SchedulingResult.objects.filter(
                 schedule_no=schedule_no).order_by('equip_no', 'sn').values(
-                'id', 'equip_no', 'recipe_name', 'time_consume', 'start_time', 'end_time', 'plan_trains')
+                'id', 'equip_no', 'recipe_name', 'time_consume', 'start_time', 'end_time', 'plan_trains', 'is_locked')
             st_idx = len(ret) + 1111
             for item in queryset:
                 product_no = '-'.join(item['recipe_name'].split('-')[-2:])
@@ -2237,7 +2239,9 @@ class APSGanttView(APIView):
                                         'text': '{}/{}/{}'.format(item['equip_no'], item['recipe_name'], str(item['plan_trains'])),
                                         'start_date': item['start_time'].strftime('%Y-%m-%d %H:%M:%S'),
                                         'end_date': item['end_time'].strftime('%Y-%m-%d %H:%M:%S'),
-                                        'equip_no': item['equip_no']})
+                                        'equip_no': item['equip_no'],
+                                        'is_locked': item['is_locked']
+                                        })
                 st_idx += 1
         else:
             for idx, equip_no in enumerate(list(Equip.objects.filter(
@@ -2246,7 +2250,7 @@ class APSGanttView(APIView):
                 ret[equip_no] = [{'id': idx+1, 'render': 'split', 'owner': equip_no}]
             queryset = SchedulingResult.objects.filter(
                 schedule_no=schedule_no).order_by('equip_no', 'sn').values(
-                'id', 'equip_no', 'recipe_name', 'time_consume', 'start_time', 'end_time', 'plan_trains')
+                'id', 'equip_no', 'recipe_name', 'time_consume', 'start_time', 'end_time', 'plan_trains', 'is_locked')
             st_idx = len(ret) + 1
             for item in queryset:
                 equip_no = item['equip_no']
@@ -2255,7 +2259,9 @@ class APSGanttView(APIView):
                                       'text': item['recipe_name'] + '/' + str(item['plan_trains']),
                                       'start_date': item['start_time'].strftime('%Y-%m-%d %H:%M:%S'),
                                       'end_date': item['end_time'].strftime('%Y-%m-%d %H:%M:%S'),
-                                      'equip_no': equip_no})
+                                      'equip_no': equip_no,
+                                      'is_locked': item['is_locked']
+                                      })
                 st_idx += 1
         results = []
         for i in list(ret.values()):
@@ -2308,6 +2314,7 @@ class APSPlanImport(APIView):
                 try:
                     plan_trains = int(item[j * 6 + 1])
                     time_consume = round(item[j * 6 + 2]/60, 1)
+                    desc = str(item[j * 6 + 3])
                     st = int(item[j * 6 + 4])
                     et = int(item[j * 6 + 5])
                 except Exception:
@@ -2327,9 +2334,10 @@ class APSPlanImport(APIView):
                                                     'recipe_name': product_no,
                                                     'plan_trains': plan_trains,
                                                     'time_consume': time_consume,
-                                                    'desc': item[j * 6 + 3],
                                                     'start_time': aps_st + datetime.timedelta(minutes=st),
-                                                    'end_time': aps_st + datetime.timedelta(minutes=et)}))
+                                                    'end_time': aps_st + datetime.timedelta(minutes=et),
+                                                    'is_locked': True if '锁定' in desc else False
+                                                   }))
                 except Exception:
                     raise ValidationError('导入数据有误，请检查后重试!')
             i += 1
