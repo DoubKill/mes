@@ -47,6 +47,7 @@ permission_data = [
     {'id': 24, 'code': 'planschedule', 'name': '工厂排班管理', 'parent_id': None, 'category_name': '基础信息管理'},
     {'id': 25, 'code': 'view_planschedule', 'name': '查看', 'parent_id': 24},
     {'id': 26, 'code': 'add_planschedule', 'name': '增加', 'parent_id': 24},
+    {'id': 1158, 'code': 'delete_planschedule', 'name': '删除排班', 'parent_id': 24},
 
     {'id': 27, 'code': 'equipcategoryattribute', 'name': '设备种类', 'parent_id': None, 'category_name': '基础信息管理'},
     {'id': 28, 'code': 'view_equipcategoryattribute', 'name': '查看', 'parent_id': 27},
@@ -1177,7 +1178,7 @@ permission_data = [
     {'id': 1156, 'code': 'view_equip_down_summary_table', 'name': '查看', 'parent_id': 1155},
     {'id': 1157, 'code': 'export_equip_down_summary_table', 'name': '导出', 'parent_id': 1155},
 
-    # 下一个 1158 开始
+    # 下一个 1159 开始
 ]
 
 
