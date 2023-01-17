@@ -1247,6 +1247,7 @@ class ProductStockDailySummary(models.Model):
     stock_weight = models.FloatField(help_text='库内库存重量', default=0)
     area_weight = models.FloatField(help_text='现场库存重量', default=0)
     stage = models.CharField(max_length=64, help_text='段次', blank=True, null=True)
+    version = models.CharField(max_length=64, help_text='版本号', blank=True, null=True)
     # recipe_no = models.CharField(max_length=64, help_text='配方名称', blank=True, null=True)
 
     class Meta:
