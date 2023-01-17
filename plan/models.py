@@ -390,6 +390,7 @@ class SchedulingResult(models.Model):
     status = models.CharField(max_length=8, help_text='下发状态（未下发/已下发）', default='未下发')
     start_time = models.DateTimeField(blank=True, null=True)
     end_time = models.DateTimeField(blank=True, null=True)
+    is_locked = models.BooleanField(help_text='是否锁定', default=False)
 
     class Meta:
         db_table = 'aps_result'
