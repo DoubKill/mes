@@ -47,6 +47,7 @@ permission_data = [
     {'id': 24, 'code': 'planschedule', 'name': '工厂排班管理', 'parent_id': None, 'category_name': '基础信息管理'},
     {'id': 25, 'code': 'view_planschedule', 'name': '查看', 'parent_id': 24},
     {'id': 26, 'code': 'add_planschedule', 'name': '增加', 'parent_id': 24},
+    {'id': 1158, 'code': 'delete_planschedule', 'name': '删除排班', 'parent_id': 24},
 
     {'id': 27, 'code': 'equipcategoryattribute', 'name': '设备种类', 'parent_id': None, 'category_name': '基础信息管理'},
     {'id': 28, 'code': 'view_equipcategoryattribute', 'name': '查看', 'parent_id': 27},
@@ -658,7 +659,7 @@ permission_data = [
     {'id': 694, 'code': 'import_equip_repair_standard', 'name': '导入', 'parent_id': 689},
     {'id': 695, 'code': 'export_equip_repair_standard', 'name': '导出', 'parent_id': 689},
 
-    {'id': 696, 'code': 'equip_warehouse', 'name': '备件库区库位管理', 'parent_id': None, 'category_name': '设备管理'},
+    {'id': 696, 'code': 'equip_warehouse', 'name': '备件库区库位管理', 'parent_id': None, 'category_name': '备品备件管理'},
     {'id': 697, 'code': 'view_equip_warehouse', 'name': '查看库区', 'parent_id': 696},
     {'id': 698, 'code': 'addArea_equip_warehouse', 'name': '新增库区', 'parent_id': 696},
     {'id': 699, 'code': 'changeArea_equip_warehouse', 'name': '修改库区', 'parent_id': 696},
@@ -669,34 +670,34 @@ permission_data = [
     {'id': 704, 'code': 'printArea_equip_warehouse', 'name': '打印库区条码', 'parent_id': 696},
     {'id': 705, 'code': 'printLocation_equip_warehouse', 'name': '打印库位条码', 'parent_id': 696},
 
-    {'id': 706, 'code': 'equip_in_warehouse', 'name': '备件入库管理', 'parent_id': None, 'category_name': '设备管理'},
+    {'id': 706, 'code': 'equip_in_warehouse', 'name': '备件入库管理', 'parent_id': None, 'category_name': '备品备件管理'},
     {'id': 707, 'code': 'view_equip_in_warehouse', 'name': '查看', 'parent_id': 706},
     {'id': 708, 'code': 'add_equip_in_warehouse', 'name': '添加', 'parent_id': 706},
     {'id': 709, 'code': 'enter_equip_in_warehouse', 'name': '入库', 'parent_id': 706},
     {'id': 771, 'code': 'delete_equip_in_warehouse', 'name': '删除', 'parent_id': 706},
     {'id': 775, 'code': 'change_equip_in_warehouse', 'name': '编辑', 'parent_id': 706},
 
-    {'id': 710, 'code': 'equip_out_warehouse', 'name': '备件出库管理', 'parent_id': None, 'category_name': '设备管理'},
+    {'id': 710, 'code': 'equip_out_warehouse', 'name': '备件出库管理', 'parent_id': None, 'category_name': '备品备件管理'},
     {'id': 711, 'code': 'view_equip_out_warehouse', 'name': '查看', 'parent_id': 710},
     {'id': 712, 'code': 'add_equip_out_warehouse', 'name': '添加', 'parent_id': 710},
     {'id': 713, 'code': 'outer_equip_out_warehouse', 'name': '出库', 'parent_id': 710},
     {'id': 772, 'code': 'delete_equip_out_warehouse', 'name': '删除', 'parent_id': 710},
     {'id': 776, 'code': 'change_equip_out_warehouse', 'name': '编辑', 'parent_id': 710},
 
-    {'id': 714, 'code': 'equip_warehouse_inventory', 'name': '备件库存查询', 'parent_id': None, 'category_name': '设备管理'},
+    {'id': 714, 'code': 'equip_warehouse_inventory', 'name': '备件库存查询', 'parent_id': None, 'category_name': '备品备件管理'},
     {'id': 715, 'code': 'view_equip_warehouse_inventory', 'name': '查看', 'parent_id': 714},
     {'id': 716, 'code': 'export_equip_warehouse_inventory', 'name': '导出', 'parent_id': 714},
     {'id': 717, 'code': 'feed_equip_warehouse_inventory', 'name': '查询', 'parent_id': 714},
     {'id': 748, 'code': 'change_equip_warehouse_inventory', 'name': '盘库', 'parent_id': 714},
     {'id': 773, 'code': 'move_equip_warehouse_inventory', 'name': '移库', 'parent_id': 714},
 
-    {'id': 718, 'code': 'equip_warehouse_record', 'name': '备件出入库履历查询', 'parent_id': None, 'category_name': '设备管理'},
+    {'id': 718, 'code': 'equip_warehouse_record', 'name': '备件出入库履历查询', 'parent_id': None, 'category_name': '备品备件管理'},
     {'id': 719, 'code': 'view_equip_warehouse_record', 'name': '查看', 'parent_id': 718},
     {'id': 720, 'code': 'export_equip_warehouse_record', 'name': '导出', 'parent_id': 718},
     {'id': 721, 'code': 'feed_equip_warehouse_record', 'name': '查询', 'parent_id': 718},
     {'id': 774, 'code': 'revocation_equip_warehouse_record', 'name': '撤销', 'parent_id': 718},
 
-    {'id': 722, 'code': 'equip_warehouse_statistical', 'name': '备件出入库统计分析', 'parent_id': None, 'category_name': '设备管理'},
+    {'id': 722, 'code': 'equip_warehouse_statistical', 'name': '备件出入库统计分析', 'parent_id': None, 'category_name': '备品备件管理'},
     {'id': 723, 'code': 'view_equip_warehouse_statistical', 'name': '查看', 'parent_id': 722},
     {'id': 724, 'code': 'export_equip_warehouse_statistical', 'name': '导出', 'parent_id': 722},
 
@@ -1164,16 +1165,28 @@ permission_data = [
     {'id': 1143, 'code': 'view_barcode_trace1', 'name': '查看', 'parent_id': 1142},
     {'id': 1144, 'code': 'add_barcode_trace1', 'name': '导出', 'parent_id': 1142},
 
-    {'id': 1147, 'code': 'equip_fault_statistic', 'name': '设备故障统计列表', 'parent_id': None, 'category_name': '设备管理'},
-    {'id': 1148, 'code': 'view_equip_fault_statistic', 'name': '查看', 'parent_id': 1147},
-    {'id': 1149, 'code': 'export_equip_fault_statistic', 'name': '导出', 'parent_id': 1147},
+    {'id': 1147, 'code': 'equip_down_analysis', 'name': '各机台停机原因分析', 'parent_id': None, 'category_name': '生产管理'},
+    {'id': 1148, 'code': 'view_equip_down_analysis', 'name': '查看', 'parent_id': 1147},
+    {'id': 1149, 'code': 'add_equip_down_analysis', 'name': '保存', 'parent_id': 1147},
+    {'id': 1150, 'code': 'delete_equip_down_analysis', 'name': '删除', 'parent_id': 1147},
 
-    {'id': 1150, 'code': 'equip_fault_analyse', 'name': '设备故障分析报表', 'parent_id': None, 'category_name': '设备管理'},
-    {'id': 1151, 'code': 'view_equip_fault_analyse', 'name': '查看', 'parent_id': 1150},
-    {'id': 1152, 'code': 'export_equip_fault_analyse', 'name': '导出', 'parent_id': 1150},
+    {'id': 1151, 'code': 'equip_down_summary', 'name': '各机台停机时间汇总', 'parent_id': None, 'category_name': '生产管理'},
+    {'id': 1152, 'code': 'view_equip_down_summary', 'name': '查看', 'parent_id': 1151},
+    {'id': 1154, 'code': 'export_equip_down_summary', 'name': '导出', 'parent_id': 1151},
 
-    # 下一个 1153 开始
+    {'id': 1155, 'code': 'equip_down_summary_table', 'name': '各机台停机原因分析图表', 'parent_id': None, 'category_name': '生产管理'},
+    {'id': 1156, 'code': 'view_equip_down_summary_table', 'name': '查看', 'parent_id': 1155},
+    {'id': 1157, 'code': 'export_equip_down_summary_table', 'name': '导出', 'parent_id': 1155},
 
+    {'id': 1159, 'code': 'equip_fault_statistic', 'name': '设备故障统计列表', 'parent_id': None, 'category_name': '设备管理'},
+    {'id': 1160, 'code': 'view_equip_fault_statistic', 'name': '查看', 'parent_id': 1159},
+    {'id': 1161, 'code': 'export_equip_fault_statistic', 'name': '导出', 'parent_id': 1159},
+
+    {'id': 1162, 'code': 'equip_fault_analyse', 'name': '设备故障分析报表', 'parent_id': None, 'category_name': '设备管理'},
+    {'id': 1163, 'code': 'view_equip_fault_analyse', 'name': '查看', 'parent_id': 1162},
+    {'id': 1164, 'code': 'export_equip_fault_analyse', 'name': '导出', 'parent_id': 1162},
+
+    # 下一个 1165 开始
 ]
 
 

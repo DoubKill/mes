@@ -168,8 +168,14 @@ urlpatterns = [
     path('tool-manage-account/', ToolManageAccountView.as_view()),
     # 班次产量统计
     path('shift-production-summary/', ShiftProductionSummaryView.as_view()),
-    # 机台停机明细导入及汇总
+    # 机台停机明细导入及汇总(停用)
     path('equip-down-detail/', EquipDownDetailView.as_view()),
+    # 机台停机明细录入
+    path('equip-down-analysis/', EquipDownAnalysisView.as_view()),
+    # 机台停机明细汇总
+    path('equip-down-summary/', EquipDownSummaryView.as_view()),
+    # 机台停机明细汇总(各类图表)
+    path('equip-down-summary-table/', EquipDownSummaryTableView.as_view()),
     path('group-production-summary/', GroupProductionSummary.as_view()),
     path('time-energy-consuming/', TimeEnergyConsuming.as_view()),
     # 胶架进出登记表

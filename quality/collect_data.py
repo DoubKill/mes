@@ -81,6 +81,8 @@ def main():
             except func_timeout.exceptions.FunctionTimedOut:
                 logger.error('connect database:{} error !'.format(server))
                 continue
+            except Exception:
+                continue
 
             method_name = equip_test_plan.test_method_name
             indicator_name = equip_test_plan.test_indicator_name
@@ -101,6 +103,8 @@ def main():
                     data = get_result_info(server, user, password, name, rid)
                 except func_timeout.exceptions.FunctionTimedOut:
                     logger.error('connect database:{} error !'.format(server))
+                    continue
+                except Exception:
                     continue
 
                 # 更新当前检测任务结果值

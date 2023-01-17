@@ -185,7 +185,17 @@ class ClassesBanBurySummaryView(ListAPIView):
         data = ret.values()
         if day_type == '2' and dimension == '1':
             data = self.get_class_dimension_page_data(ret.values())
-
+        # 增加排序
+        try:
+            if dimension == '1':
+                if equip_no:
+                    data = sorted(data, key=lambda x: (x['equip_no'], x['classes'], -x['total_time'] / x['classes_time']))
+                else:
+                    data = sorted(data, key=lambda x: (x['equip_no'], x['classes'], x['product_no']))
+            else:
+                data = sorted(data, key=lambda x: (x['equip_no'], x['date'], x['product_no']))
+        except:
+            pass
         return Response(data)
 
 
@@ -244,7 +254,7 @@ class EquipBanBurySummaryView(ClassesBanBurySummaryView):
             select_str += ' ,classes'
 
         if equip_no:
-            where_str += """and equip_no like '%{}%' """.format(equip_no)
+            where_str += """and equip_no like '%{}%' and operation_user != 'Mixer2' """.format(equip_no)
 
         if st:
             try:
@@ -283,7 +293,7 @@ class EquipBanBurySummaryView(ClassesBanBurySummaryView):
                 'equip_no': item[1],
                 'max_trains': item[3],
                 'min_trains': item[4],
-                'total_time': item[5] if item[1] != 'Z04' else int(item[5]/2),
+                'total_time': item[5],
                 'date': item[2]
             }
             if dimension == '1':
@@ -464,12 +474,18 @@ class CutTimeCollect(APIView):
             standard_time = int(gc.description)
         else:
             standard_time = None
-
+        # 12-15 修改为具体时间过滤
+        # factory_classes_group_map = WorkSchedulePlan.objects.filter(
+        #     plan_schedule__day_time__gte=s_time,
+        #     plan_schedule__day_time__lte=e_time,
+        #     plan_schedule__work_schedule__work_procedure__global_name='密炼'
+        # ).values('plan_schedule__day_time', 'classes__global_name', 'group__global_name')
         factory_classes_group_map = WorkSchedulePlan.objects.filter(
-            plan_schedule__day_time__gte=s_time,
-            plan_schedule__day_time__lte=e_time,
+            end_time__gte=s_time,
+            start_time__lte=e_time,
             plan_schedule__work_schedule__work_procedure__global_name='密炼'
         ).values('plan_schedule__day_time', 'classes__global_name', 'group__global_name')
+
         factory_classes_group_map_dict = {
             i['plan_schedule__day_time'].strftime('%Y-%m-%d') + '-' + i['classes__global_name']: i for i in
             factory_classes_group_map}
@@ -911,7 +927,7 @@ class IndexEquipMaintenanceAnalyze(IndexOverview):
             filter_kwargs = {'factory_date__gte': st, 'factory_date__lte': et}
 
         equip_data = [equip.equip_no for equip in Equip.objects.filter(category__equip_type__global_name='密炼设备').order_by('equip_no')]
-        init_data = EquipDownDetails.objects.filter(**filter_kwargs).values('equip_no').annotate(total_time=Sum('times')).values('equip_no', 'total_time')
+        init_data = EquipDownDetails.objects.filter(delete_flag=False, **filter_kwargs).values('equip_no').annotate(total_time=Sum('times')).values('equip_no', 'total_time')
         time_data = {i['equip_no']: round(i['total_time'], 2) for i in init_data}
 
         maintenance_data = {}
@@ -948,9 +964,15 @@ class CutTimeCollectSummary(APIView):
                    ).values(
             'plan_classes_uid', 'factory_date', 'classes', 'equip_no', 'st_time', 'et_time'
         ).order_by('factory_date', 'equip_no', 'st_time'))
+        # 12-15 修改为具体时间过滤
+        # factory_classes_group_map = WorkSchedulePlan.objects.filter(
+        #     plan_schedule__day_time__gte=s_time,
+        #     plan_schedule__day_time__lte=e_time,
+        #     plan_schedule__work_schedule__work_procedure__global_name='密炼'
+        # ).values('plan_schedule__day_time', 'classes__global_name', 'group__global_name')
         factory_classes_group_map = WorkSchedulePlan.objects.filter(
-            plan_schedule__day_time__gte=s_time,
-            plan_schedule__day_time__lte=e_time,
+            end_time__gte=s_time,
+            start_time__lte=e_time,
             plan_schedule__work_schedule__work_procedure__global_name='密炼'
         ).values('plan_schedule__day_time', 'classes__global_name', 'group__global_name')
         factory_classes_group_map_dict = {
