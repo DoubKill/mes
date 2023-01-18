@@ -519,6 +519,12 @@ class SchedulingRecipeMachineSettingView(ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filter_class = SchedulingRecipeMachineSettingFilter
 
+    @action(methods=['post'], detail=False, url_path='confirm')
+    def confirm(self, request):
+        obj_id = request.data.get('id')
+        SchedulingRecipeMachineSetting.objects.filter(id=obj_id).update(confirmed=True)
+        return Response('OK')
+
     @action(methods=['post'], detail=False)
     def import_xlsx(self, request):
         excel_file = request.FILES.get('file', None)
