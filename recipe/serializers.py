@@ -1,5 +1,6 @@
 import json
 import logging
+import random
 import uuid
 from datetime import datetime
 
@@ -11,6 +12,7 @@ from rest_framework.validators import UniqueValidator
 from basics.models import GlobalCode
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
+from plan.models import SchedulingRecipeMachineSetting
 from recipe.models import Material, ProductInfo, ProductBatching, ProductBatchingDetail, \
     MaterialAttribute, MaterialSupplier, WeighBatchingDetail, WeighCntType, ZCMaterial, ERPMESMaterialRelation, \
     ProductBatchingEquip, ProductBatchingMixed, MultiReplaceMaterial, RecipeChangeHistory, RecipeChangeDetail
@@ -932,6 +934,67 @@ class ProductBatchingPartialUpdateSerializer(BaseModelSerializer):
                 instance.used_user = self.context['request'].user
                 instance.used_time = datetime.now()
                 ProductBatchingEquip.objects.filter(product_batching=instance).update(is_used=True)
+                if '-FM-' in instance.stage_product_batch_no:
+                    idx_keys = {'HMB': 1, 'CMB': 2, '1MB': 3, '2MB': 4, '3MB': 5, '4MB': 6, 'FM': 7}
+                    rubber_type = random.choice(['车胎', '斜交', '实心胎', '半钢', '全钢', '丁基、胶浆、胶囊'])
+                    if all([instance.product_info, instance.versions]):
+                        product_no = instance.product_info.product_no
+                        version = instance.versions
+                        stages = ProductBatching.objects.filter(
+                            batching_type=2,
+                            stage_product_batch_no__endswith='-{}-{}'.format(product_no, version),
+                            stage__global_name__in=['HMB', 'CMB', '1MB', '2MB', '3MB', '4MB', 'FM']
+                        ).values_list('stage__global_name', flat=True)
+                        stages = sorted(stages, key=lambda x: idx_keys.get(x))
+                        stages = '/'.join(stages)
+                        ms = SchedulingRecipeMachineSetting.objects.filter(
+                                product_no=product_no, version=version).first()
+                        # if ms:  # 定机表存在
+                        #     if not ms.confirmed:
+                        #         ms.stages = stages
+                        #         ms.save()
+                        if not ms:  # 定机表不存在
+                            old_ms = SchedulingRecipeMachineSetting.objects.filter(
+                                product_no=product_no).order_by('id').last()
+                            if old_ms:
+                                if old_ms.stages == stages:
+                                    ms_data = {"rubber_type": rubber_type,
+                                               'product_no': product_no,
+                                               'version': version,
+                                                "stages": stages,
+                                                "main_machine_HMB": old_ms.main_machine_HMB,
+                                                "vice_machine_HMB": old_ms.vice_machine_HMB,
+                                                "main_machine_CMB": old_ms.main_machine_CMB,
+                                                "vice_machine_CMB": old_ms.vice_machine_CMB,
+                                                "main_machine_1MB": old_ms.main_machine_1MB,
+                                                "vice_machine_1MB": old_ms.vice_machine_1MB,
+                                                "main_machine_2MB": old_ms.main_machine_2MB,
+                                                "vice_machine_2MB": old_ms.vice_machine_2MB,
+                                                "main_machine_3MB": old_ms.main_machine_3MB,
+                                                "vice_machine_3MB": old_ms.vice_machine_3MB,
+                                                "main_machine_4MB": old_ms.main_machine_4MB,
+                                                "vice_machine_4MB": old_ms.vice_machine_4MB,
+                                                "main_machine_FM": old_ms.main_machine_FM,
+                                                "vice_machine_FM": old_ms.vice_machine_FM,
+                                               'confirmed': False
+                                               }
+                                    SchedulingRecipeMachineSetting.objects.create(**ms_data)
+                                else:
+                                    SchedulingRecipeMachineSetting.objects.create(
+                                        rubber_type=rubber_type,
+                                        product_no=product_no,
+                                        version=version,
+                                        stages=stages,
+                                        confirmed=False
+                                    )
+                            else:
+                                SchedulingRecipeMachineSetting.objects.create(
+                                    rubber_type=rubber_type,
+                                    product_no=product_no,
+                                    version=version,
+                                    stages=stages,
+                                    confirmed=False
+                                )
             elif instance.used_type == 5:
                 instance.used_type = 1
         else:
