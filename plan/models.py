@@ -261,6 +261,7 @@ class SchedulingRecipeMachineSetting(AbstractEntity):
     vice_machine_4MB = models.CharField(max_length=128, help_text='4MB辅机台', default='', blank=True)
     main_machine_FM = models.CharField(max_length=128, help_text='FM主机台', default='', blank=True)
     vice_machine_FM = models.CharField(max_length=128, help_text='FM辅机台', default='', blank=True)
+    confirmed = models.BooleanField(help_text='是否确认', default=True)
 
     class Meta:
         db_table = 'aps_recipe_machine_setting'
