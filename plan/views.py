@@ -519,6 +519,12 @@ class SchedulingRecipeMachineSettingView(ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filter_class = SchedulingRecipeMachineSettingFilter
 
+    @action(methods=['post'], detail=False, url_path='confirm')
+    def confirm(self, request):
+        obj_id = request.data.get('id')
+        SchedulingRecipeMachineSetting.objects.filter(id=obj_id).update(confirmed=True)
+        return Response('OK')
+
     @action(methods=['post'], detail=False)
     def import_xlsx(self, request):
         excel_file = request.FILES.get('file', None)
@@ -1932,6 +1938,8 @@ class APSExportDataView(APIView):
                 product_no=i.product_no, version=i.version).first()
             if not pd_ms:
                 raise ValidationError('未找到该规格：{}-{}定机表数据！'.format(i.product_no, i.version))
+            if not pd_ms.confirmed:
+                raise ValidationError('该规格：{}-{}定机表数据待确认！'.format(i.product_no, i.version))
             pd_stages = pd_ms.stages.split('/')
             need_stages = copy.deepcopy(pd_stages)
             pb_version_name = '{}-{}'.format(pd_ms.product_no, pd_ms.version)
