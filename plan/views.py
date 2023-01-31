@@ -2297,7 +2297,7 @@ class APSPlanImport(APIView):
         except Exception as e:
             raise ValidationError('打开文件失败，请用文档另存为xlsx文件后导入！'.format(e))
         try:
-            cur_sheet = data.sheet_by_name('ApsResultList')
+            cur_sheet = data.sheet_by_name('排程结果列表')
         except Exception:
             raise ValidationError('未找到排程结果sheet表格，请检查后重试！！')
         schedule_no = cur_sheet.cell(0, 0).value
