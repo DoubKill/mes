@@ -3234,7 +3234,7 @@ class EquipAutoPlanView(APIView):
                         e_inventory = EquipWarehouseInventory.objects.filter(equip_spare=e_spare, quantity__gt=0).last()
                         if e_inventory:  # 新建单据
                             record = EquipWarehouseOrder.objects.filter(created_date__gt=dt.date.today(),
-                                                                        status__in=[4, 5, 6]).values('order_id').last()
+                                                                        status__in=[4, 5, 6]).values('order_id').order_by('order_id').last()
                             order_id = f"CK{datetime.now().strftime('%Y%m%d')}" + (str('%04d' % (int(record['order_id'][-4:]) + 1)) if record else '0001')
                             create_data = {'order_id': order_id, 'submission_department': '设备科', 'status': 4,
                                            'add_username': self.request.user.username,
