@@ -2986,7 +2986,10 @@ class WmsStorageView(ListAPIView):
         if et:
             filter_kwargs['in_storage_time__lte'] = et
         if tunnel:
-            filter_kwargs['location__startswith'] = 'ZCM-{}'.format(tunnel)
+            if self.DATABASE_CONF == 'wms':
+                filter_kwargs['location__startswith'] = 'ZCM-{}'.format(tunnel)
+            else:
+                filter_kwargs['location__startswith'] = 'ZCB-{}'.format(tunnel)
         queryset = WmsInventoryStock.objects.using(self.DATABASE_CONF).filter(**filter_kwargs).order_by('-in_storage_time')
         if is_entering:
             if is_entering == 'Y':
