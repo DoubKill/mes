@@ -907,6 +907,12 @@ class SchedulingProductDemandedDeclareSummarySerializer(serializers.ModelSeriali
     #     return round(obj.plan_weight - obj.workshop_weight - obj.current_stock, 1)
 
     def create(self, validated_data):
+        pbs = list(ProductBatching.objects.using('SFJ').filter(
+            used_type=4,
+            stage_product_batch_no__endswith='-FM-{}-{}'.format(validated_data['product_no'], validated_data['version'])
+        ).order_by('used_time').values_list('stage_product_batch_no', flat=True))
+        if not pbs:
+            raise ValidationError('未找到该规格FM启用配方：{}-{}'.format(validated_data['product_no'], validated_data['version']))
         validated_data['factory_date'] = datetime.now().date()
         c = SchedulingProductDemandedDeclareSummary.objects.filter(
             factory_date=validated_data['factory_date']).count()

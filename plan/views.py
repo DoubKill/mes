@@ -793,7 +793,7 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
                 stage_product_batch_no__icontains='-FM-{}-'.format(product_no)
             ).order_by('used_time').values_list('stage_product_batch_no', flat=True))
             if not pbs:
-                raise ValidationError('未找到该规格启用配方：{}'.format(product_no))
+                raise ValidationError('未找到该规格FM启用配方：{}'.format(product_no))
             try:
                 if len(set(pbs)) == 1:  # 启用规格只有一种
                     version = pbs[0].split('-')[-1]
