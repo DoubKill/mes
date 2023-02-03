@@ -785,16 +785,16 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
             factory_date=factory_date).count()
         sn = c + 1
         for idx, item in enumerate(data):
+            product_no = re.sub(r'[\u4e00-\u9fa5]+', '', item[4])
+            if not product_no or not item[5]:
+                continue
+            pbs = list(ProductBatching.objects.using('SFJ').filter(
+                used_type=4,
+                stage_product_batch_no__icontains='-FM-{}-'.format(product_no)
+            ).order_by('used_time').values_list('stage_product_batch_no', flat=True))
+            if not pbs:
+                raise ValidationError('未找到该规格启用配方：{}'.format(product_no))
             try:
-                product_no = re.sub(r'[\u4e00-\u9fa5]+', '', item[4])
-                if not product_no or not item[5]:
-                    continue
-                pbs = list(ProductBatching.objects.using('SFJ').filter(
-                    used_type=4,
-                    stage_product_batch_no__icontains='-FM-{}-'.format(product_no)
-                ).order_by('used_time').values_list('stage_product_batch_no', flat=True))
-                if not pbs:
-                    raise ValidationError('未找到该规格启用配方：{}'.format(product_no))
                 if len(set(pbs)) == 1:  # 启用规格只有一种
                     version = pbs[0].split('-')[-1]
                     area_list.append({'factory_date': factory_date,
@@ -822,8 +822,8 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
                                           'product_no': product_no,
                                           'version': new_version,
                                           'plan_weight': item[5],
-                                          'workshop_weight': round(item[16], 1) if item[16] else 0,
-                                          'current_stock': round(item[17], 1) if item[17] else 0,
+                                          'workshop_weight': 0 if not item[16] else round(item[16], 1),
+                                          'current_stock': 0 if not item[17] else round(item[17], 1),
                                           'desc': '',
                                           })
                     else:
@@ -833,8 +833,8 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
                                               'product_no': product_no,
                                               'version': old_version,
                                               'plan_weight': old_recipe_weight,
-                                              'workshop_weight': round(item[16], 1) if item[16] else 0,
-                                              'current_stock': round(item[17], 1) if item[17] else 0,
+                                              'workshop_weight': 0 if not item[16] else round(item[16], 1),
+                                              'current_stock': 0 if not item[17] else round(item[17], 1),
                                               'desc': '',
                                               'demanded_weight': old_recipe_weight
                                               })
