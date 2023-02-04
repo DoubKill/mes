@@ -2308,13 +2308,19 @@ class APSPlanImport(APIView):
         i = 0
         ret = []
         aps_st = datetime.datetime(year=int(date_splits[0]), month=int(date_splits[1]), day=int(date_splits[2]), hour=8)
+        eq_st = 'Z01'
         for idx, item in enumerate(data):
-            if idx < 20:
-                equip_nos = ['Z01', 'Z02', 'Z03', 'Z04', 'Z05', 'Z06', 'Z07', 'Z08']
-            elif 21 < idx < 42:
-                equip_nos = ['Z09', 'Z10', 'Z11', 'Z12', 'Z13', 'Z14', 'Z15']
-            else:
+            if item[0] == 'Z09':
+                eq_st = 'Z09'
                 continue
+            if '规格' in item[0]:
+                continue
+            if eq_st == 'Z01':
+                equip_nos = ['Z01', 'Z02', 'Z03', 'Z04', 'Z05', 'Z06', 'Z07', 'Z08']
+            # elif 21 < idx < 42:
+            #     equip_nos = ['Z09', 'Z10', 'Z11', 'Z12', 'Z13', 'Z14', 'Z15']
+            else:
+                equip_nos = ['Z09', 'Z10', 'Z11', 'Z12', 'Z13', 'Z14', 'Z15']
             for j, equip_no in enumerate(equip_nos):
                 product_no = item[j * 6]
                 if not product_no:
