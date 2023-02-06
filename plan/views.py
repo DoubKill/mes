@@ -1842,6 +1842,8 @@ class APSExportDataView(APIView):
                 plan_classes_uid__in=started_plan_classes_uid).filter(
                 work_schedule_plan__plan_schedule__day_time=factory_date,
                 delete_flag=False).order_by('id'):
+            if plan.status == '停止':
+                continue
             recipe_name = plan.product_batching.stage_product_batch_no
             weight = plan.product_batching.batching_weight * plan.plan_trains
             equip_no = plan.equip.equip_no
