@@ -1401,6 +1401,7 @@ class ProductTestPlanDetailBulkCreateSerializer(serializers.Serializer):
         product_test_plan_details = validated_data['product_test_plan_detail']
         test_plan = validated_data['test_plan']
         # 新建检测任务
+        product_test_plan_details = sorted(product_test_plan_details, key=lambda x: x['actual_trains'])
         for product_test_plan_detail in product_test_plan_details:
             if 'lot_no' in product_test_plan_detail:
                 pallet_data = PalletFeedbacks.objects.filter(lot_no=product_test_plan_detail['lot_no']).first()
@@ -1467,6 +1468,7 @@ class ProductTestPlanSerializer(BaseModelSerializer):
         instance = super().create(validated_data)
 
         # 新建检测任务
+        product_test_plan_details = sorted(product_test_plan_details, key=lambda x: x['actual_trains'])
         for product_test_plan_detail in product_test_plan_details:
             if 'lot_no' in product_test_plan_detail:
                 pallet_data = PalletFeedbacks.objects.filter(lot_no=product_test_plan_detail['lot_no']).first()
