@@ -907,6 +907,25 @@ class SchedulingProductDemandedDeclareSummarySerializer(serializers.ModelSeriali
     #     return round(obj.plan_weight - obj.workshop_weight - obj.current_stock, 1)
 
     def create(self, validated_data):
+        idx_keys = {'HMB': 1, 'CMB': 2, '1MB': 3, '2MB': 4, '3MB': 5, '4MB': 6, 'FM': 7}
+        pd_ms = SchedulingRecipeMachineSetting.objects.filter(
+            product_no=validated_data['product_no'], version=validated_data['version']).first()
+        if not pd_ms:
+            raise ValidationError('未找到该规格：{}-{}定机表数据！'.format(
+                validated_data['product_no'], validated_data['version']))
+        pd_stages = sorted(pd_ms.stages.split('/'), key=lambda x: idx_keys.get(x, 0))
+        if not pd_stages:
+            raise ValidationError('该规格：{}-{}定机表数据有误！'.format(
+                validated_data['product_no'], validated_data['version']))
+        final_stage = pd_stages[-1]
+        pbs = list(ProductBatching.objects.using('SFJ').filter(
+            used_type=4,
+            stage_product_batch_no__endswith='-{}-{}-{}'.format(
+                final_stage, validated_data['product_no'], validated_data['version'])
+        ).order_by('used_time').values_list('stage_product_batch_no', flat=True))
+        if not pbs:
+            raise ValidationError('未找到该规格{}启用配方：{}-{}'.format(
+                final_stage, validated_data['product_no'], validated_data['version']))
         validated_data['factory_date'] = datetime.now().date()
         c = SchedulingProductDemandedDeclareSummary.objects.filter(
             factory_date=validated_data['factory_date']).count()

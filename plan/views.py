@@ -784,17 +784,33 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
         c = SchedulingProductDemandedDeclareSummary.objects.filter(
             factory_date=factory_date).count()
         sn = c + 1
+        idx_keys = {'HMB': 1, 'CMB': 2, '1MB': 3, '2MB': 4, '3MB': 5, '4MB': 6, 'FM': 7}
+
         for idx, item in enumerate(data):
+            product_no = re.sub(r'[\u4e00-\u9fa5]+', '', item[4])
+            if not product_no or not item[5]:
+                continue
+            pb = ProductBatching.objects.using('SFJ').filter(
+                used_type=4,
+                product_info__product_no=product_no
+            ).order_by('used_time').last()
+            if not pb:
+                raise ValidationError('未找到该规格启用配方：{}'.format(product_no))
+            pd_ms = SchedulingRecipeMachineSetting.objects.filter(
+                product_no=product_no, version=pb.versions).first()
+            if not pd_ms:
+                raise ValidationError('未找到该规格：{}-{}定机表数据！'.format(product_no, pb.versions))
+            pd_stages = sorted(pd_ms.stages.split('/'), key=lambda x: idx_keys.get(x, 0))
+            if not pd_stages:
+                raise ValidationError('该规格：{}-{}定机表数据有误！'.format(product_no, pb.versions))
+            final_stage = pd_stages[-1]  # 根据定机表找到最终生产段次（不一定是FM，前提是不同版本最终段次都一样）
+            pbs = list(ProductBatching.objects.using('SFJ').filter(
+                used_type=4,
+                stage_product_batch_no__icontains='-{}-{}-'.format(final_stage, product_no)
+            ).order_by('used_time').values_list('stage_product_batch_no', flat=True))
+            if not pbs:
+                raise ValidationError('未找到该规格{}启用配方：{}'.format(final_stage, product_no))
             try:
-                product_no = re.sub(r'[\u4e00-\u9fa5]+', '', item[4])
-                if not product_no or not item[5]:
-                    continue
-                pbs = list(ProductBatching.objects.using('SFJ').filter(
-                    used_type=4,
-                    stage_product_batch_no__icontains='-FM-{}-'.format(product_no)
-                ).order_by('used_time').values_list('stage_product_batch_no', flat=True))
-                if not pbs:
-                    raise ValidationError('未找到该规格启用配方：{}'.format(product_no))
                 if len(set(pbs)) == 1:  # 启用规格只有一种
                     version = pbs[0].split('-')[-1]
                     area_list.append({'factory_date': factory_date,
@@ -815,15 +831,15 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
                     new_version_recipe_split_data = new_version_recipe.split('-')
                     old_pb_no, old_version = old_version_recipe_split_data[2], old_version_recipe_split_data[3]
                     new_pb_no, new_version = new_version_recipe_split_data[2], new_version_recipe_split_data[3]
-                    old_recipe_weight = convert_fm_weight(old_pb_no, old_version, factory_date)
+                    old_recipe_weight = convert_fm_weight(old_pb_no, old_version, factory_date, final_stage)
                     if not old_recipe_weight:
                         area_list.append({'factory_date': factory_date,
                                           'sn': sn,
                                           'product_no': product_no,
                                           'version': new_version,
                                           'plan_weight': item[5],
-                                          'workshop_weight': round(item[16], 1) if item[16] else 0,
-                                          'current_stock': round(item[17], 1) if item[17] else 0,
+                                          'workshop_weight': 0 if not item[16] else round(item[16], 1),
+                                          'current_stock': 0 if not item[17] else round(item[17], 1),
                                           'desc': '',
                                           })
                     else:
@@ -833,8 +849,8 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
                                               'product_no': product_no,
                                               'version': old_version,
                                               'plan_weight': old_recipe_weight,
-                                              'workshop_weight': round(item[16], 1) if item[16] else 0,
-                                              'current_stock': round(item[17], 1) if item[17] else 0,
+                                              'workshop_weight': 0 if not item[16] else round(item[16], 1),
+                                              'current_stock': 0 if not item[17] else round(item[17], 1),
                                               'desc': '',
                                               'demanded_weight': old_recipe_weight
                                               })
@@ -1826,6 +1842,8 @@ class APSExportDataView(APIView):
                 plan_classes_uid__in=started_plan_classes_uid).filter(
                 work_schedule_plan__plan_schedule__day_time=factory_date,
                 delete_flag=False).order_by('id'):
+            if plan.status == '停止':
+                continue
             recipe_name = plan.product_batching.stage_product_batch_no
             weight = plan.product_batching.batching_weight * plan.plan_trains
             equip_no = plan.equip.equip_no
@@ -1931,7 +1949,7 @@ class APSExportDataView(APIView):
         sheet2 = wb.worksheets[2]
         job_list_data = {}  # 待排程结果数据 格式：{'C590-01': {'1MB': {},'2MB': {}}}
         pb_available_time_dict = {}  # 规格可用时间 格式： {'C590-01'：20, 'J290-01'：20}
-
+        idx_keys = {'HMB': 1, 'CMB': 2, '1MB': 3, '2MB': 4, '3MB': 5, '4MB': 6, 'FM': 7}
         # 构建job_list_data数据
         for i in demanded_data:
             pd_ms = SchedulingRecipeMachineSetting.objects.filter(
@@ -1940,7 +1958,8 @@ class APSExportDataView(APIView):
                 raise ValidationError('未找到该规格：{}-{}定机表数据！'.format(i.product_no, i.version))
             if not pd_ms.confirmed:
                 raise ValidationError('该规格：{}-{}定机表数据待确认！'.format(i.product_no, i.version))
-            pd_stages = pd_ms.stages.split('/')
+            pd_stages = sorted(pd_ms.stages.split('/'), key=lambda x: idx_keys.get(x, 0))
+            final_stage = pd_stages[-1]  # 最终生产段次
             need_stages = copy.deepcopy(pd_stages)
             pb_version_name = '{}-{}'.format(pd_ms.product_no, pd_ms.version)
             pb_time_consume = 0
@@ -1964,7 +1983,7 @@ class APSExportDataView(APIView):
                      'equip__category__category_name', 'stage__global_name').order_by('batching_weight')
             stage_devoted_weight = {}
             weight_qty = i.demanded_weight * 1000
-            stock_trans_weight = convert_fm_weight(i.product_no, i.version, factory_date) * 1000
+            stock_trans_weight = convert_fm_weight(i.product_no, i.version, factory_date, final_stage) * 1000
             if stock_trans_weight <= weight_qty <= stock_trans_weight * 1.15:
                 weight_qty = stock_trans_weight
             aps_fm_weight = weight_qty
@@ -1995,7 +2014,6 @@ class APSExportDataView(APIView):
                     weight_qty = prev_need_weight
                     stage_devoted_weight[prev_stage] = weight_qty
             # print(stage_devoted_weight)
-            idx_keys = {'HMB': 1, 'CMB': 2, '1MB': 3, '2MB': 4, '3MB': 5, '4MB': 6, 'FM': 7}
             pbs = sorted(list(pbs), key=lambda x: idx_keys.get(x['stage__global_name'], 999))
             for pb in pbs:
                 recipe_name = pb['stage_product_batch_no']  # 配方名称
@@ -2061,7 +2079,7 @@ class APSExportDataView(APIView):
                     else:
                         continue
 
-                if stage == 'FM':
+                if stage == final_stage:
                     weight = round(aps_fm_weight, 2)
                 else:
                     try:
@@ -2308,13 +2326,19 @@ class APSPlanImport(APIView):
         i = 0
         ret = []
         aps_st = datetime.datetime(year=int(date_splits[0]), month=int(date_splits[1]), day=int(date_splits[2]), hour=8)
+        eq_st = 'Z01'
         for idx, item in enumerate(data):
-            if idx < 20:
-                equip_nos = ['Z01', 'Z02', 'Z03', 'Z04', 'Z05', 'Z06', 'Z07', 'Z08']
-            elif 21 < idx < 42:
-                equip_nos = ['Z09', 'Z10', 'Z11', 'Z12', 'Z13', 'Z14', 'Z15']
-            else:
+            if item[0] == 'Z09':
+                eq_st = 'Z09'
                 continue
+            if '规格' in item[0]:
+                continue
+            if eq_st == 'Z01':
+                equip_nos = ['Z01', 'Z02', 'Z03', 'Z04', 'Z05', 'Z06', 'Z07', 'Z08']
+            # elif 21 < idx < 42:
+            #     equip_nos = ['Z09', 'Z10', 'Z11', 'Z12', 'Z13', 'Z14', 'Z15']
+            else:
+                equip_nos = ['Z09', 'Z10', 'Z11', 'Z12', 'Z13', 'Z14', 'Z15']
             for j, equip_no in enumerate(equip_nos):
                 product_no = item[j * 6]
                 if not product_no:
