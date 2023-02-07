@@ -792,8 +792,9 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
                 continue
             pb = ProductBatching.objects.using('SFJ').filter(
                 used_type=4,
-                product_info__product_no=product_no
-            ).order_by('used_time').last()
+                product_info__product_no=product_no,
+                stage__global_name__in=list(idx_keys.keys())
+            ).order_by('id').last()
             if not pb:
                 raise ValidationError('未找到该规格启用配方：{}'.format(product_no))
             pd_ms = SchedulingRecipeMachineSetting.objects.filter(
