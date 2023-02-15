@@ -4957,12 +4957,14 @@ class GetSpareOrder(APIView):
         data = json.loads(res.content)
         if not data.get('flag'):
             raise ValidationError(data.get('message'))
+        # 需要同步备件单据的分厂名称
+        factory_names = GlobalCode.objects.filter(global_type__use_flag=True, global_type__type_name='同步备件单据厂名', use_flag=True).values_list('global_name', flat=True).distinct()
         # 获取备件ERP同步屏蔽类别码
         overcome = GlobalCode.objects.filter(global_type__use_flag=True, global_type__type_name='备件ERP同步屏蔽类别码', use_flag=True).values_list('global_name', flat=True).distinct()
         lst = data.get('obj')
         for dic in lst:
             order = dic.get('lld')
-            if order.get('llDeptname') != '中策安吉炼胶分厂':
+            if order.get('llDeptname') not in factory_names:
                 continue
             order_detail = dic.get('lldmx')  # list
             if EquipWarehouseOrder.objects.filter(barcode=order.get('djbh')):
