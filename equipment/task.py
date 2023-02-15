@@ -274,6 +274,7 @@ class AutoDispatch(object):
         content = {
             "title": "",
             "form": [{"key": "工单编号:", "value": order.work_order_no},
+                     {"key": "工单生成时间:", "value": order.created_date.strftime('%Y-%m-%d %H:%M:%S')},
                      {"key": "机台:", "value": order.equip_no},
                      {"key": "故障原因:", "value": fault_name},
                      {"key": "重要程度:", "value": order.importance_level},

@@ -3811,6 +3811,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
                 fault_name = instance.result_fault_cause if instance.result_fault_cause else (
                     instance.equip_repair_standard.standard_name if instance.equip_repair_standard else instance.equip_maintenance_standard.standard_name)
                 new_content['form'] = [{"key": "工单编号:", "value": instance.work_order_no},
+                                       {"key": "工单生成时间:", "value": instance.created_date.strftime('%Y-%m-%d %H:%M:%S')},
                                        {"key": "机台:", "value": instance.equip_no},
                                        {"key": "部位名称:",
                                         "value": instance.equip_part_new.part_name if instance.equip_part_new else ''},
@@ -4201,6 +4202,7 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                 instance = self.queryset.filter(id=order_id).first()
                 fault_name = instance.equip_repair_standard.standard_name if instance.equip_repair_standard else ''
                 new_content['form'] = [{"key": "工单编号:", "value": instance.work_order_no},
+                                       {"key": "工单生成时间:", "value": instance.created_date.strftime('%Y-%m-%d %H:%M:%S')},
                                        {"key": "机台:", "value": instance.equip_no},
                                        {"key": "巡检标准:", "value": fault_name},
                                        {"key": "重要程度:", "value": instance.importance_level}] + new_content['form']
@@ -4955,12 +4957,14 @@ class GetSpareOrder(APIView):
         data = json.loads(res.content)
         if not data.get('flag'):
             raise ValidationError(data.get('message'))
+        # 需要同步备件单据的分厂名称
+        factory_names = GlobalCode.objects.filter(global_type__use_flag=True, global_type__type_name='同步备件单据厂名', use_flag=True).values_list('global_name', flat=True).distinct()
         # 获取备件ERP同步屏蔽类别码
         overcome = GlobalCode.objects.filter(global_type__use_flag=True, global_type__type_name='备件ERP同步屏蔽类别码', use_flag=True).values_list('global_name', flat=True).distinct()
         lst = data.get('obj')
         for dic in lst:
             order = dic.get('lld')
-            if order.get('llDeptname') != '中策安吉炼胶分厂':
+            if order.get('llDeptname') not in factory_names:
                 continue
             order_detail = dic.get('lldmx')  # list
             if EquipWarehouseOrder.objects.filter(barcode=order.get('djbh')):
@@ -5048,6 +5052,7 @@ class EquipOrderEntrustView(APIView):
             content = {"title": f"{oper_type}委托工单成功",
                        "form": [
                            {"key": "工单编号:", "value": instance.work_order_no},
+                           {"key": "工单生成时间:", "value": instance.created_date.strftime('%Y-%m-%d %H:%M:%S')},
                            {"key": "机台:", "value": instance.equip_no},
                            {"key": "重要程度:", "value": instance.importance_level},
                            {"key": "受委托人:", "value": entrust_to_user},
