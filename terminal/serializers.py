@@ -223,13 +223,20 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 unit = '包'
                 scan_material = material_no
                 if not b_instance:
+                    # 获取实际生产的工厂日期和班次
+                    b_time, b_classes = weight_package.batch_time, weight_package.batch_classes
+                    if b_time:
+                        plan_instance = WorkSchedulePlan.objects.filter(start_time__lte=b_time, end_time__gte=b_time,
+                                                                        plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
+                        if plan_instance:
+                            b_time, b_classes = plan_instance.plan_schedule.day_time, plan_instance.classes.global_name
+                        else:
+                            b_time = b_time.date()
                     BarCodeTraceDetail.objects.create(
-                        bra_code=bra_code, scan_material_record=scan_material,
-                        product_time=weight_package.batch_time.date() if weight_package.batch_time else weight_package.batch_time,
-                        material_name_record=material_name, standard_weight=total_weight, equip_no=weight_package.equip_no,
-                        plan_classes_uid=weight_package.plan_weight_uid, trains=f"{weight_package.begin_trains}-{weight_package.end_trains}",
-                        begin_time=weight_package.batch_time, end_time=weight_package.created_date, group=weight_package.batch_group,
-                        classes=weight_package.batch_classes
+                        bra_code=bra_code, scan_material_record=scan_material, product_time=b_time, material_name_record=material_name,
+                        standard_weight=total_weight, equip_no=weight_package.equip_no, plan_classes_uid=weight_package.plan_weight_uid,
+                        trains=f"{weight_package.begin_trains}-{weight_package.end_trains}", begin_time=weight_package.batch_time,
+                        end_time=weight_package.created_date, group=weight_package.batch_group, classes=b_classes
                     )
                 if common_scan:
                     save_scan_log(scan_data, scan_message='本计划只能扫通用料包', scan_material=material_name, scan_material_type='通用料包', unit='包', init_weight=total_weight)
