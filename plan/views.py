@@ -29,7 +29,7 @@ from basics.models import WorkSchedulePlan, GlobalCode, Equip
 from basics.views import CommonDeleteMixin
 from equipment.utils import gen_template_response
 from inventory.models import ProductStockDailySummary
-from mes.common_code import get_weekdays
+from mes.common_code import get_weekdays, date_range
 from mes.conf import JZ_EQUIP_NO
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
@@ -790,6 +790,7 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
             product_no = re.sub(r'[\u4e00-\u9fa5]+', '', item[4])
             if not product_no or not item[5]:
                 continue
+            product_no = product_no.lstrip('T')
             pb = ProductBatching.objects.using('SFJ').filter(
                 used_type=4,
                 product_info__product_no=product_no,
@@ -1217,85 +1218,143 @@ class SchedulingStockSummary(ModelViewSet):
         for item in data:
             version = item[1]
             product_no = item[2]
-            stock_weight_hmb = 0 if not item[4] else item[4]
-            stock_weight_cmb = 0 if not item[6] else item[6]
-            stock_weight_1mb = 0 if not item[8] else item[8]
-            stock_weight_2mb = 0 if not item[10] else item[10]
-            stock_weight_3mb = 0 if not item[12] else item[12]
+            stock_weight_hmb = 0 if not item[3] else item[3]
+            area_weight_hmb = 0 if not item[4] else item[4]
+            stock_weight_cmb = 0 if not item[5] else item[5]
+            area_weight_cmb = 0 if not item[6] else item[6]
+            stock_weight_1mb = 0 if not item[7] else item[7]
+            area_weight_1mb = 0 if not item[8] else item[8]
+            stock_weight_2mb = 0 if not item[9] else item[9]
+            area_weight_2mb = 0 if not item[10] else item[10]
+            stock_weight_3mb = 0 if not item[11] else item[11]
+            area_weight_3mb = 0 if not item[12] else item[12]
             if not all([version, product_no]):
                 continue
             # if stock_weight_hmb:
-            dt = {'area_weight': stock_weight_hmb}
+            dt = {'area_weight': area_weight_hmb, 'stock_weight': stock_weight_hmb}
             s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': 'HMB', 'version': version}
             ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
             # if stock_weight_cmb:
-            dt = {'area_weight': stock_weight_cmb}
+            dt = {'area_weight': area_weight_cmb, 'stock_weight': stock_weight_cmb}
             s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': 'CMB', 'version': version}
             ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
             # if stock_weight_1mb:
-            dt = {'area_weight': stock_weight_1mb}
+            dt = {'area_weight': area_weight_1mb, 'stock_weight': stock_weight_1mb}
             s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': '1MB', 'version': version}
             ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
             # if stock_weight_2mb:
-            dt = {'area_weight': stock_weight_2mb}
+            dt = {'area_weight': area_weight_2mb, 'stock_weight': stock_weight_2mb}
             s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': '2MB', 'version': version}
             ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
             # if stock_weight_3mb:
-            dt = {'area_weight': stock_weight_3mb}
+            dt = {'area_weight': area_weight_3mb, 'stock_weight': stock_weight_3mb}
             s_data = {'factory_date': factory_date, 'product_no': product_no, 'stage': '3MB', 'version': version}
             ProductStockDailySummary.objects.update_or_create(defaults=dt, **s_data)
         return Response('ok')
 
     @action(methods=['get'], detail=False)
     def export(self, request):
-        data = self.request.query_params
-        st = data.get('st')
-        et = data.get('et')
-        queryset = self.get_queryset().filter(factory_date__gte=st, factory_date__lte=et).order_by('factory_date')
-        serializer = self.get_serializer(queryset, many=True)
-        data = serializer.data
-        ret = {}
-        for item in data:
-            k = item['product_no'] + '-' + item['version']
-            if item['factory_date'] not in ret:
-                ret[item['factory_date']] = {k: {'product_no': item['product_no'],
-                                                 'version': item['version'],
-                                                 'stock_weight_{}'.format(item['stage']): item['stock_weight'],
-                                                 'area_weight_{}'.format(item['stage']): item['area_weight']}}
-            else:
-                if k not in ret[item['factory_date']]:
-                    ret[item['factory_date']][k] = {'product_no': item['product_no'],
-                                                    'version': item['version'],
-                                                    'stock_weight_{}'.format(item['stage']): item['stock_weight'],
-                                                    'area_weight_{}'.format(item['stage']): item['area_weight']}
+        st = self.request.query_params.get('st')
+        et = self.request.query_params.get('et')
+        try:
+            days = date_range(datetime.datetime.strptime(st, '%Y-%m-%d'),
+                              datetime.datetime.strptime(et, '%Y-%m-%d'))
+        except Exception:
+            raise ValidationError('参数错误！')
+        # 写入excel表格
+        wb = load_workbook('xlsx_template/wl_stock_templete.xlsx')
+        ws = wb.worksheets[0]
+        for day in days:
+            qs = self.get_queryset().filter(factory_date=day).values()
+            ret = {}
+            for item in qs:
+                k = item['product_no'] + '-' + item['version']
+                if k not in ret:
+                    ret[k] = {'product_no': item['product_no'],
+                              'version': item['version'],
+                              'stock_weight_{}'.format(item['stage']): item['stock_weight'],
+                              'area_weight_{}'.format(item['stage']): item['area_weight']}
                 else:
-                    ret[item['factory_date']][k]['stock_weight_{}'.format(item['stage'])] = item['stock_weight']
-                    ret[item['factory_date']][k]['area_weight_{}'.format(item['stage'])] = item['area_weight']
-        if not ret:
-            raise ValidationError('时间范围内无数据可以导出')
-        bio = BytesIO()
-        writer = pd.ExcelWriter(bio, engine='xlsxwriter')  # 注意安装这个包 pip install xlsxwriter
-        for k, v in ret.items():
-            df = pd.DataFrame(v.values(), columns=['version', 'product_no', 'stock_weight_HMB', 'area_weight_HMB', 'stock_weight_CMB', 'area_weight_CMB', 'stock_weight_1MB', 'area_weight_1MB', 'stock_weight_2MB', 'area_weight_2MB', 'stock_weight_3MB', 'area_weight_3MB'])
-            try:
-                df = df.rename(columns={'version': '版本号', 'product_no': '规格',
-                                        'stock_weight_HMB': 'HMB(库内)', 'area_weight_HMB': 'HMB(现场)',
-                                        'stock_weight_CMB': 'CMB(库内)', 'area_weight_CMB': 'CMB(现场)',
-                                        'stock_weight_1MB': '1MB(库内)', 'area_weight_1MB': '1MB(现场)',
-                                        'stock_weight_2MB': '2MB(库内)', 'area_weight_2MB': '2MB(现场)',
-                                        'stock_weight_3MB': '3MB(库内)', 'area_weight_3MB': '3MB(现场)'})
-            except:
-                pass
-            df.to_excel(writer, sheet_name=k, index=False, encoding='SIMPLIFIED CHINESE_CHINA.UTF8')
-            worksheet = writer.sheets[k]
-            worksheet.set_column(1, 10, 15)
-        writer.save()
-        bio.seek(0)
-        from django.http import FileResponse
-        response = FileResponse(bio)
-        response['Content-Type'] = 'application/octet-stream'
-        response['Content-Disposition'] = 'attachment;filename="mm.xlsx"'
+                    ret[k]['stock_weight_{}'.format(item['stage'])] = item['stock_weight']
+                    ret[k]['area_weight_{}'.format(item['stage'])] = item['area_weight']
+
+            sheet = wb.copy_worksheet(ws)
+            date_splits = day.split('-')
+            m = date_splits[1] if not date_splits[1].startswith('0') else date_splits[1].lstrip('0')
+            d = date_splits[2]
+            sheet.title = '{}.({})'.format(m, d)
+            row = 8
+            for item in ret.values():
+                sheet.cell(row, 2).value = item['version']
+                sheet.cell(row, 3).value = item['product_no']
+                sheet.cell(row, 4).value = item.get('stock_weight_HMB')
+                sheet.cell(row, 5).value = item.get('area_weight_HMB')
+                sheet.cell(row, 6).value = item.get('stock_weight_CMB')
+                sheet.cell(row, 7).value = item.get('area_weight_CMB')
+                sheet.cell(row, 8).value = item.get('stock_weight_1MB')
+                sheet.cell(row, 9).value = item.get('area_weight_1MB')
+                sheet.cell(row, 10).value = item.get('stock_weight_2MB')
+                sheet.cell(row, 11).value = item.get('area_weight_2MB')
+                sheet.cell(row, 12).value = item.get('stock_weight_3MB')
+                sheet.cell(row, 13).value = item.get('area_weight_3MB')
+                row += 1
+        wb.remove_sheet(ws)
+        output = BytesIO()
+        wb.save(output)
+        # 重新定位到开始
+        output.seek(0)
+        response = HttpResponse(content_type='application/vnd.ms-excel')
+        filename = '快检详细信息'
+        response['Content-Disposition'] = u'attachment;filename= ' + filename.encode('gbk').decode(
+            'ISO-8859-1') + '.xls'
+        response.write(output.getvalue())
         return response
+
+        # queryset = self.get_queryset().filter(factory_date__gte=st, factory_date__lte=et).order_by('factory_date')
+        # serializer = self.get_serializer(queryset, many=True)
+        # data = serializer.data
+        # ret = {}
+        # for item in data:
+        #     k = item['product_no'] + '-' + item['version']
+        #     if item['factory_date'] not in ret:
+        #         ret[item['factory_date']] = {k: {'product_no': item['product_no'],
+        #                                          'version': item['version'],
+        #                                          'stock_weight_{}'.format(item['stage']): item['stock_weight'],
+        #                                          'area_weight_{}'.format(item['stage']): item['area_weight']}}
+        #     else:
+        #         if k not in ret[item['factory_date']]:
+        #             ret[item['factory_date']][k] = {'product_no': item['product_no'],
+        #                                             'version': item['version'],
+        #                                             'stock_weight_{}'.format(item['stage']): item['stock_weight'],
+        #                                             'area_weight_{}'.format(item['stage']): item['area_weight']}
+        #         else:
+        #             ret[item['factory_date']][k]['stock_weight_{}'.format(item['stage'])] = item['stock_weight']
+        #             ret[item['factory_date']][k]['area_weight_{}'.format(item['stage'])] = item['area_weight']
+        # if not ret:
+        #     raise ValidationError('时间范围内无数据可以导出')
+        # bio = BytesIO()
+        # writer = pd.ExcelWriter(bio, engine='xlsxwriter')  # 注意安装这个包 pip install xlsxwriter
+        # for k, v in ret.items():
+        #     df = pd.DataFrame(v.values(), columns=['version', 'product_no', 'stock_weight_HMB', 'area_weight_HMB', 'stock_weight_CMB', 'area_weight_CMB', 'stock_weight_1MB', 'area_weight_1MB', 'stock_weight_2MB', 'area_weight_2MB', 'stock_weight_3MB', 'area_weight_3MB'])
+        #     try:
+        #         df = df.rename(columns={'version': '版本号', 'product_no': '规格',
+        #                                 'stock_weight_HMB': 'HMB(库内)', 'area_weight_HMB': 'HMB(现场)',
+        #                                 'stock_weight_CMB': 'CMB(库内)', 'area_weight_CMB': 'CMB(现场)',
+        #                                 'stock_weight_1MB': '1MB(库内)', 'area_weight_1MB': '1MB(现场)',
+        #                                 'stock_weight_2MB': '2MB(库内)', 'area_weight_2MB': '2MB(现场)',
+        #                                 'stock_weight_3MB': '3MB(库内)', 'area_weight_3MB': '3MB(现场)'})
+        #     except:
+        #         pass
+        #     df.to_excel(writer, sheet_name=k, index=False, encoding='SIMPLIFIED CHINESE_CHINA.UTF8')
+        #     worksheet = writer.sheets[k]
+        #     worksheet.set_column(1, 10, 15)
+        # writer.save()
+        # bio.seek(0)
+        # from django.http import FileResponse
+        # response = FileResponse(bio)
+        # response['Content-Type'] = 'application/octet-stream'
+        # response['Content-Disposition'] = 'attachment;filename="mm.xlsx"'
+        # return response
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -1968,6 +2027,8 @@ class APSExportDataView(APIView):
             # pb_available_time_dict[pb_version_name] = 720 if i.available_time == 0 else int(i.available_time * 60 * 24)  # 最晚完成时间
             equip_nos = set()
             for ps in pd_stages:
+                if ps not in idx_keys:
+                    continue
                 main_machine = getattr(pd_ms, 'main_machine_{}'.format(ps))
                 vice_machines = getattr(pd_ms, 'vice_machine_{}'.format(ps))
                 equip_nos.add(main_machine)
@@ -2010,7 +2071,13 @@ class APSExportDataView(APIView):
                 if prev_need_weight <= 0:
                     weight_qty = 0
                     stage_devoted_weight[prev_stage] = 0
-                    need_stages.remove(prev_stage)
+                    try:
+                        need_stages.remove(prev_stage)
+                    except Exception:
+                        raise ValidationError('机台：{} 配方：{},投入段次{}不在定机表内'.format(
+                            stage_recipe['equip__equip_no'],
+                            stage_recipe['stage_product_batch_no'],
+                            prev_stage))
                 else:
                     weight_qty = prev_need_weight
                     stage_devoted_weight[prev_stage] = weight_qty
@@ -2086,7 +2153,7 @@ class APSExportDataView(APIView):
                     try:
                         weight = round(stage_devoted_weight[stage], 2)
                     except Exception:
-                        raise ValidationError('定机表该规格段次错误，请检查后重试!:{}'.format(pb_version_name))
+                        raise ValidationError('定机表该规格:{}段次错误，请检查后重试!'.format(pb_version_name))
 
                 if weight == 0:
                     continue
@@ -2149,8 +2216,8 @@ class APSExportDataView(APIView):
                 pb_available_time_dict[pb_version_name] = available_time
 
             # sheet1.cell(data_row, 6).value = len(need_stages)
-            if pb_version_name not in job_list_data:
-                raise ValidationError('该规格启用配方未找到:{}'.format(pb_version_name))
+            # if pb_version_name not in job_list_data:
+                # raise ValidationError('该规格启用配方未找到:{}'.format(pb_version_name))
 
         left_plans = self.extend_last_aps_result(datetime.datetime.strptime(factory_date, "%Y-%m-%d"),
                                                  sps.lock_durations)
