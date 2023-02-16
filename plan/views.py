@@ -2064,6 +2064,9 @@ class APSExportDataView(APIView):
                     raise ValidationError('该规格{}：段次：{}配方错误，未找到投入前段次胶料数据！'.format(pb_version_name, s))
                 devoted_weight = float(c_pb.actual_weight)  # 投入前段次重量
                 prev_stage = c_pb.material.material_no.split('-')[1]  # 前段次名称
+                if prev_stage not in pd_stages:
+                    raise ValidationError('配方:{}投入段次{}物料不在定机表中，请检查后重试！'.format(
+                        stage_recipe['stage_product_batch_no'], prev_stage))
                 stock_weight = calculate_product_stock(factory_date, pd_ms.product_no, prev_stage)  # 库存重量
                 pd_trains = weight_qty / float(stage_recipe['batching_weight'])
                 prev_need_weight = pd_trains * devoted_weight - stock_weight
