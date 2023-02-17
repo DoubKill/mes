@@ -535,7 +535,10 @@ def convert_fm_weight(pb_no, version, factory_date, final_stage):
         s_stock_weight = stock_weight_data.get(s, 0) + stage_weight_data.get(s, 0)
         if not s_stock_weight:
             continue
-        out_put_stage = pb_no_stages[idx+1]
+        try:
+            out_put_stage = pb_no_stages[idx+1]
+        except Exception:
+            return 0
         stage_recipe = ProductBatching.objects.using('SFJ').filter(
             used_type=4,
             stage_product_batch_no__endswith='-{}-{}-{}'.format(out_put_stage, pb_no, version)
