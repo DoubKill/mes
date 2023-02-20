@@ -38,7 +38,7 @@ def send_bz():
                     msg_ids = ''.join(str(time.time()).split('.'))
                     item = []
                     item_dict = {"WORKID": str(int(msg_ids) + 1),
-                                 "MID": lb_obj.material_no,
+                                 "MID": mdr.product_no,
                                  "PICI": str(lb_obj.bill_id),
                                  "RFID": lb_obj.container_no,
                                  "DJJG": zjzt,
@@ -66,7 +66,7 @@ def send_bz():
                     msg_ids = ''.join(str(time.time()).split('.'))
                     item = []
                     item_dict = {"WORKID": str(int(msg_ids) + 1),
-                                 "MID": bz_obj.material_no,
+                                 "MID": mdr.product_no,
                                  "PICI": str(bz_obj.bill_id),
                                  "RFID": bz_obj.container_no,
                                  "DJJG": zjzt,
