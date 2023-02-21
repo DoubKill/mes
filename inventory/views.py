@@ -7230,14 +7230,17 @@ class ProductExpireDetailView(APIView):
         count = len(temp)
         data = temp[st:et]
         for i in data:
-            if i['lot_no']:
-                deal_result = MaterialDealResult.objects.filter(
-                    lot_no=i['lot_no']).first()
-                if deal_result:
-                    if deal_result.deal_user:
-                        i['deal_suggestion'] = deal_result.deal_suggestion
-                    else:
-                        i['deal_suggestion'] = 'PASS' if deal_result.test_result == 'PASS' else None
+            if i['quality_level'] == '待检品':
+                i['deal_suggestion'] = ''
+            else:
+                if i['lot_no']:
+                    deal_result = MaterialDealResult.objects.filter(
+                        lot_no=i['lot_no']).first()
+                    if deal_result:
+                        if deal_result.deal_user:
+                            i['deal_suggestion'] = deal_result.deal_suggestion
+                        else:
+                            i['deal_suggestion'] = 'PASS' if deal_result.test_result == 'PASS' else None
         total_weight = sum([i['total_weight'] for i in temp])
         total_quantity = sum([i['qty'] for i in temp])
         return Response(
