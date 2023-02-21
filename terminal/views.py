@@ -696,10 +696,11 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         data.append(serializer)
                     else:
                         # 已经打印数据数据更新(打印时完成了50包, 最终计划完成100包)
-                        if k.package_fufil != k.package_plan_count:
+                        if k.package_fufil <= k.package_plan_count:
                             get_status = plan_model.objects.using(equip_no).filter(planid=k.plan_weight_uid).first()
                             if get_status:
                                 k.package_fufil = get_status.actno
+                                k.package_plan_count = get_status.setno
                                 # 更新未打印数量
                                 prints = WeightPackageLog.objects.filter(plan_weight_uid=k.plan_weight_uid, equip_no=equip_no).aggregate(prints=Sum('package_count'))['prints']
                                 prints = 0 if not prints else prints
@@ -730,10 +731,11 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         data.append(serializer)
                     else:
                         # 已经打印数据数据更新(打印时完成了50包, 最终计划完成100包)
-                        if k.package_fufil != k.package_plan_count:
+                        if k.package_fufil <= k.package_plan_count:
                             get_status = plan_model.objects.using(equip_no).filter(planid=k.plan_weight_uid).first()
                             if get_status:
                                 k.package_fufil = get_status.actno
+                                k.package_plan_count = get_status.setno
                                 # 更新未打印数量
                                 prints = WeightPackageLog.objects.filter(plan_weight_uid=k.plan_weight_uid, equip_no=equip_no).aggregate(prints=Sum('package_count'))['prints']
                                 prints = 0 if not prints else prints
@@ -751,10 +753,11 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                 already_print = self.get_queryset().filter(**weight_filter_kwargs).filter(bra_code__in=bra_codes)
             for k in already_print:
                 # 已经打印数据数据更新(打印时完成了50包, 最终计划完成100包)
-                if k.package_fufil != k.package_plan_count:
+                if k.package_fufil <= k.package_plan_count:
                     get_status = plan_model.objects.using(equip_no).filter(planid=k.plan_weight_uid).first()
                     if get_status:
                         k.package_fufil = get_status.actno
+                        k.package_plan_count = get_status.setno
                         # 更新未打印数量
                         prints = WeightPackageLog.objects.filter(plan_weight_uid=k.plan_weight_uid, equip_no=equip_no).aggregate(prints=Sum('package_count'))['prints']
                         prints = 0 if not prints else prints
