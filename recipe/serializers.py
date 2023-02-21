@@ -940,11 +940,11 @@ class ProductBatchingPartialUpdateSerializer(BaseModelSerializer):
                     if all([instance.product_info, instance.versions]):
                         product_no = instance.product_info.product_no
                         version = instance.versions
-                        stages = ProductBatching.objects.exclude(used_type=6).filter(
+                        stages = list(set(ProductBatching.objects.exclude(used_type=6).filter(
                             batching_type=2,
                             stage_product_batch_no__endswith='-{}-{}'.format(product_no, version),
                             stage__global_name__in=['HMB', 'CMB', '1MB', '2MB', '3MB', '4MB', 'FM']
-                        ).values_list('stage__global_name', flat=True)
+                        ).values_list('stage__global_name', flat=True)))
                         stages = sorted(stages, key=lambda x: idx_keys.get(x))
                         stages = '/'.join(stages)
                         ms = SchedulingRecipeMachineSetting.objects.filter(
