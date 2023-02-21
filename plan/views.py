@@ -778,7 +778,7 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
             cur_sheet = data.sheet_by_name(sheet_name='{}.{}'.format(m, d))
         except Exception:
             raise ValidationError('未找到{}.{}库存excel文档！'.format(m, d))
-        data = get_sheet_data(cur_sheet, start_row=5)
+        data = get_sheet_data(cur_sheet, start_row=4)
 
         area_list = []
         c = SchedulingProductDemandedDeclareSummary.objects.filter(
@@ -786,9 +786,19 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
         sn = c + 1
         idx_keys = {'HMB': 1, 'CMB': 2, '1MB': 3, '2MB': 4, '3MB': 5, '4MB': 6, 'FM': 7}
 
-        for idx, item in enumerate(data):
-            product_no = re.sub(r'[\u4e00-\u9fa5]+', '', item[4])
-            if not product_no or not item[5]:
+        sheet_head = data[0]
+        sheet_index = {i: idx for idx, i in enumerate(sheet_head)}
+
+        try:
+            product_no_idx = sheet_index[list(filter(lambda x: isinstance(x, str) and x.startswith('规格'), sheet_head))[0]]
+            plan_weight_idx = sheet_index[list(filter(lambda x: isinstance(x, str) and x.startswith('计划（吨）'), sheet_head))[0]]
+            workshop_weight_idx = sheet_index[list(filter(lambda x: isinstance(x, str) and x.startswith('车间库存'), sheet_head))[0]]
+            current_stock = sheet_index[list(filter(lambda x: isinstance(x, str) and (x.startswith('属地加硫') or x.startswith('属地库存')), sheet_head))[0]]
+        except Exception:
+            raise ValidationError('表格格式错误！')
+        for idx, item in enumerate(data[1:]):
+            product_no = re.sub(r'[\u4e00-\u9fa5]+', '', item[product_no_idx])
+            if not product_no or not item[plan_weight_idx]:
                 continue
             product_no = product_no.lstrip('T')
             pb = ProductBatching.objects.using('SFJ').filter(
@@ -819,9 +829,9 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
                                       'sn': sn,
                                       'product_no': product_no,
                                       'version': version,
-                                      'plan_weight': item[5],
-                                      'workshop_weight': round(item[16], 1) if item[16] else 0,
-                                      'current_stock': round(item[17], 1) if item[17] else 0,
+                                      'plan_weight': item[plan_weight_idx],
+                                      'workshop_weight': round(item[workshop_weight_idx], 1) if item[workshop_weight_idx] else 0,
+                                      'current_stock': round(item[current_stock], 1) if item[current_stock] else 0,
                                       'desc': '',
                                       # 'target_stock': float(item[1]) * 1.5,
                                       # 'demanded_weight': float(item[1]) * 1.5 - float(item[2]) - float(item[3])
@@ -839,20 +849,20 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
                                           'sn': sn,
                                           'product_no': product_no,
                                           'version': new_version,
-                                          'plan_weight': item[5],
-                                          'workshop_weight': 0 if not item[16] else round(item[16], 1),
-                                          'current_stock': 0 if not item[17] else round(item[17], 1),
+                                          'plan_weight': item[plan_weight_idx],
+                                          'workshop_weight': 0 if not item[workshop_weight_idx] else round(item[workshop_weight_idx], 1),
+                                          'current_stock': 0 if not item[current_stock] else round(item[current_stock], 1),
                                           'desc': '',
                                           })
                     else:
-                        if item[5] <= old_recipe_weight:
+                        if item[plan_weight_idx] <= old_recipe_weight:
                             area_list.append({'factory_date': factory_date,
                                               'sn': sn,
                                               'product_no': product_no,
                                               'version': old_version,
                                               'plan_weight': old_recipe_weight,
-                                              'workshop_weight': 0 if not item[16] else round(item[16], 1),
-                                              'current_stock': 0 if not item[17] else round(item[17], 1),
+                                              'workshop_weight': 0 if not item[workshop_weight_idx] else round(item[workshop_weight_idx], 1),
+                                              'current_stock': 0 if not item[current_stock] else round(item[current_stock], 1),
                                               'desc': '',
                                               'demanded_weight': old_recipe_weight
                                               })
@@ -871,7 +881,7 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
                                               'sn': sn,
                                               'product_no': product_no,
                                               'version': new_version,
-                                              'plan_weight': round(item[5]-old_recipe_weight, 2),
+                                              'plan_weight': round(item[plan_weight_idx]-old_recipe_weight, 2),
                                               'workshop_weight': 0,
                                               'current_stock': 0,
                                               'desc': '',
