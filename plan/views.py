@@ -808,18 +808,18 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
                 stage__global_name__in=list(idx_keys.keys())
             ).order_by('id').last()
             if not pb:
-                error_msg += '未找到该规格启用配方：{}\r\n'.format(product_no)
+                error_msg += '未找到该规格启用配方：{}<br>'.format(product_no)
                 continue
                 # raise ValidationError('未找到该规格启用配方：{}'.format(product_no))
             pd_ms = SchedulingRecipeMachineSetting.objects.filter(
                 product_no=product_no, version=pb.versions).first()
             if not pd_ms:
-                error_msg += '未找到该规格：{}-{}定机表数据！\r\n'.format(product_no, pb.versions)
+                error_msg += '未找到该规格：{}-{}定机表数据！<br>'.format(product_no, pb.versions)
                 continue
                 # raise ValidationError('未找到该规格：{}-{}定机表数据！'.format(product_no, pb.versions))
             pd_stages = sorted(pd_ms.stages.split('/'), key=lambda x: idx_keys.get(x, 0))
             if not pd_stages:
-                error_msg += '该规格：{}-{}定机表数据有误！\r\n'.format(product_no, pb.versions)
+                error_msg += '该规格：{}-{}定机表数据有误！<br>'.format(product_no, pb.versions)
                 continue
                 # raise ValidationError('该规格：{}-{}定机表数据有误！'.format(product_no, pb.versions))
             final_stage = pd_stages[-1]  # 根据定机表找到最终生产段次（不一定是FM，前提是不同版本最终段次都一样）
@@ -828,7 +828,7 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
                 stage_product_batch_no__icontains='-{}-{}-'.format(final_stage, product_no)
             ).order_by('used_time').values_list('stage_product_batch_no', flat=True))
             if not pbs:
-                error_msg += '未找到该规格{}启用配方：{}\r\n'.format(final_stage, product_no)
+                error_msg += '未找到该规格{}启用配方：{}<br>'.format(final_stage, product_no)
                 continue
                 # raise ValidationError('未找到该规格{}启用配方：{}'.format(final_stage, product_no))
             try:
@@ -896,7 +896,7 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
                                               'desc': '',
                                               })
             except Exception:
-                error_msg += '第{}行数据有错，请检查后重试!'.format(6+idx)
+                error_msg += '第{}行数据有错，请检查后重试!<br>'.format(6+idx)
                 continue
                 # raise ValidationError('第{}行数据有错，请检查后重试!'.format(6+idx))
             sn += 1
