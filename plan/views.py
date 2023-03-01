@@ -796,32 +796,41 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
             current_stock = sheet_index[list(filter(lambda x: isinstance(x, str) and (x.startswith('属地加硫') or x.startswith('属地库存')), sheet_head))[0]]
         except Exception:
             raise ValidationError('表格格式错误！')
+        error_msg = ''
         for idx, item in enumerate(data[1:]):
             product_no = re.sub(r'[\u4e00-\u9fa5]+', '', item[product_no_idx])
             if not product_no or not item[plan_weight_idx]:
                 continue
-            product_no = product_no.lstrip('T')
+            # product_no = product_no.lstrip('T')
             pb = ProductBatching.objects.using('SFJ').filter(
                 used_type=4,
                 product_info__product_no=product_no,
                 stage__global_name__in=list(idx_keys.keys())
             ).order_by('id').last()
             if not pb:
-                raise ValidationError('未找到该规格启用配方：{}'.format(product_no))
+                error_msg += '未找到该规格启用配方：{}<br>'.format(product_no)
+                continue
+                # raise ValidationError('未找到该规格启用配方：{}'.format(product_no))
             pd_ms = SchedulingRecipeMachineSetting.objects.filter(
                 product_no=product_no, version=pb.versions).first()
             if not pd_ms:
-                raise ValidationError('未找到该规格：{}-{}定机表数据！'.format(product_no, pb.versions))
+                error_msg += '未找到该规格：{}-{}定机表数据！<br>'.format(product_no, pb.versions)
+                continue
+                # raise ValidationError('未找到该规格：{}-{}定机表数据！'.format(product_no, pb.versions))
             pd_stages = sorted(pd_ms.stages.split('/'), key=lambda x: idx_keys.get(x, 0))
             if not pd_stages:
-                raise ValidationError('该规格：{}-{}定机表数据有误！'.format(product_no, pb.versions))
+                error_msg += '该规格：{}-{}定机表数据有误！<br>'.format(product_no, pb.versions)
+                continue
+                # raise ValidationError('该规格：{}-{}定机表数据有误！'.format(product_no, pb.versions))
             final_stage = pd_stages[-1]  # 根据定机表找到最终生产段次（不一定是FM，前提是不同版本最终段次都一样）
             pbs = list(ProductBatching.objects.using('SFJ').filter(
                 used_type=4,
                 stage_product_batch_no__icontains='-{}-{}-'.format(final_stage, product_no)
             ).order_by('used_time').values_list('stage_product_batch_no', flat=True))
             if not pbs:
-                raise ValidationError('未找到该规格{}启用配方：{}'.format(final_stage, product_no))
+                error_msg += '未找到该规格{}启用配方：{}<br>'.format(final_stage, product_no)
+                continue
+                # raise ValidationError('未找到该规格{}启用配方：{}'.format(final_stage, product_no))
             try:
                 if len(set(pbs)) == 1:  # 启用规格只有一种
                     version = pbs[0].split('-')[-1]
@@ -887,8 +896,12 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
                                               'desc': '',
                                               })
             except Exception:
-                raise ValidationError('第{}行数据有错，请检查后重试!'.format(6+idx))
+                error_msg += '第{}行数据有错，请检查后重试!<br>'.format(6+idx)
+                continue
+                # raise ValidationError('第{}行数据有错，请检查后重试!'.format(6+idx))
             sn += 1
+        if error_msg:
+            raise ValidationError(error_msg)
         s = self.serializer_class(data=area_list, many=True)
         if not s.is_valid():
             raise ValidationError('导入数据有误，请检查后重试!')
