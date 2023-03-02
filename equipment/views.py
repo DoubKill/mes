@@ -3649,6 +3649,17 @@ class EquipApplyOrderViewSet(ModelViewSet):
         plan_ids = self.get_queryset().filter(id__in=pks).values_list('plan_id', flat=True)
         content = {}
         if opera_type == '指派':
+            # 2023-02-28 设备科人员可以指派
+            instance = GlobalCode.objects.filter(global_type__type_name='设备部门组织名称', use_flag=1, global_type__use_flag=1).first()
+            section_name = instance.global_name if instance else '设备科'
+            # 获取所有下级部门
+            init_section = Section.objects.filter(name=section_name).last()
+            if not init_section:
+                raise ValidationError(f'{section_name}不存在')
+            section_list = get_children_section(init_section)
+            u = User.objects.filter(section__name__in=section_list, username=user_ids)
+            if not u:
+                raise ValidationError(f'用户不属于{section_name}, 没有权限指派')
             assign_num = EquipApplyOrder.objects.filter(~Q(status__in=['已生成', '已指派', '已接单']), id__in=pks).count()
             if assign_num != 0:
                 raise ValidationError('存在非可指派/改派的订单, 请刷新订单!')
