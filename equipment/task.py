@@ -235,7 +235,8 @@ class AutoDispatch(object):
         # 提醒消息里的链接类型 False 非巡检  True 巡检
         inspection = False
         section_name = ''
-        now_date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        d_now_date = datetime.datetime.now()
+        now_date = d_now_date.strftime('%Y-%m-%d %H:%M:%S')
         if order.work_type != '巡检':
             # 班组
             group = self.get_group_info()
@@ -289,7 +290,7 @@ class AutoDispatch(object):
         for per in working_persons:
             if order.work_type != '巡检':
                 # 5分钟内派过单的不再派单(维修工单)
-                c_time = datetime.datetime.now() - datetime.timedelta(minutes=5)
+                c_time = d_now_date - datetime.timedelta(minutes=5)
                 short_order = EquipApplyOrder.objects.filter(status='已指派', assign_to_user__icontains=per['username'],
                                                              assign_datetime__gte=c_time)
                 if short_order:

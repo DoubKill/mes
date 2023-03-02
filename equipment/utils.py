@@ -17,6 +17,7 @@ from openpyxl import load_workbook, cell
 from rest_framework.exceptions import ValidationError
 import pandas as pd
 
+from basics.models import WorkSchedulePlan
 from equipment.models import EquipApplyOrder, EquipMaintenanceAreaSetting, EquipInspectionOrder, EquipSpareErp
 from mes import settings
 from system.models import User, Section
@@ -315,7 +316,16 @@ def get_staff_status(ding_api, section_name, group=''):
             if settings.DEBUG:
                 staff_dict['optional'] = True
             else:
-                records = ding_api.get_user_attendance([ding_uid], begin_time=datetime.now().date(), end_time=datetime.now().date())
+                # 获取当前时间的工厂日期
+                now = datetime.now()
+                current_work_schedule_plan = WorkSchedulePlan.objects.filter(start_time__lte=now, end_time__gte=now,
+                                                                             plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
+                if current_work_schedule_plan:
+                    s_date_now = current_work_schedule_plan.plan_schedule.day_time
+                    date_now = str(s_date_now)
+                else:
+                    date_now = str(now.date())
+                records = ding_api.get_user_attendance([ding_uid], begin_time=date_now, end_time=date_now)
                 if records and len([i for i in records if i['checkType'] != 'OnDuty' and i['timeResult'] != 'NotSigned']) == 0:
                     staff_dict['optional'] = True
                 staff_dict['records'] = records
@@ -354,7 +364,16 @@ def get_maintenance_status(ding_api, equip_no, maintenance_type):
             if settings.DEBUG:
                 staff_dict['optional'] = True
             else:
-                records = ding_api.get_user_attendance([ding_uid], begin_time=datetime.now().date(), end_time=datetime.now().date())
+                # 获取当前时间的工厂日期
+                now = datetime.now()
+                current_work_schedule_plan = WorkSchedulePlan.objects.filter(start_time__lte=now, end_time__gte=now,
+                                                                             plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
+                if current_work_schedule_plan:
+                    s_date_now = current_work_schedule_plan.plan_schedule.day_time
+                    date_now = str(s_date_now)
+                else:
+                    date_now = str(now.date())
+                records = ding_api.get_user_attendance([ding_uid], begin_time=date_now, end_time=date_now)
                 if records and len([i for i in records if i['checkType'] != 'OnDuty' and i['timeResult'] != 'NotSigned']) == 0:
                     staff_dict['optional'] = True
                 staff_dict['records'] = records

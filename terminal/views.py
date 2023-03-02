@@ -426,6 +426,16 @@ class LoadMaterialLogViewSet(TerminalCreateAPIView,
             return response(success=False, message='该物料(条码)已在其他计划中使用, 本计划不可修改')
         if batch_material.unit == '包' and int(left_weight) != left_weight:
             return response(success=False, message='包数应为整数')
+        # 计划中非料包重量修改上限
+        if batch_material.unit != '包':
+            limit_para = GlobalCode.objects.filter(global_type__use_flag=True, global_type__type_name='计划可变原料重量', use_flag=True).last()
+            try:
+                z_limit = int(limit_para.global_name)
+            except:
+                z_limit = 600
+            t_num = self.queryset.filter(plan_classes_uid=batch_material.plan_classes_uid, material_name=batch_material.material_name).aggregate(t_num=Sum('variety'))['t_num']
+            if t_num + int(left_weight) > z_limit:
+                return response(success=False, message=f'超过计划物料可修改量[{z_limit}kg]')
         update_records = last_bra_code_info.filter(plan_classes_uid=batch_material.plan_classes_uid)
         # 获取限定包数与重量
         limit_para = GlobalCode.objects.filter(global_type__use_flag=True, global_type__type_name='密炼投料物料可变重量', use_flag=True).values_list('global_name', flat=True)
