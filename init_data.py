@@ -94,7 +94,7 @@ permission_data = [
     {'id': 62, 'code': 'delete_productdayplan', 'name': '删除', 'parent_id': 58},
     {'id': 77, 'code': 'send_productdayplan', 'name': '计划下达', 'parent_id': 58},
 
-    {'id': 63, 'code': 'materialdemanded', 'name': '物料需求量统计', 'parent_id': None, 'category_name': '生产计划管理'},
+    {'id': 63, 'code': 'materialdemanded', 'name': '原材料需求量汇总表', 'parent_id': None, 'category_name': '生产计划管理'},
     {'id': 64, 'code': 'view_materialdemanded', 'name': '查看', 'parent_id': 63},
 
     {'id': 65, 'code': 'product_actual', 'name': '密炼实绩', 'parent_id': None, 'category_name': '生产管理'},
@@ -157,7 +157,7 @@ permission_data = [
     {'id': 1087, 'code': 'lock_deal_result', 'name': '出库锁定', 'parent_id': 118},
     {'id': 1088, 'code': 'unlock_deal_result', 'name': '出库解锁', 'parent_id': 118},
 
-    {'id': 120, 'code': 'class_production_summary', 'name': '班次密炼时间汇总', 'parent_id': None, 'category_name': '生产管理'},
+    {'id': 120, 'code': 'class_production_summary', 'name': '班性能稼动率', 'parent_id': None, 'category_name': '生产管理'},
     {'id': 121, 'code': 'view_class_production_summary', 'name': '查看', 'parent_id': 120},
 
     {'id': 122, 'code': 'production_time_summary', 'name': '密炼时间占比汇总', 'parent_id': None, 'category_name': '生产管理'},
@@ -306,15 +306,14 @@ permission_data = [
     {'id': 425, 'code': 'xl_material', 'name': '小料称量物料管理', 'parent_id': None, 'category_name': '生产计划管理'},
     {'id': 426, 'code': 'view_xl_material', 'name': '查看', 'parent_id': 425},
     {'id': 427, 'code': 'add_xl_material', 'name': '新增', 'parent_id': 425},
-    # {'id': 428, 'code': 'change_xl_material', 'name': '修改', 'parent_id': 424},
 
-    {'id': 429, 'code': 'xl_bin', 'name': '小料称量料仓管理', 'parent_id': None, 'category_name': '生产计划管理'},
+    {'id': 429, 'code': 'xl_bin', 'name': '小料称量料仓管理', 'parent_id': None, 'category_name': '工艺管理'},
     {'id': 430, 'code': 'view_xl_bin', 'name': '查看', 'parent_id': 429},
     # {'id': 431, 'code': 'add_xl_bin', 'name': '新增', 'parent_id': 429},
     {'id': 432, 'code': 'change_xl_bin', 'name': '修改', 'parent_id': 429},
     # {'id': 433, 'code': 'delete_xl_material', 'name': '删除', 'parent_id': 429},
 
-    {'id': 434, 'code': 'xl_recipe', 'name': '小料称量配方管理', 'parent_id': None, 'category_name': '生产计划管理'},
+    {'id': 434, 'code': 'xl_recipe', 'name': '小料称量配方管理', 'parent_id': None, 'category_name': '工艺管理'},
     {'id': 435, 'code': 'view_xl_recipe', 'name': '查看', 'parent_id': 434},
     # {'id': 436, 'code': 'add_xl_recipe', 'name': '新增', 'parent_id': 434},
     # {'id': 437, 'code': 'change_xl_recipe', 'name': '修改', 'parent_id': 434},
@@ -334,10 +333,10 @@ permission_data = [
     {'id': 801, 'code': 'auto_xl_plan', 'name': '手自动切换', 'parent_id': 439},
     {'id': 803, 'code': 'merge_xl_plan', 'name': '是否合包', 'parent_id': 439},
 
-    {'id': 447, 'code': 'xl_report_basic', 'name': '小料称量车次报表', 'parent_id': None, 'category_name': '生产计划管理'},
+    {'id': 447, 'code': 'xl_report_basic', 'name': '小料称量车次报表', 'parent_id': None, 'category_name': '工艺管理'},
     {'id': 448, 'code': 'view_xl_report_basic', 'name': '查看', 'parent_id': 447},
 
-    {'id': 449, 'code': 'xl_report_weight', 'name': '小料称量物料消耗报表', 'parent_id': None, 'category_name': '生产计划管理'},
+    {'id': 449, 'code': 'xl_report_weight', 'name': '小料称量物料消耗报表', 'parent_id': None, 'category_name': '工艺管理'},
     {'id': 450, 'code': 'view_xl_report_weight', 'name': '查看', 'parent_id': 449},
 
     {'id': 451, 'code': 'material_outbound_record', 'name': '原材料出库单据', 'parent_id': None, 'category_name': '库存管理'},
@@ -489,7 +488,7 @@ permission_data = [
     {'id': 536, 'code': 'print_xl_weight_card', 'name': '打印', 'parent_id': 534},
     {'id': 914, 'code': 'another_xl_weight_card', 'name': '补打打印', 'parent_id': 534},
 
-    {'id': 537, 'code': 'xl_expire_data', 'name': '小料包有效期管理', 'parent_id': None, 'category_name': '生产计划管理'},
+    {'id': 537, 'code': 'xl_expire_data', 'name': '小料包有效期管理', 'parent_id': None, 'category_name': '工艺管理'},
     {'id': 538, 'code': 'view_xl_expire_data', 'name': '查看', 'parent_id': 537},
     {'id': 539, 'code': 'save_xl_expire_data', 'name': '保存', 'parent_id': 537},
 
@@ -800,7 +799,7 @@ permission_data = [
     {'id': 832, 'code': 'export_machine_target_value', 'name': '导出', 'parent_id': 830},
     {'id': 833, 'code': 'save_machine_target_value', 'name': '保存', 'parent_id': 830},
 
-    {'id': 834, 'code': 'monthly_output_statistics_report', 'name': '月产量统计汇总报表', 'parent_id': None, 'category_name': '生产管理'},
+    {'id': 834, 'code': 'monthly_output_statistics_report', 'name': '生产段次汇总', 'parent_id': None, 'category_name': '生产管理'},
     {'id': 835, 'code': 'view_monthly_output_statistics_report', 'name': '查看', 'parent_id': 834},
     {'id': 836, 'code': 'export_monthly_output_statistics_report', 'name': '导出', 'parent_id': 834},
 
@@ -808,7 +807,7 @@ permission_data = [
     {'id': 838, 'code': 'view_monthly_output_statistics_and_performance', 'name': '查看', 'parent_id': 837},
     {'id': 839, 'code': 'export_monthly_output_statistics_and_performance', 'name': '导出', 'parent_id': 837},
 
-    {'id': 840, 'code': 'daily_production_completion_report', 'name': '月产量完成报表', 'parent_id': None, 'category_name': '生产管理'},
+    {'id': 840, 'code': 'daily_production_completion_report', 'name': '日产量完成', 'parent_id': None, 'category_name': '生产管理'},
     {'id': 841, 'code': 'view_daily_production_completion_report', 'name': '查看', 'parent_id': 840},
     {'id': 842, 'code': 'export_daily_production_completion_report', 'name': '导出', 'parent_id': 840},
     {'id': 970, 'code': 'add_daily_production_completion_report', 'name': '添加', 'parent_id': 840},
@@ -832,7 +831,7 @@ permission_data = [
     {'id': 855, 'code': 'aps_tank_status', 'name': '排程炭黑粉料罐物料规格汇总', 'parent_id': None, 'category_name': '生产计划管理'},
     {'id': 856, 'code': 'view_aps_tank_status', 'name': '查看', 'parent_id': 855},
 
-    {'id': 857, 'code': 'aps_equip_capacity', 'name': '排程机台设备生产能力', 'parent_id': None, 'category_name': '生产计划管理'},
+    {'id': 857, 'code': 'aps_equip_capacity', 'name': '排程机台设备生产能力', 'parent_id': None, 'category_name': '生产管理'},
     {'id': 858, 'code': 'view_aps_equip_capacity', 'name': '查看', 'parent_id': 857},
     {'id': 859, 'code': 'add_aps_equip_capacity', 'name': '新增', 'parent_id': 857},
     {'id': 860, 'code': 'change_aps_equip_capacity', 'name': '修改', 'parent_id': 857},
@@ -968,7 +967,7 @@ permission_data = [
     {'id': 965, 'code': 'view_addrubber_print', 'name': '查看', 'parent_id': 964},
     {'id': 966, 'code': 'print_addrubber_print', 'name': '打印', 'parent_id': 964},
 
-    {'id': 967, 'code': 'formula_preparation', 'name': '生产投料配方查询', 'parent_id': None, 'category_name': '生产计划管理'},
+    {'id': 967, 'code': 'formula_preparation', 'name': '生产投料配方查询', 'parent_id': None, 'category_name': '生产管理'},
     {'id': 968, 'code': 'view_formula_preparation', 'name': '查看', 'parent_id': 967},
 
     {'id': 972, 'code': 'equip_190e', 'name': '190E机台规格信息', 'parent_id': None, 'category_name': '生产管理'},
@@ -978,7 +977,7 @@ permission_data = [
     {'id': 976, 'code': 'delete_equip_190e', 'name': '删除', 'parent_id': 972},
     {'id': 977, 'code': 'change_equip_190e', 'name': '修改', 'parent_id': 972},
 
-    {'id': 978, 'code': 'material_expend_summary', 'name': '原材料消耗量汇总表', 'parent_id': None, 'category_name': '生产管理'},
+    {'id': 978, 'code': 'material_expend_summary', 'name': '原材料消耗量汇总表', 'parent_id': None, 'category_name': '生产计划管理'},
     {'id': 979, 'code': 'view_material_expend_summary', 'name': '查看', 'parent_id': 978},
 
     {'id': 980, 'code': 'material_sjdj', 'name': '原材料总部送检条码登记', 'parent_id': None, 'category_name': '质量管理'},
@@ -1179,6 +1178,8 @@ permission_data = [
     {'id': 1157, 'code': 'export_equip_down_summary_table', 'name': '导出', 'parent_id': 1155},
 
     # 下一个 1159 开始
+    {'id': 1159, 'code': 'xl_plan_consume', 'name': '细料分解每日计划用量', 'parent_id': None, 'category_name': '工艺管理'},
+    {'id': 1160, 'code': 'view_xl_plan_consume', 'name': '查看', 'parent_id': 1159},
 ]
 
 
