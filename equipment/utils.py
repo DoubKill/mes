@@ -301,6 +301,15 @@ def get_staff_status(ding_api, section_name, group=''):
                   uid=F('section_users__id'), leader=F('in_charge_user__username'),
                   leader_phone_number=F('in_charge_user__phone_number')) \
         .values('username', 'phone_number', 'uid', 'leader', 'leader_phone_number', 'group', 'name', 'is_active')
+    # 获取当前时间的工厂日期
+    now = datetime.now()
+    current_work_schedule_plan = WorkSchedulePlan.objects.filter(start_time__lte=now, end_time__gte=now,
+                                                                 plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
+    if current_work_schedule_plan:
+        s_date_now = current_work_schedule_plan.plan_schedule.day_time
+        date_now = str(s_date_now)
+    else:
+        date_now = str(now.date())
     for staff in staffs:
         # 去除已经删除的员工
         if staff.get('is_active') == 0:
@@ -316,15 +325,6 @@ def get_staff_status(ding_api, section_name, group=''):
             if settings.DEBUG:
                 staff_dict['optional'] = True
             else:
-                # 获取当前时间的工厂日期
-                now = datetime.now()
-                current_work_schedule_plan = WorkSchedulePlan.objects.filter(start_time__lte=now, end_time__gte=now,
-                                                                             plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
-                if current_work_schedule_plan:
-                    s_date_now = current_work_schedule_plan.plan_schedule.day_time
-                    date_now = str(s_date_now)
-                else:
-                    date_now = str(now.date())
                 records = ding_api.get_user_attendance([ding_uid], begin_time=date_now, end_time=date_now)
                 if records and len([i for i in records if i['checkType'] != 'OnDuty' and i['timeResult'] != 'NotSigned']) == 0:
                     staff_dict['optional'] = True
@@ -348,7 +348,15 @@ def get_maintenance_status(ding_api, equip_no, maintenance_type):
                                       leader_phone_number=F('maintenance_user__section__in_charge_user__phone_number'),
                                       is_active=F('maintenance_user__is_active'))\
         .values('username', 'phone_number', 'uid', 'leader', 'leader_phone_number', 'group', 'is_active').distinct()
-
+    # 获取当前时间的工厂日期
+    now = datetime.now()
+    current_work_schedule_plan = WorkSchedulePlan.objects.filter(start_time__lte=now, end_time__gte=now,
+                                                                 plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
+    if current_work_schedule_plan:
+        s_date_now = current_work_schedule_plan.plan_schedule.day_time
+        date_now = str(s_date_now)
+    else:
+        date_now = str(now.date())
     for staff in maintenances:
         # 去除已经删除的员工
         if staff.get('is_active') == 0:
@@ -364,15 +372,6 @@ def get_maintenance_status(ding_api, equip_no, maintenance_type):
             if settings.DEBUG:
                 staff_dict['optional'] = True
             else:
-                # 获取当前时间的工厂日期
-                now = datetime.now()
-                current_work_schedule_plan = WorkSchedulePlan.objects.filter(start_time__lte=now, end_time__gte=now,
-                                                                             plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
-                if current_work_schedule_plan:
-                    s_date_now = current_work_schedule_plan.plan_schedule.day_time
-                    date_now = str(s_date_now)
-                else:
-                    date_now = str(now.date())
                 records = ding_api.get_user_attendance([ding_uid], begin_time=date_now, end_time=date_now)
                 if records and len([i for i in records if i['checkType'] != 'OnDuty' and i['timeResult'] != 'NotSigned']) == 0:
                     staff_dict['optional'] = True
