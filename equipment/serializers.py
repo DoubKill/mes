@@ -1986,7 +1986,7 @@ class CheckTemperatureTableSerializer(BaseModelSerializer):
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
         validators = [UniqueTogetherValidator(queryset=CheckTemperatureTable.objects.filter(delete_flag=False),
-                                              fields=('select_date', 'classes', ''), message='已经存在当前日期温度检查表')]
+                                              fields=('select_date', 'classes'), message='当前日期已存在该班次温度检查表')]
 
 
 class CheckTemperatureTableUpdateSerializer(BaseModelSerializer):
