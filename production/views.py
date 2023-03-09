@@ -169,7 +169,7 @@ class PalletFeedbacksViewSet(mixins.CreateModelMixin,
             if key in ('begin_trains', 'end_trains', 'actual_weight'):
                 if not value:
                     return Response('补充成功')
-                if float(value) <= 1:
+                if float(value) < 1:
                     return Response('补充成功')
             if key == 'pallet_no':
                 if not value:
