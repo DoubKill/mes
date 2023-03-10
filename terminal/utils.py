@@ -807,7 +807,7 @@ class JZCLSystem(object):
         if rep != 1:
             logger.error(f'通知接口异常: {resp_string}, detail: table_seq[{table_seq}]-table_id[{table_id}]-opera_type[{opera_type}]')
             raise ValueError(f'通知接口异常: {resp_string}, detail: table_seq[{table_seq}]-table_id[{table_id}]-opera_type[{opera_type}]')
-        logger.info(f'通知接口调用成功 detail: table_seq[{table_seq}]-table_id[{table_id}]-opera_type[{opera_type}]')
+        logger.info(f'通知接口调用成功 detail: table_seq[{table_seq}]-table_id[{table_id}]-opera_type[{opera_type}], rep: {rep}')
         return resp_string
 
     def execute_result(self, param):

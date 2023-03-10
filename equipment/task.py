@@ -31,6 +31,7 @@ import hmac
 import hashlib
 import base64
 import urllib.parse
+from urllib.parse import quote
 from rest_framework.exceptions import ValidationError
 
 logger = logging.getLogger('send_ding_msg')
@@ -225,11 +226,22 @@ class AutoDispatch(object):
     def __init__(self):
         self.ding_api = DinDinAPI()
         if settings.DEBUG:
+            # 生成目标群聊路由参数
             self.group_url = 'https://oapi.dingtalk.com/robot/send?access_token=327a481ceb5bda5e71a560c7d1e87de8aa3e7edde2038bf4379db8c8389845ab'
             self.group_secret = 'SECf1842042def9a33612e3b7f064819033d2b5215d18deca79b14b3b1101d26081'
+            # 生成工单超链接参数
+            self.corpId = 'dinge728859def376cfbf2c783f7214b6d69'
+            self.agentId = '1336171749'
+            self.miniAppId = '5000000001345177'
+
         else:
+            # 生成目标群聊路由参数
             self.group_url = 'https://oapi.dingtalk.com/robot/send?access_token=a46ca41b47fc99c9e3994e701f099f7b648a0057bcd4767c55bd2e0db47b3f3e'
             self.group_secret = 'SEC3ba0eeb18377f850b2a207b5ff865602c07a8cf608fe1cad3dbd47767e5c1a07'
+            # 生成工单超链接参数
+            self.corpId = 'ding93de8775a6f22935ee0f45d8e4f7c288'
+            self.agentId = '1144203103'
+            self.miniAppId = '5000000000355953'
 
     def send_order(self, order):
         # 提醒消息里的链接类型 False 非巡检  True 巡检
@@ -331,11 +343,21 @@ class AutoDispatch(object):
                     repair_instance.save()
             # 派单成功发送钉钉消息给当班人员
             content.update({'title': f"系统自动派发{order.work_type}工单成功，请尽快处理！"})
-            self.ding_api.send_message([per.get('ding_uid')], content, order_id=order.id, inspection=inspection)
-            # 派单成功发送消息到设备群聊
-            msg = f"系统自动派发设备工单成功，请尽快处理！\n工单编号:\n{order.work_order_no}\n机台:{order.equip_no}\n故障原因:{fault_name}\n重要程度:{order.importance_level}\n指派人:系统自动\n被指派人:{per['username']}\n指派时间:{now_date}"
-            url = self.get_group_url()
-            send_ding_msg(url=url, secret=self.group_secret, msg=msg, isAtAll=False)
+            # 2023-03-10 取消发送工作通知
+            # self.ding_api.send_message([per.get('ding_uid')], content, order_id=order.id, inspection=inspection)
+            # 派单成功机器人发送消息到设备群聊
+            msg = {
+                "msgtype": "actionCard",
+                "actionCard": {
+                    "title": "新的设备工单到达！",
+                    "text": f"系统自动派发设备工单成功，请尽快处理！\n\r工单编号:\n\r{order.work_order_no}\n\r机台:{order.equip_no}\n\r故障原因:{fault_name}\n\r重要程度:{order.importance_level}\n\r指派人:系统自动\n\r被指派人:{per['username']}\n\r指派时间:{now_date}",
+                    "btnOrientation": "0",
+                    "singleTitle": "查看详情",
+                    "singleURL": f"dingtalk://dingtalkclient/action/open_micro_app?corpId={self.corpId}&agentId={self.agentId}&miniAppId={self.miniAppId}&pVersion=1&packageType=1&page=pages/repairOrder/repairOrder{quote('?id=' + str(order.id) + f'&inspection={inspection}')}"
+                }
+            }
+            remote_url = self.get_group_url()
+            send_res = send_ding_msg(url=remote_url, secret=self.group_secret, msg=msg, isAtAll=False, custom=True)
             logger.info(f"系统派单[{order.work_type}]-系统自动派单成功: {order.work_order_no}, 被指派人:{per['username']}")
             break
 

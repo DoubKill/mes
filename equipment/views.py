@@ -11,6 +11,7 @@ import requests
 import xlrd
 import xlwt
 
+from urllib.parse import quote
 from suds.client import Client
 from io import BytesIO
 from itertools import chain
@@ -45,7 +46,7 @@ from equipment.models import EquipTargetMTBFMTTRSetting, EquipWarehouseAreaCompo
     EquipInspectionOrder, EquipRegulationRecord, EquipMaintenanceStandardWork, EquipOrderEntrust, XLCommonCode, \
     CheckPointStandard, CheckTemperatureStandard, CheckTemperatureTable, CheckPointTable
 from equipment.serializers import *
-from equipment.task import property_template, property_import
+from equipment.task import property_template, property_import, send_ding_msg, AutoDispatch
 from equipment.utils import gen_template_response, get_staff_status, get_ding_uids, DinDinAPI, get_maintenance_status, \
     get_children_section, gen_excels_response
 from mes.common_code import OMin, OMax, OSum, CommonDeleteMixin
@@ -3643,8 +3644,8 @@ class EquipApplyOrderViewSet(ModelViewSet):
         data = copy.deepcopy(self.request.data)
         pks = data.pop('pks')
         opera_type = data.pop('opera_type')
-        user_ids = self.request.user.username
-        ding_api = DinDinAPI()
+        user_name = self.request.user.username
+        # ding_api = DinDinAPI()
         now_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         plan_ids = self.get_queryset().filter(id__in=pks).values_list('plan_id', flat=True)
         content = {}
@@ -3657,7 +3658,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
             if not init_section:
                 raise ValidationError(f'{section_name}不存在')
             section_list = get_children_section(init_section)
-            u = User.objects.filter(section__name__in=section_list, username=user_ids)
+            u = User.objects.filter(section__name__in=section_list, username=user_name)
             if not u:
                 raise ValidationError(f'用户不属于{section_name}, 没有权限指派')
             assign_num = EquipApplyOrder.objects.filter(~Q(status__in=['已生成', '已指派', '已接单']), id__in=pks).count()
@@ -3667,29 +3668,29 @@ class EquipApplyOrderViewSet(ModelViewSet):
             if not assign_to_user:
                 raise ValidationError('未选择被指派人')
             data = {
-                'status': data.get('status'), 'assign_to_user': ','.join(assign_to_user), 'assign_user': user_ids,
+                'status': data.get('status'), 'assign_to_user': ','.join(assign_to_user), 'assign_user': user_name,
                 'assign_datetime': now_date, 'last_updated_date': datetime.now(), 'receiving_user': None,
                 'receiving_datetime': None
             }
             content.update({"title": "您有新的设备维修单到达，请尽快处理！",
                             "form": [{"key": "指派人:", "value": self.request.user.username},
                                      {"key": "指派时间:", "value": now_date}]})
-            user_ids = get_ding_uids(ding_api, names=assign_to_user)
+            # user_ids = get_ding_uids(ding_api, names=assign_to_user)
         elif opera_type == '接单':
             assign_to_num = EquipApplyOrder.objects.filter(~Q(status='已指派'), id__in=pks).count()
             if assign_to_num != 0:
                 raise ValidationError('存在未被指派的订单, 请刷新订单!')
             data = {
-                'status': data.get('status'), 'receiving_user': user_ids, 'repair_user': user_ids,
+                'status': data.get('status'), 'receiving_user': user_name, 'repair_user': user_name,
                 'receiving_datetime': now_date, 'last_updated_date': datetime.now(), 'timeout_color': None
             }
             # 记录到增减人员履历中
             for plan_id in plan_ids:
-                EquipRegulationRecord.objects.create(user=user_ids, plan_id=plan_id, status='增')
-            content.update({"title": f"您指派的设备维修单已被{user_ids}接单",
-                            "form": [{"key": "接单人:", "value": user_ids},
+                EquipRegulationRecord.objects.create(user=user_name, plan_id=plan_id, status='增')
+            content.update({"title": f"您指派的设备维修单已被{user_name}接单",
+                            "form": [{"key": "接单人:", "value": user_name},
                                      {"key": "接单时间:", "value": now_date}]})
-            user_ids = get_ding_uids(ding_api, pks)
+            # user_ids = get_ding_uids(ding_api, pks)
         elif opera_type == '退单':
             receive_num = EquipApplyOrder.objects.filter(~Q(status='已指派'), id__in=pks).count()
             if receive_num != 0:
@@ -3699,10 +3700,10 @@ class EquipApplyOrderViewSet(ModelViewSet):
                 'assign_user': None, 'assign_datetime': None, 'timeout_color': None, 'back_order': True,
                 'assign_to_user': None, 'last_updated_date': datetime.now(), 'back_reason': data.get('back_reason')
             }
-            content.update({"title": f"您指派的设备维修单已被{user_ids}退单",
-                            "form": [{"key": "退单人:", "value": user_ids},
+            content.update({"title": f"您指派的设备维修单已被{user_name}退单",
+                            "form": [{"key": "退单人:", "value": user_name},
                                      {"key": "退单时间:", "value": now_date}]})
-            user_ids = get_ding_uids(ding_api, pks)
+            # user_ids = get_ding_uids(ding_api, pks)
         elif opera_type == '开始':
             # 修改
             receive_num = EquipApplyOrder.objects.filter(~Q(status='已接单'), id__in=pks).count()
@@ -3800,10 +3801,10 @@ class EquipApplyOrderViewSet(ModelViewSet):
                 raise ValidationError('存在已经关闭的订单, 请刷新订单!')
             data = {'status': data.get('status'), 'last_updated_date': datetime.now(), 'timeout_color': None,
                     'close_reason': data.get('close_reason')}
-            content.update({"title": f"您指派的设备维修单已被{user_ids}关闭",
-                            "form": [{"key": "闭单人:", "value": user_ids},
+            content.update({"title": f"您指派的设备维修单已被{user_name}关闭",
+                            "form": [{"key": "闭单人:", "value": user_name},
                                      {"key": "关闭时间:", "value": now_date}]})
-            user_ids = get_ding_uids(ding_api, pks)
+            # user_ids = get_ding_uids(ding_api, pks)
         instances = self.get_queryset().filter(id__in=pks)
         # 更新数据
         instances.update(**data)
@@ -3815,20 +3816,51 @@ class EquipApplyOrderViewSet(ModelViewSet):
         EquipApplyRepair.objects.filter(plan_id__in=instances.values_list('plan_id', flat=True)).update(
             status=data.get('status'))
         # 发送数据
-        if user_ids and isinstance(user_ids, list):
+        if content:
+            msg_robot = AutoDispatch()
             for order_id in pks:
-                new_content = copy.deepcopy(content)
+                # new_content = copy.deepcopy(content)
                 instance = self.queryset.filter(id=order_id).first()
                 fault_name = instance.result_fault_cause if instance.result_fault_cause else (
                     instance.equip_repair_standard.standard_name if instance.equip_repair_standard else instance.equip_maintenance_standard.standard_name)
-                new_content['form'] = [{"key": "工单编号:", "value": instance.work_order_no},
-                                       {"key": "工单生成时间:", "value": instance.created_date.strftime('%Y-%m-%d %H:%M:%S')},
-                                       {"key": "机台:", "value": instance.equip_no},
-                                       {"key": "部位名称:",
-                                        "value": instance.equip_part_new.part_name if instance.equip_part_new else ''},
-                                       {"key": "故障原因:", "value": fault_name},
-                                       {"key": "重要程度:", "value": instance.importance_level}] + new_content['form']
-                ding_api.send_message(user_ids, new_content, order_id)
+                # new_content['form'] = [{"key": "工单编号:", "value": instance.work_order_no},
+                #                        {"key": "工单生成时间:", "value": instance.created_date.strftime('%Y-%m-%d %H:%M:%S')},
+                #                        {"key": "机台:", "value": instance.equip_no},
+                #                        {"key": "部位名称:",
+                #                         "value": instance.equip_part_new.part_name if instance.equip_part_new else ''},
+                #                        {"key": "故障原因:", "value": fault_name},
+                #                        {"key": "重要程度:", "value": instance.importance_level}] + new_content['form']
+                # ding_api.send_message(user_ids, new_content, order_id)
+                # 2023-03-10 机器人发送消息到群聊
+                remote_url = msg_robot.get_group_url()
+
+                if opera_type == '指派':
+                    title = "新的设备维修工单到达！"
+                    msg_text = f"新的维修单到达，请尽快处理！\n\r工单编号:\n\r{instance.work_order_no}\n\r工单生成时间:{instance.created_date.strftime('%Y-%m-%d %H:%M:%S')}\n\r机台:{instance.equip_no}\n\r故障原因:{fault_name}\n\r重要程度:{instance.importance_level}\n\r指派人:{user_name}\n\r被指派人:{instance.assign_to_user}\n\r指派时间:{now_date}"
+                elif opera_type == '接单':
+                    title = "接单通知！"
+                    msg_text = f"维修单已被{user_name}接单!\n\r工单编号:\n\r{instance.work_order_no}\n\r工单生成时间:{instance.created_date.strftime('%Y-%m-%d %H:%M:%S')}\n\r机台:{instance.equip_no}\n\r故障原因:{fault_name}\n\r重要程度:{instance.importance_level}\n\r指派人:{instance.assign_user}\n\r接单人:{user_name}\n\r接单时间:{now_date}"
+                elif opera_type == '退单':
+                    title = "退单通知！"
+                    msg_text = f"维修单已被{user_name}退单!\n\r工单编号:\n\r{instance.work_order_no}\n\r工单生成时间:{instance.created_date.strftime('%Y-%m-%d %H:%M:%S')}\n\r机台:{instance.equip_no}\n\r故障原因:{fault_name}\n\r重要程度:{instance.importance_level}\n\r指派人:{instance.assign_user}\n\r退单人:{user_name}\n\r退单时间:{now_date}"
+                elif opera_type == '关闭':
+                    title = "闭单通知！"
+                    msg_text = f"维修单已被{user_name}关闭!\n\r工单编号:\n\r{instance.work_order_no}\n\r工单生成时间:{instance.created_date.strftime('%Y-%m-%d %H:%M:%S')}\n\r机台:{instance.equip_no}\n\r故障原因:{fault_name}\n\r重要程度:{instance.importance_level}\n\r指派人:{instance.assign_user}\n\r闭单人:{user_name}\n\r闭单时间:{now_date}"
+                else:
+                    title = ''
+                    msg_text = ''
+                msg = {
+                    "msgtype": "actionCard",
+                    "actionCard": {
+                        "title": title,
+                        "text": msg_text,
+                        "btnOrientation": "0",
+                        "singleTitle": "查看详情",
+                        "singleURL": f"dingtalk://dingtalkclient/action/open_micro_app?corpId={self.corpId}&agentId={self.agentId}&miniAppId={self.miniAppId}&pVersion=1&packageType=1&page=pages/repairOrder/repairOrder{quote('?id=' + str(order_id))}"
+                    }
+                }
+                if title and msg_text:
+                    send_res = send_ding_msg(url=remote_url, secret=self.group_secret, msg=msg, isAtAll=False, custom=True)
         return Response(f'{opera_type}操作成功')
 
 
@@ -4080,8 +4112,8 @@ class EquipInspectionOrderViewSet(ModelViewSet):
         data = copy.deepcopy(self.request.data)
         pks = data.pop('pks')
         opera_type = data.pop('opera_type')
-        user_ids = self.request.user.username
-        ding_api = DinDinAPI()
+        user_name = self.request.user.username
+        # ding_api = DinDinAPI()
         now_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         plan_ids = self.get_queryset().filter(id__in=pks).values_list('plan_id', flat=True)
         content = {}
@@ -4093,28 +4125,28 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             if not assign_to_user:
                 raise ValidationError('未选择被指派人')
             data = {
-                'status': data.get('status'), 'assign_to_user': ','.join(assign_to_user), 'assign_user': user_ids,
+                'status': data.get('status'), 'assign_to_user': ','.join(assign_to_user), 'assign_user': user_name,
                 'assign_datetime': now_date, 'last_updated_date': datetime.now()
             }
             content.update({"title": "您有新的设备巡检单到达，请尽快处理！",
                             "form": [{"key": "指派人:", "value": self.request.user.username},
                                      {"key": "指派时间:", "value": now_date}]})
-            user_ids = get_ding_uids(ding_api, names=assign_to_user)
+            # user_ids = get_ding_uids(ding_api, names=assign_to_user)
         elif opera_type == '接单':
             assign_to_num = EquipInspectionOrder.objects.filter(~Q(status='已指派'), id__in=pks).count()
             if assign_to_num != 0:
                 raise ValidationError('存在未被指派的订单, 请刷新订单!')
             data = {
-                'status': data.get('status'), 'receiving_user': user_ids, 'repair_user': user_ids, 'receiving_datetime': now_date,
+                'status': data.get('status'), 'receiving_user': user_name, 'repair_user': user_name, 'receiving_datetime': now_date,
                 'last_updated_date': datetime.now(), 'timeout_color': None
             }
             # 记录到增减人员履历中
             for plan_id in plan_ids:
-                EquipRegulationRecord.objects.create(user=user_ids, plan_id=plan_id, status='增')
-            content.update({"title": f"您指派的设备巡检单已被{user_ids}接单",
-                            "form": [{"key": "接单人:", "value": user_ids},
+                EquipRegulationRecord.objects.create(user=user_name, plan_id=plan_id, status='增')
+            content.update({"title": f"您指派的设备巡检单已被{user_name}接单",
+                            "form": [{"key": "接单人:", "value": user_name},
                                      {"key": "接单时间:", "value": now_date}]})
-            user_ids = get_ding_uids(ding_api, pks, check_type='巡检')
+            # user_ids = get_ding_uids(ding_api, pks, check_type='巡检')
         elif opera_type == '退单':
             receive_num = EquipInspectionOrder.objects.filter(~Q(status='已指派'), id__in=pks).count()
             if receive_num != 0:
@@ -4124,10 +4156,10 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                 'assign_user': None, 'assign_datetime': None, 'timeout_color': None, 'back_order': True,
                 'assign_to_user': None, 'last_updated_date': datetime.now(), 'back_reason': data.get('back_reason')
             }
-            content.update({"title": f"您指派的设备巡检单已被{user_ids}退单",
-                            "form": [{"key": "退单人:", "value": user_ids},
+            content.update({"title": f"您指派的设备巡检单已被{user_name}退单",
+                            "form": [{"key": "退单人:", "value": user_name},
                                      {"key": "退单时间:", "value": now_date}]})
-            user_ids = get_ding_uids(ding_api, pks, check_type='巡检')
+            # user_ids = get_ding_uids(ding_api, pks, check_type='巡检')
         elif opera_type == '开始':
             receive_num = EquipInspectionOrder.objects.filter(~Q(status='已接单'), id__in=pks).count()
             if receive_num != 0:
@@ -4195,10 +4227,10 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                 raise ValidationError('存在已经关闭的订单, 请刷新订单!')
             data = {'status': data.get('status'), 'last_updated_date': datetime.now(), 'timeout_color': None,
                     'close_reason': data.get('close_reason')}
-            content.update({"title": f"您指派的设备维修单已被{user_ids}关闭",
-                            "form": [{"key": "闭单人:", "value": user_ids},
+            content.update({"title": f"您指派的设备维修单已被{user_name}关闭",
+                            "form": [{"key": "闭单人:", "value": user_name},
                                      {"key": "关闭时间:", "value": now_date}]})
-            user_ids = get_ding_uids(ding_api, pks, check_type='巡检')
+            # user_ids = get_ding_uids(ding_api, pks, check_type='巡检')
         # 更新数据
         instances = self.get_queryset().filter(id__in=pks)
         instances.update(**data)
@@ -4207,17 +4239,47 @@ class EquipInspectionOrderViewSet(ModelViewSet):
         if not res.exists():
             EquipPlan.objects.filter(plan_id__in=instances.values_list('plan_id', flat=True)).update(status='计划已完成')
         # 发送数据
-        if user_ids and isinstance(user_ids, list):
+        if content:
+            msg_robot = AutoDispatch()
             for order_id in pks:
-                new_content = copy.deepcopy(content)
+                # new_content = copy.deepcopy(content)
                 instance = self.queryset.filter(id=order_id).first()
                 fault_name = instance.equip_repair_standard.standard_name if instance.equip_repair_standard else ''
-                new_content['form'] = [{"key": "工单编号:", "value": instance.work_order_no},
-                                       {"key": "工单生成时间:", "value": instance.created_date.strftime('%Y-%m-%d %H:%M:%S')},
-                                       {"key": "机台:", "value": instance.equip_no},
-                                       {"key": "巡检标准:", "value": fault_name},
-                                       {"key": "重要程度:", "value": instance.importance_level}] + new_content['form']
-                ding_api.send_message(user_ids, new_content, order_id, inspection=True)
+                # new_content['form'] = [{"key": "工单编号:", "value": instance.work_order_no},
+                #                        {"key": "工单生成时间:", "value": instance.created_date.strftime('%Y-%m-%d %H:%M:%S')},
+                #                        {"key": "机台:", "value": instance.equip_no},
+                #                        {"key": "巡检标准:", "value": fault_name},
+                #                        {"key": "重要程度:", "value": instance.importance_level}] + new_content['form']
+                # ding_api.send_message(user_ids, new_content, order_id, inspection=True)
+                remote_url = msg_robot.get_group_url()
+
+                if opera_type == '指派':
+                    title = "新的巡检工单到达！"
+                    msg_text = f"新的巡检工单到达，请尽快处理！\n\r工单编号:\n\r{instance.work_order_no}\n\r工单生成时间:{instance.created_date.strftime('%Y-%m-%d %H:%M:%S')}\n\r机台:{instance.equip_no}\n\r故障原因:{fault_name}\n\r重要程度:{instance.importance_level}\n\r指派人:{user_name}\n\r被指派人:{instance.assign_to_user}\n\r指派时间:{now_date}"
+                elif opera_type == '接单':
+                    title = "接单通知！"
+                    msg_text = f"巡检单已被{user_name}接单!\n\r工单编号:\n\r{instance.work_order_no}\n\r工单生成时间:{instance.created_date.strftime('%Y-%m-%d %H:%M:%S')}\n\r机台:{instance.equip_no}\n\r故障原因:{fault_name}\n\r重要程度:{instance.importance_level}\n\r指派人:{instance.assign_user}\n\r接单人:{user_name}\n\r接单时间:{now_date}"
+                elif opera_type == '退单':
+                    title = "退单通知！"
+                    msg_text = f"巡检单已被{user_name}退单!\n\r工单编号:\n\r{instance.work_order_no}\n\r工单生成时间:{instance.created_date.strftime('%Y-%m-%d %H:%M:%S')}\n\r机台:{instance.equip_no}\n\r故障原因:{fault_name}\n\r重要程度:{instance.importance_level}\n\r指派人:{instance.assign_user}\n\r退单人:{user_name}\n\r退单时间:{now_date}"
+                elif opera_type == '关闭':
+                    title = "闭单通知！"
+                    msg_text = f"巡检单已被{user_name}关闭!\n\r工单编号:\n\r{instance.work_order_no}\n\r工单生成时间:{instance.created_date.strftime('%Y-%m-%d %H:%M:%S')}\n\r机台:{instance.equip_no}\n\r故障原因:{fault_name}\n\r重要程度:{instance.importance_level}\n\r指派人:{instance.assign_user}\n\r闭单人:{user_name}\n\r闭单时间:{now_date}"
+                else:
+                    title = ''
+                    msg_text = ''
+                msg = {
+                    "msgtype": "actionCard",
+                    "actionCard": {
+                        "title": title,
+                        "text": msg_text,
+                        "btnOrientation": "0",
+                        "singleTitle": "查看详情",
+                        "singleURL": f"dingtalk://dingtalkclient/action/open_micro_app?corpId={self.corpId}&agentId={self.agentId}&miniAppId={self.miniAppId}&pVersion=1&packageType=1&page=pages/repairOrder/repairOrder{quote('?id=' + str(order_id) + '&isInspection=true')}"
+                    }
+                }
+                if title and msg_text:
+                    send_res = send_ding_msg(url=remote_url, secret=self.group_secret, msg=msg, isAtAll=False, custom=True)
         return Response(f'{opera_type}操作成功')
 
 
