@@ -327,7 +327,7 @@ def get_staff_status(ding_api, section_name, group=''):
         for k, v in attendance.items():
             if len([i for i in v if i['checkType'] != 'OnDuty' and i['timeResult'] != 'NotSigned']) == 0:
                 user_ding[k]['optional'] = True
-    result = user_ding.values()
+    result = list(user_ding.values())
     return result
 
 
@@ -370,7 +370,7 @@ def get_maintenance_status(ding_api, equip_no, maintenance_type):
         for k, v in attendance.items():
             if len([i for i in v if i['checkType'] != 'OnDuty' and i['timeResult'] != 'NotSigned']) == 0:
                 user_ding[k]['optional'] = True
-    result = user_ding.values()
+    result = list(user_ding.values())
     return result
 
 

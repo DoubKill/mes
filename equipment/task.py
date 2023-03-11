@@ -350,7 +350,7 @@ class AutoDispatch(object):
                 "msgtype": "actionCard",
                 "actionCard": {
                     "title": "新的设备工单到达！",
-                    "text": f"系统自动派发设备工单成功，请尽快处理！\n\r工单编号:\n\r{order.work_order_no}\n\r机台:{order.equip_no}\n\r故障原因:{fault_name}\n\r重要程度:{order.importance_level}\n\r指派人:系统自动\n\r被指派人:{per['username']}\n\r指派时间:{now_date}",
+                    "text": f"系统自动派发设备工单成功，请尽快处理！\n\r工单编号:\n\r{order.work_order_no}\n\r工单生成时间:\n\r{order.created_date.strftime('%Y-%m-%d %H:%M:%S')}\n\r机台:{order.equip_no}\n\r故障原因:{fault_name}\n\r重要程度:{order.importance_level}\n\r指派人:系统自动\n\r被指派人:{per['username']}\n\r指派时间:{now_date}",
                     "btnOrientation": "0",
                     "singleTitle": "查看详情",
                     "singleURL": f"dingtalk://dingtalkclient/action/open_micro_app?corpId={self.corpId}&agentId={self.agentId}&miniAppId={self.miniAppId}&pVersion=1&packageType=1&page=pages/repairOrder/repairOrder{quote('?id=' + str(order.id) + f'&inspection={inspection}')}"

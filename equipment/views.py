@@ -3644,7 +3644,8 @@ class EquipApplyOrderViewSet(ModelViewSet):
         data = copy.deepcopy(self.request.data)
         pks = data.pop('pks')
         opera_type = data.pop('opera_type')
-        user_name = self.request.user.username
+        user_obj = self.request.user
+        user_name = user_obj.username
         # ding_api = DinDinAPI()
         now_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         plan_ids = self.get_queryset().filter(id__in=pks).values_list('plan_id', flat=True)
@@ -3658,9 +3659,9 @@ class EquipApplyOrderViewSet(ModelViewSet):
             if not init_section:
                 raise ValidationError(f'{section_name}不存在')
             section_list = get_children_section(init_section)
-            u = User.objects.filter(section__name__in=section_list, username=user_name)
+            u = User.objects.filter(Q(username=user_name) | Q(is_superuser=True), section__name__in=section_list)
             if not u:
-                raise ValidationError(f'用户不属于{section_name}, 没有权限指派')
+                raise ValidationError(f'用户不属于{section_name}且不是管理员, 没有权限指派')
             assign_num = EquipApplyOrder.objects.filter(~Q(status__in=['已生成', '已指派', '已接单']), id__in=pks).count()
             if assign_num != 0:
                 raise ValidationError('存在非可指派/改派的订单, 请刷新订单!')
@@ -3680,6 +3681,11 @@ class EquipApplyOrderViewSet(ModelViewSet):
             assign_to_num = EquipApplyOrder.objects.filter(~Q(status='已指派'), id__in=pks).count()
             if assign_to_num != 0:
                 raise ValidationError('存在未被指派的订单, 请刷新订单!')
+            # 非被指派人不可接单
+            orders = EquipApplyOrder.objects.filter(id__in=pks)
+            for i in orders:
+                if user_name not in i.assign_to_user:
+                    raise ValidationError('只能接指派给自己的工单！')
             data = {
                 'status': data.get('status'), 'receiving_user': user_name, 'repair_user': user_name,
                 'receiving_datetime': now_date, 'last_updated_date': datetime.now(), 'timeout_color': None
@@ -3695,6 +3701,11 @@ class EquipApplyOrderViewSet(ModelViewSet):
             receive_num = EquipApplyOrder.objects.filter(~Q(status='已指派'), id__in=pks).count()
             if receive_num != 0:
                 raise ValidationError('未指派订单无法退单, 请刷新订单!')
+            # 非接单人与管理员不可退单
+            orders = EquipApplyOrder.objects.filter(id__in=pks)
+            for i in orders:
+                if user_name not in i.receiving_user and user_name not in i.assign_to_user and not user_obj.is_superuser:
+                    raise ValidationError('被指派人、接单人和管理员才可以退单！')
             data = {
                 'status': data.get('status'), 'receiving_user': None, 'receiving_datetime': None,
                 'assign_user': None, 'assign_datetime': None, 'timeout_color': None, 'back_order': True,
@@ -3799,6 +3810,11 @@ class EquipApplyOrderViewSet(ModelViewSet):
             close_num = EquipApplyOrder.objects.filter(status='已关闭', id__in=pks).count()
             if close_num != 0:
                 raise ValidationError('存在已经关闭的订单, 请刷新订单!')
+            # 非接单人与管理员不可退单
+            orders = EquipApplyOrder.objects.filter(id__in=pks)
+            for i in orders:
+                if user_name not in i.receiving_user and user_name not in i.assign_to_user and user_obj != i.created_user and not user_obj.is_superuser:
+                    raise ValidationError('报修人、接单人、和管理员才可以闭单！')
             data = {'status': data.get('status'), 'last_updated_date': datetime.now(), 'timeout_color': None,
                     'close_reason': data.get('close_reason')}
             content.update({"title": f"您指派的设备维修单已被{user_name}关闭",
@@ -3836,16 +3852,16 @@ class EquipApplyOrderViewSet(ModelViewSet):
 
                 if opera_type == '指派':
                     title = "新的设备维修工单到达！"
-                    msg_text = f"新的维修单到达，请尽快处理！\n\r工单编号:\n\r{instance.work_order_no}\n\r工单生成时间:{instance.created_date.strftime('%Y-%m-%d %H:%M:%S')}\n\r机台:{instance.equip_no}\n\r故障原因:{fault_name}\n\r重要程度:{instance.importance_level}\n\r指派人:{user_name}\n\r被指派人:{instance.assign_to_user}\n\r指派时间:{now_date}"
+                    msg_text = f"新的维修单到达，请尽快处理！\n\r工单编号:\n\r{instance.work_order_no}\n\r工单生成时间:\n\r{instance.created_date.strftime('%Y-%m-%d %H:%M:%S')}\n\r机台:{instance.equip_no}\n\r故障原因:{fault_name}\n\r重要程度:{instance.importance_level}\n\r指派人:{user_name}\n\r被指派人:{instance.assign_to_user}\n\r指派时间:{now_date}"
                 elif opera_type == '接单':
                     title = "接单通知！"
-                    msg_text = f"维修单已被{user_name}接单!\n\r工单编号:\n\r{instance.work_order_no}\n\r工单生成时间:{instance.created_date.strftime('%Y-%m-%d %H:%M:%S')}\n\r机台:{instance.equip_no}\n\r故障原因:{fault_name}\n\r重要程度:{instance.importance_level}\n\r指派人:{instance.assign_user}\n\r接单人:{user_name}\n\r接单时间:{now_date}"
+                    msg_text = f"维修单已被{user_name}接单!\n\r工单编号:\n\r{instance.work_order_no}\n\r工单生成时间:\n\r{instance.created_date.strftime('%Y-%m-%d %H:%M:%S')}\n\r机台:{instance.equip_no}\n\r故障原因:{fault_name}\n\r重要程度:{instance.importance_level}\n\r指派人:{instance.assign_user}\n\r接单人:{user_name}\n\r接单时间:{now_date}"
                 elif opera_type == '退单':
                     title = "退单通知！"
-                    msg_text = f"维修单已被{user_name}退单!\n\r工单编号:\n\r{instance.work_order_no}\n\r工单生成时间:{instance.created_date.strftime('%Y-%m-%d %H:%M:%S')}\n\r机台:{instance.equip_no}\n\r故障原因:{fault_name}\n\r重要程度:{instance.importance_level}\n\r指派人:{instance.assign_user}\n\r退单人:{user_name}\n\r退单时间:{now_date}"
+                    msg_text = f"维修单已被{user_name}退单!\n\r工单编号:\n\r{instance.work_order_no}\n\r工单生成时间:\n\r{instance.created_date.strftime('%Y-%m-%d %H:%M:%S')}\n\r机台:{instance.equip_no}\n\r故障原因:{fault_name}\n\r重要程度:{instance.importance_level}\n\r指派人:{instance.assign_user}\n\r退单人:{user_name}\n\r退单时间:{now_date}"
                 elif opera_type == '关闭':
                     title = "闭单通知！"
-                    msg_text = f"维修单已被{user_name}关闭!\n\r工单编号:\n\r{instance.work_order_no}\n\r工单生成时间:{instance.created_date.strftime('%Y-%m-%d %H:%M:%S')}\n\r机台:{instance.equip_no}\n\r故障原因:{fault_name}\n\r重要程度:{instance.importance_level}\n\r指派人:{instance.assign_user}\n\r闭单人:{user_name}\n\r闭单时间:{now_date}"
+                    msg_text = f"维修单已被{user_name}关闭!\n\r工单编号:\n\r{instance.work_order_no}\n\r工单生成时间:\n\r{instance.created_date.strftime('%Y-%m-%d %H:%M:%S')}\n\r机台:{instance.equip_no}\n\r故障原因:{fault_name}\n\r重要程度:{instance.importance_level}\n\r指派人:{instance.assign_user}\n\r闭单人:{user_name}\n\r闭单时间:{now_date}"
                 else:
                     title = ''
                     msg_text = ''
@@ -3856,11 +3872,11 @@ class EquipApplyOrderViewSet(ModelViewSet):
                         "text": msg_text,
                         "btnOrientation": "0",
                         "singleTitle": "查看详情",
-                        "singleURL": f"dingtalk://dingtalkclient/action/open_micro_app?corpId={self.corpId}&agentId={self.agentId}&miniAppId={self.miniAppId}&pVersion=1&packageType=1&page=pages/repairOrder/repairOrder{quote('?id=' + str(order_id))}"
+                        "singleURL": f"dingtalk://dingtalkclient/action/open_micro_app?corpId={msg_robot.corpId}&agentId={msg_robot.agentId}&miniAppId={msg_robot.miniAppId}&pVersion=1&packageType=1&page=pages/repairOrder/repairOrder{quote('?id=' + str(order_id))}"
                     }
                 }
                 if title and msg_text:
-                    send_res = send_ding_msg(url=remote_url, secret=self.group_secret, msg=msg, isAtAll=False, custom=True)
+                    send_res = send_ding_msg(url=remote_url, secret=msg_robot.group_secret, msg=msg, isAtAll=False, custom=True)
         return Response(f'{opera_type}操作成功')
 
 
@@ -4112,12 +4128,24 @@ class EquipInspectionOrderViewSet(ModelViewSet):
         data = copy.deepcopy(self.request.data)
         pks = data.pop('pks')
         opera_type = data.pop('opera_type')
-        user_name = self.request.user.username
+        user_obj = self.request.user
+        user_name = user_obj.username
         # ding_api = DinDinAPI()
         now_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         plan_ids = self.get_queryset().filter(id__in=pks).values_list('plan_id', flat=True)
         content = {}
         if opera_type == '指派':
+            # 2023-02-28 设备科人员可以指派
+            instance = GlobalCode.objects.filter(global_type__type_name='设备部门组织名称', use_flag=1, global_type__use_flag=1).first()
+            section_name = instance.global_name if instance else '设备科'
+            # 获取所有下级部门
+            init_section = Section.objects.filter(name=section_name).last()
+            if not init_section:
+                raise ValidationError(f'{section_name}不存在')
+            section_list = get_children_section(init_section)
+            u = User.objects.filter(Q(username=user_name) | Q(is_superuser=True), section__name__in=section_list)
+            if not u:
+                raise ValidationError(f'用户不属于{section_name}且不是管理员, 没有权限指派')
             assign_num = EquipInspectionOrder.objects.filter(~Q(status='已生成'), id__in=pks).count()
             if assign_num != 0:
                 raise ValidationError('存在非已生成的订单, 请刷新订单!')
@@ -4136,6 +4164,11 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             assign_to_num = EquipInspectionOrder.objects.filter(~Q(status='已指派'), id__in=pks).count()
             if assign_to_num != 0:
                 raise ValidationError('存在未被指派的订单, 请刷新订单!')
+            # 非被指派人不可接单
+            orders = EquipInspectionOrder.objects.filter(id__in=pks)
+            for i in orders:
+                if user_name not in i.assign_to_user:
+                    raise ValidationError('只能接指派给自己的工单！')
             data = {
                 'status': data.get('status'), 'receiving_user': user_name, 'repair_user': user_name, 'receiving_datetime': now_date,
                 'last_updated_date': datetime.now(), 'timeout_color': None
@@ -4151,6 +4184,11 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             receive_num = EquipInspectionOrder.objects.filter(~Q(status='已指派'), id__in=pks).count()
             if receive_num != 0:
                 raise ValidationError('未指派订单无法退单, 请刷新订单!')
+            # 非接单人与管理员不可退单
+            orders = EquipInspectionOrder.objects.filter(id__in=pks)
+            for i in orders:
+                if user_name not in i.receiving_user and user_name not in i.assign_to_user and not user_obj.is_superuser:
+                    raise ValidationError('被指派人、接单人和管理员才可以退单！')
             data = {
                 'status': data.get('status'), 'receiving_user': None, 'receiving_datetime': None,
                 'assign_user': None, 'assign_datetime': None, 'timeout_color': None, 'back_order': True,
@@ -4225,6 +4263,11 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             accept_num = EquipInspectionOrder.objects.filter(status='已关闭', id__in=pks).count()
             if accept_num != 0:
                 raise ValidationError('存在已经关闭的订单, 请刷新订单!')
+            # 非接单人与管理员不可退单
+            orders = EquipInspectionOrder.objects.filter(id__in=pks)
+            for i in orders:
+                if user_name not in i.receiving_user and user_name not in i.assign_to_user and user_obj != i.created_user and not user_obj.is_superuser:
+                    raise ValidationError('报修人、接单人、和管理员才可以闭单！')
             data = {'status': data.get('status'), 'last_updated_date': datetime.now(), 'timeout_color': None,
                     'close_reason': data.get('close_reason')}
             content.update({"title": f"您指派的设备维修单已被{user_name}关闭",
@@ -4255,16 +4298,16 @@ class EquipInspectionOrderViewSet(ModelViewSet):
 
                 if opera_type == '指派':
                     title = "新的巡检工单到达！"
-                    msg_text = f"新的巡检工单到达，请尽快处理！\n\r工单编号:\n\r{instance.work_order_no}\n\r工单生成时间:{instance.created_date.strftime('%Y-%m-%d %H:%M:%S')}\n\r机台:{instance.equip_no}\n\r故障原因:{fault_name}\n\r重要程度:{instance.importance_level}\n\r指派人:{user_name}\n\r被指派人:{instance.assign_to_user}\n\r指派时间:{now_date}"
+                    msg_text = f"新的巡检工单到达，请尽快处理！\n\r工单编号:\n\r{instance.work_order_no}\n\r工单生成时间:\n\r{instance.created_date.strftime('%Y-%m-%d %H:%M:%S')}\n\r机台:{instance.equip_no}\n\r故障原因:{fault_name}\n\r重要程度:{instance.importance_level}\n\r指派人:{user_name}\n\r被指派人:{instance.assign_to_user}\n\r指派时间:{now_date}"
                 elif opera_type == '接单':
                     title = "接单通知！"
-                    msg_text = f"巡检单已被{user_name}接单!\n\r工单编号:\n\r{instance.work_order_no}\n\r工单生成时间:{instance.created_date.strftime('%Y-%m-%d %H:%M:%S')}\n\r机台:{instance.equip_no}\n\r故障原因:{fault_name}\n\r重要程度:{instance.importance_level}\n\r指派人:{instance.assign_user}\n\r接单人:{user_name}\n\r接单时间:{now_date}"
+                    msg_text = f"巡检单已被{user_name}接单!\n\r工单编号:\n\r{instance.work_order_no}\n\r工单生成时间:\n\r{instance.created_date.strftime('%Y-%m-%d %H:%M:%S')}\n\r机台:{instance.equip_no}\n\r故障原因:{fault_name}\n\r重要程度:{instance.importance_level}\n\r指派人:{instance.assign_user}\n\r接单人:{user_name}\n\r接单时间:{now_date}"
                 elif opera_type == '退单':
                     title = "退单通知！"
-                    msg_text = f"巡检单已被{user_name}退单!\n\r工单编号:\n\r{instance.work_order_no}\n\r工单生成时间:{instance.created_date.strftime('%Y-%m-%d %H:%M:%S')}\n\r机台:{instance.equip_no}\n\r故障原因:{fault_name}\n\r重要程度:{instance.importance_level}\n\r指派人:{instance.assign_user}\n\r退单人:{user_name}\n\r退单时间:{now_date}"
+                    msg_text = f"巡检单已被{user_name}退单!\n\r工单编号:\n\r{instance.work_order_no}\n\r工单生成时间:\n\r{instance.created_date.strftime('%Y-%m-%d %H:%M:%S')}\n\r机台:{instance.equip_no}\n\r故障原因:{fault_name}\n\r重要程度:{instance.importance_level}\n\r指派人:{instance.assign_user}\n\r退单人:{user_name}\n\r退单时间:{now_date}"
                 elif opera_type == '关闭':
                     title = "闭单通知！"
-                    msg_text = f"巡检单已被{user_name}关闭!\n\r工单编号:\n\r{instance.work_order_no}\n\r工单生成时间:{instance.created_date.strftime('%Y-%m-%d %H:%M:%S')}\n\r机台:{instance.equip_no}\n\r故障原因:{fault_name}\n\r重要程度:{instance.importance_level}\n\r指派人:{instance.assign_user}\n\r闭单人:{user_name}\n\r闭单时间:{now_date}"
+                    msg_text = f"巡检单已被{user_name}关闭!\n\r工单编号:\n\r{instance.work_order_no}\n\r工单生成时间:\n\r{instance.created_date.strftime('%Y-%m-%d %H:%M:%S')}\n\r机台:{instance.equip_no}\n\r故障原因:{fault_name}\n\r重要程度:{instance.importance_level}\n\r指派人:{instance.assign_user}\n\r闭单人:{user_name}\n\r闭单时间:{now_date}"
                 else:
                     title = ''
                     msg_text = ''
@@ -4275,11 +4318,11 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                         "text": msg_text,
                         "btnOrientation": "0",
                         "singleTitle": "查看详情",
-                        "singleURL": f"dingtalk://dingtalkclient/action/open_micro_app?corpId={self.corpId}&agentId={self.agentId}&miniAppId={self.miniAppId}&pVersion=1&packageType=1&page=pages/repairOrder/repairOrder{quote('?id=' + str(order_id) + '&isInspection=true')}"
+                        "singleURL": f"dingtalk://dingtalkclient/action/open_micro_app?corpId={msg_robot.corpId}&agentId={msg_robot.agentId}&miniAppId={msg_robot.miniAppId}&pVersion=1&packageType=1&page=pages/repairOrder/repairOrder{quote('?id=' + str(order_id) + '&isInspection=true')}"
                     }
                 }
                 if title and msg_text:
-                    send_res = send_ding_msg(url=remote_url, secret=self.group_secret, msg=msg, isAtAll=False, custom=True)
+                    send_res = send_ding_msg(url=remote_url, secret=msg_robot.group_secret, msg=msg, isAtAll=False, custom=True)
         return Response(f'{opera_type}操作成功')
 
 
