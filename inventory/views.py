@@ -2935,7 +2935,7 @@ class WmsStorageView(ListAPIView):
                           "托盘号": "container_no", "库位地址": "location", "单位": "unit",
                           "单位重量": "unit_weight", "总重量": "total_weight",
                           "核酸管控": "in_charged_tag", "品质状态": "quality_status",
-                          '件数': 'sl', '唛头重量': 'zl'}
+                          "入库时间": "in_storage_time", '件数': 'sl', '唛头重量': 'zl'}
 
     def list(self, request, *args, **kwargs):
         filter_kwargs = {}
