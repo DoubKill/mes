@@ -688,7 +688,7 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
         ret['range_showed'] = QualifiedRangeDisplay.objects.first().is_showed
         # 增加挤出钢印打错异常描述
         w_instance = RubberWrongMaskReason.objects.filter(lot_no=instance.lot_no).order_by('id').last()
-        wrong_reason = '' if not w_instance else w_instance.reason_name
+        wrong_reason = '' if not w_instance or w_instance.reason_name == '清除原因' else w_instance.reason_name
         ret['wrong_reason'] = wrong_reason
         return ret
 
