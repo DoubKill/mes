@@ -100,8 +100,17 @@ def calculate_equip_recipe_avg_mixin_time(equip_no, recipe_name):
     if capacity:
         avg_mixin_time = capacity.avg_mixing_time + capacity.avg_interval_time
     else:
-        # TODO 如果该配方没有历史生产数据，密炼一车所消耗的时间默认值为多少？
-        avg_mixin_time = 150
+        if equip_no == 'Z04':
+            avg_mixin_time = 250
+        elif equip_no == 'Z07':
+            avg_mixin_time = 380
+        else:
+            if '1MB' in recipe_name:
+                avg_mixin_time = 179
+            elif '1MB' in recipe_name:
+                avg_mixin_time = 125
+            else:
+                avg_mixin_time = 150
     return avg_mixin_time
 
 
