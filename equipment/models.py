@@ -1136,6 +1136,7 @@ class CheckTemperatureStandard(AbstractEntity):
 class CheckTemperatureTable(AbstractEntity):
     select_date = models.DateField(help_text='日期')
     is_exceed = models.NullBooleanField(help_text='是否超标', default=None)
+    classes = models.CharField(max_length=64, help_text='班次: 早班、中班、夜班', null=True, blank=True)
     status = models.CharField(max_length=16, help_text='状态: 新建、已检查、已确认', default='新建')
     desc = models.CharField(max_length=512, help_text='新建或者更新输入的备注', null=True, blank=True)
     confirm_desc = models.CharField(max_length=256, help_text='确认备注', null=True, blank=True)
