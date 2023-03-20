@@ -1099,12 +1099,12 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
         is_applyed = EquipRepairMaterialReq.objects.filter(work_order_no=res['work_order_no']).first()
         res['is_applyed'] = True if is_applyed else False
         if res['work_type'] == '维修':
-            instance = EquipRepairStandard.objects.filter(id=res.get('result_repair_standard')).first()
+            s_instance = EquipRepairStandard.objects.filter(id=res.get('result_repair_standard')).first()
         else:
-            instance = EquipMaintenanceStandard.objects.filter(id=res.get('result_maintenance_standard')).first()
-        if instance:
+            s_instance = EquipMaintenanceStandard.objects.filter(id=res.get('result_maintenance_standard')).first()
+        if s_instance:
             data = EquipResultDetail.objects.filter(work_order_no=res['work_order_no'],
-                                                    equip_jobitem_standard=instance.equip_job_item_standard)
+                                                    equip_jobitem_standard=s_instance.equip_job_item_standard)
             if data:
                 for i in data:
                     work_content.append(
@@ -1130,6 +1130,10 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
         prod = GlobalCode.objects.filter(delete_flag=False, global_type__use_flag=1,
                                          global_type__type_name='设备部门组织名称').first()
         res['product_name'] = prod.global_name if prod else ''
+        # 增加被指派人电话
+        assign_to_user_list = instance.assign_to_user.split(',')
+        assign_to_user = User.objects.filter(username__in=assign_to_user_list).first()
+        res['assign_to_user_phone'] = assign_to_user.phone_number if assign_to_user else ''
         # 增加接单人电话
         receive_user = User.objects.filter(username=res.get('receiving_user')).last()
         res['receiving_user_phone'] = receive_user.phone_number if receive_user else ''
@@ -1260,11 +1264,11 @@ class EquipInspectionOrderSerializer(BaseModelSerializer):
         result_repair_video_url = res.get('result_repair_video_url') if res.get('result_repair_video_url') else '[]'
         res.update({'result_repair_graph_url': json.loads(result_repair_graph_url),
                     'result_repair_video_url': json.loads(result_repair_video_url)})
-        instance = EquipMaintenanceStandardWork.objects.filter(id=res.get('equip_maintenance_standard_work')).first()
+        s_instance = EquipMaintenanceStandardWork.objects.filter(id=res.get('equip_maintenance_standard_work')).first()
 
-        if instance:
+        if s_instance:
             data = EquipResultDetail.objects.filter(work_order_no=res['work_order_no'],
-                                                    equip_jobitem_standard=instance.equip_job_item_standard)
+                                                    equip_jobitem_standard=s_instance.equip_job_item_standard)
             if data:
                 for i in data:
                     abnormal_operation_url = []
@@ -1283,7 +1287,7 @@ class EquipInspectionOrderSerializer(BaseModelSerializer):
                          'is_save': i.is_save
                          })
             else:
-                data = EquipJobItemStandardDetail.objects.filter(equip_standard=instance.equip_job_item_standard) \
+                data = EquipJobItemStandardDetail.objects.filter(equip_standard=s_instance.equip_job_item_standard) \
                     .values('id', 'equip_standard', 'sequence', 'content', 'check_standard_desc', 'check_standard_type', 'unit')
                 for i in data:
                     work_content.append(
@@ -1302,6 +1306,10 @@ class EquipInspectionOrderSerializer(BaseModelSerializer):
         prod = GlobalCode.objects.filter(delete_flag=False, global_type__use_flag=1,
                                          global_type__type_name='设备部门组织名称').first()
         res['product_name'] = prod.global_name if prod else ''
+        # 增加被指派人电话
+        assign_to_user_list = instance.assign_to_user.split(',')
+        assign_to_user = User.objects.filter(username__in=assign_to_user_list).first()
+        res['assign_to_user_phone'] = assign_to_user.phone_number if assign_to_user else ''
         # 增加接单人电话
         receive_user = User.objects.filter(username=res.get('receiving_user')).last()
         res['receiving_user_phone'] = receive_user.phone_number if receive_user else ''
