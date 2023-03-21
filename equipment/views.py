@@ -5983,7 +5983,7 @@ class CheckTemperatureTableViewSet(ModelViewSet):
                                confirm_time=datetime.now(), confirm_user=self.request.user.username)
             elif opera_type == 3:  # 导出
                 data = self.get_serializer(records, many=True).data
-                return gen_excels_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, sheet_keyword=['select_date'],
+                return gen_excels_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME, sheet_keyword=['select_date', 'classes'],
                                            handle_str=True)
             else:
                 raise ValidationError('异常: 未知操作类型')

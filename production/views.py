@@ -2163,7 +2163,8 @@ class MachineTargetValue(APIView):
                                     'max_weight': data.get('{}_max'.format(k))})
             else:
                 for i in queryset:
-                    results.append({'equip_no': equip_no,
+                    results.append({'id': i.get('id'),
+                                    'equip_no': equip_no,
                                     'day': i.get('day'),
                                     'classes': i.get('classes'),
                                     'target_weight': i.get(equip_no),
@@ -2172,9 +2173,16 @@ class MachineTargetValue(APIView):
         return Response({'results': results})
 
     def post(self, request):
+        rid = self.request.data.get('id')
         target_month = self.request.data.get('target_month')
         target_data = self.request.data.get('data')
         data = {}
+        if rid:
+            equip_no = self.request.data.get('equip_no')
+            target_weight = self.request.data.get('target_weight')
+            max_weight = self.request.data.get('max_weight')
+            MachineTargetYieldSettings.objects.filter(id=rid).update(**{equip_no: target_weight, f'{equip_no}_max': max_weight})
+            return Response('ok')
         for item in target_data:
             equip_no = item['equip_no']
             if equip_no == '190E':
@@ -6835,7 +6843,7 @@ class EquipDownDetailView(APIView):
 class EquipDownAnalysisView(APIView):
     """机台故障停机时间分析与汇总"""
 
-    # permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated,)
 
     def get(self, request):
         all_equip = self.request.query_params.get('all_equip')
@@ -6885,13 +6893,40 @@ class EquipDownAnalysisView(APIView):
 
     @atomic
     def post(self, request):
+        user_name = self.request.user.username
+        excel_file = self.request.FILES.get('file', None)
+        if excel_file:
+            try:
+                df = pd.read_excel(excel_file, index_col=None)
+                for i in df.values:
+                    if not all([i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7]]):
+                        continue
+                    s_date = i[0].strftime('%Y-%m-%d')
+                    classes = i[1] if '班' in i[1] else f'{i[1]}班'
+                    group = i[2] if '班' in i[2] else f'{i[2]}班'
+                    begin_time, end_time = i[4].split('-')
+                    _s_data = {'factory_date': s_date, 'classes': classes, 'group': group, 'equip_no': i[5], 'down_reason': i[7],
+                               'down_type': i[6], 'begin_time': begin_time, 'end_time': end_time, 'times': i[3], 'save_user': user_name}
+                    instance = EquipDownDetails.objects.filter(factory_date=s_date, classes=classes, group=group, equip_no=i[5], down_type=i[6], down_reason=i[7]).last()
+                    if instance:
+                        instance.times = i[3]
+                        instance.begin_time = begin_time
+                        instance.end_time = end_time
+                        instance.update_user = user_name
+                        instance.update_time = datetime.datetime.now()
+                        instance.save()
+                    else:
+                        EquipDownDetails.objects.create(**_s_data)
+            except Exception as e:
+                logger.error(f'导入异常: {e.args[0]}')
+                raise ValidationError('导入异常')
+            return Response('导入数据成功')
         data = self.request.data.get('set_data')
         delete_id = self.request.data.get('delete_ids')
         factory_date = self.request.data.get('factory_date')
         equip_no = self.request.data.get('equip_no')
         group = self.request.data.get('group')
         classes = self.request.data.get('classes')
-        user_name = self.request.user.username
         # 删除物料
         if delete_id:
             EquipDownDetails.objects.filter(id=delete_id).update(delete_flag=True, update_user=user_name)
@@ -6900,7 +6935,7 @@ class EquipDownAnalysisView(APIView):
             raise ValidationError('未录入数据')
         for s_data in data:
             rid, begin_time, end_time = s_data.get('id'), s_data.get('begin_time'), s_data.get('end_time')
-            # # 班次班组
+            # 班次班组
             _s_data = {'begin_time': begin_time, 'end_time': end_time, 'factory_date': factory_date, 'equip_no': equip_no,
                        'down_reason': s_data.get('down_reason'), 'down_type': s_data.get('down_type'), 'times': round(s_data.get('times', 0), 2),
                        'group': group, 'classes': classes}
