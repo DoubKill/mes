@@ -9,7 +9,7 @@ import sys
 
 import django
 import logging
-from django.db.models import Sum, Avg, F
+from django.db.models import Sum, Avg, F, Count
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
@@ -20,7 +20,7 @@ logger = logging.getLogger('sync_log')
 from inventory.models import BzFinalMixingRubberInventoryLB, BzFinalMixingRubberInventory, ProductStockDailySummary
 from plan.models import SchedulingEquipCapacity
 from production.models import TrainsFeedbacks
-from mes.common_code import OAvg
+from mes.common_code import OSum
 
 
 def product_stock_daily_summary():
@@ -68,13 +68,14 @@ def calculate_product_equip_capacity():
     train_feedback = TrainsFeedbacks.objects.filter(
         factory_date__gte=st
     ).values('product_no', 'equip_no').annotate(
-        agv_mix_time=OAvg((F('end_time') - F('begin_time'))),
+        agv_mix_time=OSum((F('end_time') - F('begin_time'))),
         avg_interval_time=Avg('interval_time'),
         agv_gum_weight=Avg('gum_weight'),
+        cnt=Count('id')
     )
     for item in train_feedback:
         try:
-            agv_mix_time = item['agv_mix_time'].total_seconds()
+            agv_mix_time = item['agv_mix_time'].total_seconds() // item['cnt']
             if agv_mix_time <= 50 or agv_mix_time >= 400:
                 continue
         except Exception:
