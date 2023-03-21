@@ -63,7 +63,7 @@ def product_stock_daily_summary():
 
 
 def calculate_product_equip_capacity():
-    SchedulingEquipCapacity.objects.all().delete()
+    # SchedulingEquipCapacity.objects.all().delete()
     st = (datetime.datetime.now() - datetime.timedelta(days=30)).date()
     train_feedback = TrainsFeedbacks.objects.filter(
         factory_date__gte=st
