@@ -572,7 +572,10 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
             if l_batch_no:
                 filter_dict.update(batch_no__icontains=l_batch_no)
             if tunnel:
-                filter_dict['location__startswith'] = 'ZCM-{}'.format(tunnel)
+                if store_name == '原材料库':
+                    filter_dict['location__startswith'] = 'ZCM-{}'.format(tunnel)
+                else:
+                    filter_dict['location__startswith'] = 'ZCB-{}'.format(tunnel)
             if is_entering:
                 if is_entering == 'Y':
                     queryset = queryset.filter(pallet_no__startswith=5)
