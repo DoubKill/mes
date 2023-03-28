@@ -3582,7 +3582,10 @@ class EmployeeAttendanceRecordsView(APIView):
         else:
             basic_info = WeightClassPlan.objects.filter(target_month=date, delete_flag=False)
             if not basic_info:
-                raise ValidationError(f'未找到当月{clock_type}排班信息')
+                return Response({'results': [], 'group_list': [], 'export_flag': False, 'state': 0,
+                                 'audit_user': None, 'user_groups': [], 'approve_user': None,
+                                 's_choice': [], 'm_choice': []})
+                # raise ValidationError(f'未找到当月{clock_type}排班信息')
             groups = basic_info.values_list('classes', flat=True).distinct()
             days = basic_info.last().weight_class_details.all().values_list('factory_date', flat=True)
             dis_group = set([i.split('/')[0] for i in groups])

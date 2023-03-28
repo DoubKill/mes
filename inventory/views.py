@@ -3081,7 +3081,7 @@ class WmsInventoryStockView(APIView):
         if not entrance_name:
             raise ValidationError('请选择出库口！')
         if material_name:
-            extra_where_str += " and c.Name like '%{}%'".format(material_name)
+            extra_where_str += " and c.Name = '{}'".format(material_name)
         if material_no:
             extra_where_str += " and c.MaterialCode like '%{}%'".format(material_no)
         if quality_status:

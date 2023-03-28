@@ -116,7 +116,7 @@ def get_user_group(user_name, choice_type='密炼'):
                 continue
             if user_name in i.principal.split(',') and i.group not in user_groups:
                 user_groups.append(i.group)
-    return user_groups
+    return sorted(user_groups)
 
 
 def get_user_weight_flag(user):
