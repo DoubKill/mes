@@ -3050,11 +3050,12 @@ order by temp.PRODUCT_NO, temp.TEST_INDICATOR_NAME;""".format(where_str)
             tc90_unqualified_count, tc90_lower_count, tc90_upper_count = 0, 0, 0
 
             if test_indicator_name == '门尼':
-                mn_unqualified_count = qty
-                if flag == '-':
-                    mn_lower_count = qty
-                else:
-                    mn_upper_count = qty
+                if data_point_name == 'ML(1+4)':
+                    mn_unqualified_count = qty
+                    if flag == '-':
+                        mn_lower_count = qty
+                    else:
+                        mn_upper_count = qty
             elif test_indicator_name == '硬度':
                 yd_unqualified_count = qty
                 if flag == '-':
