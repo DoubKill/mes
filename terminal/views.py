@@ -2146,7 +2146,9 @@ class XLPlanVIewSet(ModelViewSet):
         equip_no = self.request.data.get('equip_no')
         # 嘉正称量系统下达的计划先通知才可以删除，非下达计划直接删除[下达也是等待状态]
         instance = self.get_object()
-        if equip_no in JZ_EQUIP_NO and instance.downtime:
+        if equip_no in JZ_EQUIP_NO:
+            if instance.downtime:
+                raise ValidationError('计划已经下达，请停止计划')
             try:
                 jz = JZCLSystem(equip_no)
                 res = jz.notice(table_seq=4, table_id=instance.id, opera_type=2)
