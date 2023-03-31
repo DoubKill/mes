@@ -6499,30 +6499,27 @@ class ToolManageAccountView(APIView):
                                                             'add': 'add_tool_manage_account'}))
 
     def get(self, request):
-        date_time = self.request.query_params.get('date_time')
+        year = self.request.query_params.get('year', '')[:4]
         results = {}
-        query_set = ToolManageAccount.objects.filter(date_time=date_time)
+        query_set = ToolManageAccount.objects.filter(year__startswith=year)
         if query_set:
-            max_times = query_set.aggregate(max_times=Max('times'))['max_times']
-            instance = query_set.filter(times=max_times).last()
-            results.update({'day': json.loads(instance.day), 'details': json.loads(instance.content)})
+            max_record = query_set.aggregate(max_record=Max('save_date'))['max_record']
+            instance = query_set.filter(save_date=max_record).last()
+            results.update({'day': json.loads(instance.day), 'content': json.loads(instance.content)})
         else:  # 返回空格式
-            results.update({'day': [], 'details': []})
-        results['date_time'] = date_time
+            results.update({'day': [], 'content': []})
+        results['year'] = year
         return Response({'results': results})
 
     @atomic
     def post(self, request):
-        date_time = self.request.data.get('date_time')
+        year = self.request.data.get('year')
         day = self.request.data.get('day')
-        details = self.request.data.get('details')
+        content = self.request.data.get('content')
         save_user = self.request.user.username
-        if not all([date_time, details]):
+        if not all([year, day, content]):
             raise ValidationError('参数异常')
-        # 获取最新保存次数
-        max_times = ToolManageAccount.objects.filter(date_time=date_time).aggregate(max_times=Max('times'))['max_times']
-        times = 1 if not max_times else max_times + 1
-        ToolManageAccount.objects.create(date_time=date_time, day=json.dumps(day), content=json.dumps(details), times=times, save_user=save_user)
+        ToolManageAccount.objects.create(year=year, day=json.dumps(day), content=json.dumps(content), save_user=save_user)
         return Response('保存成功')
 
 
