@@ -7071,20 +7071,21 @@ class EquipDownSummaryTableView(APIView):
         results = {}
         if group_flag:
             equip_list = equip_no.split(',')
+            # 03-31 停机原因->停机类型
             queryset = EquipDownDetails.objects.filter(delete_flag=False, factory_date__lte=et, factory_date__gte=st, equip_no__in=equip_list) \
-                .values('group', 'down_reason').annotate(total_times=Sum('times')).order_by('group').values('group', 'down_reason', 'total_times')
+                .values('group', 'down_type').annotate(total_times=Sum('times')).order_by('group').values('group', 'down_type', 'total_times')
             if queryset:
-                titles = list(set(queryset.values_list('down_reason', flat=True)))
+                titles = list(set(queryset.values_list('down_type', flat=True)))
                 groups = list(set(queryset.values_list('group', flat=True)))
                 groups.sort()
                 data = {}
                 for i in queryset:
-                    group, down_reason, total_times = i['group'], i['down_reason'], i['total_times']
+                    group, down_type, total_times = i['group'], i['down_type'], i['total_times']
                     if f'{group}-data' not in data:
                         data[f'{group}-data'] = {title: 0 for title in titles}
-                        data[f'{group}-data'].update({'group': group, down_reason: total_times})
+                        data[f'{group}-data'].update({'group': group, down_type: total_times})
                     else:
-                        data[f'{group}-data'].update({down_reason: total_times})
+                        data[f'{group}-data'].update({down_type: total_times})
                 # 图表数据
                 for k in data:
                     s_data = deepcopy(data[k])
@@ -7094,15 +7095,15 @@ class EquipDownSummaryTableView(APIView):
                 execl_data, reason, ratio, total_times, temp = deepcopy(list(data.values())), {}, {}, 0, {}
                 for j in execl_data:
                     group, all_times = j.pop('group'), sum(j.values())
-                    for down_reason, times in j.items():
+                    for down_type, times in j.items():
                         total_times += times
-                        if down_reason not in reason:
-                            reason[down_reason] = {'down_reason': down_reason, group: times, '总计': times}
-                            ratio[down_reason] = {'down_reason': down_reason, group: round(times / all_times * 100, 2) if all_times else 0}
+                        if down_type not in reason:
+                            reason[down_type] = {'down_reason': down_type, group: times, '总计': times}
+                            ratio[down_type] = {'down_reason': down_type, group: round(times / all_times * 100, 2) if all_times else 0}
                         else:
-                            reason[down_reason].update({group: times, '总计': reason[down_reason]['总计'] + times})
-                            ratio[down_reason].update({group: round(times / all_times * 100, 2) if all_times else 0})
-                        temp[down_reason] = temp.get(down_reason, 0) + times
+                            reason[down_type].update({group: times, '总计': reason[down_type]['总计'] + times})
+                            ratio[down_type].update({group: round(times / all_times * 100, 2) if all_times else 0})
+                        temp[down_type] = temp.get(down_type, 0) + times
                         # # 数据  12-15前端计算总计
                         # if '总计' not in reason:
                         #     reason['总计'] = {'down_reason': '总计', group: all_times, '总计': times}
