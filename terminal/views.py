@@ -2154,6 +2154,9 @@ class XLPlanVIewSet(ModelViewSet):
                 res = jz.notice(table_seq=4, table_id=instance.id, opera_type=2)
             except Exception as e:
                 raise ValidationError(f'通知称量系统{equip_no}删除计划失败')
+        else:
+            if instance.state != '等待':
+                raise ValidationError('删除失败: 计划已经下达')
         instance.delete()
         return Response('删除成功')
 
