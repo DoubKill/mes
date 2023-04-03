@@ -2234,137 +2234,138 @@ class MonthlyOutputStatisticsReport(APIView):
 
         st_month = st[:7]
         et_month = et[:7]
-        if st_month == et_month:
-            month_target = MachineTargetYieldSettings.objects.filter(target_month=st_month).order_by('-id')
-            if not month_target:
-                equip_target = {}
-            else:
-                equip_target = month_target.values('Z01', 'Z02', 'Z03', 'Z04', 'Z05',
-                                                   'Z06', 'Z07', 'Z08', 'Z09', 'Z10',
-                                                   'Z11', 'Z12', 'Z13', 'Z14', 'Z15')[0]
-                equip_target = {k: v*diff_days*2 for k, v in equip_target.items()}
-        else:
-            equip_target = {}
-            st_month_target = MachineTargetYieldSettings.objects.filter(target_month=st_month).order_by('-id')
-            et_month_target = MachineTargetYieldSettings.objects.filter(target_month=et_month).order_by('-id')
-            if st_month_target and et_month_target:
-                st_month_days = calendar.monthrange(int(st_month[:4]), int(st_month[5:7]))[1] - int(st[8:10]) + 1
-                et_month_days = int(et[8:10])
-                st_month_equip_target = st_month_target.values('Z01', 'Z02', 'Z03', 'Z04', 'Z05',
-                                                               'Z06', 'Z07', 'Z08', 'Z09', 'Z10',
-                                                               'Z11', 'Z12', 'Z13', 'Z14', 'Z15')[0]
-                et_month_equip_target = et_month_target.values('Z01', 'Z02', 'Z03', 'Z04', 'Z05',
-                                                               'Z06', 'Z07', 'Z08', 'Z09', 'Z10',
-                                                               'Z11', 'Z12', 'Z13', 'Z14', 'Z15')[0]
-                for equip_no, st_v in st_month_equip_target.items():
-                    et_v = et_month_equip_target.get(equip_no, 0)
-                    equip_target[equip_no] = st_v * st_month_days * 2 + et_v * et_month_days * 2
-
-        # 区间时间范围内机台每日、每班次最大生产数据
-        equip_max_output_data = TrainsFeedbacks.objects.exclude(
-            Q(product_no__icontains='XCJ') |
-            Q(product_no__icontains='洗车胶') |
-            Q(operation_user='Mixer2') |
-            Q(product_no__icontains='WUMING')).filter(
-            factory_date__gte=st,
-            factory_date__lte=et
-        ).values('equip_no', 'factory_date', 'classes'
-                 ).annotate(w=Sum('plan_weight')/1000, t=Count('id')).order_by('equip_no', 'w', 't')
-        equip_max_classes_dict, equip_max = {}, {}
-        for item in equip_max_output_data:
-            equip_no = item['equip_no']
-            factory_date = item['factory_date']
-            classes = item['classes']
-            w = item['w']
-            _max_num = equip_max.get(item['equip_no'], item['t'])
-            t = item['t'] if _max_num < item['t'] else _max_num
-            equip_max[item['equip_no']] = t
-            equip_max_classes_dict[equip_no] = {'factory_date': factory_date, 'weight': w, 'classes': classes, 'trains': t}
-
-        sql = """
-        select temp2.EQUIP_NO, w2/1000, FACTORY_DATE, CLASSES from(
-select
-       EQUIP_NO,
-       max(w) as w2
-from (
-select EQUIP_NO,
-       sum(PLAN_WEIGHT) as w
-from TRAINS_FEEDBACKS where FACTORY_DATE is not null group by FACTORY_DATE, EQUIP_NO, CLASSES) temp
-group by EQUIP_NO) temp2
-inner join (select FACTORY_DATE,
-       EQUIP_NO,
-       CLASSES,
-       sum(PLAN_WEIGHT) as w3
-from TRAINS_FEEDBACKS where FACTORY_DATE is not null group by FACTORY_DATE, EQUIP_NO, CLASSES) temp3
-on temp2.EQUIP_NO=temp3.EQUIP_NO and temp2.w2=temp3.w3;"""
-        cursor = connection.cursor()
-        cursor.execute(sql)
-        query_data = cursor.fetchall()
-        equip_history_max_classes_dict = {}
-        for item in query_data:
-            equip_history_max_classes_dict[item[0]] = {'factory_date': item[2],
-                                                       'weight': item[1]/2 if item[0]=='Z04' else item[1],
-                                                       'classes': item[3]}
-
-        # 机台产量
-        queryset = TrainsFeedbacks.objects.exclude(
-            Q(product_no__icontains='XCJ') |
-            Q(product_no__icontains='洗车胶') |
-            Q(operation_user='Mixer2') |
-            Q(product_no__icontains='WUMING')
-        ).filter(
-            factory_date__gte=st,
-            factory_date__lte=et
-        ).values('equip_no').annotate(total_weight=Sum('plan_weight')/1000,
-                                      total_trains=Count('id')).order_by('equip_no')
-        # 历史最高车次(班组)
-        equip_history_data = TrainsFeedbacks.objects.filter(factory_date__isnull=False).values('equip_no', 'factory_date', 'classes')\
-            .annotate(trains=Count('id')).values('equip_no', 'trains')
-        classes_equip_history_data = {}
-        for i in equip_history_data:
-            qty = classes_equip_history_data.get(i['equip_no'], 0)
-            if qty < i['trains']:
-                classes_equip_history_data[i['equip_no']] = i['trains']
-
-        # 补充机台所选时间内的产量最大值
-        for item in queryset:
-            group = ""
-            max_weight = ""
-            max_classes_trains = ""
-            history_group = ""
-            history_max_weight = ""
-            history_max_trains = ""
-            equip_max_classes_data = equip_max_classes_dict.get(item['equip_no'])
-            if equip_max_classes_data:
-                max_weight = round(equip_max_classes_data['weight'], 2)
-                max_classes_trains = equip_max_classes_data.get('trains', '')
-                work_schedule_plan = WorkSchedulePlan.objects.filter(
-                    plan_schedule__work_schedule__work_procedure__global_name='密炼',
-                    plan_schedule__day_time=equip_max_classes_data['factory_date'],
-                    classes__global_name=equip_max_classes_data['classes']
-                ).first()
-                if work_schedule_plan:
-                    group = work_schedule_plan.group.global_name
-            equip_history_max_classes_data = equip_history_max_classes_dict.get(item['equip_no'])
-            if equip_history_max_classes_data:
-                history_max_weight = round(equip_history_max_classes_data['weight'], 2)
-                history_max_trains = classes_equip_history_data.get(item['equip_no'])
-                work_schedule_plan = WorkSchedulePlan.objects.filter(
-                    plan_schedule__work_schedule__work_procedure__global_name='密炼',
-                    plan_schedule__day_time=equip_history_max_classes_data['factory_date'],
-                    classes__global_name=equip_history_max_classes_data['classes']
-                ).first()
-                if work_schedule_plan:
-                    history_group = work_schedule_plan.group.global_name
-            item['target'] = equip_target.get(item['equip_no'], 0)
-            item['group'] = group
-            item['max_classes_trains'] = max_classes_trains
-            item['max_weight'] = max_weight
-            item['history_group'] = history_group
-            item['history_max_weight'] = history_max_weight
-            item['history_max_trains'] = history_max_trains
-            item['total_weight'] = round(item['total_weight'], 2)
-
+#         if st_month == et_month:
+#             month_target = MachineTargetYieldSettings.objects.filter(target_month=st_month).order_by('-id')
+#             if not month_target:
+#                 equip_target = {}
+#             else:
+#                 equip_target = month_target.values('Z01', 'Z02', 'Z03', 'Z04', 'Z05',
+#                                                    'Z06', 'Z07', 'Z08', 'Z09', 'Z10',
+#                                                    'Z11', 'Z12', 'Z13', 'Z14', 'Z15')[0]
+#                 equip_target = {k: v*diff_days*2 for k, v in equip_target.items()}
+#         else:
+#             equip_target = {}
+#             st_month_target = MachineTargetYieldSettings.objects.filter(target_month=st_month).order_by('-id')
+#             et_month_target = MachineTargetYieldSettings.objects.filter(target_month=et_month).order_by('-id')
+#             if st_month_target and et_month_target:
+#                 st_month_days = calendar.monthrange(int(st_month[:4]), int(st_month[5:7]))[1] - int(st[8:10]) + 1
+#                 et_month_days = int(et[8:10])
+#                 st_month_equip_target = st_month_target.values('Z01', 'Z02', 'Z03', 'Z04', 'Z05',
+#                                                                'Z06', 'Z07', 'Z08', 'Z09', 'Z10',
+#                                                                'Z11', 'Z12', 'Z13', 'Z14', 'Z15')[0]
+#                 et_month_equip_target = et_month_target.values('Z01', 'Z02', 'Z03', 'Z04', 'Z05',
+#                                                                'Z06', 'Z07', 'Z08', 'Z09', 'Z10',
+#                                                                'Z11', 'Z12', 'Z13', 'Z14', 'Z15')[0]
+#                 for equip_no, st_v in st_month_equip_target.items():
+#                     et_v = et_month_equip_target.get(equip_no, 0)
+#                     equip_target[equip_no] = st_v * st_month_days * 2 + et_v * et_month_days * 2
+#
+#         # 区间时间范围内机台每日、每班次最大生产数据
+#         equip_max_output_data = TrainsFeedbacks.objects.exclude(
+#             Q(product_no__icontains='XCJ') |
+#             Q(product_no__icontains='洗车胶') |
+#             Q(operation_user='Mixer2') |
+#             Q(product_no__icontains='WUMING')).filter(
+#             factory_date__gte=st,
+#             factory_date__lte=et
+#         ).values('equip_no', 'factory_date', 'classes'
+#                  ).annotate(w=Sum('plan_weight')/1000, t=Count('id')).order_by('equip_no', 'w', 't')
+#         equip_max_classes_dict, equip_max = {}, {}
+#         for item in equip_max_output_data:
+#             equip_no = item['equip_no']
+#             factory_date = item['factory_date']
+#             classes = item['classes']
+#             w = item['w']
+#             _max_num = equip_max.get(item['equip_no'], item['t'])
+#             t = item['t'] if _max_num < item['t'] else _max_num
+#             equip_max[item['equip_no']] = t
+#             equip_max_classes_dict[equip_no] = {'factory_date': factory_date, 'weight': w, 'classes': classes, 'trains': t}
+#
+#         sql = """
+#         select temp2.EQUIP_NO, w2/1000, FACTORY_DATE, CLASSES from(
+# select
+#        EQUIP_NO,
+#        max(w) as w2
+# from (
+# select EQUIP_NO,
+#        sum(PLAN_WEIGHT) as w
+# from TRAINS_FEEDBACKS where FACTORY_DATE is not null group by FACTORY_DATE, EQUIP_NO, CLASSES) temp
+# group by EQUIP_NO) temp2
+# inner join (select FACTORY_DATE,
+#        EQUIP_NO,
+#        CLASSES,
+#        sum(PLAN_WEIGHT) as w3
+# from TRAINS_FEEDBACKS where FACTORY_DATE is not null group by FACTORY_DATE, EQUIP_NO, CLASSES) temp3
+# on temp2.EQUIP_NO=temp3.EQUIP_NO and temp2.w2=temp3.w3;"""
+#         cursor = connection.cursor()
+#         cursor.execute(sql)
+#         query_data = cursor.fetchall()
+#         equip_history_max_classes_dict = {}
+#         for item in query_data:
+#             equip_history_max_classes_dict[item[0]] = {'factory_date': item[2],
+#                                                        'weight': item[1]/2 if item[0]=='Z04' else item[1],
+#                                                        'classes': item[3]}
+#
+#         # 机台产量
+#         queryset = TrainsFeedbacks.objects.exclude(
+#             Q(product_no__icontains='XCJ') |
+#             Q(product_no__icontains='洗车胶') |
+#             Q(operation_user='Mixer2') |
+#             Q(product_no__icontains='WUMING')
+#         ).filter(
+#             factory_date__gte=st,
+#             factory_date__lte=et
+#         ).values('equip_no').annotate(total_weight=Sum('plan_weight')/1000,
+#                                       total_trains=Count('id')).order_by('equip_no')
+#         # 历史最高车次(班组)
+#         equip_history_data = TrainsFeedbacks.objects.filter(factory_date__isnull=False).values('equip_no', 'factory_date', 'classes')\
+#             .annotate(trains=Count('id')).values('equip_no', 'trains')
+#         classes_equip_history_data = {}
+#         for i in equip_history_data:
+#             qty = classes_equip_history_data.get(i['equip_no'], 0)
+#             if qty < i['trains']:
+#                 classes_equip_history_data[i['equip_no']] = i['trains']
+#
+#         # 补充机台所选时间内的产量最大值
+#         for item in queryset:
+#             group = ""
+#             max_weight = ""
+#             max_classes_trains = ""
+#             history_group = ""
+#             history_max_weight = ""
+#             history_max_trains = ""
+#             equip_max_classes_data = equip_max_classes_dict.get(item['equip_no'])
+#             if equip_max_classes_data:
+#                 max_weight = round(equip_max_classes_data['weight'], 2)
+#                 max_classes_trains = equip_max_classes_data.get('trains', '')
+#                 work_schedule_plan = WorkSchedulePlan.objects.filter(
+#                     plan_schedule__work_schedule__work_procedure__global_name='密炼',
+#                     plan_schedule__day_time=equip_max_classes_data['factory_date'],
+#                     classes__global_name=equip_max_classes_data['classes']
+#                 ).first()
+#                 if work_schedule_plan:
+#                     group = work_schedule_plan.group.global_name
+#             equip_history_max_classes_data = equip_history_max_classes_dict.get(item['equip_no'])
+#             if equip_history_max_classes_data:
+#                 history_max_weight = round(equip_history_max_classes_data['weight'], 2)
+#                 history_max_trains = classes_equip_history_data.get(item['equip_no'])
+#                 work_schedule_plan = WorkSchedulePlan.objects.filter(
+#                     plan_schedule__work_schedule__work_procedure__global_name='密炼',
+#                     plan_schedule__day_time=equip_history_max_classes_data['factory_date'],
+#                     classes__global_name=equip_history_max_classes_data['classes']
+#                 ).first()
+#                 if work_schedule_plan:
+#                     history_group = work_schedule_plan.group.global_name
+#             item['target'] = equip_target.get(item['equip_no'], 0)
+#             item['group'] = group
+#             item['max_classes_trains'] = max_classes_trains
+#             item['max_weight'] = max_weight
+#             item['history_group'] = history_group
+#             item['history_max_weight'] = history_max_weight
+#             item['history_max_trains'] = history_max_trains
+#             item['total_weight'] = round(item['total_weight'], 2)
+        # 只保留段数信息
+        queryset = []
         wl_stage_output = {'wl': {'name': "wl", 'value': 0}}
         jl_stage_output = {'jl': {'name': "jl", 'value': 0}}
         # 各段次产量
