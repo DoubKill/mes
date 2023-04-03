@@ -7218,13 +7218,15 @@ class GroupProductionSummary(APIView):
         if td_flag:
             down_data = EquipDownDetails.objects.filter(
                 factory_date__year=year,
-                factory_date__month=month
+                factory_date__month=month,
+                down_type__in=['计划停机', '计划检修']
             ).values('group', 'equip_no').annotate(s=Sum('times'))
         else:
             down_data = EquipDownDetails.objects.filter(
                 ~Q(factory_date=now_date),
                 factory_date__year=year,
-                factory_date__month=month
+                factory_date__month=month,
+                down_type__in=['计划停机', '计划检修']
             ).values('group', 'equip_no').annotate(s=Sum('times'))
         equip_target_data = MachineTargetYieldSettings.objects.filter(target_month=target_month).order_by('-id').values()
         target_data = {}
