@@ -389,7 +389,11 @@ if __name__ == '__main__':
     auto_dispatch = AutoDispatch()
     limit_range = datetime.datetime.now() - datetime.timedelta(days=5)
     repair_orders = list(EquipApplyOrder.objects.filter(status='已生成', back_order=False, created_date__gte=limit_range))
-    inspect_order = list(EquipInspectionOrder.objects.filter(status='已生成', back_order=False, created_date__gte=limit_range))
+    # 2023-03-31 巡检工单关联标准的周期单位不是班次的, 00:00:00-07:59:59不派单
+    filter_kwargs = {}
+    if '00:00:00' <= datetime.datetime.now().strftime('%H:%M:%S') <= '07:59:59':
+        filter_kwargs = {'equip_repair_standard__cycle_unit': '班次'}
+    inspect_order = list(EquipInspectionOrder.objects.filter(status='已生成', back_order=False, created_date__gte=limit_range, **filter_kwargs))
     orders = repair_orders + inspect_order
     if not orders:
         logger.info("系统派单: 没有新生成的工单可派")

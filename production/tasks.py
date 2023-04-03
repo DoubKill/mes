@@ -55,7 +55,8 @@ class SaveFinishRatio(object):
         down_data = EquipDownDetails.objects.filter(
             delete_flag=False,
             factory_date__year=year,
-            factory_date__month=month
+            factory_date__month=month,
+            down_type__in=['计划停机', '计划检修']
         ).values('group', 'equip_no').annotate(s=Sum('times'))
         equip_target_data = MachineTargetYieldSettings.objects.filter(target_month=target_month).order_by('-day').values()
         target_data = {}
@@ -98,8 +99,9 @@ class SaveFinishRatio(object):
         for i in group_data_dict.values():
             target_trains = i.get('target_trains')
             for g in group_list:
-                s_train, s_day = i.get(f'trains_{g}', 0), i.get(f'days_{g}', 0)
-                ratio = 0 if target_trains == 0 or s_day == 0 else round(s_train / (target_trains * s_day), 4)
+                # 2023-04-03 完成率 = 班组总车数 / (班组总天数 - 停机[计划/检修]时间 / 60 / 12) / 设备目标产量
+                s_train, s_day, s_down = i.get(f'trains_{g}', 0), i.get(f'days_{g}', 0), i.get(f'down_{g}', 0)
+                ratio = 0 if target_trains == 0 or s_day == 0 else round(s_train / (s_day - s_down / 60 / 12) / target_trains, 4)
                 if g not in res:
                     res[g] = {i.get('equip_no'): ratio}
                 else:
