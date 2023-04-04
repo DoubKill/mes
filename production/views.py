@@ -59,7 +59,7 @@ from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, Pla
     FillCardApply, ApplyForExtraWork, EquipMaxValueCache, Equip190EWeight, OuterMaterial, Equip190E, \
     AttendanceClockDetail, AttendanceResultAudit, ManualInputTrains, ActualWorkingDay, EmployeeAttendanceRecordsLog, \
     RubberFrameRepair, ToolManageAccount, ActualWorkingEquip, ActualWorkingDay190E, WeightClassPlan, \
-    WeightClassPlanDetail, EquipDownDetails, FinishRatio, RubberLog, RubberLogSummary
+    WeightClassPlanDetail, EquipDownDetails, FinishRatio, RubberLog, RubberLogSummary, HistoryProductionGroup
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, \
@@ -6719,11 +6719,15 @@ class ShiftProductionSummaryView(APIView):
             factory_date__month=month,
             group=group_name
         ).values('equip_no').annotate(days=Sum('times') / 60 / 24).values_list('equip_no', 'days'))
+        # 获取机台历史最高产量和班组
+        history_info = self.get_max_values(target_month)
         equip_production_data_dict = {i: {'equip_no': i,
                                           'total_trains': 0,
                                           'target_trains': target_data.get(i, 0),
                                           'days': working_days - down_days_dict.get(i, 0),
                                           'group_days': group_schedule_days - group_down_days_dict.get(i, 0),
+                                          'max_trains': history_info.get(i, {}).get('max_trains', 0),
+                                          'max_group': history_info.get(i, {}).get('max_group', ''),
                                           } for i in
                                       list(Equip.objects.filter(
                                           category__equip_type__global_name="密炼设备"
@@ -6735,8 +6739,41 @@ class ShiftProductionSummaryView(APIView):
             trains = d['total_trains'] // 2 if equip_no == 'Z04' else d['total_trains']
             equip_production_data_dict[equip_no][key] = trains
             equip_production_data_dict[equip_no]['total_trains'] += trains
+            max_trains = equip_production_data_dict[equip_no]['max_trains']
+            if not max_trains or max_trains < trains:
+                equip_production_data_dict[equip_no]['max_trains'] = trains
+                equip_production_data_dict[equip_no]['max_group'] = schedule_dict[k]
+                HistoryProductionGroup.objects.filter(target_month=target_month, equip_no=equip_no).update(max_trains=trains, max_group=schedule_dict[k])
+        # 折线图
+        equip_list, day_trains, day_ratio = [], [], []
+        for j in equip_production_data_dict.values():
+            equip_list.append(j['equip_no'])
+            day_trains.append(j['total_trains'])
+            ratio = 0 if not j['days'] or j['target_trains'] else round(j['total_trains'] / j['days'] / j['target_trains'] / 2 * 100, 2)
+            day_ratio.append(ratio)
         return Response({'table_head': schedule_dict,
-                         'data': equip_production_data_dict.values()})
+                         'data': equip_production_data_dict.values(),
+                         'equip_list': equip_list,
+                         'day_trains': day_trains,
+                         'day_ratio': day_ratio})
+
+    @atomic
+    def get_max_values(self, target_month):
+        history_info = HistoryProductionGroup.objects.filter(target_month=target_month).values('equip_no', 'max_trains', 'max_group')
+        if history_info:
+            return {i['equip_no']: {'max_trains': i['max_trains'], 'max_group': i['max_group']} for i in history_info}
+        else:
+            last_info = HistoryProductionGroup.objects.filter(target_month__lte=target_month).order_by('id').last()
+            if last_info:
+                create_data = HistoryProductionGroup.objects.filter(target_month=last_info.target_month).values('equip_no', 'max_trains', 'max_group')
+                for i in create_data:
+                    i['target_month'] = target_month
+            else:
+                create_data = [{'equip_no': i, 'max_trains': 0, 'max_group': '', 'target_month': target_month}
+                               for i in list(Equip.objects.filter(category__equip_type__global_name="密炼设备")
+                                             .order_by('equip_no').values_list("equip_no", flat=True))]
+            HistoryProductionGroup.objects.bulk_create([HistoryProductionGroup(**i) for i in create_data])
+            return {i['equip_no']: {'max_trains': i['max_trains'], 'max_group': i['max_group']} for i in create_data}
 
 
 @method_decorator([api_recorder], name='dispatch')

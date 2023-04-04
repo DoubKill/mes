@@ -846,3 +846,16 @@ class RubberLogSummary(models.Model):
         db_table = 'rubber_log_summary'
         verbose_name_plural = verbose_name = '胶架进出登记汇总表'
 
+
+class HistoryProductionGroup(models.Model):
+    target_month = models.CharField(max_length=8, help_text='年-月')
+    equip_no = models.CharField(max_length=8, help_text='机台')
+    max_trains = models.IntegerField(help_text='最高产量: 车')
+    max_group = models.CharField(max_length=64, help_text='班组')
+    save_time = models.DateTimeField(help_text='更新时间', auto_now=True)
+
+    class Meta:
+        db_table = 'history_production_group'
+        verbose_name_plural = verbose_name = '历史最高产量和班组'
+
+
