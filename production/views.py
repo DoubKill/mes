@@ -7281,7 +7281,8 @@ class TimeEnergyConsuming(APIView):
         ).values('product_no', 'equip_no').annotate(cnt=Count('id'),
                                                     actual_weight=Max('actual_weight')/100,
                                                     evacuation_energy=Avg('evacuation_energy'),
-                                                    consum_time=OSum((F('end_time') - F('begin_time')))
+                                                    consum_time=OSum((F('end_time') - F('begin_time'))),
+                                                    avg_interval_time=Avg('interval_time'),
                                                     ).order_by('product_no', 'cnt')
         item_dict = {}
         # 设备机台对应机型字典数据
@@ -7315,18 +7316,21 @@ class TimeEnergyConsuming(APIView):
                     consum_time = 150
             except Exception:
                 consum_time = 150
+            avg_interval_time = item['avg_interval_time']
+            if not avg_interval_time or avg_interval_time <= 5 or avg_interval_time >= 30:
+                avg_interval_time = 15
             if recipe_no not in item_dict:
                 item_dict[recipe_no] = {stage: {'devoted_weight': actual_weight,
                                                 'actual_weight': actual_weight,
                                                 'evacuation_energy': evacuation_energy,
-                                                'consum_time': consum_time,
+                                                'consum_time': consum_time+avg_interval_time,
                                                 'equip_no': item['equip_no'],
                                                 }}
             else:
                 item_dict[recipe_no][stage] = {'devoted_weight': actual_weight,
                                                 'actual_weight': actual_weight,
                                                 'evacuation_energy': evacuation_energy,
-                                                'consum_time': consum_time,
+                                                'consum_time': consum_time+avg_interval_time,
                                                 'equip_no': item['equip_no']}
         # 写入excel表格
         wb = load_workbook('xlsx_template/energy_consume.xlsx')
