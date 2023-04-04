@@ -7389,7 +7389,9 @@ class TimeEnergyConsuming(APIView):
 
                 for idx, field_name in stage_idx.get(k, {}).items():
                     if field_name == 'evacuation_energy':  # 计算耗电量，每个机台都不一样
-                        if equip_no == 'Z01':
+                        if not v['evacuation_energy']:
+                            evacuation_energy = None
+                        elif equip_no == 'Z01':
                             evacuation_energy = int(v['evacuation_energy'] / 10)
                         elif equip_no == 'Z02':
                             evacuation_energy = int(v['evacuation_energy'] / 0.6)
