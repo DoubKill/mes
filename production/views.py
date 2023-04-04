@@ -7306,7 +7306,7 @@ class TimeEnergyConsuming(APIView):
             if stage not in ['CMB', 'HMB', '1MB', '2MB', '3MB', 'RMB', 'FM']:
                 continue
             if item['equip_no'] == 'Z04':
-                evacuation_energy = item['evacuation_energy'] * 2
+                evacuation_energy = None if not item['evacuation_energy'] else item['evacuation_energy'] * 2
             else:
                 evacuation_energy = item['evacuation_energy']
             actual_weight = item['actual_weight']
