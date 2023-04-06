@@ -194,6 +194,54 @@ class PalletFeedbacksViewSet(mixins.CreateModelMixin,
             message = "重新绑定成功"
         return Response(message)
 
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        auto = request.query_params.get("auto")
+        manual = request.query_params.get("manual")
+        target_equip = request.query_params.get("equip_no", '')
+        product_no = request.query_params.get("product_no", '')
+        day_time = request.query_params.get("day_time", '')
+        if auto or manual:
+            try:
+                auto, manual = int(auto), int(manual)
+                data = []
+                if auto and manual:
+                    queryset = list(queryset.values()) + list(
+                        ManualInputTrains.objects.filter(equip_no=target_equip, product_no=product_no, factory_date=day_time).order_by('-id').values())
+                elif not auto and manual:
+                    queryset = ManualInputTrains.objects.filter(equip_no=target_equip, product_no=product_no, factory_date=day_time).order_by('-id').values()
+                elif auto and not manual:
+                    queryset = queryset.values()
+                else:
+                    queryset = []
+                for item in queryset:
+                    weight = item.get('weight')
+                    if weight is None:  # 自动
+                        data.append(item)
+                    else:  # 手动
+                        created_time = item['created_time'].strftime('%Y-%m-%d %H:%M:%S')
+                        data.append({
+                            "plan_classes_uid": '', "bath_no": '', "equip_no": item['equip_no'], "product_no": item['product_no'], "id": item['id'],
+                            "plan_weight": weight, "actual_weight": weight, "begin_time": item['created_time'], "end_time": created_time,
+                            "operation_user": item['created_username'], "begin_trains": 1, "end_trains": item['actual_trains'], "pallet_no": '',
+                            "classes": item['classes'], "lot_no": '', "product_time": created_time, "factory_date": item['factory_date']
+                        })
+                page = self.paginate_queryset(data)
+                if page is not None:
+                    return self.get_paginated_response(page)
+                return Response(data)
+            except Exception as e:
+                logger.error(f"密炼实绩异常: {e.args[0]}")
+                raise ValidationError('解析异常')
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
 
 @method_decorator([api_recorder], name="dispatch")
 class EquipStatusViewSet(mixins.CreateModelMixin,
