@@ -412,6 +412,8 @@ class ProductActualViewSet(mixins.ListModelMixin,
         params = request.query_params
         day_time = params.get("search_time", datetime.datetime.now().date())
         target_equip_no = params.get('equip_no')
+        auto = int(params.get('auto', 1))
+        manual = int(params.get('manual', 1))
         plan_queryset = ProductClassesPlan.objects.filter(delete_flag=False,
                                                           work_schedule_plan__plan_schedule__day_time=day_time
                                                           ).order_by('equip__equip_no')
@@ -426,6 +428,32 @@ class ProductActualViewSet(mixins.ListModelMixin,
                                                            plan_trains=F('plan_trains'),
                                                            classes=F('work_schedule_plan__classes__global_name'))
         plan_data_dict = {item['equip_no']+item['product_no']+item['classes']: item for item in plan_data}
+        manual_plan_data = ManualInputTrains.objects.filter(factory_date=day_time).values('equip_no', 'product_no', 'classes')\
+            .annotate(plan_trains=Sum('actual_trains'), actual_weight=F('weight'), plan_weight=F('weight'))\
+            .values('equip_no', 'product_no', 'plan_trains', 'classes', 'actual_trains', 'actual_weight', 'plan_weight').order_by('equip_no')
+        if target_equip_no:
+            manual_plan_data = manual_plan_data.filter(equip_no=target_equip_no)
+        manual_plan_data_dict = {item['equip_no']+item['product_no']+item['classes']: item for item in manual_plan_data}
+        real_plan_data_dict = {}
+        if auto and manual:
+            keys = set(list(plan_data_dict.keys()) + list(manual_plan_data_dict.keys()))
+            sorted_keys = sorted(keys)
+            for k in sorted_keys:
+                if k in plan_data_dict and k in manual_plan_data_dict:
+                    real_plan_data_dict[k] = plan_data_dict[k]
+                    real_plan_data_dict[k]['plan_trains'] += manual_plan_data_dict[k]['plan_trains']
+                elif k in plan_data_dict and k not in manual_plan_data_dict:
+                    real_plan_data_dict[k] = plan_data_dict[k]
+                elif k not in plan_data_dict and k in manual_plan_data_dict:
+                    real_plan_data_dict[k] = manual_plan_data_dict[k]
+                else:
+                    continue
+        elif auto and not manual:
+            real_plan_data_dict = plan_data_dict
+        elif not auto and manual:
+            real_plan_data_dict = manual_plan_data_dict
+        else:
+            real_plan_data_dict = real_plan_data_dict
 
         plan_classes_uid_list = plan_queryset.values_list('plan_classes_uid', flat=True)
         tf_set = TrainsFeedbacks.objects.filter(
@@ -439,6 +467,26 @@ class ProductActualViewSet(mixins.ListModelMixin,
             plan_weight=Max('plan_weight')
         ).values('equip_no', 'product_no', 'classes', 'actual_trains', 'actual_weight', 'plan_weight')
         actual_data_dict = {item['equip_no']+item['product_no']+item['classes']: item for item in tf_set}
+        real_data_dict = {}
+        if auto and manual:
+            keys = set(list(actual_data_dict.keys()) + list(manual_plan_data_dict.keys()))
+            sorted_keys = sorted(keys)
+            for k in sorted_keys:
+                if k in actual_data_dict and k in manual_plan_data_dict:
+                    real_data_dict[k] = actual_data_dict[k]
+                    real_data_dict[k]['actual_trains'] += manual_plan_data_dict[k]['actual_trains']
+                elif k in actual_data_dict and k not in manual_plan_data_dict:
+                    real_data_dict[k] = actual_data_dict[k]
+                elif k not in actual_data_dict and k in manual_plan_data_dict:
+                    real_data_dict[k] = manual_plan_data_dict[k]
+                else:
+                    continue
+        elif auto and not manual:
+            real_data_dict = actual_data_dict
+        elif not auto and manual:
+            real_data_dict = manual_plan_data_dict
+        else:
+            real_data_dict = real_data_dict
         ret = {}
         aps_result = SchedulingResult.objects.filter(factory_date=day_time).order_by('id').last()
         if aps_result:
@@ -450,11 +498,11 @@ class ProductActualViewSet(mixins.ListModelMixin,
         else:
             aps_data_dict = {}
 
-        for key, value in plan_data_dict.items():
-            if key in actual_data_dict:
-                value['actual_trains'] = actual_data_dict[key]['actual_trains']
-                value['actual_weight'] = actual_data_dict[key]['actual_weight']
-                value['plan_weight'] = actual_data_dict[key]['plan_weight']
+        for key, value in real_plan_data_dict.items():
+            if key in real_data_dict:
+                value['actual_trains'] = real_data_dict[key]['actual_trains']
+                value['actual_weight'] = real_data_dict[key]['actual_weight']
+                value['plan_weight'] = real_data_dict[key]['plan_weight']
             else:
                 value['actual_trains'] = 0
                 value['actual_weight'] = 0
