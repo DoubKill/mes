@@ -2379,12 +2379,60 @@ class MonthlyOutputStatisticsReport(APIView):
             factory_date__lte=et
         )
         stage_production_queryset = qs.values('product_no').annotate(total_weight=Sum('plan_weight')/1000).order_by('product_no')
+        # 当月190E除去洗车胶外的所有产量
+        queryset_190e = Equip190EWeight.objects.exclude(setup__specification__in=('洗车胶', 'XCJ', 'WUMING')).filter(factory_date__gte=st, factory_date__lte=et)
+        # 按胶料编码分组，计算190E总生产重量
+        total_queryset_190e_dict = dict(queryset_190e.values('setup').annotate(stage=F('setup__state'), sum_weight=Sum(F('setup__weight')*F('qty')/1000, output_field=DecimalField())).values_list('stage', 'sum_weight'))
+        # 按胶料编码分组，计算手动总生产重量
+        total_manual_input_trains = ManualInputTrains.objects.exclude(
+            Q(product_no__icontains='XCJ') |
+            Q(product_no__icontains='洗车胶') |
+            Q(product_no__icontains='-WUMING-')
+        ).filter(factory_date__gte=st, factory_date__lte=et)
+        total_manual_input_trains_dict = dict(total_manual_input_trains.values('product_no').annotate(weight=Sum(F('weight') * F('actual_trains')/1000, output_field=DecimalField())).values_list('product_no', 'weight'))
+
+        # 密炼产量
         for item in stage_production_queryset:
             try:
                 stage = item['product_no'].split('-')[1]
             except Exception:
                 continue
             weight = round(item['total_weight'], 2)
+            if stage in ('RE', 'FM', 'RFM'):
+                jl_stage_output['jl']['value'] += weight
+                if stage not in jl_stage_output:
+                    jl_stage_output[stage] = {'name': stage, 'value': weight}
+                else:
+                    jl_stage_output[stage]['value'] += weight
+            else:
+                wl_stage_output['wl']['value'] += weight
+                if stage not in wl_stage_output:
+                    wl_stage_output[stage] = {'name': stage, 'value': weight}
+                else:
+                    wl_stage_output[stage]['value'] += weight
+        # 190e产量
+        for item in total_queryset_190e_dict:
+            stage = item['stage']
+            weight = round(item['sum_weight'], 2)
+            if stage in ('RE', 'FM', 'RFM'):
+                jl_stage_output['jl']['value'] += weight
+                if stage not in jl_stage_output:
+                    jl_stage_output[stage] = {'name': stage, 'value': weight}
+                else:
+                    jl_stage_output[stage]['value'] += weight
+            else:
+                wl_stage_output['wl']['value'] += weight
+                if stage not in wl_stage_output:
+                    wl_stage_output[stage] = {'name': stage, 'value': weight}
+                else:
+                    wl_stage_output[stage]['value'] += weight
+        # 手动生产产量
+        for item in total_manual_input_trains_dict:
+            try:
+                stage = item['product_no'].split('-')[1]
+            except Exception:
+                continue
+            weight = round(item['weight'], 2)
             if stage in ('RE', 'FM', 'RFM'):
                 jl_stage_output['jl']['value'] += weight
                 if stage not in jl_stage_output:
@@ -7281,7 +7329,8 @@ class TimeEnergyConsuming(APIView):
         ).values('product_no', 'equip_no').annotate(cnt=Count('id'),
                                                     actual_weight=Max('actual_weight')/100,
                                                     evacuation_energy=Avg('evacuation_energy'),
-                                                    consum_time=OSum((F('end_time') - F('begin_time')))
+                                                    consum_time=OSum((F('end_time') - F('begin_time'))),
+                                                    avg_interval_time=Avg('interval_time'),
                                                     ).order_by('product_no', 'cnt')
         item_dict = {}
         # 设备机台对应机型字典数据
@@ -7305,7 +7354,7 @@ class TimeEnergyConsuming(APIView):
             if stage not in ['CMB', 'HMB', '1MB', '2MB', '3MB', 'RMB', 'FM']:
                 continue
             if item['equip_no'] == 'Z04':
-                evacuation_energy = item['evacuation_energy'] * 2
+                evacuation_energy = None if not item['evacuation_energy'] else item['evacuation_energy'] * 2
             else:
                 evacuation_energy = item['evacuation_energy']
             actual_weight = item['actual_weight']
@@ -7315,18 +7364,21 @@ class TimeEnergyConsuming(APIView):
                     consum_time = 150
             except Exception:
                 consum_time = 150
+            avg_interval_time = item['avg_interval_time']
+            if not avg_interval_time or avg_interval_time <= 5 or avg_interval_time >= 30:
+                avg_interval_time = 15
             if recipe_no not in item_dict:
                 item_dict[recipe_no] = {stage: {'devoted_weight': actual_weight,
                                                 'actual_weight': actual_weight,
                                                 'evacuation_energy': evacuation_energy,
-                                                'consum_time': consum_time,
+                                                'consum_time': consum_time+avg_interval_time,
                                                 'equip_no': item['equip_no'],
                                                 }}
             else:
                 item_dict[recipe_no][stage] = {'devoted_weight': actual_weight,
                                                 'actual_weight': actual_weight,
                                                 'evacuation_energy': evacuation_energy,
-                                                'consum_time': consum_time,
+                                                'consum_time': consum_time+avg_interval_time,
                                                 'equip_no': item['equip_no']}
         # 写入excel表格
         wb = load_workbook('xlsx_template/energy_consume.xlsx')
@@ -7385,7 +7437,9 @@ class TimeEnergyConsuming(APIView):
 
                 for idx, field_name in stage_idx.get(k, {}).items():
                     if field_name == 'evacuation_energy':  # 计算耗电量，每个机台都不一样
-                        if equip_no == 'Z01':
+                        if not v['evacuation_energy']:
+                            evacuation_energy = None
+                        elif equip_no == 'Z01':
                             evacuation_energy = int(v['evacuation_energy'] / 10)
                         elif equip_no == 'Z02':
                             evacuation_energy = int(v['evacuation_energy'] / 0.6)
