@@ -2411,9 +2411,8 @@ class MonthlyOutputStatisticsReport(APIView):
                 else:
                     wl_stage_output[stage]['value'] += weight
         # 190e产量
-        for item in total_queryset_190e_dict:
-            stage = item['stage']
-            weight = round(item['sum_weight'], 2)
+        for k, v in total_queryset_190e_dict.items():
+            stage, weight = k, round(v, 2)
             if stage in ('RE', 'FM', 'RFM'):
                 jl_stage_output['jl']['value'] += weight
                 if stage not in jl_stage_output:
@@ -2427,12 +2426,11 @@ class MonthlyOutputStatisticsReport(APIView):
                 else:
                     wl_stage_output[stage]['value'] += weight
         # 手动生产产量
-        for item in total_manual_input_trains_dict:
+        for k, v in total_manual_input_trains_dict.items():
             try:
-                stage = item['product_no'].split('-')[1]
+                stage, weight = k.split('-')[1], round(v, 2)
             except Exception:
                 continue
-            weight = round(item['weight'], 2)
             if stage in ('RE', 'FM', 'RFM'):
                 jl_stage_output['jl']['value'] += weight
                 if stage not in jl_stage_output:
