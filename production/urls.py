@@ -142,6 +142,9 @@ urlpatterns = [
     # 月产量完成报表
     path('daily-production-completion-report/', DailyProductionCompletionReport.as_view()),
 
+    # 年产量完成报表
+    path('monthly-production-completion-report/', MonthlyProductionCompletionReport.as_view()),
+
     # =============钉钉考勤======
     # 补卡申请
     path('reissue-card/', ReissueCardView.as_view()),

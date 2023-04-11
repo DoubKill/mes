@@ -3320,6 +3320,619 @@ class DailyProductionCompletionReport(APIView):
 
 
 @method_decorator([api_recorder], name="dispatch")
+class MonthlyProductionCompletionReport(APIView):
+    permission_classes = (IsAuthenticated,)
+    pagination_class = None
+
+    def export(self, month, days, data1, data2):
+        response = HttpResponse(content_type='application/vnd.ms-excel')
+        filename = '年产量完成报表'
+        response['Content-Disposition'] = u'attachment;filename= ' + filename.encode('gbk').decode(
+            'ISO-8859-1') + '.xls'
+        # 创建一个文件对象
+        wb = xlwt.Workbook(encoding='utf8')
+        # 创建一个sheet对象
+        sheet1 = wb.add_sheet('年产量完成', cell_overwrite_ok=True)
+        sheet2 = wb.add_sheet('班次车数', cell_overwrite_ok=True)
+        sheet3 = wb.add_sheet('年产量吨位', cell_overwrite_ok=True)
+        title1 = ['项目/日期', '汇总', '平均']
+        title2 = ['序号', '规格', '段数', '机台', '型号', '班别']
+        title3 = ['序号', '规格', '段数', '机台', '型号', '班别']
+        for day in range(1, days + 1):
+            title1.append(f'{day}月')
+            title2.append(f'{month}/{day}')
+            title3.append(f'{month}/{day}')
+        # title1.append('汇总')
+        title2.append('汇总')
+        title3.append('汇总')
+
+        style = xlwt.XFStyle()
+        style.alignment.wrap = 1
+
+        # 写入文件标题
+        for col_num in range(len(title1)):
+            sheet1.write(0, col_num, title1[col_num])
+        for col_num in range(len(title2)):
+            sheet2.write(0, col_num, title2[col_num])
+        for col_num in range(len(title3)):
+            sheet3.write(0, col_num, title3[col_num])
+        # 写入数据
+        for index, dic in enumerate(data1):
+            for key, value in dic.items():
+                if key == 'name':
+                    sheet1.write(index + 1, 0, dic['name'])
+                elif key == 'weight':
+                    sheet1.write(index + 1, 1, dic['weight'])
+                elif key == 'avg':
+                    sheet1.write(index + 1, 2, dic['avg'])
+                else:
+                    sheet1.write(index + 1, int(key[:-1])+2, value)
+        for index, dic in enumerate(data2):
+            sheet2.write(index + 1, 0, index + 1)
+            sheet3.write(index + 1, 0, index + 1)
+            for key, value in dic.items():
+                if key == '规格':
+                    sheet2.write(index + 1, 1, value)
+                    sheet3.write(index + 1, 1, value)
+                elif key == '段数':
+                    sheet2.write(index + 1, 2, value)
+                    sheet3.write(index + 1, 2, value)
+                elif key == '机台':
+                    sheet2.write(index + 1, 3, value)
+                    sheet3.write(index + 1, 3, value)
+                elif key == '机型':
+                    sheet2.write(index + 1, 4, value)
+                    sheet3.write(index + 1, 4, value)
+                elif key == '班别':
+                    sheet2.write(index + 1, 5, value)
+                    sheet3.write(index + 1, 5, value)
+                elif key == '汇总_qty':
+                    sheet2.write(index + 1, len(title2) - 1, value)
+                elif key == '汇总_weight':
+                    sheet3.write(index + 1, len(title3) - 1, value)
+                else:
+                    day, s = key.split('_')
+                    if s == 'qty':
+                        sheet2.write(index + 1, int(day) + 5, value)
+                    else:
+                        sheet3.write(index + 1, int(day) + 5, value)
+        # 写出到IO
+        output = BytesIO()
+        wb.save(output)
+        # 重新定位到开始
+        output.seek(0)
+        response.write(output.getvalue())
+        return response
+
+    def get(self, request):
+        params = self.request.query_params
+        date = params.get('date')
+        td_flag = params.get('td_flag', 'N')  # 默认
+        if not date:
+            raise ValidationError('请选择年份！')
+        try:
+            year = int(date)
+        except Exception:
+            raise ValidationError('请输入正确的年份!')
+        now_time, days = datetime.datetime.now(), 12
+        exclude_today_flat = False  # 总计是否去掉当月产量
+        if td_flag != 'Y' and now_time.year == year:
+            exclude_today_flat = True
+        now_day = now_time.month
+        results = {
+            'name_1': {'name': '混炼胶实际完成(吨)', 'weight': 0},  # CMB HMB 1MB~4MB
+            'name_2': {'name': '终炼胶实际完成(吨)', 'weight': 0},  # FM + 190E终炼产量
+            'name_3': {'name': '外发无硫料(吨)', 'weight': 0},  # 人工输入
+            'name_4': {'name': '实际完成数-1(吨)', 'weight': 0},  # 190E终炼产量 + FM + 外发无硫料*0.7
+            'name_5': {'name': '实际完成数-2(吨)', 'weight': 0},  # 190E终炼产量 + FM + 外发无硫料
+            'name_6': {'name': '实际生产工作日数', 'weight': 0},
+            'name_10': {'name': '190E实际生产工作日数', 'weight': 0},
+            'name_7': {'name': '月均完成量-1（吨）', 'weight': 0},
+            'name_8': {'name': '月均完成量-2（吨）', 'weight': 0},
+            'name_9': {'name': '实际生产机台数', 'weight': 0},
+            'name_11': {'name': '单机台效率-1（吨/台）', 'weight': 0},
+            'name_12': {'name': '单机台效率-2（吨/台）', 'weight': 0},
+            'name_13': {'name': '每月段数', 'weight': 0},
+            'name_14': {'name': '吨耗时（分钟/吨）', 'weight': 0},
+            'name_15': {'name': '吨胶密炼耗能（KWH/吨）', 'weight': 0}
+        }
+
+        # 除去洗车胶的总车次报表数据
+        total_queryset = TrainsFeedbacks.objects.exclude(Q(product_no__icontains='XCJ') |
+                                                         Q(product_no__icontains='洗车胶') |
+                                                         Q(operation_user='Mixer2') |
+                                                         Q(product_no__icontains='WUMING')
+                                                         ).filter(factory_date__year=year)
+        # 按月分组，计算每月总生产重量
+        month_total_dict = dict(total_queryset.values(
+                'factory_date__month'
+            ).annotate(weight=Sum(
+                'plan_weight', output_field=DecimalField())/1000
+            ).values_list('factory_date__month', 'weight'))
+
+        # 当月混炼实际完成吨  CMB HMB 1MB~4MB
+        queryset1 = total_queryset.filter(Q(product_no__icontains='-CMB-') |
+                                          Q(product_no__icontains='-HMB-') |
+                                          Q(product_no__icontains='-1MB-') |
+                                          Q(product_no__icontains='-2MB-') |
+                                          Q(product_no__icontains='-3MB-') |
+                                          Q(product_no__icontains='-4MB-'))
+        mix_queryset = queryset1.values('factory_date__month').annotate(weight=Sum('plan_weight', output_field=DecimalField())/1000)
+
+        # 当月终炼实际完成（FM段次）  FM
+        queryset2 = total_queryset.filter(product_no__icontains='-FM-')
+        fin_queryset = queryset2.values('factory_date__month').annotate(weight=Sum('plan_weight', output_field=DecimalField())/1000)
+        fm_total_dict = dict(fin_queryset.values_list('factory_date__month', 'weight'))
+
+        # 当月190E除去洗车胶外的所有产量
+        queryset_190e = Equip190EWeight.objects.exclude(
+            setup__specification__in=('洗车胶', 'XCJ', 'WUMING')).filter(factory_date__year=year)
+        # 按月分组，计算190E每月总生产重量
+        total_queryset_190e_dict = dict(queryset_190e.values(
+            'factory_date__month').annotate(
+                sum_weight=Sum(F('setup__weight')*F('qty')/1000, output_field=DecimalField())).values_list('factory_date__month', 'sum_weight'))
+        # 按月分组，计算190E每月终炼产量  FM
+        equip_190e_weight = queryset_190e.filter(setup__state='FM').values('factory_date__month').annotate(
+                sum_weight=Sum(F('setup__weight')*F('qty')/1000, output_field=DecimalField()))
+        # 按月分组，计算190E每月混炼产量  CMB HMB 1MB~4MB
+        equip_190e_mixin_weight = queryset_190e.filter(
+            setup__state__in=('1MB', '2MB', '3MB', '4MB', 'CMB', 'HMB')
+        ).values('factory_date__month').annotate(sum_weight=Sum(F('setup__weight') * F('qty') / 1000, output_field=DecimalField()))
+        fm_queryset_190e_dict = dict(equip_190e_weight.values_list('factory_date__month', 'sum_weight'))
+
+        # 按月分组，计算每月手动总生产重量
+        total_manual_input_trains = ManualInputTrains.objects.exclude(
+            Q(product_no__icontains='XCJ') |
+            Q(product_no__icontains='洗车胶') |
+            Q(product_no__icontains='-WUMING-')
+        ).filter(factory_date__year=year)
+        total_manual_input_trains_dict = dict(total_manual_input_trains.values(
+                'factory_date__month'
+            ).annotate(
+            weight=Sum(F('weight') * F('actual_trains')/1000, output_field=DecimalField())
+        ).values_list('factory_date__month', 'weight'))
+
+        # 当月每日手动总生产混炼实际完成吨  CMB HMB 1MB~4MB
+        total_manual_input_trains_mixin_dict = dict(
+            total_manual_input_trains.filter(
+                Q(product_no__icontains='-CMB-') |
+                Q(product_no__icontains='-HMB-') |
+                Q(product_no__icontains='-1MB-') |
+                Q(product_no__icontains='-2MB-') |
+                Q(product_no__icontains='-3MB-') |
+                Q(product_no__icontains='-4MB-')
+            ).values('factory_date__month').annotate(
+                weight=Sum(F('weight') * F('actual_trains')/1000, output_field=DecimalField())
+            ).values_list('factory_date__month', 'weight'))
+
+        # 当月每日手动总生产终炼实际完成吨  FM
+        total_manual_input_trains_final_dict = dict(
+            total_manual_input_trains.filter(
+                product_no__icontains='-FM-'
+            ).values('factory_date__month').annotate(
+                weight=Sum(F('weight') * F('actual_trains')/1000, output_field=DecimalField())
+            ).values_list('factory_date__month', 'weight'))
+
+        # 190E产量曲线 加硫、无硫、所有、终炼
+        data_190e = {
+            'dates': [i for i in range(1, days+1)],
+            'wl': [0] * days,
+            'jl': [0] * days,
+            'total': [total_queryset_190e_dict.get(i, 0) for i in range(1, days+1)],
+            'fm': [fm_queryset_190e_dict.get(i, 0) for i in range(1, days+1)]
+        }
+
+        # 每日实际工作天数
+        actual_working_day_dict = dict(
+            ActualWorkingDay.objects.filter(
+                factory_date__year=year,
+                num__gt=0).values_list('factory_date__month', 'num'))
+
+        # 190E每日实际工作天数
+        actual_working_day_190e_dict = dict(
+            ActualWorkingDay190E.objects.filter(
+                factory_date__year=year,
+                num__gt=0).values_list('factory_date__month', 'num'))
+
+        # 每日实际工作机台数
+        actual_working_equip_dict = dict(
+            ActualWorkingEquip.objects.filter(
+                factory_date__year=year,
+                num__gt=0).values_list('factory_date__month', 'num'))
+
+        # 外发无硫料（吨）
+        out_queryset = OuterMaterial.objects.filter(
+            factory_date__year=year).values('factory_date__month').annotate(weight=Sum('weight', output_field=DecimalField()))
+        out_queryset_dict = dict(out_queryset.values_list('factory_date__month', 'weight'))
+
+        time_consume_dict = dict(TrainsFeedbacks.objects.filter(
+            factory_date__year=year).values('factory_date').annotate(
+            time_consume=OSum((F('end_time') - F('begin_time')))).values_list('factory_date__month', 'time_consume'))
+        energy_consume_data = TrainsFeedbacks.objects.filter(
+            factory_date__year=year).extra().values('factory_date__month', 'equip_no').annotate(
+            energy_consume=Sum('evacuation_energy'),
+            sum_weight=Avg('plan_weight')
+        )
+        energy_consume_dict = {}
+        for e in energy_consume_data:
+            energy_consume = 0 if not e['energy_consume'] else e['energy_consume']
+            equip_no = e['equip_no']
+            if equip_no == 'Z01':
+                evacuation_energy = energy_consume / 10
+            elif equip_no == 'Z02':
+                evacuation_energy = energy_consume / 0.6
+            elif equip_no == 'Z04':
+                evacuation_energy = energy_consume * 0.28 * float(e['sum_weight']) / 1000
+            elif equip_no == 'Z12':
+                evacuation_energy = energy_consume / 5.3
+            elif equip_no == 'Z13':
+                evacuation_energy = energy_consume / 31.7
+            else:
+                evacuation_energy = energy_consume
+            energy_consume_dict[e['factory_date__month']] = energy_consume_dict.get(e['factory_date__month'], 0) + evacuation_energy
+        for item in mix_queryset:
+            mixin_weight = round(item['weight'], 2)
+            if not(item['factory_date__month'] == now_day and exclude_today_flat):
+                results['name_1']['weight'] += mixin_weight
+            results['name_1'][f"{item['factory_date__month']}月"] = mixin_weight
+        for item in equip_190e_mixin_weight:
+            weight = round(item['sum_weight'], 2)
+            if not(item['factory_date__month'] == now_day and exclude_today_flat):
+                results['name_1']['weight'] += weight
+            results['name_1'][f"{item['factory_date__month']}月"] = results['name_1'].get(f"{item['factory_date__month']}月", 0) + weight
+            data_190e['wl'][item['factory_date__month']-1] = weight
+        for d, v in total_manual_input_trains_mixin_dict.items():
+            v = round(v, 2)
+            if not(d == now_day and exclude_today_flat):
+                results['name_1']['weight'] += v
+            results['name_1'][f"{d}月"] = results['name_1'].get(f"{d}月", 0) + v
+        for item in equip_190e_weight:
+            weight = round(item['sum_weight'], 2)
+            results['name_2'][f"{item['factory_date__month']}月"] = results['name_2'].get(f"{item['factory_date__month']}月", 0) + weight
+            results['name_4'][f"{item['factory_date__month']}月"] = results['name_4'].get(f"{item['factory_date__month']}月", 0) + weight
+            results['name_5'][f"{item['factory_date__month']}月"] = results['name_5'].get(f"{item['factory_date__month']}月", 0) + weight
+            data_190e['jl'][item['factory_date__month']-1] = weight
+            if not(item['factory_date__month'] == now_day and exclude_today_flat):
+                results['name_2']['weight'] += weight
+                results['name_4']['weight'] += weight
+                results['name_5']['weight'] += weight
+        for item in fin_queryset:
+            final_weight = round(item['weight'], 2)
+            if not(item['factory_date__month'] == now_day and exclude_today_flat):
+                results['name_2']['weight'] += final_weight
+                results['name_4']['weight'] += final_weight
+                results['name_5']['weight'] += final_weight
+            results['name_2'][f"{item['factory_date__month']}月"] = results['name_2'].get(f"{item['factory_date__month']}月", 0) + final_weight
+            results['name_4'][f"{item['factory_date__month']}月"] = results['name_4'].get(f"{item['factory_date__month']}月", 0) + final_weight
+            results['name_5'][f"{item['factory_date__month']}月"] = results['name_5'].get(f"{item['factory_date__month']}月", 0) + final_weight
+        for d, v in total_manual_input_trains_final_dict.items():
+            v = round(v, 2)
+            if not(d == now_day and exclude_today_flat):
+                results['name_2']['weight'] += v
+                results['name_4']['weight'] += v
+                results['name_5']['weight'] += v
+            results['name_2'][f"{d}月"] = results['name_2'].get(f"{d}月", 0) + v
+            results['name_4'][f"{d}月"] = results['name_4'].get(f"{d}月", 0) + v
+            results['name_5'][f"{d}月"] = results['name_5'].get(f"{d}月", 0) + v
+        for item in out_queryset:
+            results['name_3'][f"{item['factory_date__month']}月"] = round(item['weight'], 2)
+            results['name_4'][f"{item['factory_date__month']}月"] = results['name_4'].get(f"{item['factory_date__month']}月", 0) + round((item['weight']) * decimal.Decimal(0.7), 2)
+            results['name_5'][f"{item['factory_date__month']}月"] = results['name_5'].get(f"{item['factory_date__month']}月", 0) + round(item['weight'], 2)
+            if not(item['factory_date__month'] == now_day and exclude_today_flat):
+                results['name_3']['weight'] += round(item['weight'], 2)
+                results['name_4']['weight'] += round((item['weight']) * decimal.Decimal(0.7), 2)
+                results['name_5']['weight'] += round(item['weight'], 2)
+        for k, v in actual_working_day_dict.items():
+            v = round(v, 2)
+            results['name_6'][f"{k}月"] = v
+            if not(k == now_day and exclude_today_flat):
+                results['name_6']['weight'] = round(results['name_6']['weight'] + v, 2)
+        for k, v in actual_working_equip_dict.items():
+            v = round(v, 2)
+            results['name_9'][f"{k}月"] = v
+            if not(k == now_day and exclude_today_flat):
+                results['name_9']['weight'] = round(results['name_9']['weight'] + v, 2)
+        for k, v in actual_working_day_190e_dict.items():
+            v = round(v, 2)
+            results['name_10'][f"{k}月"] = v
+            if not(k == now_day and exclude_today_flat):
+                results['name_10']['weight'] = round(results['name_10']['weight'] + v, 2)
+        if len(results['name_6']) - 2 != 0:
+            for key, value in results['name_4'].items():
+                if key[0].isdigit():
+                    if results['name_6'].get(key):
+                        results['name_7'][key] = round(results['name_4'][key] / decimal.Decimal(results['name_6'][key]), 2)
+                        results['name_8'][key] = round(results['name_5'][key] / decimal.Decimal(results['name_6'][key]), 2)
+            results['name_7']['weight'] = 0 if results['name_6']['weight'] == 0 else round(results['name_4']['weight'] / decimal.Decimal(results['name_6']['weight']), 2)
+            results['name_8']['weight'] = 0 if results['name_6']['weight'] == 0 else round(results['name_5']['weight'] / decimal.Decimal(results['name_6']['weight']), 2)
+        if exclude_today_flat:
+            # 190E当月总天数
+            month_working_days_190e = float(sum(actual_working_day_190e_dict.values()) -
+                                            actual_working_day_190e_dict.get(now_day, 0))
+            # 当月总天数
+            month_working_days = float(sum(actual_working_day_dict.values()) -
+                                            actual_working_day_dict.get(now_day, 0))
+            # 当月总生产机台数
+            actual_working_equips = float(sum(actual_working_equip_dict.values()) -
+                                            actual_working_equip_dict.get(now_day, 0))
+        else:
+            # 190E当月总天数
+            month_working_days_190e = float(sum(actual_working_day_190e_dict.values()))
+            # 当月总天数
+            month_working_days = float(sum(actual_working_day_dict.values()))
+            # 当月总生产机台数
+            actual_working_equips = float(sum(actual_working_equip_dict.values()))
+
+        # 计算每日单机台效率-1
+        for k, v in results['name_4'].items():
+            if k[0].isdigit():
+                ds = actual_working_equip_dict.get(int(k[:-1]))
+                if not ds:
+                    continue
+                value = round(float(v) / ds, 2)
+                results['name_11'][k] = value
+        results['name_11']['weight'] = 0 if not actual_working_equips else round(float(results['name_4']['weight']) / actual_working_equips, 2)
+
+        # 计算每日单机台效率-2
+        for k, v in results['name_5'].items():
+            if k[0].isdigit():
+                ds = actual_working_equip_dict.get(int(k[:-1]))
+                if ds:
+                    value = round(float(v) / ds, 2)
+                    results['name_12'][k] = value
+                time_consume = time_consume_dict.get(int(k[:-1]))
+                if time_consume:
+                    time_value = round(float(time_consume.total_seconds()) / 60 / float(v), 2)
+                    results['name_14'][k] = time_value
+                    if not (k == now_day and exclude_today_flat):
+                        results['name_14']['weight'] = round(results['name_14']['weight'] + time_value, 2)
+                energy_consume = energy_consume_dict.get(int(k[:-1]))
+                if energy_consume:
+                    energy_value = round(float(energy_consume) / float(v), 2)
+                    results['name_15'][k] = energy_value
+                    if not (k == now_day and exclude_today_flat):
+                        results['name_15']['weight'] = round(results['name_15']['weight'] + energy_value, 2)
+        results['name_12']['weight'] = 0 if not actual_working_equips else round(float(results['name_5']['weight']) / actual_working_equips, 2)
+
+        # 计算平均值
+        for item in results.values():
+            if item['name'] == '190E实际生产工作日数':
+                l1 = len(actual_working_day_190e_dict)
+                if exclude_today_flat:
+                    if actual_working_day_190e_dict.get(now_day):
+                        l1 -= 1
+                item['avg'] = "" if not month_working_days_190e else round(
+                    float(item['weight']) / l1, 2)
+            elif item['name'] == '实际生产机台数':
+                l2 = len(actual_working_equip_dict)
+                if exclude_today_flat:
+                    if actual_working_equip_dict.get(now_day):
+                        l2 -= 1
+                item['avg'] = "" if not actual_working_equips else round(
+                    float(item['weight']) / l2, 2)
+            elif item['name'] == '实际生产工作日数':
+                l3 = len(actual_working_day_dict)
+                if exclude_today_flat:
+                    if actual_working_day_dict.get(now_day):
+                        l3 -= 1
+                item['avg'] = "" if not month_working_days else round(
+                    float(item['weight']) / l3, 2)
+            elif item['name'] in ('单机台效率-1（吨/台）', '单机台效率-2（吨/台）', '每日段数'):
+                item['avg'] = item['weight']
+            elif item['name'] == '吨耗时（分钟/吨）':
+                length = len(results['name_14']) - 2
+                item['avg'] = '' if not length else round(item['weight'] / length, 2)
+            elif item['name'] == '吨胶密炼耗能（KWH/吨）':
+                length = len(results['name_15']) - 2
+                item['avg'] = '' if not length else round(item['weight'] / length, 2)
+            else:
+                item['avg'] = "" if month_working_days <= 0 else round(float(item['weight']) / month_working_days, 2)
+        try:
+            results['name_11']['avg'] = round(results['name_4']['avg'] / results['name_9']['avg'], 2)
+        except Exception:
+            results['name_11']['avg'] = ''
+        try:
+            results['name_12']['avg'] = round(results['name_5']['avg'] / results['name_9']['avg'], 2)
+        except Exception:
+            results['name_12']['avg'] = ''
+
+        # 计算190E每日段数
+        cnt = 0
+        sum_ds = 0
+        for idx in range(1, days):
+            fm = data_190e['fm'][idx]
+            total = data_190e['total'][idx]
+            if not total:
+                continue
+            try:
+                ds = total/fm
+            except Exception:
+                ds = 0
+            sum_ds += ds
+            cnt += 1
+
+        if exclude_today_flat:
+            total_190e_jl = sum(data_190e['jl']) - data_190e['jl'][now_day-1]
+            # length1 = len([i for i in data_190e['jl'] if i > 0])
+            # if data_190e['jl'][now_day-1]:
+            #     length1 -= 1
+            total_190e_wl = sum(data_190e['wl']) - data_190e['wl'][now_day-1]
+            # length2 = len([i for i in data_190e['wl'] if i > 0])
+            # if data_190e['wl'][now_day-1]:
+            #     length2 -= 1
+            total_190e_fm = sum(data_190e['fm']) - data_190e['fm'][now_day-1]
+            total_190e_total = sum(data_190e['total']) - data_190e['total'][now_day-1]
+        else:
+            total_190e_jl = sum(data_190e['jl'])
+            # length1 = len([i for i in data_190e['jl'] if i > 0])
+            total_190e_wl = sum(data_190e['wl'])
+            # length2 = len([i for i in data_190e['wl'] if i > 0])
+            total_190e_fm = sum(data_190e['fm'])
+            total_190e_total = sum(data_190e['total'])
+
+        avg_190e = {'jl': 0 if not month_working_days_190e else round(float(total_190e_jl) / float(month_working_days_190e), 2),
+                    'wl': 0 if not month_working_days_190e else round(float(total_190e_wl) / float(month_working_days_190e), 2),
+                    'ds': 0 if not total_190e_fm else round(total_190e_total / total_190e_fm, 2)}
+
+        # 计算每日总产量段数
+        cnt2 = 0
+        sum_ds2 = 0
+        for t_day in range(1, days+1):
+            t_weight = float(month_total_dict.get(t_day, 0)) \
+                       + float(total_queryset_190e_dict.get(t_day, 0)) \
+                       + float(total_manual_input_trains_dict.get(t_day, 0))
+            if not t_weight:
+                continue
+            fm_weight = float(fm_total_dict.get(t_day, 0)) \
+                        + float(fm_queryset_190e_dict.get(t_day, 0)) \
+                        + float(out_queryset_dict.get(t_day, 0)) \
+                        + float(total_manual_input_trains_final_dict.get(t_day, 0))
+            try:
+                ds2 = t_weight / fm_weight
+            except Exception:
+                ds2 = 0
+            if not (exclude_today_flat and t_day == now_day):
+                sum_ds2 += ds2
+                cnt2 += 1
+            results['name_13']['{}月'.format(str(t_day))] = round(ds2, 2)
+
+        # 计算段数总计和平均值
+        if exclude_today_flat:
+            total_weight = sum(list(month_total_dict.values())) \
+                           + sum(list(total_queryset_190e_dict.values())) \
+                           + sum(list(total_manual_input_trains_dict.values())) \
+                           - month_total_dict.get(now_day, 0)\
+                           - total_queryset_190e_dict.get(now_day, 0)\
+                           - total_manual_input_trains_dict.get(now_day, 0)
+            total_fm_weight = sum(list(fm_total_dict.values())) \
+                              + sum(list(fm_queryset_190e_dict.values())) \
+                              + sum(list(out_queryset_dict.values())) \
+                              + sum(list(total_manual_input_trains_final_dict.values())) \
+                              - fm_total_dict.get(now_day, 0)\
+                              - fm_queryset_190e_dict.get(now_day, 0)\
+                              - out_queryset_dict.get(now_day, 0)\
+                              - total_manual_input_trains_final_dict.get(now_day, 0)
+        else:
+            total_weight = sum(list(month_total_dict.values())) \
+                           + sum(list(total_queryset_190e_dict.values())) \
+                           + sum(list(total_manual_input_trains_dict.values()))
+            total_fm_weight = sum(list(fm_total_dict.values())) \
+                              + sum(list(fm_queryset_190e_dict.values())) \
+                              + sum(list(out_queryset_dict.values())) \
+                              + sum(list(total_manual_input_trains_final_dict.values()))
+        results['name_13']['weight'] = "" if not total_fm_weight or not total_weight else round(total_weight/total_fm_weight, 2)
+        results['name_13']['avg'] = 0 if not cnt2 else round(sum_ds2/cnt2, 2)
+        results['name_14']['weight'] = '' if not results['name_5']['weight'] else round(sum([i.total_seconds() / 60 for i in time_consume_dict.values()]) / float(results['name_5']['weight']), 2)
+        results['name_15']['weight'] = '' if not results['name_5']['weight'] else round(sum(energy_consume_dict.values()) / float(results['name_5']['weight']), 2)
+        # 总产量加硫、无硫、段数平均值
+        avg_results = {'jl': results['name_2']['avg'],
+                       'wl': results['name_1']['avg'],
+                       'ds': results['name_13']['weight']}
+        if self.request.query_params.get('export', None):
+            results2 = {}
+            equip_query = Equip.objects.filter(
+                category__equip_type__global_name='密炼设备').values('equip_no', 'category__category_name')
+            equip_dic = {item['equip_no']: item['category__category_name'] for item in equip_query}
+            data2 = TrainsFeedbacks.objects.exclude(operation_user='Mixer2').filter(
+                factory_date__year=year).values(
+                'factory_date__month', 'product_no', 'equip_no', 'classes'
+            ).annotate(actual_trains=Count('id'), weight=Sum('plan_weight')/1000).order_by('-classes')
+            for item in data2:
+                try:
+                    state = item['product_no'].split("-")[1]
+                    space = item['product_no'].split("-")[2]
+                    key = f'{space}_{state}_{item["equip_no"]}_{item["classes"]}'
+                except:
+                    continue
+                weight = round(float(item['weight']), 3)
+                if results2.get(key):
+                    results2[key][f'{item["factory_date__month"]}_qty'] = results2[key].get(
+                        f'{item["factory_date__month"]}_qty', 0) + item['actual_trains']
+                    results2[key][f'{item["factory_date__month"]}_weight'] = round(
+                        results2[key].get(f'{item["factory_date__month"]}_weight', 0) + weight, 3)
+                    results2[key]['汇总_weight'] += weight
+                    results2[key]['汇总_qty'] += item['actual_trains']
+                else:
+                    results2[key] = {'规格': space, '段数': state, '机台': item["equip_no"],
+                                     '机型': equip_dic[item["equip_no"]], '班别': item['classes'],
+                                     '汇总_qty': item['actual_trains'], '汇总_weight': weight,
+                                     f'{item["factory_date__month"]}_qty': item['actual_trains'],
+                                     f'{item["factory_date__month"]}_weight': weight}
+            equip_190e_result = {}
+            equip_190e_queryset = Equip190EWeight.objects.filter(
+                factory_date__year=year
+            ).values('factory_date__month', 'setup__specification', 'setup__state', 'classes').annotate(
+                sum_weight=Sum(F('setup__weight')*F('qty')/1000, output_field=DecimalField()),
+                total_trains=Sum('qty')).order_by('-classes')
+            for item in equip_190e_queryset:
+                weight = item['sum_weight']
+                product_no = item['setup__specification']
+                stage = item['setup__state']
+                classes = item['classes']
+                key = '{}_{}_{}'.format(
+                    product_no, stage, classes
+                )
+                if equip_190e_result.get(key):
+                    equip_190e_result[key][f'{item["factory_date__month"]}_qty'] = equip_190e_result[key].get(
+                        f'{item["factory_date__month"]}_qty', 0) + item['total_trains']
+                    equip_190e_result[key][f'{item["factory_date__month"]}_weight'] = round(
+                        equip_190e_result[key].get(f'{item["factory_date__month"]}_weight', 0) + weight, 3)
+                    equip_190e_result[key]['汇总_weight'] += weight
+                    equip_190e_result[key]['汇总_qty'] += item['total_trains']
+                else:
+                    equip_190e_result[key] = {'规格': product_no, '段数': stage, '机台': '190E',
+                                              '机型': '190E', '班别': classes,
+                                              '汇总_qty': item['total_trains'], '汇总_weight': weight,
+                                               f'{item["factory_date__month"]}_qty': item['total_trains'],
+                                               f'{item["factory_date__month"]}_weight': weight}
+
+            manual_input_queryset = ManualInputTrains.objects.filter(
+                factory_date__year=year
+            ).values('factory_date__month',
+                     'equip_no',
+                     'product_no',
+                     'classes'
+                     ).annotate(
+                weight=Sum(F('weight') * F('actual_trains') / 1000, output_field=DecimalField()),
+                total_trains=Sum('actual_trains')
+            ).order_by('-classes')
+            for item in manual_input_queryset:
+                try:
+                    state = item['product_no'].split("-")[1]
+                    space = item['product_no'].split("-")[2]
+                    key = f'{space}_{state}_{item["equip_no"]}_{item["classes"]}'
+                except:
+                    continue
+                weight = round(float(item['weight']), 3)
+                if results2.get(key):
+                    results2[key][f'{item["factory_date__month"]}_qty'] = results2[key].get(
+                        f'{item["factory_date__month"]}_qty', 0) + item['total_trains']
+                    results2[key][f'{item["factory_date__month"]}_weight'] = round(
+                        results2[key].get(f'{item["factory_date__month"]}_weight', 0) + weight, 3)
+                    results2[key]['汇总_weight'] += weight
+                    results2[key]['汇总_qty'] += item['total_trains']
+                else:
+                    results2[key] = {'规格': space, '段数': state, '机台': item["equip_no"],
+                                     '机型': equip_dic[item["equip_no"]], '班别': item['classes'],
+                                     '汇总_qty': item['total_trains'], '汇总_weight': weight,
+                                     f'{item["factory_date__month"]}_qty': item['total_trains'],
+                                     f'{item["factory_date__month"]}_weight': weight}
+            excel_sheet_1_data = list(results.values())
+            excel_sheet_23_data = sorted(
+                list(results2.values()), key=itemgetter('机台', '规格', '段数')
+            ) + sorted(
+                list(equip_190e_result.values()), key=itemgetter('机台', '规格', '段数')
+            )
+            return self.export(year, days, excel_sheet_1_data, excel_sheet_23_data)
+
+        return Response({'results': results.values(),
+                         'data_190e': data_190e,
+                         'avg_190e': avg_190e,
+                         'avg_results': avg_results
+                         })
+
+
+@method_decorator([api_recorder], name="dispatch")
 class Equip190EViewSet(ModelViewSet):
     queryset = Equip190E.objects.filter(delete_flag=False).order_by('id')
     serializer_class = Equip190ESerializer
