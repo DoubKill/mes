@@ -934,10 +934,10 @@ class ProductBatchingPartialUpdateSerializer(BaseModelSerializer):
                 instance.used_user = self.context['request'].user
                 instance.used_time = datetime.now()
                 ProductBatchingEquip.objects.filter(product_batching=instance).update(is_used=True)
-                if '-FM-' in instance.stage_product_batch_no:
-                    idx_keys = {'HMB': 1, 'CMB': 2, '1MB': 3, '2MB': 4, '3MB': 5, '4MB': 6, 'FM': 7}
-                    rubber_type = random.choice(['车胎', '斜交', '实心胎', '半钢', '全钢', '丁基、胶浆、胶囊'])
-                    if all([instance.product_info, instance.versions]):
+                idx_keys = {'HMB': 1, 'CMB': 2, '1MB': 3, '2MB': 4, '3MB': 5, '4MB': 6, 'FM': 7}
+                rubber_type = random.choice(['车胎', '斜交', '实心胎', '半钢', '全钢', '丁基、胶浆、胶囊'])
+                if all([instance.product_info, instance.versions, instance.stage]):
+                    if instance.stage.global_name in idx_keys:
                         product_no = instance.product_info.product_no
                         version = instance.versions
                         stages = list(set(ProductBatching.objects.exclude(used_type=6).filter(
