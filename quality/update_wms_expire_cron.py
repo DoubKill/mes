@@ -19,7 +19,7 @@ from django.db.models import Min
 
 def main():
     now_time = datetime.now()
-    for m in WmsInventoryMaterial.objects.using('wms').filter(is_validity=1, material_no='3C25B2A7-84B9-40D9-BA8C-02100EA3D5AD'):
+    for m in WmsInventoryMaterial.objects.using('wms').filter(is_validity=1):
         period_of_validity = m.period_of_validity
         min_storage_time = WmsInventoryStock.objects.using('wms').filter(
             material_no=m.material_no).aggregate(min_time=Min('in_storage_time'))['min_time']
