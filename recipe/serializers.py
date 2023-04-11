@@ -949,10 +949,10 @@ class ProductBatchingPartialUpdateSerializer(BaseModelSerializer):
                         stages = '/'.join(stages)
                         ms = SchedulingRecipeMachineSetting.objects.filter(
                                 product_no=product_no, version=version).first()
-                        # if ms:  # 定机表存在
-                        #     if not ms.confirmed:
-                        #         ms.stages = stages
-                        #         ms.save()
+                        if ms:  # 定机表存在
+                            if not ms.confirmed:
+                                ms.stages = stages
+                                ms.save()
                         if not ms:  # 定机表不存在
                             old_ms = SchedulingRecipeMachineSetting.objects.filter(
                                 product_no=product_no).order_by('id').last()
