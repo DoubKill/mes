@@ -1900,7 +1900,8 @@ class APSExportDataView(APIView):
                     'begin_time': 0,
                     }
             equip_plan_data[equip_no] = data
-        return equip_plan_data.values()
+        left_data = list(equip_plan_data.values())
+        return list(sorted(left_data, key=lambda x: x['time_consume']))
 
     def get(self, request):
         factory_date = self.request.query_params.get('factory_date')
@@ -2406,7 +2407,7 @@ class APSPlanImport(APIView):
                                                     'time_consume': time_consume,
                                                     'start_time': aps_st + datetime.timedelta(minutes=st),
                                                     'end_time': aps_st + datetime.timedelta(minutes=et),
-                                                    'is_locked': False
+                                                    'is_locked': True if '锁定' in desc else False
                                                    }))
                 except Exception:
                     raise ValidationError('导入数据有误，请检查后重试!')
