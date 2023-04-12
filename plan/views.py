@@ -2407,7 +2407,8 @@ class APSPlanImport(APIView):
                                                     'time_consume': time_consume,
                                                     'start_time': aps_st + datetime.timedelta(minutes=st),
                                                     'end_time': aps_st + datetime.timedelta(minutes=et),
-                                                    'is_locked': True if '锁定' in desc else False
+                                                    'is_locked': True if '锁定' in desc else False,
+                                                    'status': '已下发' if '锁定' in desc else '未下发'
                                                    }))
                 except Exception:
                     raise ValidationError('导入数据有误，请检查后重试!')
