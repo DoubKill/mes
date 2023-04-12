@@ -4710,8 +4710,8 @@ class AttendanceClockViewSet(ModelViewSet):
         # 获取单选和多选机台的岗位
         s_choice, m_choice = [], []
         if equip_list:
-            keyword = equip_list[0][0]
-            equip_type = '密炼' if keyword == 'Z' else '生产配料'
+            keyword = set([i[0] for i in equip_list if i.startswith('Z')])
+            equip_type = '密炼' if 'Z' in keyword else '生产配料'
             s_choice = list(PerformanceJobLadder.objects.filter(type=equip_type, relation=1).values_list('name', flat=True).distinct())
             m_choice = list(PerformanceJobLadder.objects.filter(type=equip_type, relation=2).values_list('name', flat=True).distinct())
         results = {
