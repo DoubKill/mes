@@ -2304,61 +2304,63 @@ class APSPlanImport(APIView):
         data = get_sheet_data(cur_sheet, start_row=3)
         i = 0
         ret = []
-        started_plan_data = TrainsFeedbacks.objects.exclude(operation_user='Mixer2').filter(
-            factory_date=factory_date
-        ).values('plan_classes_uid', 'product_no', 'equip_no'
-                 ).annotate(pt=Max('plan_trains'),
-                            st=Min('begin_time'),
-                            et=Max('end_time'))
-        # 正在运行中的计划
-        running_plan_uid = list(ProductClassesPlan.objects.using('SFJ').filter(
-            work_schedule_plan__plan_schedule__day_time=factory_date,
-            delete_flag=False,
-            status__in=['运行中', '已下达']).values_list('plan_classes_uid', flat=True))
-        st_uid_list = []
-        for sp in started_plan_data:
-            equip_no = sp['equip_no']
-            product_no = sp['product_no']
-            plan_trains = sp['pt']
-            plan_classes_uid = sp['plan_classes_uid']
-            st = sp['st']
-            et = sp['et']
-            st_uid_list.append(plan_classes_uid)
-            if plan_classes_uid in running_plan_uid:
-                et = st + datetime.timedelta(seconds=calculate_equip_recipe_avg_mixin_time(equip_no, product_no))*plan_trains
-            ret.append(SchedulingResult(**{'factory_date': factory_date,
-                                           'schedule_no': schedule_no,
-                                           'equip_no': equip_no,
-                                           'sn': 1,
-                                           'recipe_name': product_no,
-                                           'plan_trains': plan_trains,
-                                           'time_consume': (et - st).total_seconds() // 60,
-                                           'start_time': st,
-                                           'end_time': et,
-                                           'is_locked': True,
-                                           'status': '已下发'
-                                           }))
-        wp_uid = set(running_plan_uid) - set(st_uid_list)
-        for wp in ProductClassesPlan.objects.using('SFJ').filter(
-                plan_classes_uid__in=list(wp_uid)).values(
-            'equip__equip_no', 'plan_trains', 'product_batching__stage_product_batch_no'
-        ):
-            equip_no = wp['equip__equip_no']
-            plan_trains = wp['plan_trains']
-            product_no = wp['product_batching__stage_product_batch_no']
-            time_consume = calculate_equip_recipe_avg_mixin_time(equip_no, product_no) * plan_trains // 60
-            ret.append(SchedulingResult(**{'factory_date': factory_date,
-                                           'schedule_no': schedule_no,
-                                           'equip_no': equip_no,
-                                           'sn': 1,
-                                           'recipe_name': product_no,
-                                           'plan_trains': plan_trains,
-                                           'time_consume': time_consume,
-                                           'start_time': datetime.datetime.now(),
-                                           'end_time': datetime.datetime.now() + datetime.timedelta(minutes=time_consume),
-                                           'is_locked': True,
-                                           'status': '已下发'
-                                           }))
+        # started_plan_data = TrainsFeedbacks.objects.exclude(operation_user='Mixer2').filter(
+        #     factory_date=factory_date
+        # ).values('plan_classes_uid', 'product_no', 'equip_no'
+        #          ).annotate(st=Min('begin_time'),
+        #                     et=Max('end_time'))
+        # plan_trains_dict = dict(ProductClassesPlan.objects.using('SFJ').filter(
+        #     work_schedule_plan__plan_schedule__day_time=factory_date,
+        #     delete_flag=False).values_list('plan_classes_uid', 'plan_trains'))
+        # # 正在运行中的计划
+        # running_plan_uid = list(ProductClassesPlan.objects.using('SFJ').filter(
+        #     work_schedule_plan__plan_schedule__day_time=factory_date,
+        #     delete_flag=False,
+        #     status__in=['运行中', '已下达']).values_list('plan_classes_uid', flat=True))
+        # st_uid_list = []
+        # for sp in started_plan_data:
+        #     equip_no = sp['equip_no']
+        #     product_no = sp['product_no']
+        #     plan_classes_uid = sp['plan_classes_uid']
+        #     plan_trains = plan_trains_dict.get(plan_classes_uid, 0)
+        #     st = sp['st']
+        #     et = sp['et']
+        #     st_uid_list.append(plan_classes_uid)
+        #     if plan_classes_uid in running_plan_uid:
+        #         et = st + datetime.timedelta(seconds=calculate_equip_recipe_avg_mixin_time(equip_no, product_no))*plan_trains
+        #     ret.append(SchedulingResult(**{'factory_date': factory_date,
+        #                                    'schedule_no': schedule_no,
+        #                                    'equip_no': equip_no,
+        #                                    'sn': 1,
+        #                                    'recipe_name': product_no,
+        #                                    'plan_trains': plan_trains,
+        #                                    'time_consume': (et - st).total_seconds() // 60,
+        #                                    'start_time': st,
+        #                                    'end_time': et,
+        #                                    'is_locked': True,
+        #                                    'status': '已下发'
+        #                                    }))
+        # wp_uid = set(running_plan_uid) - set(st_uid_list)
+        # for wp in ProductClassesPlan.objects.using('SFJ').filter(
+        #         plan_classes_uid__in=list(wp_uid)).values(
+        #     'equip__equip_no', 'plan_trains', 'product_batching__stage_product_batch_no'
+        # ):
+        #     equip_no = wp['equip__equip_no']
+        #     plan_trains = wp['plan_trains']
+        #     product_no = wp['product_batching__stage_product_batch_no']
+        #     time_consume = calculate_equip_recipe_avg_mixin_time(equip_no, product_no) * plan_trains // 60
+        #     ret.append(SchedulingResult(**{'factory_date': factory_date,
+        #                                    'schedule_no': schedule_no,
+        #                                    'equip_no': equip_no,
+        #                                    'sn': 1,
+        #                                    'recipe_name': product_no,
+        #                                    'plan_trains': plan_trains,
+        #                                    'time_consume': time_consume,
+        #                                    'start_time': datetime.datetime.now(),
+        #                                    'end_time': datetime.datetime.now() + datetime.timedelta(minutes=time_consume),
+        #                                    'is_locked': True,
+        #                                    'status': '已下发'
+        #                                    }))
 
         eq_st = 'Z01'
         for idx, item in enumerate(data):
@@ -2385,8 +2387,8 @@ class APSPlanImport(APIView):
                     et = int(item[j * 6 + 5])
                 except Exception:
                     raise ValidationError('数据错误，请检查后重试！')
-                if '锁定' in desc:
-                    continue
+                # if '锁定' in desc:
+                #     continue
                 pb = ProductBatching.objects.using('SFJ').filter(
                     stage_product_batch_no=product_no,
                     used_type=4,
