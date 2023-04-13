@@ -64,7 +64,8 @@ class SaveFinishRatio(object):
             target_data = equip_target_data[0]
         group_data_dict = {i: {'equip_no': i, 'target_trains': target_data.get(i, 0)} for i in
                            list(Equip.objects.filter(
-                               category__equip_type__global_name="密炼设备"
+                               category__equip_type__global_name="密炼设备",
+                               equip_no__startswith='Z'
                            ).order_by('equip_no').values_list("equip_no", flat=True))}
 
         for p in production_data:
