@@ -4130,7 +4130,7 @@ class PerformanceSummaryView(APIView):
                          'calculate_begin_date', 'calculate_end_date', 'standard_begin_date', 'standard_end_date')
         user_dic = {}
         equip_dic = {}
-        equip_list = Equip.objects.filter(category__equip_type__global_name='密炼设备').values('category__category_no', 'equip_no')
+        equip_list = Equip.objects.filter(category__equip_type__global_name='密炼设备', equip_no__startswith='Z').values('category__category_no', 'equip_no')
         for item in equip_list:
             equip_dic[item['equip_no']] = 'GK400' if item['category__category_no'].startswith('GK400') else item['category__category_no']
         for item in user_query:
@@ -4648,7 +4648,7 @@ class AttendanceClockViewSet(ModelViewSet):
         group_type = attendance_group_obj.type   # 密炼/细料称量/硫磺称量
         if group_type == '密炼':
             equip_type = '密炼设备'
-            equip_list = Equip.objects.filter(category__equip_type__global_name=equip_type).values_list('equip_no', flat=True)
+            equip_list = Equip.objects.filter(category__equip_type__global_name=equip_type, equip_no__startswith='Z').values_list('equip_no', flat=True)
         else:
             equip_type = '称量设备'
             equip_list = Equip.objects.filter(category__equip_type__global_name=equip_type).values_list('equip_no',  flat=True)
@@ -6069,8 +6069,12 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
             if equip:
                 filter_kwargs['equip__in'] = equip.split(',')
             else:  # 所有机台
-                equip_type = '密炼设备' if clock_type == '密炼' else '称量设备'
-                equip_info = list(Equip.objects.filter(category__equip_type__global_name=equip_type, use_flag=True).values_list('equip_no', flat=True))
+                if clock_type == '密炼':
+                    equip_type = '密炼设备'
+                    equip_info = list(Equip.objects.filter(category__equip_type__global_name=equip_type, use_flag=True, equip_no__startswith='Z').values_list('equip_no', flat=True))
+                else:
+                    equip_type = '称量设备'
+                    equip_info = list(Equip.objects.filter(category__equip_type__global_name=equip_type, use_flag=True).values_list('equip_no', flat=True))
                 filter_kwargs['equip__in'] = equip_info
             if section:
                 filter_kwargs['section__in'] = section.split(',')
