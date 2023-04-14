@@ -1177,9 +1177,14 @@ permission_data = [
     {'id': 1156, 'code': 'view_equip_down_summary_table', 'name': '查看', 'parent_id': 1155},
     {'id': 1157, 'code': 'export_equip_down_summary_table', 'name': '导出', 'parent_id': 1155},
 
-    # 下一个 1159 开始
     {'id': 1159, 'code': 'xl_plan_consume', 'name': '细料分解每日计划用量', 'parent_id': None, 'category_name': '工艺管理'},
     {'id': 1160, 'code': 'view_xl_plan_consume', 'name': '查看', 'parent_id': 1159},
+
+    {'id': 1161, 'code': 'monthly_production_completion_report', 'name': '月产量完成', 'parent_id': None, 'category_name': '生产管理'},
+    {'id': 1162, 'code': 'view_monthly_production_completion_report', 'name': '查看', 'parent_id': 1161},
+    {'id': 1163, 'code': 'export_monthly_production_completion_report', 'name': '导出', 'parent_id': 1161},
+
+    # 下一个 1164 开始
 ]
 
 
