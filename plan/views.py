@@ -1860,13 +1860,16 @@ class WeightPackageDailyTimeConsumeViewSet(ModelViewSet):
 @method_decorator([api_recorder], name='dispatch')
 class APSExportDataView(APIView):
 
-    def extend_last_aps_result(self, factory_date):
+    def extend_last_aps_result(self, factory_date, now_time, lock_durations):
         """
         继承前一天未打完的排程计划
+        @param lock_durations:
+        @param now_time:
         @param factory_date: 日期
         @return:
         """
         equip_plan_data = {}
+        equip_end_time_dict = {}
         started_plan_trains_dict = dict(TrainsFeedbacks.objects.filter(
             factory_date=factory_date
         ).values('plan_classes_uid').annotate(mt=Max('actual_trains')).values_list('plan_classes_uid', 'mt'))
@@ -1894,14 +1897,68 @@ class APSExportDataView(APIView):
             data = {'recipe_name': recipe_name,
                     'equip_no': equip_no,
                     'plan_trains': left_trains,
-                    'time_consume': time_consume,
                     'status': 'COMMITED',
                     'weight': weight,
                     'begin_time': 0,
+                    'end_time': time_consume,
+                    'time_consume': time_consume
                     }
             equip_plan_data[equip_no] = data
+            equip_end_time_dict[equip_no] = now_time + datetime.timedelta(minutes=int(time_consume) + 3)
         left_data = list(equip_plan_data.values())
-        return list(sorted(left_data, key=lambda x: x['time_consume']))
+        equip_plan_data = []
+
+        # 前一天未下达的计划，锁定时间以内的状态为COMMITED，其他为STANDARD
+        yesterday = factory_date - datetime.timedelta(days=1)
+        yesterday_last_res = SchedulingResult.objects.filter(
+            factory_date=yesterday).order_by('id').last()
+        if yesterday_last_res:
+            equip_time_dict = {}
+            last_aps_results = SchedulingResult.objects.filter(
+                schedule_no=yesterday_last_res.schedule_no,
+                status='未下发').order_by('equip_no', 'sn').values()
+            for result in last_aps_results:
+                equip_no = result['equip_no']
+                recipe_name = result['recipe_name']
+                plan_trains = result['plan_trains']
+                time_consume = result['time_consume']
+                equip_time_consume = equip_time_dict.get(equip_no, 0)
+                pb = ProductBatching.objects.using('SFJ').filter(
+                    stage_product_batch_no=recipe_name, equip__equip_no=equip_no).order_by('id').last()
+                if pb:
+                    weight = pb.batching_weight * plan_trains
+                else:
+                    weight = 6.6
+                if equip_end_time_dict.get(equip_no):
+                    tt = equip_end_time_dict[equip_no]
+                else:
+                    tt = now_time
+                # 锁定时间范围之内的为committed
+                locked_end_time = now_time + datetime.timedelta(hours=float(lock_durations))
+                if lock_durations != 0 and equip_time_consume <= lock_durations and tt < locked_end_time:
+                    equip_end_time_dict[equip_no] = tt + datetime.timedelta(hours=time_consume) + datetime.timedelta(minutes=3)
+                    begin_time = int((tt - now_time).total_seconds() / 60)
+                    equip_plan_data.append({'recipe_name': recipe_name,
+                                            'equip_no': equip_no,
+                                            'plan_trains': plan_trains,
+                                            'status': 'COMMITED',
+                                            'begin_time': begin_time,
+                                            'weight': weight,
+                                            'end_time': begin_time + time_consume * 60,
+                                            'time_consume': time_consume * 60
+                                            })
+                # else:
+                #     equip_plan_data.append({'recipe_name': recipe_name,
+                #                             'equip_no': equip_no,
+                #                             'plan_trains': plan_trains,
+                #                             'delivery_time': time_consume * 60,
+                #                             'time_consume': time_consume * 60,
+                #                             'status': 'STANDARD',
+                #                             'weight': weight
+                #                             })
+                equip_time_dict[equip_no] = equip_time_consume + time_consume
+        left_data.extend(equip_plan_data)
+        return list(sorted(left_data, key=lambda x: x['end_time']))
 
     def get(self, request):
         factory_date = self.request.query_params.get('factory_date')
@@ -2139,7 +2196,8 @@ class APSExportDataView(APIView):
             # if pb_version_name not in job_list_data:
                 # raise ValidationError('该规格启用配方未找到:{}'.format(pb_version_name))
 
-        left_plans = self.extend_last_aps_result(datetime.datetime.strptime(factory_date, "%Y-%m-%d"))
+        left_plans = self.extend_last_aps_result(datetime.datetime.strptime(factory_date, "%Y-%m-%d"),
+                                                 now_time, sps.lock_durations)
 
         # write excel
         data_row = 2
@@ -2181,7 +2239,7 @@ class APSExportDataView(APIView):
             sheet1.cell(data_row, 2).value = '-'.join(j['recipe_name'].split('-')[-2:])  # 规格名称（带版本号）
             sheet1.cell(data_row, 3).value = 0  # 胶料代码开始时间(暂时无用)
             sheet1.cell(data_row, 4).value = 0  # 关键路径持续时间（暂时无用）
-            sheet1.cell(data_row, 5).value = int(j['time_consume'])
+            sheet1.cell(data_row, 5).value = int(j['end_time'])
             sheet1.cell(data_row, 6).value = 1  # job_list_size(总共需要打待段次数量)
             # 写入job list
             sheet2.cell(data_row1, 1).value = data_row - 1
@@ -2193,7 +2251,7 @@ class APSExportDataView(APIView):
             sheet2.cell(data_row1, 7).value = 1
             sheet2.cell(data_row1, 8).value = int(j['time_consume'])
             sheet2.cell(data_row1, 9).value = int(j['equip_no'][-2:])
-            sheet2.cell(data_row1, 10).value = 0
+            sheet2.cell(data_row1, 10).value = int(j['begin_time'])
             sheet2.cell(data_row1, 11).value = int(j['plan_trains'])
             data_row1 += 1
             data_row += 1
@@ -2407,8 +2465,8 @@ class APSPlanImport(APIView):
                                                     'time_consume': time_consume,
                                                     'start_time': aps_st + datetime.timedelta(minutes=st),
                                                     'end_time': aps_st + datetime.timedelta(minutes=et),
-                                                    'is_locked': True if '锁定' in desc else False,
-                                                    'status': '已下发' if '锁定' in desc else '未下发'
+                                                    'is_locked': True if '锁定' in desc else False
+                                                    # 'status': '已下发' if '锁定' in desc else '未下发'
                                                    }))
                 except Exception:
                     raise ValidationError('导入数据有误，请检查后重试!')
