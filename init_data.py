@@ -506,6 +506,7 @@ permission_data = [
 
     {'id': 564, 'code': 'product_quality_analyze', 'name': '胶料规格别合格率统计', 'parent_id': None, 'category_name': '质量管理'},
     {'id': 565, 'code': 'view_product_quality_analyze', 'name': '查看', 'parent_id': 564},
+    {'id': 1164, 'code': 'curve_product_quality_analyze', 'name': '查看推移图', 'parent_id': 564},
 
     {'id': 566, 'code': 'classes_quality_analyze', 'name': '胶料班次别合格率统计', 'parent_id': None, 'category_name': '质量管理'},
     {'id': 567, 'code': 'view_classes_quality_analyze', 'name': '查看', 'parent_id': 566},
@@ -1184,7 +1185,7 @@ permission_data = [
     {'id': 1162, 'code': 'view_monthly_production_completion_report', 'name': '查看', 'parent_id': 1161},
     {'id': 1163, 'code': 'export_monthly_production_completion_report', 'name': '导出', 'parent_id': 1161},
 
-    # 下一个 1164 开始
+    # 下一个 1165 开始
 ]
 
 
