@@ -643,7 +643,7 @@ class JZCLSystem(object):
             logger.error(f'{plan_no}:未知响应码{rep}')
             raise ValueError(f'{plan_no}:未知响应码{rep}')
         if rep != 1:
-            logger.error(f'{plan_no}:新建计划异常: {resp_string}')
+            logger.error(f'{plan_no}:新建计划异常: {resp_string}, rep: {rep}')
             raise ValueError(f'{plan_no}:新建计划异常: {resp_string}')
         return resp_string
 
@@ -684,7 +684,7 @@ class JZCLSystem(object):
             logger.error(f'{plan_no}:未知响应码{rep}')
             raise ValueError(f'{plan_no}:未知响应码{rep}')
         if rep != 1:
-            logger.error(f'{plan_no}:下达计划异常: {resp_string}')
+            logger.error(f'{plan_no}:下达计划异常: {resp_string}, rep: {rep}')
             raise ValueError(f'{plan_no}:下达计划异常: {resp_string}')
         return resp_string
 
@@ -721,7 +721,7 @@ class JZCLSystem(object):
             logger.error(f'{plan_no}:未知响应码{rep}')
             raise ValueError(f'{plan_no}:未知响应码{rep}')
         if rep != 1:
-            logger.error(f'{plan_no}:停止计划异常: {resp_string}')
+            logger.error(f'{plan_no}:停止计划异常: {resp_string}, rep: {rep}')
             raise ValueError(f'{plan_no}:停止计划异常: {resp_string}')
         return resp_string
 
@@ -760,7 +760,7 @@ class JZCLSystem(object):
             logger.error(f'{plan_no}:未知响应码{rep}')
             raise ValueError(f'{plan_no}:未知响应码{rep}')
         if rep != 1:
-            logger.error(f'{plan_no}:修改车次异常: {resp_string}')
+            logger.error(f'{plan_no}:修改车次异常: {resp_string}, rep: {rep}')
             raise ValueError(f'{plan_no}:修改车次异常: {resp_string}')
         return resp_string
 

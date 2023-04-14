@@ -2475,12 +2475,58 @@ class MonthlyOutputStatisticsReport(APIView):
             factory_date__lte=et
         )
         stage_production_queryset = qs.values('product_no').annotate(total_weight=Sum('plan_weight')/1000).order_by('product_no')
+        # 当月190E除去洗车胶外的所有产量
+        queryset_190e = Equip190EWeight.objects.exclude(setup__specification__in=('洗车胶', 'XCJ', 'WUMING')).filter(factory_date__gte=st, factory_date__lte=et)
+        # 按胶料编码分组，计算190E总生产重量
+        total_queryset_190e_dict = dict(queryset_190e.values('setup').annotate(stage=F('setup__state'), sum_weight=Sum(F('setup__weight')*F('qty')/1000, output_field=DecimalField())).values_list('stage', 'sum_weight'))
+        # 按胶料编码分组，计算手动总生产重量
+        total_manual_input_trains = ManualInputTrains.objects.exclude(
+            Q(product_no__icontains='XCJ') |
+            Q(product_no__icontains='洗车胶') |
+            Q(product_no__icontains='-WUMING-')
+        ).filter(factory_date__gte=st, factory_date__lte=et)
+        total_manual_input_trains_dict = dict(total_manual_input_trains.values('product_no').annotate(weight=Sum(F('weight') * F('actual_trains')/1000, output_field=DecimalField())).values_list('product_no', 'weight'))
+
+        # 密炼产量
         for item in stage_production_queryset:
             try:
                 stage = item['product_no'].split('-')[1]
             except Exception:
                 continue
             weight = round(item['total_weight'], 2)
+            if stage in ('RE', 'FM', 'RFM'):
+                jl_stage_output['jl']['value'] += weight
+                if stage not in jl_stage_output:
+                    jl_stage_output[stage] = {'name': stage, 'value': weight}
+                else:
+                    jl_stage_output[stage]['value'] += weight
+            else:
+                wl_stage_output['wl']['value'] += weight
+                if stage not in wl_stage_output:
+                    wl_stage_output[stage] = {'name': stage, 'value': weight}
+                else:
+                    wl_stage_output[stage]['value'] += weight
+        # 190e产量
+        for k, v in total_queryset_190e_dict.items():
+            stage, weight = k, round(v, 2)
+            if stage in ('RE', 'FM', 'RFM'):
+                jl_stage_output['jl']['value'] += weight
+                if stage not in jl_stage_output:
+                    jl_stage_output[stage] = {'name': stage, 'value': weight}
+                else:
+                    jl_stage_output[stage]['value'] += weight
+            else:
+                wl_stage_output['wl']['value'] += weight
+                if stage not in wl_stage_output:
+                    wl_stage_output[stage] = {'name': stage, 'value': weight}
+                else:
+                    wl_stage_output[stage]['value'] += weight
+        # 手动生产产量
+        for k, v in total_manual_input_trains_dict.items():
+            try:
+                stage, weight = k.split('-')[1], round(v, 2)
+            except Exception:
+                continue
             if stage in ('RE', 'FM', 'RFM'):
                 jl_stage_output['jl']['value'] += weight
                 if stage not in jl_stage_output:
@@ -4793,7 +4839,7 @@ class PerformanceSummaryView(APIView):
                          'calculate_begin_date', 'calculate_end_date', 'standard_begin_date', 'standard_end_date')
         user_dic = {}
         equip_dic = {}
-        equip_list = Equip.objects.filter(category__equip_type__global_name='密炼设备').values('category__category_no', 'equip_no')
+        equip_list = Equip.objects.filter(category__equip_type__global_name='密炼设备', equip_no__startswith='Z').values('category__category_no', 'equip_no')
         for item in equip_list:
             equip_dic[item['equip_no']] = 'GK400' if item['category__category_no'].startswith('GK400') else item['category__category_no']
         for item in user_query:
@@ -5311,7 +5357,7 @@ class AttendanceClockViewSet(ModelViewSet):
         group_type = attendance_group_obj.type   # 密炼/细料称量/硫磺称量
         if group_type == '密炼':
             equip_type = '密炼设备'
-            equip_list = Equip.objects.filter(category__equip_type__global_name=equip_type).values_list('equip_no', flat=True)
+            equip_list = Equip.objects.filter(category__equip_type__global_name=equip_type, equip_no__startswith='Z').values_list('equip_no', flat=True)
         else:
             equip_type = '称量设备'
             equip_list = Equip.objects.filter(category__equip_type__global_name=equip_type).values_list('equip_no',  flat=True)
@@ -5373,8 +5419,8 @@ class AttendanceClockViewSet(ModelViewSet):
         # 获取单选和多选机台的岗位
         s_choice, m_choice = [], []
         if equip_list:
-            keyword = equip_list[0][0]
-            equip_type = '密炼' if keyword == 'Z' else '生产配料'
+            keyword = set([i[0] for i in equip_list if i.startswith('Z')])
+            equip_type = '密炼' if 'Z' in keyword else '生产配料'
             s_choice = list(PerformanceJobLadder.objects.filter(type=equip_type, relation=1).values_list('name', flat=True).distinct())
             m_choice = list(PerformanceJobLadder.objects.filter(type=equip_type, relation=2).values_list('name', flat=True).distinct())
         results = {
@@ -6732,8 +6778,12 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
             if equip:
                 filter_kwargs['equip__in'] = equip.split(',')
             else:  # 所有机台
-                equip_type = '密炼设备' if clock_type == '密炼' else '称量设备'
-                equip_info = list(Equip.objects.filter(category__equip_type__global_name=equip_type, use_flag=True).values_list('equip_no', flat=True))
+                if clock_type == '密炼':
+                    equip_type = '密炼设备'
+                    equip_info = list(Equip.objects.filter(category__equip_type__global_name=equip_type, use_flag=True, equip_no__startswith='Z').values_list('equip_no', flat=True))
+                else:
+                    equip_type = '称量设备'
+                    equip_info = list(Equip.objects.filter(category__equip_type__global_name=equip_type, use_flag=True).values_list('equip_no', flat=True))
                 filter_kwargs['equip__in'] = equip_info
             if section:
                 filter_kwargs['section__in'] = section.split(',')
