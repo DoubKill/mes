@@ -186,7 +186,11 @@ class PalletFeedbacksViewSet(mixins.CreateModelMixin,
         if not lot_no:
             raise ValidationError("请传入lot_no")
         if MaterialTestOrder.objects.filter(lot_no=lot_no).exists():
-            raise ValidationError("该批次数据已绑定快检数据，不可修改！")
+            # raise ValidationError("该批次数据已绑定快检数据，不可修改！")
+            # 根据条码修正重量
+            fix_weight = validated_data.get('actual_weight')
+            PalletFeedbacks.objects.filter(lot_no=lot_no).update(actual_weight=fix_weight)
+            return Response("补充成功")
         instance, flag = PalletFeedbacks.objects.update_or_create(defaults=validated_data, **{"lot_no": lot_no})
         if flag:
             message = "补充成功"
@@ -4678,7 +4682,7 @@ class AttendanceClockViewSet(ModelViewSet):
             if queryset.class_code == '休' and not apply:  # 进入考勤页面时异常记录日志,补卡时忽略
                 b_date = (datetime.datetime.strptime(date_now, '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
                 last_obj = EmployeeAttendanceRecords.objects.filter(user=self.request.user, factory_date=b_date, end_date__isnull=True,
-                                                                    clock_type=clock_type).order_by('factory_date').last()
+                                                                    clock_type=clock_type).order_by('factory_date', 'id').last()
                 if last_obj:
                     queryset = r_queryset.filter(factory_date=b_date).last()
                     date_now = b_date
@@ -4729,7 +4733,7 @@ class AttendanceClockViewSet(ModelViewSet):
             return Response({'results': results})
 
         # 判断最后一条的工厂时间是不是当天，是的话说明是正在进行中的
-        last_obj = EmployeeAttendanceRecords.objects.filter(user=self.request.user, clock_type=attendance_group_obj.type).order_by('factory_date').last()
+        last_obj = EmployeeAttendanceRecords.objects.filter(user=self.request.user, clock_type=attendance_group_obj.type).order_by('factory_date', 'id').last()
         if attendance_group_obj.type == '密炼':
             if last_obj:
                 key_second = (last_obj.standard_end_date - last_obj.standard_begin_date).total_seconds()
@@ -6002,8 +6006,10 @@ class GroupClockDetailView(APIView):
                         names = [i for i in s_section if i['name'] == real_name]
                         if _key in exist_r:
                             if names:
+                                if equip in names[0]['equip']:
+                                    continue
                                 _equip = names[0]['equip'] + f'/{equip}'
-                                if len(_equip.split('/')) >= 15:
+                                if len(_equip.split('/')) >= 15 and clock_type == '密炼':
                                     _equip = 'Z01~Z15'
                                 names[0]['equip'] = _equip
                             else:
@@ -6027,6 +6033,8 @@ class GroupClockDetailView(APIView):
                 end_date = s.end_date.strftime('%Y-%m-%d %H:%M:%S') if s.end_date else None
                 s_status = results.get(status)
                 if s_status:
+                    if equip in s_status['equip']:
+                        continue
                     s_status['equip'] += f",{equip}"
                 else:
                     results[status] = {'id': s.id, 'user_name': user_name, 'section': section, 'equip': equip, 'status': status,
