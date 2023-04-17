@@ -5260,6 +5260,8 @@ class EquipIndexView(APIView):
             current_product = ''
             equip_no = equip.equip_no
             equip_cat = equip.category.equip_type.global_name
+            if equip_no == '190E':
+                continue
             if equip_cat == '密炼设备':
                 # 实际生产车次
                 actual_trains = actual_data.get(equip_no, 0) if equip_no != 'Z04' else actual_data.get(equip_no, 0)//2
