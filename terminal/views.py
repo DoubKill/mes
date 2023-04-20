@@ -3449,11 +3449,11 @@ class ToleranceKeyword(APIView):
         model_name = ToleranceDistinguish if keyword_type == '区分' else (
             ToleranceProject if keyword_type == '项目' else ToleranceHandle)
         if all:
-            results = model_name.objects.all().values('id', 'keyword_name')
+            results = model_name.objects.all().values('id', 'keyword_name').order_by('id')
         elif single:
-            results = model_name.objects.filter(keyword_name__in=['<', '≤', '<=']).values('id', 'keyword_name')
+            results = model_name.objects.filter(keyword_name__in=['<', '≤', '<=']).values('id', 'keyword_name').order_by('id')
         else:
-            results = model_name.objects.all().values()
+            results = model_name.objects.all().values().order_by('id')
         return Response({'results': list(results)})
 
     @atomic
@@ -3499,7 +3499,7 @@ class ToleranceRuleViewSet(CommonDeleteMixin, ModelViewSet):
     update: 技术标准-公差录入规则修改
     destroy: 技术标准-公差录入规则停用
     """
-    queryset = ToleranceRule.objects.all()
+    queryset = ToleranceRule.objects.all().order_by('rule_code')
     serializer_class = ToleranceRuleSerializer
     pagination_class = None
     permission_classes = (IsAuthenticated,)
