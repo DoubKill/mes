@@ -136,7 +136,7 @@ class ProductBatchingSyncInterface(serializers.ModelSerializer, BaseInterface):
                     .values('material_name', 'actual_weight', 'standard_error')
                 total_weight = weight_cnt_type.cnt_total_weight(i.equip_no)
                 batching_equip = 'S' if weight_cnt_type.weigh_type == 1 else 'F'
-                tolerance = get_tolerance(batching_equip, total_weight, project_name='整包', only_num=True)
+                tolerance = get_tolerance(batching_equip, total_weight, project_name='整包', only_num=True, destination='群控')
                 if batching_equip == 'F' and total_weight and total_weight > 30 and tolerance:
                     try:
                         n = round(tolerance, 1)

@@ -832,26 +832,56 @@ class JZCLSystem(object):
         return int(Decimal(rep))
 
 
-def get_tolerance(batching_equip, standard_weight, material_name=None, project_name='单个化工重量', only_num=None):
+def get_tolerance(batching_equip, standard_weight, material_name=None, project_name='单个化工重量', material_type=None, material_species=None,
+                  only_num=None, destination=None):
+    """
+    获取公差
+    :param batching_equip: 机台号
+    :param standard_weight: 重量
+    :param material_name: 物料名称
+    :param project_name: 项目名称
+    :param material_type: 物料类型
+    :param material_species: 物料种类
+    :param only_num: 仅返回公差值
+    :param destination: 来源[群控、其他]
+    :return: 公差
+    """
     if not standard_weight:
         standard_weight = 0
     standard_weight = Decimal(standard_weight)
+    rule, tolerance = None, 0
     # 人工单配细料硫磺包
     if batching_equip:
         type_name = '硫磺' if batching_equip.startswith('S') else '细料'
         if '单个' not in project_name:
             project_name = f"整包{type_name}重量"
-        rule = ToleranceRule.objects.filter(distinguish__keyword_name=f"{type_name}称量",
+        keyword_name = f"{type_name}称量" if not destination else f"{destination}{type_name}称量"
+        rule = ToleranceRule.objects.filter(distinguish__keyword_name=keyword_name,
                                             project__keyword_name=project_name, use_flag=True,
                                             small_num__lt=standard_weight, big_num__gte=standard_weight).first()
+        tolerance = f"{rule.handle.keyword_name}{rule.standard_error}{rule.unit}" if rule else tolerance
     # 人工单配配方或通用(所有量程)
     else:
-        if not material_name:
-            rule = None
-        else:
-            rule = ToleranceRule.objects.filter(distinguish__re_str__icontains=material_name, use_flag=True).first()
-    tolerance = f"{rule.handle.keyword_name}{rule.standard_error}{rule.unit}" if rule else ""
-    if tolerance:
+        if material_name:
+            if not material_species:
+                rule = ToleranceRule.objects.filter(distinguish__re_str__icontains=material_name,
+                                                    use_flag=True, small_num__lt=standard_weight, big_num__gte=standard_weight).first()
+                tolerance = f"{rule.handle.keyword_name}{rule.standard_error}{rule.unit}" if rule else tolerance
+            else:
+                if material_species == '炭黑':
+                    tolerance = 0.5
+                elif material_species == '油料':
+                    tolerance = 0.2
+                elif material_species in ['细料', '硫磺']:
+                    if material_type == '炭黑':
+                        tolerance = 0.3
+                    else:
+                        rule = ToleranceRule.objects.filter(distinguish__keyword_name__icontains=material_species, distinguish__re_str__icontains=material_type,
+                                                            use_flag=True, small_num__lt=standard_weight, big_num__gte=standard_weight).first()
+                        tolerance = f"{rule.handle.keyword_name}{rule.standard_error}{rule.unit}" if rule else tolerance
+                else:
+                    rule, tolerance = rule, tolerance
+    if rule:
         if rule.unit == '%':
             handle_num = round(rule.standard_error / 100 * standard_weight, 3)
             tolerance = f"{rule.handle.keyword_name}{handle_num}kg" if not only_num else handle_num
@@ -860,7 +890,8 @@ def get_tolerance(batching_equip, standard_weight, material_name=None, project_n
                 tolerance = rule.standard_error
     else:
         if only_num:
-            tolerance = 0
+            tolerance = tolerance
+
     return tolerance
 
 

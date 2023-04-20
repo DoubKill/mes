@@ -1277,10 +1277,12 @@ class GetMaterialTolerance(APIView):
         data = self.request.query_params
         batching_equip = data.get('batching_equip')
         material_name = data.get('material_name')
+        material_type = data.get('material_type')  # 物料类别: 活化剂、防老剂、合成胶、炭黑
+        material_species = data.get('material_species')  # 种类: 胶料、炭黑、油料、细料、硫磺
         standard_weight = data.get('standard_weight')
         project_name = data.get('project_name', '单个化工重量')
         only_num = data.get('only_num')
-        tolerance = get_tolerance(batching_equip, standard_weight, material_name, project_name, only_num)
+        tolerance = get_tolerance(batching_equip, standard_weight, material_name, project_name, material_type, material_species, only_num)
         return Response(tolerance)
 
 
