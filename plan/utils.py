@@ -553,12 +553,14 @@ def convert_fm_weight(pb_no, version, factory_date, final_stage):
             stage_product_batch_no__endswith='-{}-{}-{}'.format(out_put_stage, pb_no, version)
         ).order_by('-batching_weight').first()
         if not stage_recipe:
-            raise ValidationError('未找到该规格{}段次配方数据:{}-{}'.format(out_put_stage, pb_no, version))
+            continue
+            # raise ValidationError('未找到该规格{}段次配方数据:{}-{}'.format(out_put_stage, pb_no, version))
         devoted_recipe = ProductBatchingDetail.objects.using('SFJ').filter(
             product_batching_id=stage_recipe.id,
             material__material_no__endswith='-{}-{}-{}'.format(s, pb_no, version)).first()
         if not devoted_recipe:
-            raise ValidationError('未找到该规格投入{}段次配方数据:{}-{}'.format(out_put_stage, pb_no, version))
+            continue
+            # raise ValidationError('未找到该规格投入{}段次配方数据:{}-{}'.format(out_put_stage, pb_no, version))
         trains = s_stock_weight / float(devoted_recipe.actual_weight)
         stage_weight_data[out_put_stage] = trains * float(stage_recipe.batching_weight)
     return round(stage_weight_data[final_stage] / 1000, 2)
