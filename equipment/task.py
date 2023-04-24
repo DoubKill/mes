@@ -256,7 +256,7 @@ class AutoDispatch(object):
             instance = GlobalCode.objects.filter(global_type__type_name='设备部门组织名称', use_flag=1,
                                                  global_type__use_flag=1).first()
             section_name = instance.global_name if instance else section_name
-            choice_all_user = get_staff_status(DinDinAPI(), section_name, group=group) if section_name else []
+            choice_all_user = get_staff_status(section_name, group=group) if section_name else []
             fault_name = order.result_fault_cause if order.result_fault_cause else (
                 order.equip_repair_standard.standard_name if order.equip_repair_standard else order.equip_maintenance_standard.standard_name)
         else:
@@ -271,7 +271,7 @@ class AutoDispatch(object):
                 order.save()
             inspection = True
             # 查询工单对应的包干人员[上班并且有空]
-            choice_all_user = get_maintenance_status(self.ding_api, order.equip_no, order.equip_repair_standard.type)
+            choice_all_user = get_maintenance_status(order.equip_no, order.equip_repair_standard.type)
             fault_name = order.equip_repair_standard.standard_name
         if not choice_all_user:
             logger.info(f'系统派单[{order.work_type}]: {order.work_order_no}-无人员可派单')
@@ -373,7 +373,7 @@ class AutoDispatch(object):
         group = '早班' if '08:00:00' < now_date[11:] < '20:00:00' else '夜班'
         record = WorkSchedulePlan.objects.filter(plan_schedule__day_time=now_date[:10], classes__global_name=group,
                                                  plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
-        return record.group.global_name
+        return record.group.global_name if record and record.group else ''
 
     def get_group_url(self):
         timestamp = str(round(time.time() * 1000))
