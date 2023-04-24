@@ -63,7 +63,7 @@ class DingIdAttendance(object):
                 # 根据手机号获取用户钉钉uid
                 ding_uid = ding_api.get_user_id(phone_number)
                 if ding_uid:
-                    user_ding[ding_uid] = {'user_id': uid, 'optional': default_optional, 'ding_uid': ding_uid}
+                    user_ding[ding_uid] = {'user_id': uid, 'ding_uid': ding_uid, 'phone_number': phone_number, 'optional': default_optional}
                 else:
                     DingUser.objects.update_or_create(user_id=uid, defaults={'user_id': uid, 'ding_uid': ding_uid, 'phone_number': phone_number,
                                                                              'optional': default_optional})
