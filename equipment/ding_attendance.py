@@ -78,7 +78,7 @@ class DingIdAttendance(object):
             # 更新或者创建
             for k, v in user_ding.items():
                 DingUser.objects.update_or_create(user_id=v['user_id'], defaults={'user_id': v['user_id'], 'ding_uid': v['ding_uid'],
-                                                                                  'optional': v['optional']})
+                                                                                  'optional': v['optional'], 'phone_number': v['phone_number']})
 
 
 if __name__ == '__main__':
