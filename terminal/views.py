@@ -3218,6 +3218,24 @@ class FeedingErrorLampForCarbonView(APIView):
         data = {'feeding_type': 2, 'feeding_port_no': feed_port, 'feeding_time': now_time,
                 'feeding_material_name': material_name, 'feeding_username': self.request.user.username,
                 'feed_reason': '', 'feeding_classes': feeding_class, 'feed_result': 'N'}
+        # 防错是否开启、是否为压送状态
+        try:
+            carbon_obj = CarbonDeliverySystem()
+            prevent_states = carbon_obj.prevent_state()
+        except Exception as e:
+            data.update({'feed_reason': '获取输送线防错、压送状态失败'})
+            FeedingOperationLog.objects.create(**data)
+            return Response({'state': 0, 'msg': f'获取输防错、压送状态失败: {e.args[0]}', 'FeedingResult': 2})
+        # 解析防错开关状态和压送状态
+        prevent_state = prevent_states.get('防错状态', False)
+        if not prevent_state:
+            data.update({'feed_reason': '输送线防错未打开, 手动模式'})
+            FeedingOperationLog.objects.create(**data)
+            return Response({'state': 0, 'msg': '输送线防错未打开, 手动模式', 'FeedingResult': 1})
+        if not prevent_states.get(feed_port[0:3], False):
+            data.update({'feed_reason': '输送线防错未打开或压送状态未开启'})
+            FeedingOperationLog.objects.create(**data)
+            return Response({'state': 0, 'msg': '输送线防错未打开或压送状态未开启', 'FeedingResult': 2})
         # 通过物料条码获取炭黑数量与重量
         carbon_out_info = MaterialOutHistory.objects.using('cb').filter(order_no=task_id).first()
         if not carbon_out_info:
@@ -3234,7 +3252,6 @@ class FeedingErrorLampForCarbonView(APIView):
             data['feeding_bar_code'] = '99999999'
         # 获取当前输送线与炭黑罐关系
         try:
-            carbon_obj = CarbonDeliverySystem()
             line_tank_info = carbon_obj.line_info()
         except Exception as e:
             data.update({'feed_reason': '获取输送线与炭黑罐信息失败'})

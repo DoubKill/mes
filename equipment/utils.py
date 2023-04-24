@@ -18,7 +18,7 @@ from rest_framework.exceptions import ValidationError
 import pandas as pd
 
 from basics.models import WorkSchedulePlan
-from equipment.models import EquipApplyOrder, EquipMaintenanceAreaSetting, EquipInspectionOrder, EquipSpareErp
+from equipment.models import EquipApplyOrder, EquipMaintenanceAreaSetting, EquipInspectionOrder, EquipSpareErp, DingUser
 from mes import settings
 from system.models import User, Section
 
@@ -285,92 +285,48 @@ def get_children_section(init_section, include_self=True):
     return r
 
 
-def get_staff_status(ding_api, section_name, group=''):
+def get_staff_status(section_name, group=''):
     """section_name: 设备部"""
     result = []
     filter_kwargs = {'section_users__repair_group': group} if group else {'section_users__repair_group__isnull': False}
-    # 获取所有下级部门
-    init_section = Section.objects.filter(name=section_name).last()
-    if not init_section:
-        return result
-    section_list = get_children_section(init_section)
+    # 获取数据
+    ding_users = DingUser.objects.filter(delete_flag=False).values('user_id', 'ding_uid', 'optional')
+    user_infos = {u['user_id']: u for u in ding_users}
     # 获取部门所有员工信息
-    staffs = Section.objects.filter(name__in=section_list, section_users__is_active=1, **filter_kwargs) \
+    staffs = Section.objects.filter(section_users__id__in=list(user_infos.keys()), **filter_kwargs) \
         .annotate(username=F('section_users__username'), phone_number=F('section_users__phone_number'),
-                  group=F('section_users__repair_group'), uid=F('section_users__id'), leader=F('in_charge_user__username'),
+                  group=F('section_users__repair_group'), user_id=F('section_users__id'), leader=F('in_charge_user__username'),
                   leader_phone_number=F('in_charge_user__phone_number')) \
-        .values('username', 'phone_number', 'uid', 'leader', 'leader_phone_number', 'group', 'name')
-    # 获取当前时间的工厂日期
-    now = datetime.now()
-    current_work_schedule_plan = WorkSchedulePlan.objects.filter(start_time__lte=now, end_time__gte=now,
-                                                                 plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
-    if current_work_schedule_plan:
-        s_date_now = current_work_schedule_plan.plan_schedule.day_time
-        date_now = str(s_date_now)
-    else:
-        date_now = str(now.date())
-    user_ding, default_optional = {}, True if settings.DEBUG else False
+        .values('username', 'phone_number', 'user_id', 'leader', 'leader_phone_number', 'group', 'name')
+    result = []
     for staff in staffs:
-        # 根据手机号获取用户钉钉uid
-        ding_uid = ding_api.get_user_id(staff.get('phone_number'))
-        if ding_uid:
-            user_ding[ding_uid] = {'id': staff.get('uid'), 'phone_number': staff.get('phone_number'), 'optional': default_optional,
-                                   'username': staff.get('username'), 'group': staff.get('group'), 'leader': staff.get('leader'),
-                                   'leader_phone_number': staff.get('leader_phone_number'), 'section_name': staff.get('name'),
-                                   'ding_uid': ding_uid}
-    if not settings.DEBUG:
-        # 查询、整合考勤记录
-        attendance = {}
-        records = ding_api.get_user_attendance(list(user_ding.keys()), begin_time=date_now, end_time=date_now)
-        for r in records:
-            attendance[r['userId']] = attendance.get(r['userId'], []) + [r]
-        for k, v in attendance.items():
-            if len([i for i in v if i['checkType'] != 'OnDuty' and i['timeResult'] != 'NotSigned']) == 0:
-                user_ding[k]['optional'] = True
-    result = list(user_ding.values())
+        _info = user_infos.get(staff.get('user_id'), {})
+        staff.update(_info)
+        result.append(staff)
     return result
 
 
-def get_maintenance_status(ding_api, equip_no, maintenance_type):
+def get_maintenance_status(equip_no, maintenance_type):
     result = []
     """获取包干人员信息"""
     if maintenance_type == '通用':
         query_set = EquipMaintenanceAreaSetting.objects.filter(equip__equip_no=equip_no)
     else:
         query_set = EquipMaintenanceAreaSetting.objects.filter(equip__equip_no=equip_no, maintenance_user__workshop__icontains=maintenance_type)
-    staffs = query_set.filter(maintenance_user__is_active=1)\
+    # 获取数据
+    ding_users = DingUser.objects.filter(delete_flag=False).values('user_id', 'ding_uid', 'optional')
+    user_infos = {u['user_id']: u for u in ding_users}
+    # 整合数据
+    staffs = query_set.filter(maintenance_user__is_active=1, maintenance_user__id__in=list(user_infos.keys()))\
         .annotate(username=F('maintenance_user__username'), phone_number=F('maintenance_user__phone_number'), group=F('maintenance_user__repair_group'),
                   uid=F('maintenance_user__id'), leader=F('maintenance_user__section__in_charge_user__username'),
                   leader_phone_number=F('maintenance_user__section__in_charge_user__phone_number'))\
         .values('username', 'phone_number', 'uid', 'leader', 'leader_phone_number', 'group').distinct()
-    # 获取当前时间的工厂日期
-    now = datetime.now()
-    current_work_schedule_plan = WorkSchedulePlan.objects.filter(start_time__lte=now, end_time__gte=now,
-                                                                 plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
-    if current_work_schedule_plan:
-        s_date_now = current_work_schedule_plan.plan_schedule.day_time
-        date_now = str(s_date_now)
-    else:
-        date_now = str(now.date())
-    user_ding, default_optional = {}, True if settings.DEBUG else False
+    result = []
     for staff in staffs:
-        # 根据手机号获取用户钉钉uid
-        ding_uid = ding_api.get_user_id(staff.get('phone_number'))
-        if ding_uid:
-            user_ding[ding_uid] = {'id': staff.get('uid'), 'phone_number': staff.get('phone_number'), 'optional': default_optional,
-                                   'username': staff.get('username'), 'group': staff.get('group'), 'leader': staff.get('leader'),
-                                   'leader_phone_number': staff.get('leader_phone_number'), 'section_name': staff.get('name'),
-                                   'ding_uid': ding_uid}
-    if not settings.DEBUG:
-        # 查询、整合考勤记录
-        attendance = {}
-        records = ding_api.get_user_attendance(list(user_ding.keys()), begin_time=date_now, end_time=date_now)
-        for r in records:
-            attendance[r['userId']] = attendance.get(r['userId'], []) + [r]
-        for k, v in attendance.items():
-            if len([i for i in v if i['checkType'] != 'OnDuty' and i['timeResult'] != 'NotSigned']) == 0:
-                user_ding[k]['optional'] = True
-    result = list(user_ding.values())
+        _info = user_infos.get(staff.get('user_id'), {})
+        staff.update(_info)
+        result.append(staff)
     return result
 
 
