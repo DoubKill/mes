@@ -276,7 +276,7 @@ class AutoDispatch(object):
         if not choice_all_user:
             logger.info(f'系统派单[{order.work_type}]: {order.work_order_no}-无人员可派单')
             return f'系统派单[{order.work_type}]: {order.work_order_no}-无人员可派单'
-        working_persons = [i for i in choice_all_user if i['optional']]
+        working_persons = [i for i in choice_all_user if i.get('optional')]
         if order.work_type != '巡检':
             section = Section.objects.filter(name=section_name).first()
             leader_phone_number = '' if not section else section.in_charge_user.phone_number
