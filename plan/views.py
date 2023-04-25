@@ -1958,7 +1958,7 @@ class APSExportDataView(APIView):
                 #                             })
                 equip_time_dict[equip_no] = equip_time_consume + time_consume
         left_data.extend(equip_plan_data)
-        return list(sorted(left_data, key=lambda x: x['end_time']))
+        return list(sorted(left_data, key=lambda x: x['end_time'])), equip_end_time_dict
 
     def get(self, request):
         factory_date = self.request.query_params.get('factory_date')
@@ -2196,8 +2196,8 @@ class APSExportDataView(APIView):
             # if pb_version_name not in job_list_data:
                 # raise ValidationError('该规格启用配方未找到:{}'.format(pb_version_name))
 
-        left_plans = self.extend_last_aps_result(datetime.datetime.strptime(factory_date, "%Y-%m-%d"),
-                                                 now_time, sps.lock_durations)
+        left_plans, equip_end_time_dict = self.extend_last_aps_result(
+            datetime.datetime.strptime(factory_date, "%Y-%m-%d"), now_time, sps.lock_durations)
 
         # write excel
         data_row = 2
@@ -2211,8 +2211,9 @@ class APSExportDataView(APIView):
             sheet1.cell(data_row, 2).value = pb_name  # 规格名称（带版本号）
             sheet1.cell(data_row, 3).value = 0  # 胶料代码开始时间
             sheet1.cell(data_row, 4).value = 0  # 关键路径持续时间（暂时无用）
-            sheet1.cell(data_row, 5).value = int(pb_available_time_dict.get(pb_name, 720))
+            # sheet1.cell(data_row, 5).value = int(pb_available_time_dict.get(pb_name, 720))
             sheet1.cell(data_row, 6).value = len(item)  # job_list_size(总共需要打待段次数量)
+            eq_locked_time = [0]
             for _, data in item.items():
                 # 写入job_list sheet
                 sheet2.cell(data_row1, 1).value = data_row - 1
@@ -2225,12 +2226,16 @@ class APSExportDataView(APIView):
                 details = sorted(data['details'], key=lambda x: x['main_equip_flag'], reverse=True)
                 data_col1 = 8
                 for d in details:
+                    eq_end_time = equip_end_time_dict.get('Z{}'.format(str(d['equip_no']).zfill(2)))
+                    if eq_end_time:
+                        eq_locked_time.append((eq_end_time - now_time).total_seconds()//60)
                     sheet2.cell(data_row1, data_col1).value = int(d['time_consume'])
                     sheet2.cell(data_row1, data_col1+1).value = int(d['equip_no'])
                     sheet2.cell(data_row1, data_col1+2).value = int(d['wait_time'])
                     sheet2.cell(data_row1, data_col1+3).value = d['plan_trains']
                     data_col1 += 4
                 data_row1 += 1
+            sheet1.cell(data_row, 5).value = int(pb_available_time_dict.get(pb_name, 720)) + max(eq_locked_time)
             data_row += 1
 
         for j in left_plans:
