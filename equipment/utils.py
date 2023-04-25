@@ -319,9 +319,9 @@ def get_maintenance_status(equip_no, maintenance_type):
     # 整合数据
     staffs = query_set.filter(maintenance_user__is_active=1, maintenance_user__id__in=list(user_infos.keys()))\
         .annotate(username=F('maintenance_user__username'), phone_number=F('maintenance_user__phone_number'), group=F('maintenance_user__repair_group'),
-                  uid=F('maintenance_user__id'), leader=F('maintenance_user__section__in_charge_user__username'),
+                  user_id=F('maintenance_user__id'), leader=F('maintenance_user__section__in_charge_user__username'),
                   leader_phone_number=F('maintenance_user__section__in_charge_user__phone_number'))\
-        .values('username', 'phone_number', 'uid', 'leader', 'leader_phone_number', 'group').distinct()
+        .values('username', 'phone_number', 'user_id', 'leader', 'leader_phone_number', 'group').distinct()
     result = []
     for staff in staffs:
         _info = user_infos.get(staff.get('user_id'), {})
