@@ -225,7 +225,7 @@ class BatchProductBatchingVIew(APIView):
             single_material['scan_finished'] = False  # 默认未扫码或扫码不全
             # 不存在则说明当前只完成了一部分的进料,数量置为0
             if not load_data:
-                if material_name in ['细料', '硫磺']:
+                if material_name in ['细料', '硫磺', '细料(ZY)', '硫磺(ZY)']:
                     xl_bra = []
                     detail, xl_detail_count = [], 0
                     if xl:  # [存在料包，但获取不到信息说明是不合包场景]
@@ -331,7 +331,7 @@ class BatchProductBatchingVIew(APIView):
         sfj_details = ProductBatchingDetailPlan.objects.using('SFJ').filter(plan_classes_uid=plan_classes_uid)
         if common_scan:
             # 查询上辅机料包重量、误差
-            other_xl = sfj_details.filter(material_name__in=['细料', '硫磺']).last()
+            other_xl = sfj_details.filter(material_name__in=['细料', '硫磺', '细料(ZY)', '硫磺(ZY)']).last()
             if other_xl:  # 防止配方中没有料包但是扫了通用料包条码
                 res.append({
                     "material__material_name": other_xl.material_name, "actual_weight": 1,
