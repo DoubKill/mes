@@ -509,6 +509,7 @@ class ProductActualViewSet(mixins.ListModelMixin,
 
         plan_classes_uid_list = plan_queryset.values_list('plan_classes_uid', flat=True)
         tf_set = TrainsFeedbacks.objects.filter(
+            ~Q(operation_user='Mixer2'),
             plan_classes_uid__in=plan_classes_uid_list
         ).values('equip_no',
                  'product_no',

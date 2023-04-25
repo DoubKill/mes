@@ -316,6 +316,25 @@ class CarbonDeliverySystem(object):
         line_info = json.loads(rep_json)
         return line_info
 
+    def prevent_state(self):
+        """获取防错开关和压送状态"""
+        headers = {"Content-Type": "text/xml; charset=utf-8",
+                   "SOAPAction": "http://tempuri.org/INXWebService/Item1"}
+        send_data = """<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
+                       <soapenv:Header/>
+                       <soapenv:Body>
+                          <tem:Item1>
+                             <!--Optional:-->
+                             <tem:Request>1</tem:Request>
+                          </tem:Item1>
+                       </soapenv:Body>
+                    </soapenv:Envelope>"""
+        door_info = requests.post(self.url, data=send_data.encode('utf-8'), headers=headers, timeout=1)
+        res = door_info.content.decode('utf-8')
+        rep_json = re.findall(r'<Item1Result>(.*)</Item1Result>', res)[0]
+        prevent_states = json.loads(rep_json)
+        return prevent_states
+
 
 def out_task_carbon(task_id, station_no, material_no, material_name, need_weight):
     url = f"http://{cb_ip}:{cb_port}/MESApi/AllocateWeightDelivery"

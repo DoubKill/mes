@@ -1131,7 +1131,7 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
                                          global_type__type_name='设备部门组织名称').first()
         res['product_name'] = prod.global_name if prod else ''
         # 增加被指派人电话
-        assign_to_user_list = instance.assign_to_user.split(',')
+        assign_to_user_list = instance.assign_to_user.split(',') if instance.assign_to_user else []
         assign_to_user = User.objects.filter(username__in=assign_to_user_list).first()
         res['assign_to_user_phone'] = assign_to_user.phone_number if assign_to_user else ''
         # 增加接单人电话
@@ -1307,7 +1307,7 @@ class EquipInspectionOrderSerializer(BaseModelSerializer):
                                          global_type__type_name='设备部门组织名称').first()
         res['product_name'] = prod.global_name if prod else ''
         # 增加被指派人电话
-        assign_to_user_list = instance.assign_to_user.split(',')
+        assign_to_user_list = instance.assign_to_user.split(',') if instance.assign_to_user else []
         assign_to_user = User.objects.filter(username__in=assign_to_user_list).first()
         res['assign_to_user_phone'] = assign_to_user.phone_number if assign_to_user else ''
         # 增加接单人电话
