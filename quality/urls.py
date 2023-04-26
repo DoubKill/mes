@@ -24,7 +24,7 @@ from quality.views import TestIndicatorViewSet, TestTypeViewSet, DataPointViewSe
     ProductTestStaticsView, ClassTestStaticsView, UnqialifiedEquipView, LabelPrintLogView, \
     MaterialDataPointIndicatorHistoryView, ProductSynthesisRate, ProductSynthesisEquipRate, ProductSynthesisGroupRate, \
     ProductSynthesisProductRate, ProductSynthesisMonthRate, ProductTestValueHistoryView, ProductIndicatorStandard, \
-    ProductMaterials, TestedMaterials, ProductTestedTrains, ScorchTimeView, ProductTestPlanInterval
+    ProductMaterials, TestedMaterials, ProductTestedTrains, ScorchTimeView, ProductTestPlanInterval, DailyProductTestStaticsView
 
 router = DefaultRouter()
 
@@ -150,7 +150,7 @@ urlpatterns = [
     path('data-point-list/', DataPointListView.as_view()),
 
     # 不合格率统计
-    path('product-test-statics/', ProductTestStaticsView.as_view()),  # 胶料别不合格率统计
+    path('daily_product-test-statics/', DailyProductTestStaticsView.as_view()),  # 胶料别不合格率统计
     path('class-test-statics/', ClassTestStaticsView.as_view()),  # 班次别不合格率统计
     path('unqialified-equip/', UnqialifiedEquipView.as_view()),  # 机台别 不合格率统计
 
