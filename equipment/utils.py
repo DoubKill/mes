@@ -171,7 +171,7 @@ class DinDinAPI(object):
             "workDateFrom": str(begin_time) + ' 00:00:00',
             "offset": 0,
             "userIdList": user_ids,
-            "limit": 10,
+            "limit": 50,
             "isI18n": False,
             "workDateTo": str(end_time) + ' 00:00:00'
         }
