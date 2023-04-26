@@ -68,10 +68,15 @@ class DingIdAttendance(object):
                     DingUser.objects.update_or_create(user_id=uid, defaults={'user_id': uid, 'ding_uid': ding_uid, 'phone_number': phone_number,
                                                                              'optional': default_optional})
             # 查询、整合考勤记录
-            attendance = {}
-            records = ding_api.get_user_attendance(list(user_ding.keys()), begin_time=date_now, end_time=date_now)
+            attendance, user_ids, records = {}, list(user_ding.keys()), []
+            # 考勤记录一次最多查询50个人, 所以需要分批查询(钉钉一次返回最多50条考勤记录)
+            for i in range(0, len(user_ids), 10):
+                record = ding_api.get_user_attendance(user_ids[i:i+10], begin_time=date_now, end_time=date_now)
+                records.extend(record)
+            # 整合考勤记录
             for r in records:
                 attendance[r['userId']] = attendance.get(r['userId'], []) + [r]
+            # 判断是否为可选人员
             for k, v in attendance.items():
                 if len([i for i in v if i['checkType'] != 'OnDuty' and i['timeResult'] != 'NotSigned']) == 0:
                     user_ding[k]['optional'] = True
