@@ -285,10 +285,10 @@ def get_children_section(init_section, include_self=True):
     return r
 
 
-def get_staff_status(section_name, group=''):
-    """section_name: 设备部"""
+def get_staff_status(section_name, group='', all_user=True):
+    """section_name: 设备科"""
     result = []
-    filter_kwargs = {'section_users__repair_group': group} if group else {'section_users__repair_group__isnull': False}
+    filter_kwargs = {'section_users__repair_group': group} if group else {}
     # 获取数据
     ding_users = DingUser.objects.filter(delete_flag=False).values('user_id', 'ding_uid', 'optional')
     user_infos = {u['user_id']: u for u in ding_users}
@@ -301,12 +301,14 @@ def get_staff_status(section_name, group=''):
     result = []
     for staff in staffs:
         _info = user_infos.get(staff.get('user_id'), {})
+        if all_user:
+            _info['optional'] = True
         staff.update(_info)
         result.append(staff)
     return result
 
 
-def get_maintenance_status(equip_no, maintenance_type):
+def get_maintenance_status(equip_no, maintenance_type, all_user=True):
     result = []
     """获取包干人员信息"""
     if maintenance_type == '通用':
@@ -325,6 +327,8 @@ def get_maintenance_status(equip_no, maintenance_type):
     result = []
     for staff in staffs:
         _info = user_infos.get(staff.get('user_id'), {})
+        if all_user:
+            _info['optional'] = True
         staff.update(_info)
         result.append(staff)
     return result

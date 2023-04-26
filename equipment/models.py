@@ -1167,8 +1167,8 @@ class CheckTemperatureTableDetail(models.Model):
 
 class DingUser(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='did')
-    phone_number = models.CharField(max_length=64, help_text='手机号', default='')
-    ding_uid = models.CharField(max_length=64, help_text='钉钉用户id', default='')
+    phone_number = models.CharField(max_length=64, help_text='手机号', null=True, blank=True)
+    ding_uid = models.CharField(max_length=64, help_text='钉钉用户id', null=True, blank=True)
     optional = models.BooleanField(help_text='是否可指派', default=False)
     delete_flag = models.BooleanField(help_text='是否删除', default=False)
     save_time = models.DateTimeField(help_text='保存时间', auto_now=True)

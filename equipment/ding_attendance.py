@@ -34,11 +34,13 @@ class DingIdAttendance(object):
         # 设备科下的所有部门
         init_section = Section.objects.filter(name=section_name).last()
         section_list = get_children_section(init_section) if init_section else []
-        # 忽略的用户
-        ignore_ids = DingUser.objects.filter(delete_flag=True).values_list('user_id', flat=True)
         # 获取所有人员
-        staffs = Section.objects.filter(~Q(section_users__id__in=ignore_ids), name__in=section_list, section_users__is_active=1)\
-            .annotate(phone_number=F('section_users__phone_number'), uid=F('section_users__id')).values('phone_number', 'uid')
+        staffs = Section.objects.filter(name__in=section_list, section_users__is_active=True)\
+            .annotate(phone_number=F('section_users__phone_number'), uid=F('section_users__id'))\
+            .values('phone_number', 'uid')
+        # 删除用户不可被选
+        active_ids = set(staffs.values_list('uid', flat=True))
+        DingUser.objects.exclude(user_id__in=active_ids).update(delete_flag=True, optional=False)
         # 获取当前时间的工厂日期
         now = datetime.now()
         current_work_schedule_plan = WorkSchedulePlan.objects.filter(start_time__lte=now, end_time__gte=now,
@@ -55,7 +57,7 @@ class DingIdAttendance(object):
                 ding_uid = ding_api.get_user_id(phone_number)
                 # 更新或者创建
                 DingUser.objects.update_or_create(user_id=uid, defaults={'user_id': uid, 'ding_uid': ding_uid, 'phone_number': phone_number,
-                                                                         'optional': True if ding_uid else False})
+                                                                         'optional': True if ding_uid else False, 'delete_flag': False})
         else:
             user_ding, default_optional = {}, False
             for staff in staffs:
@@ -66,7 +68,7 @@ class DingIdAttendance(object):
                     user_ding[ding_uid] = {'user_id': uid, 'ding_uid': ding_uid, 'phone_number': phone_number, 'optional': default_optional}
                 else:
                     DingUser.objects.update_or_create(user_id=uid, defaults={'user_id': uid, 'ding_uid': ding_uid, 'phone_number': phone_number,
-                                                                             'optional': default_optional})
+                                                                             'optional': default_optional, 'delete_flag': False})
             # 查询、整合考勤记录
             attendance, user_ids, records = {}, list(user_ding.keys()), []
             # 考勤记录一次最多查询50个人, 所以需要分批查询(钉钉一次返回最多50条考勤记录)
