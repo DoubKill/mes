@@ -1071,7 +1071,7 @@ class CutTimeAnalysis(APIView):
                 normal_cut_time_consumer = avg_cut_time_consume
             ret[key][item['equip_no'] + 'err_cut_time_consumer'] = err_cut_time_consumer
             ret[key][item['equip_no'] + 'normal_cut_time_consumer'] = normal_cut_time_consumer
-        results, data = [], ret.values()
+        results, data = [], list(ret.values())
         if data:
             # 各机台标准切换时间
             standard_set = dict(GlobalCode.objects.filter(global_type__use_flag=True, global_type__type_name='规格切换时间标准', use_flag=True).values_list('global_name', 'description'))
@@ -1080,7 +1080,7 @@ class CutTimeAnalysis(APIView):
             # 整合数据
             standard_switch = {i: int(standard_set.get(i, '0')) for i in equips}
             used_equip, standard_info = list(standard_switch.keys()), list(standard_switch.values())
-            if analysis_type == '1':  # 按照机台分析(嗝机台之间的时间图表)  1张图
+            if analysis_type == '1':  # 按照机台分析(各机台之间的时间图表)  1张图
                 actual_dict = {}
                 for item in data:
                     for equip_no in used_equip:

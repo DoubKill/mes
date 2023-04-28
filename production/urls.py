@@ -162,6 +162,8 @@ urlpatterns = [
 
     # 交接班时间汇总
     path('shift-time-summary/', ShiftTimeSummaryView.as_view()),
+    # 交接班时间汇总分析图表
+    path('shift-time-analysis/', ShiftTimeAnalysisView.as_view()),
     # 交接班时间汇总明细
     path('shift-time-summary/detail/', ShiftTimeSummaryDetailView.as_view()),
     # 胶架维修记录
