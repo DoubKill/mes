@@ -1013,3 +1013,121 @@ class CutTimeCollectSummary(APIView):
         if classes:
             result = list(filter(lambda x: x['classes'] == classes, result))
         return Response(result)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class CutTimeAnalysis(APIView):
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_product_exchange_consume'}))
+
+    def get(self, request):
+        st = self.request.query_params.get('st')
+        et = self.request.query_params.get('et')
+        analysis_type = self.request.query_params.get('analysis_type')
+        if not all([st, et, analysis_type]):
+            raise ValidationError('时间段、分析类型不能为空！')
+        try:
+            s_time = datetime.datetime.strptime(st, '%Y-%m-%d %H:%M:%S')
+            e_time = datetime.datetime.strptime(et, '%Y-%m-%d %H:%M:%S')
+        except Exception:
+            raise ValidationError('日期错误！')
+        query_set = list(TrainsFeedbacks.objects.filter(classes__isnull=False, begin_time__gte=s_time, end_time__lte=e_time)
+                         .values('plan_classes_uid', 'factory_date', 'classes', 'equip_no')
+                         .annotate(st_time=Min('begin_time'), et_time=Max('end_time'))
+                         .values('plan_classes_uid', 'factory_date', 'classes', 'equip_no', 'st_time', 'et_time')
+                         .order_by('factory_date', 'equip_no', 'st_time'))
+        factory_classes_group_map = WorkSchedulePlan.objects.filter(
+            end_time__gte=s_time,
+            start_time__lte=e_time,
+            plan_schedule__work_schedule__work_procedure__global_name='密炼'
+        ).values('plan_schedule__day_time', 'classes__global_name', 'group__global_name')
+        factory_classes_group_map_dict = {i['plan_schedule__day_time'].strftime('%Y-%m-%d') + '-' + i['classes__global_name']: i for i in factory_classes_group_map}
+        ret = {}
+        for idx, item in enumerate(query_set[:-1]):
+            key = item['factory_date'].strftime('%Y-%m-%d') + '-' + item['classes']
+            next_st_time = query_set[idx + 1]['st_time']
+            if not query_set[idx + 1]['equip_no'] == item['equip_no']:
+                continue
+            cut_time_consume = int((next_st_time - item['et_time']).total_seconds())
+            if key in ret:
+                if item['equip_no'] in ret[key]:
+                    ret[key][item['equip_no']] += cut_time_consume
+                    ret[key][item['equip_no'] + 'cnt'] += 1
+                else:
+                    ret[key][item['equip_no']] = cut_time_consume
+                    ret[key][item['equip_no'] + 'cnt'] = 1
+            else:
+                ret[key] = {'factory_date': item['factory_date'].strftime('%Y-%m-%d'),
+                            'classes': item['classes'],
+                            item['equip_no']: cut_time_consume,
+                            item['equip_no'] + 'cnt': 1,
+                            'group': factory_classes_group_map_dict[key]['group__global_name'],
+                            }
+            avg_cut_time_consume = int(ret[key][item['equip_no']] / ret[key][item['equip_no'] + 'cnt'])
+            if abs(avg_cut_time_consume) >= 1000 or avg_cut_time_consume <= 0:
+                err_cut_time_consumer = avg_cut_time_consume
+                normal_cut_time_consumer = None
+            else:
+                err_cut_time_consumer = None
+                normal_cut_time_consumer = avg_cut_time_consume
+            ret[key][item['equip_no'] + 'err_cut_time_consumer'] = err_cut_time_consumer
+            ret[key][item['equip_no'] + 'normal_cut_time_consumer'] = normal_cut_time_consumer
+        results, data = [], ret.values()
+        if data:
+            # 各机台标准切换时间
+            standard_set = dict(GlobalCode.objects.filter(global_type__use_flag=True, global_type__type_name='规格切换时间标准', use_flag=True).values_list('global_name', 'description'))
+            # 所有密炼机台
+            equips = Equip.objects.filter(equip_no__startswith='Z', category__equip_type__global_name='密炼设备', use_flag=True).values_list('equip_no', flat=True).order_by('equip_no')
+            # 整合数据
+            standard_switch = {i: int(standard_set.get(i, '0')) for i in equips}
+            used_equip, standard_info = list(standard_switch.keys()), list(standard_switch.values())
+            if analysis_type == '1':  # 按照机台分析(嗝机台之间的时间图表)  1张图
+                actual_dict = {}
+                for item in data:
+                    for equip_no in used_equip:
+                        _time = item.get(f"{equip_no}normal_cut_time_consumer", None)
+                        h_time = [] if _time is None else [_time]
+                        actual_dict[equip_no] = actual_dict.get(equip_no, []) + h_time
+                actual_info = [round(sum(i) / len(i)) if i else 0 for i in actual_dict.values()]
+                results.append({'axis': used_equip, 'standard': standard_info, 'actual': actual_info})
+            elif analysis_type == '2':  # 按照班次分析(各班次之间的时间图表) 3张图
+                actual_dict = {}
+                for item in data:
+                    g_group = item.get('group')
+                    if not g_group:
+                        continue
+                    for equip_no in used_equip:
+                        _time = item.get(f"{equip_no}normal_cut_time_consumer", None)
+                        h_time = [] if _time is None else [_time]
+                        actual_dict[f"{g_group}-{equip_no}"] = actual_dict.get(f"{g_group}-{equip_no}", []) + h_time
+                actual_info = {}
+                for k, v in actual_dict.items():
+                    g_group, equip = k.split('-')
+                    actual_info[g_group] = actual_info.get(g_group, []) + [round(sum(v) / len(v)) if v else 0]
+                # 排序
+                actual_info = dict(sorted(actual_info.items(), key=lambda x: x[0]))
+                for group, actual in actual_info.items():
+                    results.append({'title': group, 'axis': used_equip, 'standard': standard_info, 'actual': actual})
+            elif analysis_type == '3':  # 按照日期分析(各机台日期分析图表) 15张图
+                actual_dict = {}
+                for item in data:
+                    factory_date = item.get('factory_date')
+                    if not factory_date:
+                        continue
+                    for equip_no in used_equip:
+                        _time = item.get(f"{equip_no}normal_cut_time_consumer", None)
+                        h_time = [] if _time is None else [_time]
+                        actual_dict[f'{equip_no}_{factory_date}'] = actual_dict.get(f'{equip_no}_{factory_date}', []) + h_time
+                actual_info = {}
+                for k, v in actual_dict.items():
+                    equip_no, factory_date = k.split('_')
+                    standard, _time = standard_switch.get(equip_no), round(sum(v) / len(v)) if v else 0
+                    if equip_no not in actual_info:
+                        actual_info[equip_no] = {'title': equip_no, 'axis': [factory_date], 'standard': [standard], 'actual': [_time]}
+                    else:
+                        actual_info[equip_no]['axis'].append(factory_date)
+                        actual_info[equip_no]['standard'].append(standard)
+                        actual_info[equip_no]['actual'].append(_time)
+                results = list(actual_info.values())
+            else:
+                raise ValidationError('未知分析类型！')
+        return Response(results)
