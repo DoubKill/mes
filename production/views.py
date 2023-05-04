@@ -7323,7 +7323,8 @@ class TimeEnergyConsuming(APIView):
         # 产量数据，按每个规格和车次数量排序
         production_data = TrainsFeedbacks.objects.filter(
             factory_date__gte=st,
-            factory_date__lte=et
+            factory_date__lte=et,
+            operating_type='自动'
         ).values('product_no', 'equip_no').annotate(cnt=Count('id'),
                                                     actual_weight=Max('actual_weight')/100,
                                                     evacuation_energy=Avg('evacuation_energy'),
@@ -7363,7 +7364,7 @@ class TimeEnergyConsuming(APIView):
             except Exception:
                 consum_time = 150
             avg_interval_time = item['avg_interval_time']
-            if not avg_interval_time or avg_interval_time <= 5 or avg_interval_time >= 30:
+            if not avg_interval_time or avg_interval_time <= 9 or avg_interval_time >= 26:
                 avg_interval_time = 15
             if recipe_no not in item_dict:
                 item_dict[recipe_no] = {stage: {'devoted_weight': actual_weight,
