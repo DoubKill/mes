@@ -9,7 +9,7 @@ import pandas as pd
 import requests
 import xlrd
 from django.db import connection, IntegrityError
-from django.db.models import Sum, Max, Q, Min
+from django.db.models import Sum, Max, Q, Min, F
 from django.db.transaction import atomic
 from django.http import HttpResponse
 from django.utils.decorators import method_decorator
@@ -1536,6 +1536,8 @@ class MaterialPlanConsumeView(APIView):
         material_name = self.request.query_params.get('material_name')
         equip_no = self.request.query_params.get('equip_no')
         product_no = self.request.query_params.get('product_no')
+        other_display = self.request.query_params.get('other_display')
+        xl_display = self.request.query_params.get('xl_display')
         factory_date = get_current_factory_date().get('factory_date', datetime.datetime.now().date())
         filter_kwargs = {}
         filter_kwargs2 = {}
@@ -1564,23 +1566,42 @@ class MaterialPlanConsumeView(APIView):
                                                                          stage_product_batch_no=recipe_no,
                                                                          dev_type_id=dev_type_id).first()
             if mes_pb:
-                weight_details = WeighBatchingDetail.objects.filter(**filter_kwargs2).filter(
-                    weigh_cnt_type__product_batching=mes_pb,
-                    delete_flag=False).values('material__material_name',
-                                              'material__material_type__global_name',
-                                              'standard_weight')
-                for detail in weight_details:
-                    m_name = detail['material__material_name']
-                    weight = detail['standard_weight']*trains
-                    ret.append(
-                        {'material_type': detail['material__material_type__global_name'],
-                         'material_name': m_name,
-                         'equip_no': equip_no,
-                         'product_no': recipe_no,
-                         'total_weight': weight}
-                    )
-                    material_weight_dict[m_name] = material_weight_dict.get(m_name, 0) + weight
-        result = sorted(ret, key=itemgetter('material_type', 'material_name', 'equip_no'))  #  按多个字段排序
+                if other_display:
+                    recipe_details = mes_pb.batching_details.filter(delete_flag=False, **filter_kwargs2).order_by('sn') \
+                        .annotate(standard_weight=F('actual_weight')).values('sn', 'material__material_name', 'material__material_type__global_name',
+                                                                             'standard_weight')
+                    for detail in recipe_details:
+                        sn = detail['sn']
+                        m_name = detail['material__material_name']
+                        weight = detail['standard_weight'] * trains
+                        ret.append(
+                            {'material_type': detail['material__material_type__global_name'],
+                             'material_name': m_name,
+                             'equip_no': equip_no,
+                             'product_no': recipe_no,
+                             'total_weight': weight,
+                             'sn': sn}
+                        )
+                        material_weight_dict[m_name] = material_weight_dict.get(m_name, 0) + weight
+                if xl_display:
+                    weight_details = WeighBatchingDetail.objects.filter(**filter_kwargs2).filter(
+                        weigh_cnt_type__product_batching=mes_pb,
+                        delete_flag=False).values('material__material_name',
+                                                  'material__material_type__global_name',
+                                                  'standard_weight')
+                    for detail in weight_details:
+                        m_name = detail['material__material_name']
+                        weight = detail['standard_weight'] * trains
+                        ret.append(
+                            {'material_type': detail['material__material_type__global_name'],
+                             'material_name': m_name,
+                             'equip_no': equip_no,
+                             'product_no': recipe_no,
+                             'total_weight': weight,
+                             'sn': 4}
+                        )
+                        material_weight_dict[m_name] = material_weight_dict.get(m_name, 0) + weight
+        result = sorted(ret, key=itemgetter('sn', 'material_type', 'material_name', 'equip_no'))  #  按多个字段排序
         return Response({'result': result, 'material_weight_dict': material_weight_dict})
 
 
