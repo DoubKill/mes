@@ -6757,7 +6757,7 @@ class GroupClockDetailView(APIView):
 class AttendanceTimeStatisticsViewSet(ModelViewSet):
     queryset = EmployeeAttendanceRecords.objects.filter(
         Q(end_date__isnull=False, begin_date__isnull=False) |
-        Q(end_date__isnull=True, begin_date__isnull=True)).order_by('begin_date')
+        Q(end_date__isnull=True, begin_date__isnull=True)).order_by('equip', 'section', 'begin_date')
     serializer_class = EmployeeAttendanceRecordsSerializer
     permission_classes = (IsAuthenticated,)
 
