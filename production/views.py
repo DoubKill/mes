@@ -7620,7 +7620,7 @@ class ShiftProductionSummaryView(APIView):
         for j in equip_production_data_dict.values():
             equip_list.append(j['equip_no'])
             day_trains.append(j['total_trains'])
-            ratio = 0 if not j['days'] or j['target_trains'] else round(j['total_trains'] / j['days'] / j['target_trains'] / 2 * 100, 2)
+            ratio = 0 if not j['days'] or not j['target_trains'] else round(j['total_trains'] / j['days'] / j['target_trains'] / 2 * 100, 2)
             day_ratio.append(ratio)
         return Response({'table_head': schedule_dict,
                          'data': equip_production_data_dict.values(),
