@@ -896,6 +896,7 @@ def get_tolerance(batching_equip, standard_weight, material_name=None, project_n
                         tolerance = 0.3
                     else:
                         rule = ToleranceRule.objects.filter(distinguish__keyword_name__icontains=material_species, distinguish__re_str__icontains=material_type,
+                                                            project__keyword_name=project_name,
                                                             use_flag=True, small_num__lt=standard_weight, big_num__gte=standard_weight).first()
                         tolerance = f"{rule.handle.keyword_name}{rule.standard_error}{rule.unit}" if rule else tolerance
                 else:
