@@ -4381,12 +4381,12 @@ class GetStaffsView(APIView):
                                                          plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
                 group = record.group.global_name
                 # 查询各员工考勤状态
-                result = get_staff_status(ding_api, section_name, group)
+                result = get_staff_status(section_name, group)
             else:
                 # 查询各员工考勤状态
-                result = get_staff_status(ding_api, section_name)
+                result = get_staff_status(section_name)
         else:
-            result = get_maintenance_status(ding_api, equip_no, maintenance_type)
+            result = get_maintenance_status(equip_no, maintenance_type)
         return Response({'results': result})
 
 
@@ -5249,7 +5249,7 @@ class EquipIndexView(APIView):
             'responsor_user': ''
         }
         # ding_api = DinDinAPI()
-        # result = get_staff_status(ding_api, '设备科')
+        # result = get_staff_status('设备科')
         result = []
         if result:
             ret['incharge_user'] = result[0].get('username')
@@ -5260,6 +5260,8 @@ class EquipIndexView(APIView):
             current_product = ''
             equip_no = equip.equip_no
             equip_cat = equip.category.equip_type.global_name
+            if equip_no == '190E':
+                continue
             if equip_cat == '密炼设备':
                 # 实际生产车次
                 actual_trains = actual_data.get(equip_no, 0) if equip_no != 'Z04' else actual_data.get(equip_no, 0)//2

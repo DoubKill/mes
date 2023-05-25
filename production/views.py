@@ -186,7 +186,11 @@ class PalletFeedbacksViewSet(mixins.CreateModelMixin,
         if not lot_no:
             raise ValidationError("请传入lot_no")
         if MaterialTestOrder.objects.filter(lot_no=lot_no).exists():
-            raise ValidationError("该批次数据已绑定快检数据，不可修改！")
+            # raise ValidationError("该批次数据已绑定快检数据，不可修改！")
+            # 根据条码修正重量
+            fix_weight = validated_data.get('actual_weight')
+            PalletFeedbacks.objects.filter(lot_no=lot_no).update(actual_weight=fix_weight)
+            return Response("补充成功")
         instance, flag = PalletFeedbacks.objects.update_or_create(defaults=validated_data, **{"lot_no": lot_no})
         if flag:
             message = "补充成功"
@@ -429,6 +433,7 @@ class ProductActualViewSet(mixins.ListModelMixin,
 
         plan_classes_uid_list = plan_queryset.values_list('plan_classes_uid', flat=True)
         tf_set = TrainsFeedbacks.objects.filter(
+            ~Q(operation_user='Mixer2'),
             plan_classes_uid__in=plan_classes_uid_list
         ).values('equip_no',
                  'product_no',
@@ -985,7 +990,7 @@ class TrainsFeedbacksAPIView(mixins.ListModelMixin,
                 df['evacuation_energy'] = df['evacuation_energy'] * 0.28 * df['plan_weight'] / 1000
             elif df['equip_no'] == 'Z12':
                 df['evacuation_energy'] = df['evacuation_energy'] / 5.3
-            elif df['equip_no'] == 'Z01':
+            elif df['equip_no'] == 'Z13':
                 df['evacuation_energy'] = df['evacuation_energy'] / 31.7
         except Exception:
             pass
@@ -4130,7 +4135,7 @@ class PerformanceSummaryView(APIView):
                          'calculate_begin_date', 'calculate_end_date', 'standard_begin_date', 'standard_end_date')
         user_dic = {}
         equip_dic = {}
-        equip_list = Equip.objects.filter(category__equip_type__global_name='密炼设备').values('category__category_no', 'equip_no')
+        equip_list = Equip.objects.filter(category__equip_type__global_name='密炼设备', equip_no__startswith='Z').values('category__category_no', 'equip_no')
         for item in equip_list:
             equip_dic[item['equip_no']] = 'GK400' if item['category__category_no'].startswith('GK400') else item['category__category_no']
         for item in user_query:
@@ -4648,7 +4653,7 @@ class AttendanceClockViewSet(ModelViewSet):
         group_type = attendance_group_obj.type   # 密炼/细料称量/硫磺称量
         if group_type == '密炼':
             equip_type = '密炼设备'
-            equip_list = Equip.objects.filter(category__equip_type__global_name=equip_type).values_list('equip_no', flat=True)
+            equip_list = Equip.objects.filter(category__equip_type__global_name=equip_type, equip_no__startswith='Z').values_list('equip_no', flat=True)
         else:
             equip_type = '称量设备'
             equip_list = Equip.objects.filter(category__equip_type__global_name=equip_type).values_list('equip_no',  flat=True)
@@ -4678,7 +4683,7 @@ class AttendanceClockViewSet(ModelViewSet):
             if queryset.class_code == '休' and not apply:  # 进入考勤页面时异常记录日志,补卡时忽略
                 b_date = (datetime.datetime.strptime(date_now, '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
                 last_obj = EmployeeAttendanceRecords.objects.filter(user=self.request.user, factory_date=b_date, end_date__isnull=True,
-                                                                    clock_type=clock_type).order_by('factory_date').last()
+                                                                    clock_type=clock_type).order_by('factory_date', 'id').last()
                 if last_obj:
                     queryset = r_queryset.filter(factory_date=b_date).last()
                     date_now = b_date
@@ -4710,8 +4715,8 @@ class AttendanceClockViewSet(ModelViewSet):
         # 获取单选和多选机台的岗位
         s_choice, m_choice = [], []
         if equip_list:
-            keyword = equip_list[0][0]
-            equip_type = '密炼' if keyword == 'Z' else '生产配料'
+            keyword = set([i[0] for i in equip_list if i.startswith('Z')])
+            equip_type = '密炼' if 'Z' in keyword else '生产配料'
             s_choice = list(PerformanceJobLadder.objects.filter(type=equip_type, relation=1).values_list('name', flat=True).distinct())
             m_choice = list(PerformanceJobLadder.objects.filter(type=equip_type, relation=2).values_list('name', flat=True).distinct())
         results = {
@@ -4729,7 +4734,7 @@ class AttendanceClockViewSet(ModelViewSet):
             return Response({'results': results})
 
         # 判断最后一条的工厂时间是不是当天，是的话说明是正在进行中的
-        last_obj = EmployeeAttendanceRecords.objects.filter(user=self.request.user, clock_type=attendance_group_obj.type).order_by('factory_date').last()
+        last_obj = EmployeeAttendanceRecords.objects.filter(user=self.request.user, clock_type=attendance_group_obj.type).order_by('factory_date', 'id').last()
         if attendance_group_obj.type == '密炼':
             if last_obj:
                 key_second = (last_obj.standard_end_date - last_obj.standard_begin_date).total_seconds()
@@ -6002,8 +6007,10 @@ class GroupClockDetailView(APIView):
                         names = [i for i in s_section if i['name'] == real_name]
                         if _key in exist_r:
                             if names:
+                                if equip in names[0]['equip']:
+                                    continue
                                 _equip = names[0]['equip'] + f'/{equip}'
-                                if len(_equip.split('/')) >= 15:
+                                if len(_equip.split('/')) >= 15 and clock_type == '密炼':
                                     _equip = 'Z01~Z15'
                                 names[0]['equip'] = _equip
                             else:
@@ -6027,6 +6034,8 @@ class GroupClockDetailView(APIView):
                 end_date = s.end_date.strftime('%Y-%m-%d %H:%M:%S') if s.end_date else None
                 s_status = results.get(status)
                 if s_status:
+                    if equip in s_status['equip']:
+                        continue
                     s_status['equip'] += f",{equip}"
                 else:
                     results[status] = {'id': s.id, 'user_name': user_name, 'section': section, 'equip': equip, 'status': status,
@@ -6039,7 +6048,7 @@ class GroupClockDetailView(APIView):
 class AttendanceTimeStatisticsViewSet(ModelViewSet):
     queryset = EmployeeAttendanceRecords.objects.filter(
         Q(end_date__isnull=False, begin_date__isnull=False) |
-        Q(end_date__isnull=True, begin_date__isnull=True)).order_by('begin_date')
+        Q(end_date__isnull=True, begin_date__isnull=True)).order_by('equip', 'section', 'begin_date')
     serializer_class = EmployeeAttendanceRecordsSerializer
     permission_classes = (IsAuthenticated,)
 
@@ -6069,8 +6078,12 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
             if equip:
                 filter_kwargs['equip__in'] = equip.split(',')
             else:  # 所有机台
-                equip_type = '密炼设备' if clock_type == '密炼' else '称量设备'
-                equip_info = list(Equip.objects.filter(category__equip_type__global_name=equip_type, use_flag=True).values_list('equip_no', flat=True))
+                if clock_type == '密炼':
+                    equip_type = '密炼设备'
+                    equip_info = list(Equip.objects.filter(category__equip_type__global_name=equip_type, use_flag=True, equip_no__startswith='Z').values_list('equip_no', flat=True))
+                else:
+                    equip_type = '称量设备'
+                    equip_info = list(Equip.objects.filter(category__equip_type__global_name=equip_type, use_flag=True).values_list('equip_no', flat=True))
                 filter_kwargs['equip__in'] = equip_info
             if section:
                 filter_kwargs['section__in'] = section.split(',')

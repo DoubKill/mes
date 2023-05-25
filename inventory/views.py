@@ -5484,6 +5484,8 @@ class LIBRARYINVENTORYView(APIView):
         locked_status = params.get("locked_status")
         ordering_field = params.get("ordering_field")
         order_by = params.get("order_by")
+        begin_date = params.get("begin_date")
+        end_date = params.get("end_date")
 
         product_validity_dict = dict(MaterialAttribute.objects.filter(
             period_of_validity__isnull=False
@@ -5511,6 +5513,10 @@ class LIBRARYINVENTORYView(APIView):
             filter_kwargs['quality_level'] = quality_level
         if equip_no:
             filter_kwargs['bill_id__iendswith'] = equip_no
+        if begin_date:
+            filter_kwargs['in_storage_time__date__gte'] = begin_date
+        if end_date:
+            filter_kwargs['in_storage_time__date__lte'] = end_date
         if locked_status:
             if locked_status == '1':
                 locked_lot_nos = list(
@@ -6422,10 +6428,12 @@ class WmsOutboundOrderView(APIView):
         try:
             res = requests.post(url, json=data, timeout=10)
         except Exception as e:
+            logger.error(f'请求出库失败, 单据号:{task_num}, 异常原因:{e.args[0]}')
             raise ValidationError('请求出库失败，请联系管理员！')
         try:
             resp = json.loads(res.content)
-        except Exception:
+        except Exception as e:
+            logger.warning(f'请求出库响应解析失败, 单据号:{task_num}, 异常原因:{e.args[0]}')
             resp = {}
         resp_status = resp.get('state')
         if resp_status != 1:
