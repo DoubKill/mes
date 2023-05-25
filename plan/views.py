@@ -1994,6 +1994,7 @@ class APSExportDataView(APIView):
                 raise ValidationError('该规格：{}-{}定机表数据待确认！'.format(i.product_no, i.version))
             pd_stages = sorted(pd_ms.stages.split('/'), key=lambda x: idx_keys.get(x, 0))
             final_stage = pd_stages[-1]  # 最终生产段次
+            first_stage = pd_stages[0]  # 首次生产段次
             need_stages = copy.deepcopy(pd_stages)
             pb_version_name = '{}-{}'.format(pd_ms.product_no, pd_ms.version)
             pb_time_consume = 0
@@ -2138,6 +2139,8 @@ class APSExportDataView(APIView):
                 plan_trains = weight//float(batching_weight)
                 if int(plan_trains) == 0:
                     continue
+                if stage == first_stage:
+                    plan_trains = plan_trains // 10 * 10 + 10
                 train_time_consume = calculate_equip_recipe_avg_mixin_time(equip_no, recipe_name)
                 time_consume = plan_trains * train_time_consume/60
                 if pb_version_name not in job_list_data:
@@ -2470,8 +2473,8 @@ class APSPlanImport(APIView):
                                                     'time_consume': time_consume,
                                                     'start_time': aps_st + datetime.timedelta(minutes=st),
                                                     'end_time': aps_st + datetime.timedelta(minutes=et),
-                                                    'is_locked': True if '锁定' in desc else False
-                                                    # 'status': '已下发' if '锁定' in desc else '未下发'
+                                                    'is_locked': True if '锁定' in desc else False,
+                                                    'status': '已下发' if '锁定' in desc else '未下发'
                                                    }))
                 except Exception:
                     raise ValidationError('导入数据有误，请检查后重试!')
