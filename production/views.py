@@ -990,7 +990,7 @@ class TrainsFeedbacksAPIView(mixins.ListModelMixin,
                 df['evacuation_energy'] = df['evacuation_energy'] * 0.28 * df['plan_weight'] / 1000
             elif df['equip_no'] == 'Z12':
                 df['evacuation_energy'] = df['evacuation_energy'] / 5.3
-            elif df['equip_no'] == 'Z01':
+            elif df['equip_no'] == 'Z13':
                 df['evacuation_energy'] = df['evacuation_energy'] / 31.7
         except Exception:
             pass
