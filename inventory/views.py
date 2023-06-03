@@ -6437,6 +6437,7 @@ class WmsOutboundOrderView(APIView):
             resp = {}
         resp_status = resp.get('state')
         if resp_status != 1:
+            logger.error(f'请求出库失败, 单据号:{task_num}, 异常码:{resp_status}')
             raise ValidationError('出库失败：{}'.format(resp.get('msg')))
         return Response('成功')
 
