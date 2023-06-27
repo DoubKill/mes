@@ -6757,8 +6757,9 @@ class ShiftProductionSummaryView(APIView):
         down_days_dict = dict(EquipDownDetails.objects.filter(
             delete_flag=False,
             factory_date__year=year,
-            factory_date__month=month
-        ).values('equip_no').annotate(days=Sum('times')/60/24).values_list('equip_no', 'days'))
+            factory_date__month=month,
+            down_type__in=['计划停机', '计划检修']
+        ).values('equip_no').annotate(days=Sum('times')/60/12).values_list('equip_no', 'days'))
         if month == datetime.datetime.now().month and year == datetime.datetime.now().year:
             now_date = get_current_factory_date()['factory_date']
             group_schedule_days = WorkSchedulePlan.objects.filter(
@@ -6780,8 +6781,9 @@ class ShiftProductionSummaryView(APIView):
             delete_flag=False,
             factory_date__year=year,
             factory_date__month=month,
-            group=group_name
-        ).values('equip_no').annotate(days=Sum('times') / 60 / 24).values_list('equip_no', 'days'))
+            group=group_name,
+            down_type__in=['计划停机', '计划检修']
+        ).values('equip_no').annotate(days=Sum('times') / 60 / 12).values_list('equip_no', 'days'))
         equip_production_data_dict = {i: {'equip_no': i,
                                           'total_trains': 0,
                                           'target_trains': target_data.get(i, 0),
