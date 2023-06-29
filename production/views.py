@@ -4060,7 +4060,10 @@ class PerformanceSummaryView(APIView):
                     # PerformanceUnitPrice.objects.create(state=state, equip_type=equip_type, dj=1.2, pt=1.1)
                     price_dic.update({f"{equip_type}_{state}": {'pt': 1.2, 'dj': 1.1}, f"fz_{state}": {'pt': 1.2, 'dj': 1.1}})
                 # 判断是否是丁基胶
-                frame_type = 'dj' if item['product_no'] in dj_list else 'pt'
+                split_no = item['product_no'].split('-')
+                frame_type = 'pt'
+                if len(split_no) >= 3 and split_no[2] in dj_list:
+                    frame_type = 'dj'
                 # 根据工作时长求机台的产量
                 work_time = detail['actual_time']
                 equip_type = 'fz' if section in ['三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库'] else equip_type
