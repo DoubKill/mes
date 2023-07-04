@@ -7270,6 +7270,7 @@ class GroupProductionSummary(APIView):
                 plan_schedule__work_schedule__work_procedure__global_name='密炼',
                 plan_schedule__day_time__year=year,
                 plan_schedule__day_time__month=month,
+                start_time__lte=datetime.datetime.now(),
                 **filter_kwargs
             )
         else:
