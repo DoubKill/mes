@@ -3615,8 +3615,9 @@ class XlRecipeNoticeView(APIView):
             return Response({'notice_flag': True, 'msg': ','.join(out_mes_materials)})
         # 配方和线体相同物料
         same_material_list = list(set(mes_xl_materials) & set(xl_equip_materials))
-        # 在使用称量配方不能下发
-        # 下发配方数据
+        # 记录要下发的配方名(增加料包过期时间使用)
+        wait_expire_recipe = []
+        # 下发配方数据(在使用称量配方不能下发)
         send_data = {'dev_type': product_batching.dev_type.category_no if not wf_flag else None}
         detail_msg = ""
         send_equip_list = []
@@ -3635,6 +3636,8 @@ class XlRecipeNoticeView(APIView):
                 continue
             send_data[send_recipe_name] = send_materials
             detail_msg += f'{single_equip_no}: 配方下发成功 '
+            if send_recipe_name not in wait_expire_recipe:
+                wait_expire_recipe.append(send_recipe_name)
         # 下传配方
         error_msg = '下发配方异常'
         try:
@@ -3646,6 +3649,15 @@ class XlRecipeNoticeView(APIView):
                     self.issue_xl_system(xl_equip, send_data)
         except Exception as e:
             raise ValidationError(f"{error_msg}:{e.args[0]}")
+        try:
+            exist_recipe = set(PackageExpire.objects.filter(product_name__in=wait_expire_recipe).values_list('product_name', flat=True))
+            real_wait_recipe = set(wait_expire_recipe) - exist_recipe
+            for i in real_wait_recipe:
+                PackageExpire.objects.create(product_no=i, product_name=i, package_fine_usefullife=7, package_sulfur_usefullife=5,
+                                             update_user=self.request.user.username, update_date=datetime.datetime.now().strftime('%Y-%m-%d'))
+
+        except Exception as e:
+            error_logger.error(f'记录料包 {wait_expire_recipe} 有效期异常, 原因: {e}')
         if '成功' in detail_msg:
             e_xl_equip = mes_xl_details.last().send_xl_equip
             if xl_equip not in e_xl_equip:
