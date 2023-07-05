@@ -1355,7 +1355,10 @@ class WeightPackageCViewSet(ListModelMixin, UpdateModelMixin, GenericViewSet):
                 if now:
                     current_plan = WorkSchedulePlan.objects.filter(start_time__lte=now, end_time__gte=now, plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
                     if current_plan:
-                        n_time = current_plan.plan_schedule.day_time.strftime('%Y-%m-%d')
+                        s_date_now = current_plan.plan_schedule.day_time
+                        if '07:00:00' <= now[-8:] < '08:00:00' and i.get('batch_classes') == '早班':
+                            s_date_now = s_date_now + datetime.timedelta(days=1)
+                        n_time = str(s_date_now)
                     else:
                         n_time = now
                 else:
