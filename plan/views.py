@@ -979,7 +979,7 @@ class SchedulingResultViewSet(ModelViewSet):
         if not schedule_no:
             raise ValidationError('请输入排程单号！')
         ret = {}
-        for equip in Equip.objects.filter(
+        for equip in Equip.objects.exclude(equip_no='190E').filter(
                 category__equip_type__global_name='密炼设备'
         ).order_by('equip_no'):
             ret[equip.equip_no] = {'data': [], 'dev_type': equip.category.category_name}
@@ -1994,7 +1994,7 @@ class APSExportDataView(APIView):
         sheet = wb.worksheets[0]
         sheet.cell(1, 2).value = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # 当前时间
         sheet.cell(3, 2).value = 'APS1{}'.format(now_time.strftime('%Y%m%d%H%M%S'))  # 排程编号
-        sheet.cell(4, 2).value = Equip.objects.filter(category__equip_type__global_name="密炼设备").count()  # 机台数量
+        sheet.cell(4, 2).value = Equip.objects.exclude(equip_no='190E').filter(category__equip_type__global_name="密炼设备").count()  # 机台数量
         sheet.cell(5, 2).value = now_time.strftime('%Y-%m-%d %H:%M:%S')  # 排程开始时间
         sheet.cell(6, 2).value = sps.scheduling_during_time  # 排程持续时间
         sheet.cell(7, 2).value = len(set(equip_stop_plan.values_list('equip_no', flat=True)))  # 停机机台数量
@@ -2015,6 +2015,7 @@ class APSExportDataView(APIView):
                 raise ValidationError('该规格：{}-{}定机表数据待确认！'.format(i.product_no, i.version))
             pd_stages = sorted(pd_ms.stages.split('/'), key=lambda x: idx_keys.get(x, 0))
             final_stage = pd_stages[-1]  # 最终生产段次
+            first_stage = pd_stages[0]  # 首次生产段次
             need_stages = copy.deepcopy(pd_stages)
             pb_version_name = '{}-{}'.format(pd_ms.product_no, pd_ms.version)
             pb_time_consume = 0
@@ -2159,6 +2160,8 @@ class APSExportDataView(APIView):
                 plan_trains = weight//float(batching_weight)
                 if int(plan_trains) == 0:
                     continue
+                # if stage == first_stage:
+                #     plan_trains = plan_trains // 10 * 10 + 10
                 train_time_consume = calculate_equip_recipe_avg_mixin_time(equip_no, recipe_name)
                 time_consume = plan_trains * train_time_consume/60
                 if pb_version_name not in job_list_data:
@@ -2491,8 +2494,8 @@ class APSPlanImport(APIView):
                                                     'time_consume': time_consume,
                                                     'start_time': aps_st + datetime.timedelta(minutes=st),
                                                     'end_time': aps_st + datetime.timedelta(minutes=et),
-                                                    'is_locked': True if '锁定' in desc else False
-                                                    # 'status': '已下发' if '锁定' in desc else '未下发'
+                                                    'is_locked': True if '锁定' in desc else False,
+                                                    'status': '已下发' if '锁定' in desc else '未下发'
                                                    }))
                 except Exception:
                     raise ValidationError('导入数据有误，请检查后重试!')

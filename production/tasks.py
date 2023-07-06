@@ -42,6 +42,7 @@ class SaveFinishRatio(object):
                 plan_schedule__day_time__year=year,
                 plan_schedule__day_time__month=month,
                 plan_schedule__day_time__lte=now_date,
+                start_time__lte=datetime.now()
             )
         else:
             schedule_queryset = WorkSchedulePlan.objects.filter(

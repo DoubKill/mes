@@ -6428,13 +6428,16 @@ class WmsOutboundOrderView(APIView):
         try:
             res = requests.post(url, json=data, timeout=10)
         except Exception as e:
+            logger.error(f'请求出库失败, 单据号:{task_num}, 异常原因:{e.args[0]}')
             raise ValidationError('请求出库失败，请联系管理员！')
         try:
             resp = json.loads(res.content)
-        except Exception:
+        except Exception as e:
+            logger.warning(f'请求出库响应解析失败, 单据号:{task_num}, 异常原因:{e.args[0]}')
             resp = {}
         resp_status = resp.get('state')
         if resp_status != 1:
+            logger.error(f'请求出库失败, 单据号:{task_num}, 异常码:{resp_status}')
             raise ValidationError('出库失败：{}'.format(resp.get('msg')))
         return Response('成功')
 

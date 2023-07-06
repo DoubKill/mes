@@ -1086,7 +1086,7 @@ class TrainsFeedbacksAPIView(mixins.ListModelMixin,
                 df['evacuation_energy'] = df['evacuation_energy'] * 0.28 * df['plan_weight'] / 1000
             elif df['equip_no'] == 'Z12':
                 df['evacuation_energy'] = df['evacuation_energy'] / 5.3
-            elif df['equip_no'] == 'Z01':
+            elif df['equip_no'] == 'Z13':
                 df['evacuation_energy'] = df['evacuation_energy'] / 31.7
         except Exception:
             pass
@@ -4769,7 +4769,10 @@ class PerformanceSummaryView(APIView):
                     # PerformanceUnitPrice.objects.create(state=state, equip_type=equip_type, dj=1.2, pt=1.1)
                     price_dic.update({f"{equip_type}_{state}": {'pt': 1.2, 'dj': 1.1}, f"fz_{state}": {'pt': 1.2, 'dj': 1.1}})
                 # 判断是否是丁基胶
-                frame_type = 'dj' if item['product_no'] in dj_list else 'pt'
+                split_no = item['product_no'].split('-')
+                frame_type = 'pt'
+                if len(split_no) >= 3 and split_no[2] in dj_list:
+                    frame_type = 'dj'
                 # 根据工作时长求机台的产量
                 work_time = detail['actual_time']
                 equip_type = 'fz' if section in ['三楼粉料', '吊料', '出库叉车', '叉车', '一楼叉车', '密炼叉车', '二楼出库'] else equip_type
@@ -7566,8 +7569,9 @@ class ShiftProductionSummaryView(APIView):
         down_days_dict = dict(EquipDownDetails.objects.filter(
             delete_flag=False,
             factory_date__year=year,
-            factory_date__month=month
-        ).values('equip_no').annotate(days=Sum('times')/60/24).values_list('equip_no', 'days'))
+            factory_date__month=month,
+            down_type__in=['计划停机', '计划检修']
+        ).values('equip_no').annotate(days=Sum('times')/60/12).values_list('equip_no', 'days'))
         if month == datetime.datetime.now().month and year == datetime.datetime.now().year:
             now_date = get_current_factory_date()['factory_date']
             group_schedule_days = WorkSchedulePlan.objects.filter(
@@ -7575,7 +7579,8 @@ class ShiftProductionSummaryView(APIView):
                 plan_schedule__day_time__year=year,
                 plan_schedule__day_time__month=month,
                 plan_schedule__day_time__lte=now_date,
-                group__global_name=group_name
+                group__global_name=group_name,
+                start_time__lte=datetime.datetime.now()
             ).count()
         else:
             group_schedule_days = WorkSchedulePlan.objects.filter(
@@ -7588,8 +7593,9 @@ class ShiftProductionSummaryView(APIView):
             delete_flag=False,
             factory_date__year=year,
             factory_date__month=month,
-            group=group_name
-        ).values('equip_no').annotate(days=Sum('times') / 60 / 24).values_list('equip_no', 'days'))
+            group=group_name,
+            down_type__in=['计划停机', '计划检修']
+        ).values('equip_no').annotate(days=Sum('times') / 60 / 12).values_list('equip_no', 'days'))
         # 获取机台历史最高产量和班组
         history_info = self.get_max_values(target_month)
         equip_production_data_dict = {i: {'equip_no': i,
@@ -8110,6 +8116,7 @@ class GroupProductionSummary(APIView):
                 plan_schedule__work_schedule__work_procedure__global_name='密炼',
                 plan_schedule__day_time__year=year,
                 plan_schedule__day_time__month=month,
+                start_time__lte=datetime.datetime.now(),
                 **filter_kwargs
             )
         else:
