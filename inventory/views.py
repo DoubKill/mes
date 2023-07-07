@@ -2941,6 +2941,9 @@ class WmsStorageView(ListAPIView):
                           "入库时间": "in_storage_time", '件数': 'sl', '唛头重量': 'zl'}
 
     def list(self, request, *args, **kwargs):
+        # 2023-07-07 获取公共代码特殊账号进行验证[如果是特殊账号,品质状态只显示合格(1)和待检(5)]
+        special_names = set(GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='原材料库存明细特殊账号').values_list('global_name', flat=True))
+        special_flag = True if self.request.user.username in special_names else False
         filter_kwargs = {}
         # 模糊查询字段
         container_no = self.request.query_params.get('pallet_no')
@@ -2984,6 +2987,9 @@ class WmsStorageView(ListAPIView):
             filter_kwargs['batch_no'] = batch_no
         if quality_status:
             filter_kwargs['quality_status'] = quality_status
+        else:
+            if special_flag:
+                filter_kwargs['quality_status__in'] = ['1', '5']
         if st:
             filter_kwargs['in_storage_time__gte'] = st
         if et:
@@ -3052,6 +3058,7 @@ class WmsStorageView(ListAPIView):
                                       total_trains=Sum('qty'))
         data['total_weight'] = sum_data['total_weight']
         data['total_trains'] = sum_data['total_trains']
+        data['special_flag'] = special_flag
         return Response(data)
 
 
