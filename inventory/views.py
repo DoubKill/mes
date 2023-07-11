@@ -3281,7 +3281,7 @@ class WmsInStockView(APIView):
                  'unit': item[6],
                  'inventory_time': item[7],
                  'position': '内' if item[4][6] in ('1', '2') else '外',
-                 'pallet_no': item[8]
+                 'RFID': item[8]
                  })
         sc.close()
         return Response(result)
