@@ -3243,7 +3243,8 @@ class WmsInStockView(APIView):
                  a.SpaceId,
                  a.Sn,
                  a.StandardUnit,
-                 a.CreaterTime
+                 a.CreaterTime,
+                 a.LadenToolNumber
             FROM 
                  dbo.t_inventory_stock AS a
              INNER JOIN t_inventory_space b ON b.Id = a.StorageSpaceEntityId
@@ -3279,7 +3280,8 @@ class WmsInStockView(APIView):
                  'Sn': item[5],
                  'unit': item[6],
                  'inventory_time': item[7],
-                 'position': '内' if item[4][6] in ('1', '2') else '外'
+                 'position': '内' if item[4][6] in ('1', '2') else '外',
+                 'pallet_no': item[8]
                  })
         sc.close()
         return Response(result)
