@@ -35,13 +35,13 @@ class SaveFinishRatio(object):
             factory_date__year=year,
             factory_date__month=month
         ).values('equip_no', 'factory_date', 'classes').annotate(total_trains=Count('id'))
+        now_date = get_current_factory_date()['factory_date']
         if month == datetime.now().month and year == datetime.now().year:
-            now_date = get_current_factory_date()['factory_date']
             schedule_queryset = WorkSchedulePlan.objects.filter(
                 plan_schedule__work_schedule__work_procedure__global_name='密炼',
                 plan_schedule__day_time__year=year,
                 plan_schedule__day_time__month=month,
-                plan_schedule__day_time__lte=now_date,
+                plan_schedule__day_time__lt=now_date,
                 start_time__lte=datetime.now()
             )
         else:
@@ -54,6 +54,7 @@ class SaveFinishRatio(object):
         date_classes_dict = {'{}-{}'.format(i.plan_schedule.day_time.strftime("%m-%d"), i.classes.global_name): i.group.global_name for i in
                              schedule_queryset}
         down_data = EquipDownDetails.objects.filter(
+            ~Q(factory_date=now_date),
             delete_flag=False,
             factory_date__year=year,
             factory_date__month=month,
