@@ -3556,7 +3556,7 @@ class SummaryOfWeighingOutput(APIView):
                     users[key]['status'] = '调岗'
 
         # 机台产量统计
-        qty_data, t_num = {}, 32
+        qty_data, t_num = {}, 4
         pool = ThreadPool(t_num)
         for equip_no in equip_list:
             pool.apply_async(self.concat_user_package, args=(equip_no, result, factory_date, users, work_times, user_result, qty_data))
@@ -4187,9 +4187,11 @@ class PerformanceSummaryView(APIView):
             raise ValidationError('请先完成当月的机台目标值设定')
         # 处理机台目标值
         target_info = {f"{i['day']}-{i['classes']}": i for i in max_setting}
+        # 是否存在虚拟完成率
+        virtual_ratio = GlobalCode.objects.filter(global_type__use_flag=True, use_flag=True, global_type__type_name='虚拟完成率').exists()
         # 获取该月人员密炼完成率
         ratio_info = FinishRatio.objects.filter(target_month=date).values('username', 'ratio')
-        ratio = {i['username']: i['ratio'] for i in ratio_info}
+        ratio = {i['username']: i['ratio'] if not virtual_ratio else 1 for i in ratio_info}
         # 计算薪资
         for k, v in user_dic.items():
             name, day, group, section = v['name'], v['day'], v['group'], v['section']
