@@ -59,7 +59,7 @@ from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, Pla
     FillCardApply, ApplyForExtraWork, EquipMaxValueCache, Equip190EWeight, OuterMaterial, Equip190E, \
     AttendanceClockDetail, AttendanceResultAudit, ManualInputTrains, ActualWorkingDay, EmployeeAttendanceRecordsLog, \
     RubberFrameRepair, ToolManageAccount, ActualWorkingEquip, ActualWorkingDay190E, WeightClassPlan, \
-    WeightClassPlanDetail, EquipDownDetails, FinishRatio, RubberLog, RubberLogSummary
+    WeightClassPlanDetail, EquipDownDetails, FinishRatio, RubberLog, RubberLogSummary, ManualWeightOutput
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, \
@@ -3423,7 +3423,7 @@ class SummaryOfMillOutput(APIView):
 class SummaryOfWeighingOutput(APIView):
     permission_classes = (IsAuthenticated,)
 
-    def concat_user_package(self, equip_no, result, factory_date, users, work_times, user_result, qty_data):
+    def concat_user_package(self, equip_no, result, factory_date, users, work_times, user_result, qty_data, manual_data):
         dic = {'equip_no': equip_no, 'hj': 0}
         plan_model, report_basic = [JZPlan, JZReportBasic] if equip_no in JZ_EQUIP_NO else [Plan, ReportBasic]
         data = plan_model.objects.using(equip_no).filter(actno__gt=1, date_time__istartswith=factory_date).values('date_time', 'grouptime').annotate(count=Sum('actno'))
@@ -3432,8 +3432,9 @@ class SummaryOfWeighingOutput(APIView):
             day = int(date.split('-')[2])    # 2  早班
             classes = item['grouptime']  # 早班/ 中班 / 夜班
             filter_classes = classes if equip_no not in JZ_EQUIP_NO else ('早' if classes == '早班' else ('晚' if classes == '夜班' else '中'))
-            dic[f'{day}{classes}'] = item['count']
-            dic['hj'] = dic.get('hj', 0) + item['count']
+            manual_count = manual_data.get(f'{equip_no}_{date}-{filter_classes}', 0)
+            dic[f'{day}{classes}'] = item['count'] + manual_count
+            dic['hj'] = dic.get('hj', 0) + item['count'] + manual_count
             names = users.get(f'{day}-{classes}-{equip_no}')
             if names:
                 status = names.pop('status', None)
@@ -3466,6 +3467,10 @@ class SummaryOfWeighingOutput(APIView):
 
     def get(self, request):
         factory_date = self.request.query_params.get('factory_date')
+        manual_flag = self.request.query_params.get('manual_flag')
+        if manual_flag:
+            data = ManualWeightOutput.objects.filter(s_factory_date__startswith=factory_date).values().order_by('equip_no', 's_factory_date')
+            return Response(data)
         export = self.request.query_params.get('export')
         year = int(factory_date.split('-')[0])
         month = int(factory_date.split('-')[1])
@@ -3554,12 +3559,14 @@ class SummaryOfWeighingOutput(APIView):
                 users[key] = {item['user__username']: [item['section']]}
                 if item['status'] == '调岗':
                     users[key]['status'] = '调岗'
-
+        # 人工录入产量
+        manual_set = ManualWeightOutput.objects.filter(s_factory_date__startswith=factory_date).values('equip_no', 's_factory_date', 'classes').annotate(count=Sum('package_count')).values('equip_no', 's_factory_date', 'classes', 'count')
+        manual_data = {f"{i['equip_no']}_{i['s_factory_date']}_{i['classes']}": i['count'] for i in manual_set}
         # 机台产量统计
         qty_data, t_num = {}, 4
         pool = ThreadPool(t_num)
         for equip_no in equip_list:
-            pool.apply_async(self.concat_user_package, args=(equip_no, result, factory_date, users, work_times, user_result, qty_data))
+            pool.apply_async(self.concat_user_package, args=(equip_no, result, factory_date, users, work_times, user_result, qty_data, manual_data))
         pool.close()
         pool.join()
         sort_res = sorted(result, key=lambda x: x['equip_no'])
@@ -3608,6 +3615,26 @@ class SummaryOfWeighingOutput(APIView):
             else:
                 result1[name] = {'name': name, f"{day}{classes}": price, f"{day}{classes}_count": count_, 'xl': round(xl, 2), 'lh': round(lh, 2)}
         return Response({'results': sort_res, 'users': result1.values(), 'user_result': user_result})
+
+    @atomic
+    def post(self, request):
+        """手动增加称量产量"""
+        factory_date = self.request.data.get('factory_date')
+        if not factory_date:
+            raise ValidationError('月份不能为空！')
+        username = self.request.user.username
+        manual_data = self.request.data.get('manual_data')
+        ManualWeightOutput.objects.filter(s_factory_date__startswith=factory_date).delete()
+        ready_data = []
+        for i in manual_data:
+            s_factory_date, equip_no, product_no, classes, package_count = i.get('s_factory_date'), i.get('equip_no'), i.get('product_no'), i.get('classes'), \
+                i.get('package_count')
+            if not all([s_factory_date, equip_no, product_no, classes, package_count]):
+                raise ValidationError('手动录入数据不可为空！')
+            ready_data.append(ManualWeightOutput(s_factory_date=s_factory_date, equip_no=equip_no, product_no=product_no, classes=classes,
+                                                 package_count=package_count, save_user=username))
+        ManualWeightOutput.objects.bulk_create(ready_data)
+        return Response('手动录入称量产量成功！')
 
 
 @method_decorator([api_recorder], name="dispatch")
