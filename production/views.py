@@ -6842,6 +6842,8 @@ class ShiftProductionSummaryView(APIView):
                                           category__equip_type__global_name="密炼设备"
                                       ).order_by('equip_no').values_list("equip_no", flat=True))}
         for d in production_data:
+            if not td_flag and d['factory_date'].strftime('%Y-%m-%d') == now_date.strftime('%Y-%m-%d'):
+                continue
             equip_no = d['equip_no']
             k = '{}-{}'.format(d['factory_date'].strftime("%m/%d"), d['classes'][0])
             key = '{}-{}'.format(k, schedule_dict[k])
