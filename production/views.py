@@ -3432,7 +3432,7 @@ class SummaryOfWeighingOutput(APIView):
             day = int(date.split('-')[2])    # 2  早班
             classes = item['grouptime']  # 早班/ 中班 / 夜班
             filter_classes = classes if equip_no not in JZ_EQUIP_NO else ('早' if classes == '早班' else ('晚' if classes == '夜班' else '中'))
-            manual_count = manual_data.get(f'{equip_no}_{date}-{filter_classes}', 0)
+            manual_count = manual_data.get(f'{equip_no}_{date}_{filter_classes}', 0)
             dic[f'{day}{classes}'] = item['count'] + manual_count
             dic['hj'] = dic.get('hj', 0) + item['count'] + manual_count
             names = users.get(f'{day}-{classes}-{equip_no}')
@@ -3450,7 +3450,7 @@ class SummaryOfWeighingOutput(APIView):
                             num = qty_data[f'{day}-{st}-{et}']
                         else:
                             c_num = report_basic.objects.using(equip_no).filter(starttime__gte=work_time[0], savetime__lte=work_time[1], grouptime=filter_classes).aggregate(num=Count('id'))['num']
-                            num = c_num if c_num else 0  # 是否需要去除为0的机台再取平均
+                            num = manual_count + (c_num if c_num else 0)  # 是否需要去除为0的机台再取平均
                             qty_data[f'{day}-{st}-{et}'] = num
                         # 车数计算：当天产量 / 12小时 * 实际工作时间 -> 修改为根据考勤时间计算
                         if f"{name}_{day}_{classes}" not in key_dic:
@@ -3507,26 +3507,33 @@ class SummaryOfWeighingOutput(APIView):
         user_list = EmployeeAttendanceRecords.objects.filter(
             Q(factory_date__year=year, factory_date__month=month, equip__in=equip_list) &
             Q(end_date__isnull=False, begin_date__isnull=False) & ~Q(is_use='废弃'), ~Q(clock_type='密炼'), **filter_kwargs)\
-            .values('user__username', 'factory_date__day', 'group', 'classes', 'section', 'equip', 'calculate_begin_date', 'calculate_end_date', 'status')
+            .values('user__username', 'factory_date__day', 'group', 'classes', 'section', 'equip', 'calculate_begin_date', 'calculate_end_date', 'status', 'factory_date')
+        # 人工录入产量
+        manual_set = ManualWeightOutput.objects.filter(s_factory_date__startswith=factory_date).values('equip_no', 's_factory_date', 'classes').annotate(
+            count=Sum('package_count')).values('equip_no', 's_factory_date', 'classes', 'count')
+        manual_data = {f"{i['equip_no']}_{i['s_factory_date']}_{i['classes']}": i['count'] for i in manual_set}
         if filter_kwargs:  # 获取包数
             data = user_list.order_by('equip')
             user_total = {}
             for i in data:
-                section, equip_no, st, et, classes = i.get('section'), i.get('equip'), i.get('calculate_begin_date'), i.get('calculate_end_date'), i.get('classes')
+                section, equip_no, st, et, classes, s_factory_date = i.get('section'), i.get('equip'), i.get('calculate_begin_date'), \
+                    i.get('calculate_end_date'), i.get('classes'), i.get('factory_date')
                 plan_model, report_basic = [JZPlan, JZReportBasic] if equip_no in JZ_EQUIP_NO else [Plan, ReportBasic]
                 if equip_no in JZ_EQUIP_NO:
                     classes = '早' if classes == '早班' else ('晚' if classes == '夜班' else '中')
                 num = report_basic.objects.using(equip_no).filter(starttime__gte=st, savetime__lte=et, grouptime=classes).aggregate(num=Count('id'))['num']
-                if not num:
+                manual_count = manual_data.get(f'{equip_no}_{s_factory_date}_{classes}', 0)
+                t_num = manual_count + num
+                if not t_num:
                     continue
                 key = f"{equip_no}-{section}"
                 unit = price_obj.xl if equip_no.startswith('F') else price_obj.lh
                 equip_data = user_package.get(key)
                 if equip_data:
-                    equip_data['num'] += num
+                    equip_data['num'] += t_num
                 else:
-                    user_package[key] = {'section': section, 'num': num, 'equip_no': equip_no, 'unit': unit}
-                user_total[equip_no] = user_total.get(equip_no, 0) + num
+                    user_package[key] = {'section': section, 'num': t_num, 'equip_no': equip_no, 'unit': unit}
+                user_total[equip_no] = user_total.get(equip_no, 0) + t_num
             return Response({'detail': user_package.values(), 'user_total': user_total})
         # 岗位系数
         section_dic = {}
@@ -3559,9 +3566,6 @@ class SummaryOfWeighingOutput(APIView):
                 users[key] = {item['user__username']: [item['section']]}
                 if item['status'] == '调岗':
                     users[key]['status'] = '调岗'
-        # 人工录入产量
-        manual_set = ManualWeightOutput.objects.filter(s_factory_date__startswith=factory_date).values('equip_no', 's_factory_date', 'classes').annotate(count=Sum('package_count')).values('equip_no', 's_factory_date', 'classes', 'count')
-        manual_data = {f"{i['equip_no']}_{i['s_factory_date']}_{i['classes']}": i['count'] for i in manual_set}
         # 机台产量统计
         qty_data, t_num = {}, 4
         pool = ThreadPool(t_num)
