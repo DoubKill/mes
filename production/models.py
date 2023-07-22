@@ -847,3 +847,16 @@ class RubberLogSummary(models.Model):
         db_table = 'rubber_log_summary'
         verbose_name_plural = verbose_name = '胶架进出登记汇总表'
 
+
+class ManualWeightOutput(models.Model):
+    s_factory_date = models.DateField(help_text='工厂日期')
+    equip_no = models.CharField(max_length=12, help_text='机台')
+    classes = models.CharField(max_length=12, help_text='班次')
+    product_no = models.CharField(max_length=64, help_text='产出胶料')
+    package_count = models.IntegerField(help_text='包数')
+    save_user = models.CharField(max_length=64, help_text='保存人')
+    save_time = models.DateTimeField(auto_now_add=True, help_text='保存时间')
+
+    class Meta:
+        db_table = 'manual_weight_output'
+        verbose_name_plural = verbose_name = '人工录入称量产量'
