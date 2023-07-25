@@ -686,9 +686,9 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
             sheet.write(data_row, 13, i['qty'])
             sheet.write(data_row, 14, i['weight'])
             sheet.write(data_row, 15, i['sl'])
-            sheet.write(data_row, 15, i['zl'])
-            sheet.write(data_row, 16, i['last_time'])
-            sheet.write(data_row, 17, i['fin_time'])
+            sheet.write(data_row, 16, i['zl'])
+            sheet.write(data_row, 17, i['last_time'])
+            sheet.write(data_row, 18, i['fin_time'])
             data_row = data_row + 1
         # 写出到IO
         output = BytesIO()
