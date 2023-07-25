@@ -6788,15 +6788,15 @@ class ShiftProductionSummaryView(APIView):
             k = '{}-{}'.format(i['plan_schedule__day_time'].strftime("%m/%d"), i['classes__global_name'][0])
             schedule_dict[k] = i['group__global_name'][0]
 
-        working_days = ActualWorkingDay.objects.filter(
-            factory_date__year=year, factory_date__month=month).aggregate(days=Sum('num'))['days']
-        working_days = 0 if not working_days else working_days
+        # working_days = ActualWorkingDay.objects.filter(
+        #     factory_date__year=year, factory_date__month=month).aggregate(days=Sum('num'))['days']
+        # working_days = 0 if not working_days else working_days
         down_days_dict = dict(EquipDownDetails.objects.filter(
             delete_flag=False,
             factory_date__year=year,
             factory_date__month=month,
             down_type__in=['计划停机', '计划检修']
-        ).values('equip_no').annotate(days=Sum('times')/60/12).values_list('equip_no', 'days'))
+        ).values('equip_no').annotate(days=Sum('times')/60/24).values_list('equip_no', 'days'))
         now_date = get_current_factory_date()['factory_date']
         if month == datetime.datetime.now().month and year == datetime.datetime.now().year:
             filter_kwargs = {'plan_schedule__day_time__lte': now_date} if td_flag else {'plan_schedule__day_time__lt': now_date}
@@ -6808,6 +6808,7 @@ class ShiftProductionSummaryView(APIView):
                 start_time__lte=datetime.datetime.now(),
                 **filter_kwargs
             ).count()
+            working_days = now_date.day if td_flag else (now_date.day - 1)
         else:
             group_schedule_days = WorkSchedulePlan.objects.filter(
                 plan_schedule__work_schedule__work_procedure__global_name='密炼',
@@ -6815,6 +6816,7 @@ class ShiftProductionSummaryView(APIView):
                 plan_schedule__day_time__month=month,
                 group__global_name=group_name
             ).count()
+            working_days = len(days_cur_month_dates(target_month))
         if td_flag:
             group_down_days_dict = dict(EquipDownDetails.objects.filter(
                 delete_flag=False,
