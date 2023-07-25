@@ -3446,12 +3446,12 @@ class SummaryOfWeighingOutput(APIView):
                         if len(work_time) < 2:
                             continue
                         st, et = work_time[:2]
-                        if f'{day}-{st}-{et}' in qty_data:
-                            num = qty_data[f'{day}-{st}-{et}']
+                        if f'{equip_no}-{day}-{st}-{et}' in qty_data:
+                            num = qty_data[f'{equip_no}-{day}-{st}-{et}']
                         else:
                             c_num = report_basic.objects.using(equip_no).filter(starttime__gte=work_time[0], savetime__lte=work_time[1], grouptime=filter_classes).aggregate(num=Count('id'))['num']
                             num = manual_count + (c_num if c_num else 0)  # 是否需要去除为0的机台再取平均
-                            qty_data[f'{day}-{st}-{et}'] = num
+                            qty_data[f'{equip_no}-{day}-{st}-{et}'] = num
                         # 车数计算：当天产量 / 12小时 * 实际工作时间 -> 修改为根据考勤时间计算
                         if f"{name}_{day}_{classes}" not in key_dic:
                             key_dic[f"{name}_{day}_{classes}"] = key

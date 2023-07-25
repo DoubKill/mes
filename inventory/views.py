@@ -663,7 +663,7 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         style.alignment.wrap = 1
 
         columns = ['序号', '出库单据号', '下架任务号', '巷道编码', '追踪码', '识别卡ID', '库位码', '物料名称', '物料编码',
-                   '批次号', '创建时间', '状态', '创建人', '数量', '重量', '件数', '唛头重量']
+                   '批次号', '创建时间', '状态', '创建人', '数量', '重量', '件数', '唛头重量', '开始时间', '完成时间']
         # 写入文件标题
         for col_num in range(len(columns)):
             sheet.write(0, col_num, columns[col_num])
@@ -687,6 +687,8 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
             sheet.write(data_row, 14, i['weight'])
             sheet.write(data_row, 15, i['sl'])
             sheet.write(data_row, 15, i['zl'])
+            sheet.write(data_row, 16, i['last_time'])
+            sheet.write(data_row, 17, i['fin_time'])
             data_row = data_row + 1
         # 写出到IO
         output = BytesIO()
