@@ -7025,7 +7025,8 @@ class EquipDownAnalysisView(APIView):
                     begin_time, end_time = i[4].split('-')
                     _s_data = {'factory_date': s_date, 'classes': classes, 'group': group, 'equip_no': i[5], 'down_reason': i[7],
                                'down_type': i[6], 'begin_time': begin_time, 'end_time': end_time, 'times': i[3], 'save_user': user_name}
-                    instance = EquipDownDetails.objects.filter(factory_date=s_date, classes=classes, group=group, equip_no=i[5], down_type=i[6], down_reason=i[7]).last()
+                    instance = EquipDownDetails.objects.filter(factory_date=s_date, classes=classes, group=group, equip_no=i[5], down_type=i[6],
+                                                               down_reason=i[7], begin_time=begin_time, end_time=end_time).last()
                     if instance:
                         instance.times = i[3]
                         instance.begin_time = begin_time
