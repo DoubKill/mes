@@ -3381,6 +3381,9 @@ class WMSExpireListView(APIView):
     DATABASE_CONF = WMS_CONF
 
     def get(self, request):
+        # 2023-07-31 获取公共代码特殊账号进行验证[如果是特殊账号,不展示即将超期数据]
+        username = self.request.user.username
+        special_flag = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='原材料库存明细特殊账号', global_name=username).exists()
         expire_days = self.request.query_params.get('expire_days', 30)
         page = self.request.query_params.get('page', 1)
         page_size = self.request.query_params.get('page_size', 15)
@@ -3402,7 +3405,7 @@ group by m.MaterialCode,
          a.StockDetailState
 order by m.MaterialCode;""".format(expire_days)
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)
-        temp = sc.all()
+        temp = sc.all() if not special_flag else []
         count = len(temp)
         result = []
         data = temp[st:et]
