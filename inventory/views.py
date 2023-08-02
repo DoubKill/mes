@@ -6055,6 +6055,9 @@ class WMSStockSummaryView(APIView):
         page_size = self.request.query_params.get('page_size', 15)
         st = (int(page) - 1) * int(page_size)
         et = int(page) * int(page_size)
+        username = self.request.user.username
+        special_flag = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='原材料库存明细特殊账号',
+                                                 global_name=username).exists()
         extra_where_str = ""
         if material_name:
             extra_where_str += "where temp.MaterialName like '%{}%'".format(material_name)
@@ -6110,20 +6113,21 @@ class WMSStockSummaryView(APIView):
             quality_status = item[8]
             if quality_status == 2:
                 quality_status = 5
+            item_6, item_7 = [0, 0] if special_flag and quality_status == 3 else [item[6], item[7]]
             if item[1] not in data_dict:
                 data = {'name': item[0], 'code': item[1], 'zc_material_code': item[2], 'unit': item[3], 'pdm': item[4],
-                        'group_name': item[5], 'total_quantity': item[6], 'total_weight': item[7], 'total_sl': item[9],
+                        'group_name': item[5], 'total_quantity': item_6, 'total_weight': item[7], 'total_sl': item[9],
                         'total_zl': item[10], 'quantity_1': 0, 'weight_1': 0, 'quantity_3': 0, 'weight_3': 0,
                         'quantity_4': 0, 'weight_4': 0, 'quantity_5': 0, 'weight_5': 0,
-                        'quantity_{}'.format(quality_status): item[6], 'weight_{}'.format(quality_status): item[7]}
+                        'quantity_{}'.format(quality_status): item_6, 'weight_{}'.format(quality_status): item_7}
                 data_dict[item[1]] = data
             else:
-                data_dict[item[1]]['total_quantity'] += item[6]
-                data_dict[item[1]]['total_weight'] += item[7]
+                data_dict[item[1]]['total_quantity'] += item_6
+                data_dict[item[1]]['total_weight'] += item_7
                 data_dict[item[1]]['total_sl'] += item[9]
                 data_dict[item[1]]['total_zl'] += item[10]
-                data_dict[item[1]]['quantity_{}'.format(quality_status)] = item[6]
-                data_dict[item[1]]['weight_{}'.format(quality_status)] = item[7]
+                data_dict[item[1]]['quantity_{}'.format(quality_status)] = item_6
+                data_dict[item[1]]['weight_{}'.format(quality_status)] = item_7
         result = []
         for item in data_dict.values():
             weighting = safety_data.get(item['code'].strip())
@@ -6157,7 +6161,7 @@ class WMSStockSummaryView(APIView):
                 data = result
             return self.export_xls(data)
         return Response(
-            {'results': ret, "count": count,
+            {'results': ret, "count": count, 'special_flag': special_flag,
              'total_quantity': total_quantity, 'total_weight': total_weight, 'total_sl': total_sl, 'total_zl': total_zl,
              'total_quantity1': total_quantity1, 'total_weight1': total_weight1,
              'total_quantity3': total_quantity3, 'total_weight3': total_weight3,
