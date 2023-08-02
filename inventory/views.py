@@ -6116,7 +6116,7 @@ class WMSStockSummaryView(APIView):
             item_6, item_7 = [0, 0] if special_flag and quality_status == 3 else [item[6], item[7]]
             if item[1] not in data_dict:
                 data = {'name': item[0], 'code': item[1], 'zc_material_code': item[2], 'unit': item[3], 'pdm': item[4],
-                        'group_name': item[5], 'total_quantity': item_6, 'total_weight': item[7], 'total_sl': item[9],
+                        'group_name': item[5], 'total_quantity': item_6, 'total_weight': item_7, 'total_sl': item[9],
                         'total_zl': item[10], 'quantity_1': 0, 'weight_1': 0, 'quantity_3': 0, 'weight_3': 0,
                         'quantity_4': 0, 'weight_4': 0, 'quantity_5': 0, 'weight_5': 0,
                         'quantity_{}'.format(quality_status): item_6, 'weight_{}'.format(quality_status): item_7}
