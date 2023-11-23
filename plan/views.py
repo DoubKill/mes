@@ -1401,9 +1401,12 @@ class SchedulingMaterialDemanded(APIView):
         elif interval_type == '2':
             st = now_time + datetime.timedelta(hours=4)
             et = now_time + datetime.timedelta(hours=8)
-        else:
+        elif interval_type == '3':
             st = now_time + datetime.timedelta(hours=8)
             et = now_time + datetime.timedelta(hours=12)
+        else:
+            st = now_time
+            et = now_time + datetime.timedelta(hours=24)
 
         factory_date = get_current_factory_date().get('factory_date', datetime.datetime.now().date())
         if not factory_date:
