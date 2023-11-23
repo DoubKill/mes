@@ -825,7 +825,7 @@ class ToleranceDistinguish(AbstractEntity):
     """公差标准-区分关键字定义"""
     keyword_code = models.CharField(max_length=64, help_text='区分关键字编号')
     keyword_name = models.CharField(max_length=64, help_text='区分关键字名称')
-    re_str = models.CharField(max_length=64, help_text='匹配字符', null=True, blank=True)
+    re_str = models.CharField(max_length=1024, help_text='匹配字符', null=True, blank=True)
     desc = models.CharField(max_length=64, help_text='备注', null=True, blank=True)
 
     class Meta:

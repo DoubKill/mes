@@ -219,7 +219,7 @@ class ProductBatching(AbstractEntity):
                                                       standard_error=F('cnt_type_detail_equip__standard_error'))
                                      .values('material__material_name', 'actual_weight', 'standard_error'))
         else:
-            material_name_weight = [i for i in material_name_weight if i['material__material_name'] not in ['细料', '硫磺']]
+            material_name_weight = [i for i in material_name_weight if i['material__material_name'] not in ['细料', '硫磺', '细料(ZY)', '硫磺(ZY)']]
         return material_name_weight, cnt_type_details
 
     class Meta:
