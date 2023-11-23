@@ -225,7 +225,7 @@ class BatchProductBatchingVIew(APIView):
             single_material['scan_finished'] = False  # 默认未扫码或扫码不全
             # 不存在则说明当前只完成了一部分的进料,数量置为0
             if not load_data:
-                if material_name in ['细料', '硫磺']:
+                if material_name in ['细料', '硫磺', '细料(ZY)', '硫磺(ZY)']:
                     xl_bra = []
                     detail, xl_detail_count = [], 0
                     if xl:  # [存在料包，但获取不到信息说明是不合包场景]
@@ -331,7 +331,7 @@ class BatchProductBatchingVIew(APIView):
         sfj_details = ProductBatchingDetailPlan.objects.using('SFJ').filter(plan_classes_uid=plan_classes_uid)
         if common_scan:
             # 查询上辅机料包重量、误差
-            other_xl = sfj_details.filter(material_name__in=['细料', '硫磺']).last()
+            other_xl = sfj_details.filter(material_name__in=['细料', '硫磺', '细料(ZY)', '硫磺(ZY)']).last()
             if other_xl:  # 防止配方中没有料包但是扫了通用料包条码
                 res.append({
                     "material__material_name": other_xl.material_name, "actual_weight": 1,
@@ -1277,10 +1277,12 @@ class GetMaterialTolerance(APIView):
         data = self.request.query_params
         batching_equip = data.get('batching_equip')
         material_name = data.get('material_name')
+        material_type = data.get('material_type')  # 物料类别: 活化剂、防老剂、合成胶、炭黑
+        material_species = data.get('material_species')  # 种类: 胶料、炭黑、油料、细料、硫磺
         standard_weight = data.get('standard_weight')
         project_name = data.get('project_name', '单个化工重量')
         only_num = data.get('only_num')
-        tolerance = get_tolerance(batching_equip, standard_weight, material_name, project_name, only_num)
+        tolerance = get_tolerance(batching_equip, standard_weight, material_name, project_name, material_type, material_species, only_num)
         return Response(tolerance)
 
 
@@ -3467,11 +3469,11 @@ class ToleranceKeyword(APIView):
         model_name = ToleranceDistinguish if keyword_type == '区分' else (
             ToleranceProject if keyword_type == '项目' else ToleranceHandle)
         if all:
-            results = model_name.objects.all().values('id', 'keyword_name')
+            results = model_name.objects.all().values('id', 'keyword_name').order_by('id')
         elif single:
-            results = model_name.objects.filter(keyword_name__in=['<', '≤', '<=']).values('id', 'keyword_name')
+            results = model_name.objects.filter(keyword_name__in=['<', '≤', '<=']).values('id', 'keyword_name').order_by('id')
         else:
-            results = model_name.objects.all().values()
+            results = model_name.objects.all().values().order_by('id')
         return Response({'results': list(results)})
 
     @atomic
@@ -3517,7 +3519,7 @@ class ToleranceRuleViewSet(CommonDeleteMixin, ModelViewSet):
     update: 技术标准-公差录入规则修改
     destroy: 技术标准-公差录入规则停用
     """
-    queryset = ToleranceRule.objects.all()
+    queryset = ToleranceRule.objects.all().order_by('rule_code')
     serializer_class = ToleranceRuleSerializer
     pagination_class = None
     permission_classes = (IsAuthenticated,)

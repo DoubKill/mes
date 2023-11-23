@@ -118,6 +118,7 @@ class ProductBatchingSyncInterface(serializers.ModelSerializer, BaseInterface):
 
     def get_weight_details(self, obj):
         enable_equip = self.context.get('enable_equip')
+        common_equip = self.context.get('common_equip')  # 2023-04-21 细料(ZY)、硫磺(ZY)
         weight_details = {}
         for weight_cnt_type in obj.weight_cnt_types.filter(delete_flag=False):
             # 获取投料方式
@@ -136,19 +137,20 @@ class ProductBatchingSyncInterface(serializers.ModelSerializer, BaseInterface):
                     .values('material_name', 'actual_weight', 'standard_error')
                 total_weight = weight_cnt_type.cnt_total_weight(i.equip_no)
                 batching_equip = 'S' if weight_cnt_type.weigh_type == 1 else 'F'
-                tolerance = get_tolerance(batching_equip, total_weight, project_name='整包', only_num=True)
+                tolerance = get_tolerance(batching_equip, total_weight, project_name='整包', only_num=True, destination='群控')
                 if batching_equip == 'F' and total_weight and total_weight > 30 and tolerance:
                     try:
                         n = round(tolerance, 1)
                         tolerance = n if n >= tolerance else (n + Decimal(0.1))
                     except:
                         pass
+                lb_name = f"{weight_cnt_type.name}" + ("" if i.equip_no in common_equip else "(ZY)")
                 if i.equip_no not in weight_details:
-                    weight_details[i.equip_no] = [{'material_name': weight_cnt_type.name,
+                    weight_details[i.equip_no] = [{'material_name': lb_name,
                                                    'actual_weight': total_weight, 'standard_error': tolerance,
                                                    'feeding_mode': i.feeding_mode, 'c_xl_tank': list(c_xl)}]
                 else:
-                    weight_details[i.equip_no].append({'material_name': weight_cnt_type.name,
+                    weight_details[i.equip_no].append({'material_name':lb_name,
                                                        'actual_weight': total_weight, 'standard_error': tolerance,
                                                        'feeding_mode': i.feeding_mode, 'c_xl_tank': list(c_xl)})
                 equip_no_list.append(i.equip_no)

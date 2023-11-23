@@ -101,7 +101,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             save_scan_log(scan_data, scan_message='同一计划中不可多次扫同一条码', unit=is_used.unit, scan_material=is_used.scan_material,
                           scan_material_type=is_used.scan_material_type, init_weight=is_used.init_weight)
             raise serializers.ValidationError('同一计划中不可多次扫同一条码')
-        common_xl = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, scan_material_type__in=['机配', '人工配', '细料', '硫磺'])
+        common_xl = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, scan_material_type__in=['机配', '人工配', '细料', '硫磺', '细料(ZY)', '硫磺(ZY)'])
         common_scan = OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, other_type='通用料包', status=1)
         # 获取机型  check_used获取扫码限制使用
         scan_dev = classes_plan.equip.category.category_name
@@ -112,7 +112,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             raise serializers.ValidationError(f'获取配方详情失败:{plan_product_no}')
         detail_infos = {i['material__material_name']: i['actual_weight'] for i in material_name_weight}
         for i in material_name_weight:
-            if i['material__material_name'] in ['硫磺', '细料']:
+            if i['material__material_name'] in ['硫磺', '细料', '细料(ZY)', '硫磺(ZY)']:
                 if not cnt_type_details:
                     save_scan_log(scan_data, scan_message='未找到MES配方')
                     raise serializers.ValidationError('未找到MES配方')
@@ -129,7 +129,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             if not common_code:
                 save_scan_log(scan_data, scan_message='未找到条码信息或条码已被使用', scan_material='通用料包', scan_material_type='通用料包', unit='包')
                 raise serializers.ValidationError('未找到条码信息或条码已被使用')
-            xl_recipe = [i for i in material_name_weight if i['material__material_name'] in ['硫磺', '细料']]
+            xl_recipe = [i for i in material_name_weight if i['material__material_name'] in ['硫磺', '细料', '细料(ZY)', '硫磺(ZY)']]
             if xl_recipe:  # 需要料包
                 OtherMaterialLog.objects.create(**{'plan_classes_uid': plan_classes_uid, 'product_no': plan_product_no,
                                                    'material_name': '通用料包', 'bra_code': bra_code, 'status': 1, 'other_type': '通用料包'})
@@ -490,10 +490,12 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                         attrs.update({'material_name': material_name, 'material_no': material_no})
                         attrs['tank_data'].update({'material_name': material_name, 'material_no': material_no})
                 else:  # 料包
-                    if '硫磺' not in materials and '细料' not in materials:  # 是否存在料包
+                    lb_names = ['硫磺', '硫磺(ZY)', '细料', '细料(ZY)']
+                    lb = [i for i in materials if i in lb_names]
+                    if not lb:  # 是否存在料包
                         save_scan_log(scan_data, scan_message='该配方生产不需要投入料包')
                         raise serializers.ValidationError('该配方生产不需要投入料包')
-                    xl_total_weight = detail_infos.get('硫磺') if '硫磺' in materials else detail_infos.get('细料')
+                    xl_total_weight = detail_infos.get(lb[0])
                     total_standard_error = sum([i['standard_error'] for i in cnt_type_details])
                     already_y = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, scan_material_type__in=['硫磺', '细料'], useup_time__year='1970')
                     already_n = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, scan_material_type__in=['机配', '人工配'], useup_time__year='1970')
@@ -534,8 +536,8 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                     ReplaceMaterial.objects.create(**replace_material_data)
                                 flag, send_flag = False, False
                         if flag and merge_flag and abs(weight_package.total_weight[0] - xl_total_weight) > total_standard_error:  # 合包但重量不一致
-                            scan_material_type = '硫磺' if '硫磺' in materials else '细料'
-                            material_no = material_name = '细料' if '细料' in materials else '硫磺'
+                            scan_material_type = '硫磺' if '硫磺' in lb[0] else '细料'
+                            material_no = material_name = lb[0]
                             res = self.material_pass(plan_classes_uid, scan_material, reason_type='重量不匹配', material_type=scan_material_type)
                             if not res[0]:
                                 scan_material_msg, is_release = '料包重量与配方不一致, 请工艺确认', False
@@ -585,12 +587,12 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                     raise serializers.ValidationError('添加的人工配料与之前不一致')
                         if flag:
                             if merge_flag:
-                                material_no = material_name = '细料' if '细料' in materials else '硫磺'
+                                material_no = material_name = lb[0]
                             else:
                                 material_name['single_weight'] = weight_package.split_count
                             attrs.update({'material_name': material_name, 'material_no': material_no})
                             attrs['tank_data'].update({'material_name': material_name, 'material_no': material_no, 'scan_material': material_name,
-                                                       'scan_material_type': scan_material_type if not merge_flag else ('硫磺' if '硫磺' in materials else '细料')})
+                                                       'scan_material_type': scan_material_type if not merge_flag else ('硫磺' if '硫磺' in lb[0] else '细料')})
                     else:  # 两种场景(全人工配、机配+人工配)
                         if 'ONLY' in manual.product_no and manual.product_no.split('-')[-2] != plan_equip_no:
                             save_scan_log(scan_data, scan_message=f"物料为{manual.product_no.split('-')[-2]}, 无法在当前机台使用投料", is_release=False)
