@@ -4356,7 +4356,7 @@ class GetStaffsView(APIView):
     permission_classes = (IsAuthenticated,)
 
     def get(self, request):
-        ding_api = DinDinAPI()
+        # ding_api = DinDinAPI()
         equip_no = self.request.query_params.get('equip_no')
         maintenance_type = self.request.query_params.get('maintenance_type', '通用')
         have_classes = self.request.query_params.get('have_classes')
