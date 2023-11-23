@@ -301,6 +301,20 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
         sheet.cell(6, 16).value = indicators_data_dict.get('TC50', {}).get('lower_limit')
         sheet.cell(5, 17).value = indicators_data_dict.get('TC90', {}).get('upper_limit')
         sheet.cell(6, 17).value = indicators_data_dict.get('TC90', {}).get('lower_limit')
+        sheet.cell(5, 18).value = indicators_data_dict.get('T5', {}).get('upper_limit')
+        sheet.cell(6, 18).value = indicators_data_dict.get('T5', {}).get('lower_limit')
+        sheet.cell(5, 19).value = indicators_data_dict.get('钢拔', {}).get('upper_limit')
+        sheet.cell(6, 19).value = indicators_data_dict.get('钢拔', {}).get('lower_limit')
+        sheet.cell(5, 20).value = indicators_data_dict.get('100%', {}).get('upper_limit')
+        sheet.cell(6, 20).value = indicators_data_dict.get('100%', {}).get('lower_limit')
+        sheet.cell(5, 21).value = indicators_data_dict.get('M300', {}).get('upper_limit')
+        sheet.cell(6, 21).value = indicators_data_dict.get('M300', {}).get('lower_limit')
+        sheet.cell(5, 22).value = indicators_data_dict.get('伸长率%', {}).get('upper_limit')
+        sheet.cell(6, 22).value = indicators_data_dict.get('伸长率%', {}).get('lower_limit')
+        sheet.cell(5, 23).value = indicators_data_dict.get('扯断强度', {}).get('upper_limit')
+        sheet.cell(6, 23).value = indicators_data_dict.get('扯断强度', {}).get('lower_limit')
+        sheet.cell(5, 24).value = indicators_data_dict.get('永久变形', {}).get('upper_limit')
+        sheet.cell(6, 24).value = indicators_data_dict.get('永久变形', {}).get('lower_limit')
         for i in result:
             deal_suggestion = ''
             result_data = lot_deal_result_dict.get(i['lot_no'])
@@ -337,6 +351,20 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
                 sheet.cell(6, 16).value = indicators_data_dict.get('TC50', {}).get('lower_limit')
                 sheet.cell(5, 17).value = indicators_data_dict.get('TC90', {}).get('upper_limit')
                 sheet.cell(6, 17).value = indicators_data_dict.get('TC90', {}).get('lower_limit')
+                sheet.cell(5, 18).value = indicators_data_dict.get('T5', {}).get('upper_limit')
+                sheet.cell(6, 18).value = indicators_data_dict.get('T5', {}).get('lower_limit')
+                sheet.cell(5, 19).value = indicators_data_dict.get('钢拔', {}).get('upper_limit')
+                sheet.cell(6, 19).value = indicators_data_dict.get('钢拔', {}).get('lower_limit')
+                sheet.cell(5, 20).value = indicators_data_dict.get('100%', {}).get('upper_limit')
+                sheet.cell(6, 20).value = indicators_data_dict.get('100%', {}).get('lower_limit')
+                sheet.cell(5, 21).value = indicators_data_dict.get('M300', {}).get('upper_limit')
+                sheet.cell(6, 21).value = indicators_data_dict.get('M300', {}).get('lower_limit')
+                sheet.cell(5, 22).value = indicators_data_dict.get('伸长率%', {}).get('upper_limit')
+                sheet.cell(6, 22).value = indicators_data_dict.get('伸长率%', {}).get('lower_limit')
+                sheet.cell(5, 23).value = indicators_data_dict.get('扯断强度', {}).get('upper_limit')
+                sheet.cell(6, 23).value = indicators_data_dict.get('扯断强度', {}).get('lower_limit')
+                sheet.cell(5, 24).value = indicators_data_dict.get('永久变形', {}).get('upper_limit')
+                sheet.cell(6, 24).value = indicators_data_dict.get('永久变形', {}).get('lower_limit')
             order_results = i['order_results']
             mn_machine_name = ''
             lb_machine_name = ''
@@ -368,8 +396,15 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
             sheet.cell(row_num, 15).value = ret.get('TC10')
             sheet.cell(row_num, 16).value = ret.get('TC50')
             sheet.cell(row_num, 17).value = ret.get('TC90')
-            sheet.cell(row_num, 18).value = i['state']
-            sheet.cell(row_num, 19).value = deal_suggestion
+            sheet.cell(row_num, 18).value = ret.get('T5')
+            sheet.cell(row_num, 19).value = ret.get('钢拔')
+            sheet.cell(row_num, 20).value = ret.get('100%')
+            sheet.cell(row_num, 21).value = ret.get('M300')
+            sheet.cell(row_num, 22).value = ret.get('伸长率%')
+            sheet.cell(row_num, 23).value = ret.get('扯断强度')
+            sheet.cell(row_num, 24).value = ret.get('永久变形')
+            sheet.cell(row_num, 25).value = i['state']
+            sheet.cell(row_num, 26).value = deal_suggestion
 
             # 写入汇总
             sheet0.cell(data_row0, 1).value = i['product_no']
@@ -389,8 +424,15 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
             sheet0.cell(data_row0, 15).value = ret.get('TC10')
             sheet0.cell(data_row0, 16).value = ret.get('TC50')
             sheet0.cell(data_row0, 17).value = ret.get('TC90')
-            sheet0.cell(data_row0, 18).value = i['state']
-            sheet0.cell(data_row0, 19).value = deal_suggestion
+            sheet0.cell(data_row0, 18).value = ret.get('T5')
+            sheet0.cell(data_row0, 19).value = ret.get('钢拔')
+            sheet0.cell(data_row0, 20).value = ret.get('100%')
+            sheet0.cell(data_row0, 21).value = ret.get('M300')
+            sheet0.cell(data_row0, 22).value = ret.get('伸长率%')
+            sheet0.cell(data_row0, 23).value = ret.get('扯断强度')
+            sheet0.cell(data_row0, 24).value = ret.get('永久变形')
+            sheet0.cell(data_row0, 25).value = i['state']
+            sheet0.cell(data_row0, 26).value = deal_suggestion
 
             row_num += 1
             data_row0 += 1
@@ -3008,11 +3050,12 @@ order by temp.PRODUCT_NO, temp.TEST_INDICATOR_NAME;""".format(where_str)
             tc90_unqualified_count, tc90_lower_count, tc90_upper_count = 0, 0, 0
 
             if test_indicator_name == '门尼':
-                mn_unqualified_count = qty
-                if flag == '-':
-                    mn_lower_count = qty
-                else:
-                    mn_upper_count = qty
+                if data_point_name == 'ML(1+4)':
+                    mn_unqualified_count = qty
+                    if flag == '-':
+                        mn_lower_count = qty
+                    else:
+                        mn_upper_count = qty
             elif test_indicator_name == '硬度':
                 yd_unqualified_count = qty
                 if flag == '-':
@@ -3201,6 +3244,148 @@ order by temp.PRODUCT_NO, temp.TEST_INDICATOR_NAME;""".format(where_str)
                         'rate_1': round((yc_check_cnt-yc_qualified_cnt)/yc_check_cnt*100, 2) if yc_check_cnt else '',
                         'rate_lb': round((lb_check_cnt-lb_qualified_cnt)/lb_check_cnt*100, 2) if lb_check_cnt else ''}
         return Response({'result': resp_data, 'all': summary_data})
+
+
+@method_decorator([api_recorder], name='dispatch')
+class DailyProductTestStaticsView(APIView):
+    """胶料别不合格率 规格每日合格率汇总"""
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        stage = self.request.query_params.get('station', '')  # 段次
+        product_standard = self.request.query_params.get('product_type', '')  # 胶料规格
+        production_equip_no = self.request.query_params.get('equip_no', '')  # 机台
+        production_class = self.request.query_params.get('classes', '')  # 班次
+        st = self.request.query_params.get('s_time')  # 开始时间
+        et = self.request.query_params.get('e_time')  # 结束时间
+        sy_flag = self.request.query_params.get('sy_flag', 'N')
+        if not all([st, et]):
+            raise ValidationError('请选择日期范围查询！')
+        diff = datetime.datetime.strptime(et, '%Y-%m-%d') - datetime.datetime.strptime(st, '%Y-%m-%d')
+        if diff.days > 31:
+            raise ValidationError('搜索日期跨度不得超过一个月！')
+        filter_kwargs = {
+            'production_factory_date__gte': st,
+            'production_factory_date__lte': et,
+        }
+        where_str = """ mtr."LEVEL" = 2 AND to_char(mto."PRODUCTION_FACTORY_DATE", 'yyyy-mm-dd') >= '{}' 
+                      AND to_char(mto."PRODUCTION_FACTORY_DATE", 'yyyy-mm-dd') <= '{}'""".format(st, et)
+        product_filter_str = ""
+        if stage:
+            product_filter_str += '-{}-'.format(stage)
+            filter_kwargs['product_no__icontains'] = product_filter_str
+            where_str += " AND mto.PRODUCT_NO like '%-{}-%'".format(stage)
+        if product_standard:
+            if product_filter_str:
+                product_filter_str += '{}-'.format(product_standard)
+            else:
+                product_filter_str += '-{}-'.format(product_standard)
+            filter_kwargs['product_no__icontains'] = product_filter_str
+            where_str += " AND mto.PRODUCT_NO like '%-{}-%'".format(product_standard)
+        if production_equip_no:
+            filter_kwargs['production_equip_no'] = production_equip_no
+            where_str += " AND mto.PRODUCTION_EQUIP_NO='{}'".format(production_equip_no)
+        if production_class:
+            filter_kwargs['production_class'] = production_class
+            where_str += " AND mto.PRODUCTION_CLASS='{}'".format(production_class)
+        if sy_flag == 'N':
+            filter_kwargs['is_experiment'] = False
+            where_str += " AND mto.IS_EXPERIMENT={}".format(0)
+        results = []
+        mto_data = MaterialTestOrder.objects.filter(**filter_kwargs).values('production_factory_date', 'product_no', 'is_qualified').annotate(qty=Count('id'))
+        if mto_data:
+            total_check_count = {}
+            total_qualified_count = {}
+            # 各胶料总检车、合格、不合格车次
+            mto_data_dict = {}  # {'2023-04-26_C590': {"total_qty": 12, "qualified_qty": 10, "unqualified_qty": 2}}
+            for item in mto_data:
+                mo_date = item['production_factory_date'].strftime('%Y-%m-%d')
+                mto_product_no = item['product_no'].split('-')[2]
+                mto_qty = item['qty']
+                mto_qualified_qty = 0
+                mto_unqualified_qty = 0
+                is_qualified = item['is_qualified']
+                keyword = f"{mo_date}_{mto_product_no}"
+                total_check_count[mo_date] = total_check_count.get(mo_date, 0) + mto_qty
+                if is_qualified:
+                    mto_qualified_qty += mto_qty
+                    total_qualified_count[mo_date] = total_qualified_count.get(mo_date, 0) + mto_qty
+                else:
+                    mto_unqualified_qty += mto_qty
+                if keyword not in mto_data_dict:
+                    mto_data_dict[keyword] = {'total_qty': mto_qty, 'qualified_qty': mto_qualified_qty, 'unqualified_qty': mto_unqualified_qty}
+                else:
+                    mto_data_dict[keyword]['total_qty'] += mto_qty
+                    mto_data_dict[keyword]['qualified_qty'] += mto_qualified_qty
+                    mto_data_dict[keyword]['unqualified_qty'] += mto_unqualified_qty
+
+            sql = """
+                            select
+                            temp.PRODUCT_NO product_no,
+                            temp.DATA_POINT_NAME,
+                            temp.TEST_INDICATOR_NAME,
+                            count(*) uqd,
+                            temp.flag,
+                            temp.PRODUCTION_FACTORY_DATE
+                        from (SELECT
+                               mtr.DATA_POINT_NAME,
+                               (CASE
+                                   WHEN mtr.VALUE < mtr.JUDGED_LOWER_LIMIT THEN '-'
+                                   WHEN mtr.VALUE > mtr.JUDGED_UPPER_LIMIT THEN '+'
+                                   ELSE '+' END) as flag,
+                               REGEXP_SUBSTR(PRODUCT_NO, '[^-]+', 1, 3, 'i') as PRODUCT_NO,
+                               mtr.TEST_INDICATOR_NAME,
+                               mto.PRODUCTION_FACTORY_DATE
+                        FROM "MATERIAL_TEST_RESULT" mtr
+                        INNER JOIN "MATERIAL_TEST_ORDER" mto ON (mtr."MATERIAL_TEST_ORDER_ID" = mto."ID")
+                        WHERE {}
+                            ) temp
+                        group by temp.PRODUCTION_FACTORY_DATE, temp.DATA_POINT_NAME, temp.PRODUCT_NO, temp.TEST_INDICATOR_NAME, temp.flag
+                        order by temp.PRODUCTION_FACTORY_DATE, temp.PRODUCT_NO, temp.TEST_INDICATOR_NAME;""".format(where_str)
+            cursor = connection.cursor()
+            cursor.execute(sql)
+            query_data = cursor.fetchall()
+            ret = {}
+            for item in query_data:
+                _date = item[5].strftime('%Y-%m-%d')
+                product_type = item[0]
+                data_point_name = item[1]
+                test_indicator_name = item[2]
+                qty = item[3]
+                flag = item[4]
+                keyword = f"{_date}_{product_type}"
+                if keyword not in ret:
+                    qt_data = mto_data_dict.get(keyword, {})
+                    if qt_data:
+                        check_qty = qt_data.get('total_qty', 0)
+                        qualified_qty = qt_data.get('qualified_qty', 0)
+                        unqualified_qty = qt_data.get('unqualified_qty', 0)
+                        rate = round(qualified_qty / check_qty * 100, 2) if check_qty else ''
+                    else:
+                        check_qty = qualified_qty = unqualified_qty = ''
+                        rate = ''
+                    ret[keyword] = {"product_type": product_type,  # 胶料
+                                    "JC": check_qty,  # 检查数量
+                                    "HG": qualified_qty,  # 合格数量
+                                    "rate": rate}
+
+            # 补充全部合格的胶料规格数据
+            for k, v in mto_data_dict.items():
+                date, product_type = k.split('_')
+                unqualified_qty = v['unqualified_qty']
+                check_qty = v['total_qty']
+                qualified_qty = v['qualified_qty']
+                if unqualified_qty == 0:
+                    if k not in ret:
+                        rate = round(qualified_qty / check_qty * 100, 2) if check_qty else ''
+                        ret[k] = {
+                            "product_type": product_type,  # 胶料
+                            "JC": check_qty,  # 检查数量
+                            "HG": qualified_qty,  # 合格数量
+                            "rate": rate
+                        }
+            results = [{'product_date': k.split('_')[0], 'product_type': v.get('product_type'), 'ratio': v.get('rate')} for k, v in ret.items()]
+        return Response({'results': results})
 
 
 @method_decorator([api_recorder], name='dispatch')

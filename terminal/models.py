@@ -536,6 +536,20 @@ class MaterialInfo(models.Model):
         db_table = 'material'
 
 
+class PlanRecords(models.Model):
+    """称量计划号记录表"""
+    equip_no = models.CharField(max_length=16, help_text='称量线体')
+    record_id = models.IntegerField(help_text='计划号数据行id')
+    planid = models.CharField(max_length=16, help_text='计划号')
+    recipe = models.CharField(max_length=64, help_text='配方号')
+    recorder = models.CharField(max_length=64, help_text='创建人')
+    record_time = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'plan_records'
+        verbose_name_plural = verbose_name = '称量计划号记录表'
+
+
 class Plan(models.Model):
     """称量计划"""
     id = models.BigAutoField(db_column='ID', help_text='自增字段', primary_key=True)  # Field name made lowercase.
@@ -811,7 +825,7 @@ class ToleranceDistinguish(AbstractEntity):
     """公差标准-区分关键字定义"""
     keyword_code = models.CharField(max_length=64, help_text='区分关键字编号')
     keyword_name = models.CharField(max_length=64, help_text='区分关键字名称')
-    re_str = models.CharField(max_length=64, help_text='匹配字符', null=True, blank=True)
+    re_str = models.CharField(max_length=1024, help_text='匹配字符', null=True, blank=True)
     desc = models.CharField(max_length=64, help_text='备注', null=True, blank=True)
 
     class Meta:

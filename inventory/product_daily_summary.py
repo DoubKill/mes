@@ -1,5 +1,5 @@
 """
-    胶片库存每日8点统计
+    胶片库存每日8点统计、设备生产能力每日统计
 """
 
 
@@ -9,9 +9,7 @@ import sys
 
 import django
 import logging
-
-from django.db.models import Sum
-
+from django.db.models import Sum, Avg, F, Count
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
@@ -20,6 +18,9 @@ django.setup()
 logger = logging.getLogger('sync_log')
 
 from inventory.models import BzFinalMixingRubberInventoryLB, BzFinalMixingRubberInventory, ProductStockDailySummary
+from plan.models import SchedulingEquipCapacity
+from production.models import TrainsFeedbacks
+from mes.common_code import OSum
 
 
 def product_stock_daily_summary():
@@ -61,5 +62,37 @@ def product_stock_daily_summary():
         )
 
 
+def calculate_product_equip_capacity():
+    # SchedulingEquipCapacity.objects.all().delete()
+    st = (datetime.datetime.now() - datetime.timedelta(days=30)).date()
+    train_feedback = TrainsFeedbacks.objects.filter(
+        factory_date__gte=st
+    ).values('product_no', 'equip_no').annotate(
+        agv_mix_time=OSum((F('end_time') - F('begin_time'))),
+        avg_interval_time=Avg('interval_time'),
+        agv_gum_weight=Avg('gum_weight'),
+        cnt=Count('id')
+    )
+    for item in train_feedback:
+        try:
+            agv_mix_time = item['agv_mix_time'].total_seconds() // item['cnt']
+            if agv_mix_time <= 50 or agv_mix_time >= 400:
+                continue
+        except Exception:
+            continue
+        avg_interval_time = 15 if not item['avg_interval_time'] else item['avg_interval_time']
+        agv_gum_weight = 0 if not item['agv_gum_weight'] else int(item['agv_gum_weight']/100)
+        equip_no = item['equip_no']
+        product_no = item['product_no']
+        if not all([agv_mix_time, equip_no, product_no]):
+            continue
+        SchedulingEquipCapacity.objects.update_or_create(
+            defaults={'avg_mixing_time': agv_mix_time,
+                      'avg_interval_time': 10 if avg_interval_time > 30 else avg_interval_time,
+                      'avg_rubbery_quantity': agv_gum_weight},
+            **{'equip_no': equip_no, 'product_no': product_no})
+
+
 if __name__ == '__main__':
     product_stock_daily_summary()
+    calculate_product_equip_capacity()

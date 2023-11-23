@@ -1136,6 +1136,7 @@ class CheckTemperatureStandard(AbstractEntity):
 class CheckTemperatureTable(AbstractEntity):
     select_date = models.DateField(help_text='日期')
     is_exceed = models.NullBooleanField(help_text='是否超标', default=None)
+    classes = models.CharField(max_length=64, help_text='班次: 早班、中班、夜班', null=True, blank=True)
     status = models.CharField(max_length=16, help_text='状态: 新建、已检查、已确认', default='新建')
     desc = models.CharField(max_length=512, help_text='新建或者更新输入的备注', null=True, blank=True)
     confirm_desc = models.CharField(max_length=256, help_text='确认备注', null=True, blank=True)
@@ -1163,4 +1164,16 @@ class CheckTemperatureTableDetail(models.Model):
         db_table = 'check_temperature_table_detail'
         verbose_name_plural = verbose_name = '除尘袋滤器温度检查表详情'
 
+
+class DingUser(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='did')
+    phone_number = models.CharField(max_length=64, help_text='手机号', null=True, blank=True)
+    ding_uid = models.CharField(max_length=64, help_text='钉钉用户id', null=True, blank=True)
+    optional = models.BooleanField(help_text='是否可指派', default=False)
+    delete_flag = models.BooleanField(help_text='是否删除', default=False)
+    save_time = models.DateTimeField(help_text='保存时间', auto_now=True)
+
+    class Meta:
+        db_table = 'ding_user'
+        verbose_name_plural = verbose_name = '用户的ding uid'
 

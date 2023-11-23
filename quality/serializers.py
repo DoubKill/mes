@@ -688,7 +688,7 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
         ret['range_showed'] = QualifiedRangeDisplay.objects.first().is_showed
         # 增加挤出钢印打错异常描述
         w_instance = RubberWrongMaskReason.objects.filter(lot_no=instance.lot_no).order_by('id').last()
-        wrong_reason = '' if not w_instance else w_instance.reason_name
+        wrong_reason = '' if not w_instance or w_instance.reason_name == '清除原因' else w_instance.reason_name
         ret['wrong_reason'] = wrong_reason
         return ret
 
@@ -1401,6 +1401,7 @@ class ProductTestPlanDetailBulkCreateSerializer(serializers.Serializer):
         product_test_plan_details = validated_data['product_test_plan_detail']
         test_plan = validated_data['test_plan']
         # 新建检测任务
+        product_test_plan_details = sorted(product_test_plan_details, key=lambda x: x['actual_trains'])
         for product_test_plan_detail in product_test_plan_details:
             if 'lot_no' in product_test_plan_detail:
                 pallet_data = PalletFeedbacks.objects.filter(lot_no=product_test_plan_detail['lot_no']).first()
@@ -1467,6 +1468,7 @@ class ProductTestPlanSerializer(BaseModelSerializer):
         instance = super().create(validated_data)
 
         # 新建检测任务
+        product_test_plan_details = sorted(product_test_plan_details, key=lambda x: x['actual_trains'])
         for product_test_plan_detail in product_test_plan_details:
             if 'lot_no' in product_test_plan_detail:
                 pallet_data = PalletFeedbacks.objects.filter(lot_no=product_test_plan_detail['lot_no']).first()

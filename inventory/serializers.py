@@ -731,6 +731,8 @@ class BzMixingRubberInventorySearchSerializer(BzFinalMixingRubberInventorySerial
         return locked_lot_data.get(obj.lot_no)
 
     def get_deal_suggestion(self, obj):
+        if obj.quality_level == '待检品':
+            return ''
         if obj.lot_no:
             deal_result = MaterialDealResult.objects.filter(
                 lot_no=obj.lot_no).first()
@@ -854,6 +856,8 @@ class BzFinalRubberInventorySearchSerializer(BzFinalMixingRubberLBInventorySeria
         return locked_lot_data.get(obj.lot_no)
 
     def get_deal_suggestion(self, obj):
+        if obj.quality_level == '待检品':
+            return ''
         if obj.lot_no:
             deal_result = MaterialDealResult.objects.filter(
                 lot_no=obj.lot_no).first()

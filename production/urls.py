@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from production.models import WeightClassPlan
 from production.summary_views import ClassesBanBurySummaryView, EquipBanBurySummaryView, CollectTrainsFeedbacksList, \
-    CutTimeCollect, SumCollectTrains, CutTimeCollectSummary
+    CutTimeCollect, SumCollectTrains, CutTimeCollectSummary, CutTimeAnalysis
 from production.views import *
 
 router = DefaultRouter()
@@ -86,6 +86,7 @@ urlpatterns = [
     path('sum-collect-trains/', SumCollectTrains.as_view()),  # 胶料单车次时间汇总最大最小平均时间
     path('cut-time-collect/', CutTimeCollect.as_view()),  # 规格切换时间汇总
     path('cut-time-collect-summary/', CutTimeCollectSummary.as_view()),  # 规格切换时间汇总
+    path('cut-time-analysis/', CutTimeAnalysis.as_view()),  # 规格切换时间汇总分析图表
     path('equip-banbury-summary/', EquipBanBurySummaryView.as_view()),
     path('pallet-trains-feedbacks/', PalletTrainFeedback.as_view()),  # 托盘开始到结束车次列表
     path('production-plan-reality-analysis/', ProductionPlanRealityAnalysisView.as_view()),  # 产量计划实际分析
@@ -142,6 +143,9 @@ urlpatterns = [
     # 月产量完成报表
     path('daily-production-completion-report/', DailyProductionCompletionReport.as_view()),
 
+    # 年产量完成报表
+    path('monthly-production-completion-report/', MonthlyProductionCompletionReport.as_view()),
+
     # =============钉钉考勤======
     # 补卡申请
     path('reissue-card/', ReissueCardView.as_view()),
@@ -158,6 +162,8 @@ urlpatterns = [
 
     # 交接班时间汇总
     path('shift-time-summary/', ShiftTimeSummaryView.as_view()),
+    # 交接班时间汇总分析图表
+    path('shift-time-analysis/', ShiftTimeAnalysisView.as_view()),
     # 交接班时间汇总明细
     path('shift-time-summary/detail/', ShiftTimeSummaryDetailView.as_view()),
     # 胶架维修记录

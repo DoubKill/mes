@@ -30,7 +30,7 @@ class PalletFeedbacksFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = PalletFeedbacks
-        fields = ('plan_classes_uid', 'equip_no', 'product_no', "classes", "day_time", 'lot_no', 'plan_classes_uid')
+        fields = ('plan_classes_uid', 'equip_no', 'product_no', "classes", "day_time", 'lot_no', 'plan_classes_uid', 'pallet_no')
 
 
 class EquipStatusFilter(django_filters.rest_framework.FilterSet):

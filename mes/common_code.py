@@ -329,7 +329,7 @@ class OAvg(Avg):
         expression = self.get_source_expressions()[0]
         from django.db.backends.oracle.functions import IntervalToSeconds, SecondsToInterval
         return compiler.compile(
-            SecondsToInterval(Min(IntervalToSeconds(expression), filter=self.filter))
+            SecondsToInterval(Avg(IntervalToSeconds(expression), filter=self.filter))
         )
 
 

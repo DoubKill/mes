@@ -39,6 +39,7 @@ from recipe.models import Material, ProductInfo, ProductBatching, MaterialAttrib
     ProductBatchingDetail, MaterialSupplier, WeighCntType, WeighBatchingDetail, ZCMaterial, ERPMESMaterialRelation, \
     ProductBatchingEquip, ProductBatchingMixed, MultiReplaceMaterial, RecipeChangeHistory, RecipeChangeDetail
 from recipe.utils import get_mixed
+from terminal.utils import get_common_equip
 
 error_logger = logging.getLogger('error_log')
 
@@ -557,6 +558,8 @@ class ReplaceRecipeMaterialViewSet(ModelViewSet):
         times = 1 if not max_times else max_times + 1
         multi_created_list = []
         for i in replace_ids:
+            if not i:
+                continue
             mes_recipe = ProductBatching.objects.filter(id=i).last()
             created_data = {'origin_material': origin_material, 'replace_material': replace_material,
                             'created_user': self.request.user, 'created_date': datetime.datetime.now(),
@@ -778,7 +781,24 @@ class RecipeNoticeAPiView(APIView):
                     send_equip.append(single_equip_no)
         if not send_equip:
             raise ValidationError(check_msg)
-        interface = ProductBatchingSyncInterface(instance=product_batching, context={'enable_equip': send_equip})
+        # 通用料包机台 2023-04-21 细料(ZY)、硫磺(ZY)
+        mes_xl_details = ProductBatchingEquip.objects.filter(product_batching=product_batching, is_used=True, type=4)
+        if mes_xl_details:
+            equip_no_list = mes_xl_details.values_list('equip_no', flat=True).distinct()
+            common_equip = []
+            if len(equip_no_list) > 1:
+                flag, res = get_common_equip(product_batching.stage_product_batch_no, product_batching.dev_type)
+                if not flag:
+                    raise ValidationError(res)
+                else:
+                    common_equip = res
+            else:
+                c_p = mes_xl_details.filter(Q(Q(feeding_mode__startswith='C') | Q(feeding_mode__startswith='P')))
+                if not c_p:
+                    common_equip = list(equip_no_list)
+        else:
+            common_equip = send_equip
+        interface = ProductBatchingSyncInterface(instance=product_batching, context={'enable_equip': send_equip, 'common_equip': common_equip})
         try:
             interface.request()
         except Exception as e:
