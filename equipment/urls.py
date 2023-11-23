@@ -150,6 +150,12 @@ router.register('check-temperature-standard', CheckTemperatureStandardViewSet)
 # 除尘袋滤器温度检查表
 router.register('check-temperature-table', CheckTemperatureTableViewSet)
 
+# 设备故障统计列表
+router.register('equip-fault-statistic', EquipFaultStatisticViewSet)
+
+# 设备故障分析报表
+router.register('equip-fault-analyse', EquipFaultAnalyseViewSet)
+
 
 urlpatterns = [
     path('', include(router.urls)),

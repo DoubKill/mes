@@ -1185,7 +1185,15 @@ permission_data = [
     {'id': 1162, 'code': 'view_monthly_production_completion_report', 'name': '查看', 'parent_id': 1161},
     {'id': 1163, 'code': 'export_monthly_production_completion_report', 'name': '导出', 'parent_id': 1161},
 
-    # 下一个 1165 开始
+    {'id': 1165, 'code': 'equip_fault_statistic', 'name': '设备故障统计列表', 'parent_id': None, 'category_name': '设备管理'},
+    {'id': 1166, 'code': 'view_equip_fault_statistic', 'name': '查看', 'parent_id': 1165},
+    {'id': 1167, 'code': 'export_equip_fault_statistic', 'name': '导出', 'parent_id': 1165},
+
+    {'id': 1168, 'code': 'equip_fault_analyse', 'name': '设备故障分析报表', 'parent_id': None, 'category_name': '设备管理'},
+    {'id': 1169, 'code': 'view_equip_fault_analyse', 'name': '查看', 'parent_id': 1168},
+    {'id': 1170, 'code': 'export_equip_fault_analyse', 'name': '导出', 'parent_id': 1168},
+
+    # 下一个 1171 开始
 ]
 
 

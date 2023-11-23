@@ -1,4 +1,5 @@
 import json
+import math
 import uuid
 from datetime import datetime, date
 
@@ -2027,3 +2028,41 @@ class CheckTemperatureTableUpdateSerializer(BaseModelSerializer):
         fields = ('desc', 'table_details', 'check_image_urls')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
+
+class EquipFaultStatisticSerializer(BaseModelSerializer):
+
+    def to_representation(self, instance):
+        res = super().to_representation(instance)
+        # 班次、班组, [区域、位置、细分区域],
+        now_date = datetime.now().replace(microsecond=0)
+        # classes_dict = {'早班': '1', '中班': '2', '夜班': '3'}
+        # 获取班次班组
+        equip_classes = '早班' if '08:00:00' < str(now_date)[-8:] < '20:00:00' else '夜班'
+        record = WorkSchedulePlan.objects.filter(plan_schedule__day_time=str(res['created_date'])[:10],
+                                                 classes__global_name=equip_classes,
+                                                 plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
+        equip_group = record.group.global_name if record and record.group else ''
+        if instance.equip_repair_standard:
+            area_name = instance.equip_repair_standard.equip_part.part_name
+            fault_desc = instance.equip_repair_standard.standard_name
+            fault_detail = instance.equip_repair_standard.equip_fault.fault_name
+            repair_start_datetime = res['repair_start_datetime'][11:16]
+            repair_end_datetime = res['repair_end_datetime'][11:16]
+        else:
+            area_name = '' if not instance.equip_part_new else instance.equip_part_new.part_name
+            fault_desc = instance.result_fault_desc
+            fault_detail = instance.result_fault_cause
+            repair_start_datetime = res['repair_start_datetime'][11:16]
+            repair_end_datetime = res['repair_end_datetime'][11:16]
+        minutes = math.floor((instance.repair_end_datetime - instance.repair_start_datetime).total_seconds() / 60)
+        interval = divmod(minutes, 60)
+        interval_time = f'{interval[0]}:{interval[1]}'
+        res.update({'equip_classes': equip_classes, 'equip_group': equip_group, 'area_name': area_name, 'part': area_name,
+                    'area_detail': area_name, 'fault_desc': fault_desc, 'fault_detail': fault_detail, 'equip_times': 1,
+                    'repair_start_datetime': repair_start_datetime, 'repair_end_datetime': repair_end_datetime,
+                    'interval_time': interval_time, 'minutes': minutes, 'created_date': instance.created_date.date()})
+        return res
+
+    class Meta:
+        model = EquipApplyOrder
+        fields = '__all__'

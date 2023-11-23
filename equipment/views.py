@@ -5993,3 +5993,144 @@ class CheckTemperatureTableViewSet(ModelViewSet):
             logger.error(f'点检-温度检查表{key_word}操作异常: {e.args[0]}')
             raise ValidationError(f'{key_word}操作异常' if '异常' not in e.args[0] else e.args[0])
         return Response(f"温度表{key_word}操作成功")
+
+
+@method_decorator([api_recorder], name="dispatch")
+class EquipFaultStatisticViewSet(ListModelMixin, GenericViewSet):
+    """设别故障统计报表"""
+
+    queryset = EquipApplyOrder.objects.filter(status__in=['已完成', '已验收'])
+    pagination_class = None
+    permission_classes = (IsAuthenticated,)
+    filter_backends = [DjangoFilterBackend]
+    serializer_class = EquipFaultStatisticSerializer
+    FILE_NAME = '设别故障统计报表'
+    EXPORT_FIELDS_DICT = {'日期': 'created_date',
+                          '班次': 'equip_classes',
+                          '设备班组': 'equip_group',
+                          '机台': 'equip_no',
+                          '区域': 'area_name',
+                          '位置': 'part',
+                          '问题描述': 'fault_desc',
+                          '故障原因说明': 'fault_detail',
+                          '维修起始时间': 'repair_start_datetime',
+                          '维修结束时间': 'repair_end_datetime',
+                          '间隔时间': 'interval_time',
+                          '分钟': 'minutes',
+                          '维修人员': 'repair_user',
+                          '维修结果': 'result_repair_final_result',
+                          '设备次数': 'equip_times',
+                          '细分区域': 'area_detail'
+                          }
+
+    def get_queryset(self):
+        equip_no = self.request.query_params.get('equip_no')
+        select_date = self.request.query_params.get('created_date')
+        filter_kwargs = {}
+        if select_date:
+            filter_kwargs['created_date__date'] = select_date
+        if equip_no:
+            filter_kwargs['equip_no'] = equip_no
+        query_set = self.queryset.filter(**filter_kwargs)
+        return query_set
+
+    def list(self, request, *args, **kwargs):
+        query_set = self.get_queryset()
+        export = self.request.query_params.get('export')
+        res = self.get_serializer(query_set, many=True).data
+        if export:
+            return gen_template_response(self.EXPORT_FIELDS_DICT, res, self.FILE_NAME, handle_str=True)
+        return Response({'results': list(res)})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class EquipFaultAnalyseViewSet(ListModelMixin, GenericViewSet):
+    """设别故障分析报表"""
+
+    queryset = EquipApplyOrder.objects.filter(status__in=['已完成', '已验收'], equip_part_new__isnull=False).order_by('equip_no')
+    pagination_class = None
+    permission_classes = (IsAuthenticated,)
+    filter_backends = [DjangoFilterBackend]
+
+    def list(self, request, *args, **kwargs):
+        equip_no = self.request.query_params.get('equip_no')
+        part_id = self.request.query_params.get('part_id')
+        check_type = self.request.query_params.get('type', 'classes')
+        select_date = self.request.query_params.get('time')
+        now = datetime.now().date() if not select_date else datetime.strptime(select_date, '%Y-%m-%d')
+        # 本周第一天和最后一天
+        this_week_start = now - dt.timedelta(days=now.weekday())
+        this_week_end = now + dt.timedelta(days=6 - now.weekday())
+        # 本月第一天和最后一天
+        days = calendar.monthrange(now.year, now.month)[1]
+        this_month_start = dt.datetime(now.year, now.month, 1)
+        this_month_end = dt.datetime(now.year, now.month, 1) + dt.timedelta(days=days - 1)
+        # 本年第一天和最后一天
+        this_year_start = dt.datetime(now.year, 1, 1)
+        this_year_end = dt.datetime(now.year + 1, 1, 1) - dt.timedelta(days=1)
+
+        kwargs = {
+            'classes': {'begin_time': now, 'end_time': now + dt.timedelta(days=1), 'date': now.strftime('%Y-%m-%d')},
+            'day': {'begin_time': now, 'end_time': now + dt.timedelta(days=1), 'date': now.strftime('%Y-%m-%d')},
+            'week': {'begin_time': this_week_start, 'end_time': this_week_end, 'date': f"{this_week_start.strftime('%Y-%m-%d')}-{this_week_end.strftime('%Y-%m-%d')}"},
+            'month': {'begin_time': this_month_start, 'end_time': this_month_end, 'date': now.strftime('%Y-%m')},
+            'year': {'begin_time': this_year_start, 'end_time': this_year_end, 'date': now.strftime('%Y')},
+        }
+        display_date = kwargs.get(check_type).get('date')
+        # 获取所有密炼设备
+        if equip_no:
+            equip_data = [equip_no]
+        else:
+            equip_data = list(Equip.objects.filter(category__equip_type__global_name='密炼设备').order_by('equip_no')
+                              .values_list('equip_no', flat=True))
+        part_list = EquipBom.objects.filter(equip_info__equip_no__in=equip_data, part__isnull=False, delete_flag=False)
+        if part_id:
+            part_list = part_list.filter(part__id=part_id)
+        parts = set(part_list.values_list('part__part_name', flat=True))
+        order_data = list(self.get_queryset().filter(created_date__range=(kwargs.get(check_type).get('begin_time'),
+                                                                          kwargs.get(check_type).get('end_time')))
+                          .filter(equip_part_new__part_name__in=parts).values('equip_no', 'equip_part_new')
+                          .annotate(total_time=OSum(F('repair_end_datetime') - F('repair_start_datetime')))
+                          .values('equip_no', 'equip_part_new__part_name', 'total_time'))
+        if not order_data:
+            return Response({'results': []})
+        part_time = {k: 0 for k in parts}
+        data = {'part_time': part_time}
+        for single_data in order_data:
+            equip_no = single_data['equip_no']
+            part_name = single_data['equip_part_new__part_name']
+            total_time = round(single_data['total_time'].total_seconds() / 60, 2)
+            if equip_no not in data:
+                data[equip_no] = {part_name: total_time}
+            else:
+                data[equip_no][part_name] = total_time + (data[equip_no][part_name] if data[equip_no].get(part_name) else 0)
+            data['part_time'][part_name] += total_time
+        part_time = data.pop('part_time')
+        results = {'part_time': part_time}
+        # 补全机台、部位[班组?]
+        batch_classes, batch_group = '', ''
+        check_type = self.request.query_params.get('type', 'classes')
+        if check_type == 'classes':  # 班次, 班组
+            now_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            batch_classes = '早班' if '08:00:00' <= now_date[-8:] < '20:00:00' else '夜班'
+            record = WorkSchedulePlan.objects.filter(plan_schedule__day_time=now_date[:10],
+                                                     classes__global_name=batch_classes,
+                                                     plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
+            batch_group = record.group.global_name if record and record.group else ''
+        all_time = 0
+        for s_equip_no in equip_data:
+            s_data = data.get(s_equip_no)
+            new_data = {s_equip_no: {i: 0 for i in parts}}
+            if batch_classes:
+                new_data[s_equip_no].update({'batch_classes': batch_classes, 'batch_group': batch_group})
+            if s_data:
+                s_data.update({'m_equip_time': round(sum(s_data.values()), 2), 'h_equip_time': round(sum(s_data.values()) / 60, 2)})
+                new_data[s_equip_no].update(s_data)
+                all_time += s_data['m_equip_time']
+            else:
+                new_data[s_equip_no].update({'m_equip_time': 0, 'h_equip_time': 0})
+            new_data[s_equip_no]['display_date'] = display_date
+            results.update(new_data)
+        results.update({'all_time': round(all_time, 2), 'h_all_time': round(all_time / 60, 2)})
+        return Response({'results': results})
+
