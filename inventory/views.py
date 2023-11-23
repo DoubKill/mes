@@ -663,7 +663,7 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         style.alignment.wrap = 1
 
         columns = ['序号', '出库单据号', '下架任务号', '巷道编码', '追踪码', '识别卡ID', '库位码', '物料名称', '物料编码',
-                   '批次号', '创建时间', '状态', '创建人', '数量', '重量', '件数', '唛头重量']
+                   '批次号', '创建时间', '状态', '创建人', '数量', '重量', '件数', '唛头重量', '开始时间', '完成时间']
         # 写入文件标题
         for col_num in range(len(columns)):
             sheet.write(0, col_num, columns[col_num])
@@ -686,7 +686,9 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
             sheet.write(data_row, 13, i['qty'])
             sheet.write(data_row, 14, i['weight'])
             sheet.write(data_row, 15, i['sl'])
-            sheet.write(data_row, 15, i['zl'])
+            sheet.write(data_row, 16, i['zl'])
+            sheet.write(data_row, 17, i['last_time'])
+            sheet.write(data_row, 18, i['fin_time'])
             data_row = data_row + 1
         # 写出到IO
         output = BytesIO()
@@ -2941,6 +2943,9 @@ class WmsStorageView(ListAPIView):
                           "入库时间": "in_storage_time", '件数': 'sl', '唛头重量': 'zl'}
 
     def list(self, request, *args, **kwargs):
+        # 2023-07-07 获取公共代码特殊账号进行验证[如果是特殊账号,品质状态只显示合格(1)和待检(5)]
+        special_names = set(GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='原材料库存明细特殊账号').values_list('global_name', flat=True))
+        special_flag = True if self.request.user.username in special_names else False
         filter_kwargs = {}
         # 模糊查询字段
         container_no = self.request.query_params.get('pallet_no')
@@ -2984,6 +2989,9 @@ class WmsStorageView(ListAPIView):
             filter_kwargs['batch_no'] = batch_no
         if quality_status:
             filter_kwargs['quality_status'] = quality_status
+        else:
+            if special_flag:
+                filter_kwargs['quality_status__in'] = ['1', '5']
         if st:
             filter_kwargs['in_storage_time__gte'] = st
         if et:
@@ -3052,6 +3060,7 @@ class WmsStorageView(ListAPIView):
                                       total_trains=Sum('qty'))
         data['total_weight'] = sum_data['total_weight']
         data['total_trains'] = sum_data['total_trains']
+        data['special_flag'] = special_flag
         return Response(data)
 
 
@@ -3236,7 +3245,8 @@ class WmsInStockView(APIView):
                  a.SpaceId,
                  a.Sn,
                  a.StandardUnit,
-                 a.CreaterTime
+                 a.CreaterTime,
+                 a.LadenToolNumber
             FROM 
                  dbo.t_inventory_stock AS a
              INNER JOIN t_inventory_space b ON b.Id = a.StorageSpaceEntityId
@@ -3272,7 +3282,8 @@ class WmsInStockView(APIView):
                  'Sn': item[5],
                  'unit': item[6],
                  'inventory_time': item[7],
-                 'position': '内' if item[4][6] in ('1', '2') else '外'
+                 'position': '内' if item[4][6] in ('1', '2') else '外',
+                 'RFID': item[8]
                  })
         sc.close()
         return Response(result)
@@ -3370,6 +3381,9 @@ class WMSExpireListView(APIView):
     DATABASE_CONF = WMS_CONF
 
     def get(self, request):
+        # 2023-07-31 获取公共代码特殊账号进行验证[如果是特殊账号,不展示即将超期数据]
+        username = self.request.user.username
+        special_flag = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='原材料库存明细特殊账号', global_name=username).exists()
         expire_days = self.request.query_params.get('expire_days', 30)
         page = self.request.query_params.get('page', 1)
         page_size = self.request.query_params.get('page_size', 15)
@@ -3391,7 +3405,7 @@ group by m.MaterialCode,
          a.StockDetailState
 order by m.MaterialCode;""".format(expire_days)
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)
-        temp = sc.all()
+        temp = sc.all() if not special_flag else []
         count = len(temp)
         result = []
         data = temp[st:et]
@@ -6041,6 +6055,9 @@ class WMSStockSummaryView(APIView):
         page_size = self.request.query_params.get('page_size', 15)
         st = (int(page) - 1) * int(page_size)
         et = int(page) * int(page_size)
+        username = self.request.user.username
+        special_flag = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='原材料库存明细特殊账号',
+                                                 global_name=username).exists()
         extra_where_str = ""
         if material_name:
             extra_where_str += "where temp.MaterialName like '%{}%'".format(material_name)
@@ -6096,20 +6113,21 @@ class WMSStockSummaryView(APIView):
             quality_status = item[8]
             if quality_status == 2:
                 quality_status = 5
+            item_6, item_7 = [0, 0] if special_flag and quality_status == 3 else [item[6], item[7]]
             if item[1] not in data_dict:
                 data = {'name': item[0], 'code': item[1], 'zc_material_code': item[2], 'unit': item[3], 'pdm': item[4],
-                        'group_name': item[5], 'total_quantity': item[6], 'total_weight': item[7], 'total_sl': item[9],
+                        'group_name': item[5], 'total_quantity': item_6, 'total_weight': item_7, 'total_sl': item[9],
                         'total_zl': item[10], 'quantity_1': 0, 'weight_1': 0, 'quantity_3': 0, 'weight_3': 0,
                         'quantity_4': 0, 'weight_4': 0, 'quantity_5': 0, 'weight_5': 0,
-                        'quantity_{}'.format(quality_status): item[6], 'weight_{}'.format(quality_status): item[7]}
+                        'quantity_{}'.format(quality_status): item_6, 'weight_{}'.format(quality_status): item_7}
                 data_dict[item[1]] = data
             else:
-                data_dict[item[1]]['total_quantity'] += item[6]
-                data_dict[item[1]]['total_weight'] += item[7]
+                data_dict[item[1]]['total_quantity'] += item_6
+                data_dict[item[1]]['total_weight'] += item_7
                 data_dict[item[1]]['total_sl'] += item[9]
                 data_dict[item[1]]['total_zl'] += item[10]
-                data_dict[item[1]]['quantity_{}'.format(quality_status)] = item[6]
-                data_dict[item[1]]['weight_{}'.format(quality_status)] = item[7]
+                data_dict[item[1]]['quantity_{}'.format(quality_status)] = item_6
+                data_dict[item[1]]['weight_{}'.format(quality_status)] = item_7
         result = []
         for item in data_dict.values():
             weighting = safety_data.get(item['code'].strip())
@@ -6143,7 +6161,7 @@ class WMSStockSummaryView(APIView):
                 data = result
             return self.export_xls(data)
         return Response(
-            {'results': ret, "count": count,
+            {'results': ret, "count": count, 'special_flag': special_flag,
              'total_quantity': total_quantity, 'total_weight': total_weight, 'total_sl': total_sl, 'total_zl': total_zl,
              'total_quantity1': total_quantity1, 'total_weight1': total_weight1,
              'total_quantity3': total_quantity3, 'total_weight3': total_weight3,
