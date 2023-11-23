@@ -291,7 +291,7 @@ DATABASES = {
             'NAME': os.getenv('MES_DATABASE_NAME', 'xe'),  # 服务名：ip:port/service_name 或者SID
             'USER': os.getenv('MES_DATABASE_USERNAME', 'mes'),  # 用户名
             'PASSWORD': os.getenv('MES_DATABASE_PASSWORD', 'mes'),  # 密码
-            # 'HOST': os.getenv('MES_DATABASE_HOSTNAME', '10.10.120.40'),  # HOST
+            # 'HOST': os.getenv('MES_DATABASE_HOSTNAME', '10.10.130.58'),  # HOST
             # 'PORT': os.getenv('MES_MONOCLE_API_PORT', '1521'),  # 端口
         },
     'bz': {
@@ -531,7 +531,7 @@ CORS_ORIGIN_ALLOW_ALL = True
 # 上辅机部署地址
 AUXILIARY_URL = os.environ.get('AUXILIARY_URL', 'http://127.0.0.1:9000/')
 
-CELERY_BROKER_URL = 'amqp://guest@10.10.120.40//'  # Broker配置，使用Redis作为消息中间件
+CELERY_BROKER_URL = 'amqp://guest@10.10.130.58//'  # Broker配置，使用Redis作为消息中间件
 
 CELERY_RESULT_BACKEND = 'django-db'  # BACKEND配置，这里使用orm
 

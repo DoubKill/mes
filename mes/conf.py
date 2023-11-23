@@ -31,7 +31,7 @@ BZ_PASSWORD = "mes@_123"
 BZ_HOST = "10.4.23.101"
 
 if settings.DEBUG:
-    HF_CONF = {'host': '10.10.120.40', 'user': 'sa', 'password': 'Gz@admin', 'database': 'hongfang'}
+    HF_CONF = {'host': '10.10.130.58', 'user': 'sa', 'password': 'Gz@admin', 'database': 'hongfang'}
 else:
     HF_CONF = {'host': '10.4.24.25', 'user': 'sa', 'password': 'Admin123$', 'database': 'wcs_aj_Storage'}
 
