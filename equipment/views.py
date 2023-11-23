@@ -55,7 +55,7 @@ from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
 from mes.permissions import PermissionClass
 from plan.models import ProductClassesPlan
-from production.models import TrainsFeedbacks
+from production.models import TrainsFeedbacks, EquipDownDetails
 from quality.utils import get_cur_sheet, get_sheet_data
 from terminal.models import ToleranceDistinguish, ToleranceProject, ToleranceHandle, ToleranceRule, Plan, ReportBasic, \
     JZPlan
@@ -406,9 +406,9 @@ class EquipErrorDayStatisticsView(APIView):
             raise ValidationError(f'{now}无排班，请补充排班信息')
         day_time = work_schedule_plan.plan_schedule.day_time
         factory_date = request.query_params.get("day_time", day_time)
-        temp_set = EquipMaintenanceOrder.objects.filter(factory_date=factory_date, down_flag=True)
+        temp_set = EquipDownDetails.objects.filter(factory_date=factory_date, delete_flag=False)
         # 动态生成表头字段
-        equip_list = list(set(temp_set.values_list('equip_part__equip__equip_no', flat=True)))
+        equip_list = list(set(temp_set.values_list('equip_no', flat=True).order_by('equip_no')))
         class_list = list(
             GlobalCode.objects.filter(global_type__type_name='班次', use_flag=True).values_list('global_name', flat=True))
         class_count = len(class_list)
@@ -417,9 +417,7 @@ class EquipErrorDayStatisticsView(APIView):
         class_list.append(str(factory_date))
         ret = {x: {"class_name": class_list, "error_time": copy.deepcopy(time_list),
                    "error_percent": copy.deepcopy(percent_list)} for x in equip_list}
-        data_set = temp_set.values('equip_part__equip__equip_no', 'class_name'). \
-            annotate(all_time=OSum((F('end_time') - F('begin_time')))).values(
-            'equip_part__equip__equip_no', 'class_name', 'all_time')
+        data_set = temp_set.values('equip_no', 'classes').annotate(all_time=F('times')).values('equip_no', 'classes', 'all_time')
         for temp in data_set:
             # class_dict.update(**{temp.get('class_name'): {
             #     "error_time": temp.get("all_time"),
@@ -427,9 +425,9 @@ class EquipErrorDayStatisticsView(APIView):
             #     "equip": temp.get('equip_part__equip__equip_no')
             # })
             # ret.append(class_dict)
-            equip_data = ret[temp.get('equip_part__equip__equip_no')]
-            data_index = equip_data["class_name"].index(temp.get('class_name'))
-            time_time = round(temp.get('all_time').total_seconds() / 60, 2) if temp.get('all_time') else 0
+            equip_data = ret[temp.get('equip_no')]
+            data_index = equip_data["class_name"].index(temp.get('classes'))
+            time_time = round(temp.get('all_time'), 2) if temp.get('all_time') else 0
             equip_data["error_time"][data_index] = time_time
             equip_data["error_percent"][data_index] = round(time_time / (12 * 60), 4)
         for k in ret.keys():
@@ -449,22 +447,21 @@ class EquipErrorMonthStatisticsView(APIView):
             raise ValidationError("时间格式错误")
         month = now.month
         year = now.year
-        temp_set = EquipMaintenanceOrder.objects.filter(factory_date__year=year, factory_date__month=month,
-                                                        down_flag=True)
-        title_set = set(temp_set.values("equip_part__name").annotate().values_list("equip_part__name", flat=True))
-        equip_list = set(temp_set.values_list('equip_part__equip__equip_no', flat=True))
+        temp_set = EquipDownDetails.objects.filter(factory_date__year=year, factory_date__month=month, delete_flag=False)
+        title_set = set(temp_set.values("down_type").annotate().values_list("down_type", flat=True))
+        equip_list = set(temp_set.values_list('equip_no', flat=True))
         data = {e: {} for e in equip_list}
-        data_set = temp_set.values('equip_part__equip__equip_no', 'equip_part__name'). \
-            annotate(all_time=OSum(F('end_time') - F('begin_time'))). \
-            values('equip_part__equip__equip_no', 'equip_part__name', 'all_time').order_by(
-            'equip_part__equip__equip_no')
+        data_set = temp_set.values('equip_no', 'down_type'). \
+            annotate(all_time=F('times')). \
+            values('equip_no', 'down_type', 'all_time').order_by(
+            'equip_no')
         # data_set = temp_set.values('equip_part__equip__equip_no', 'equip_part__name'). \
         #     annotate(all_time=Sum((F('end_time') - F('begin_time')) / (1000000 * 60))). \
         #     values('equip_part__equip__equip_no', 'equip_part__name', 'all_time').order_by('equip_part__equip__equip_no')
         data_set = list(data_set)
         for temp in data_set:
-            data[temp.get('equip_part__equip__equip_no')].update(**{
-                temp.get('equip_part__name'): round(temp.get('all_time').total_seconds() / 60, 2) if temp.get(
+            data[temp.get('equip_no')].update(**{
+                temp.get('down_type'): round(temp.get('all_time'), 2) if temp.get(
                     'all_time') else 0})
         for k, v in data.items():
             data[k]["sum"] = sum(v.values())
@@ -484,19 +481,18 @@ class EquipErrorWeekStatisticsView(APIView):
             raise ValidationError("时间格式错误")
         monday = factory_date - dt.timedelta(days=factory_date.weekday())
         sunday = factory_date + dt.timedelta(days=6 - factory_date.weekday())
-        temp_set = EquipMaintenanceOrder.objects.filter(factory_date__gte=monday, factory_date__lte=sunday,
-                                                        down_flag=True)
+        temp_set = EquipDownDetails.objects.filter(factory_date__gte=monday, factory_date__lte=sunday, delete_flag=False)
         # 各个机台数据
-        title_set = set(temp_set.values("equip_part__name").annotate().values_list("equip_part__name", flat=True))
-        equip_list = set(temp_set.values_list('equip_part__equip__equip_no', flat=True))
+        title_set = set(temp_set.values("down_type").annotate().values_list("down_type", flat=True))
+        equip_list = set(temp_set.values_list('equip_no', flat=True))
         data = {e: {} for e in equip_list}
-        data_set = temp_set.values('equip_part__equip__equip_no', 'equip_part__name'). \
-            annotate(all_time=OSum((F('end_time') - F('begin_time')))). \
-            values('equip_part__equip__equip_no', 'equip_part__name', 'all_time').order_by(
-            'equip_part__equip__equip_no')
+        data_set = temp_set.values('equip_no', 'down_type'). \
+            annotate(all_time=F('times')). \
+            values('equip_no', 'down_type', 'all_time').order_by(
+            'equip_no')
         for temp in data_set:
-            data[temp.get('equip_part__equip__equip_no')].update(**{
-                temp.get('equip_part__name'): round(temp.get('all_time').total_seconds() / 60, 2) if temp.get(
+            data[temp.get('equip_no')].update(**{
+                temp.get('down_type'): round(temp.get('all_time'), 2) if temp.get(
                     'all_time') else 0})
         for k, v in data.items():
             data[k]["sum"] = sum(v.values())
@@ -517,16 +513,15 @@ class MonthErrorSortView(APIView):
             raise ValidationError("时间格式错误")
         month = now.month
         year = now.year
-        temp_set = EquipMaintenanceOrder.objects.filter(factory_date__year=year, factory_date__month=month,
-                                                        down_flag=True)
-        data_set = temp_set.values('equip_part__equip__equip_no', 'equip_part__name'). \
-            annotate(all_time=OSum((F('end_time') - F('begin_time')))). \
-            values('equip_part__equip__equip_no', 'equip_part__name', 'all_time').order_by('all_time')
-        equip_list = [x.get('equip_part__equip__equip_no') for x in data_set]
+        temp_set = EquipDownDetails.objects.filter(factory_date__year=year, factory_date__month=month, delete_flag=False)
+        data_set = temp_set.values('equip_no', 'down_type'). \
+            annotate(all_time=F('times')). \
+            values('equip_no', 'down_type', 'all_time').order_by('all_time')
+        equip_list = [x.get('equip_no') for x in data_set]
         data = {e: {} for e in equip_list}
         for temp in data_set:
-            data[temp.get('equip_part__equip__equip_no')].update(**{
-                temp.get('equip_part__name'): round(temp.get('all_time').total_seconds() / 60, 2) if temp.get(
+            data[temp.get('equip_no')].update(**{
+                temp.get('down_type'): round(temp.get('all_time'), 2) if temp.get(
                     'all_time') else 0})
         for k, v in data.items():
             data[k]["sum"] = sum(v.values())
