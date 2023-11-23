@@ -31,6 +31,7 @@ import hmac
 import hashlib
 import base64
 import urllib.parse
+from urllib.parse import quote
 from rest_framework.exceptions import ValidationError
 
 logger = logging.getLogger('send_ding_msg')
@@ -225,17 +226,29 @@ class AutoDispatch(object):
     def __init__(self):
         self.ding_api = DinDinAPI()
         if settings.DEBUG:
+            # 生成目标群聊路由参数
             self.group_url = 'https://oapi.dingtalk.com/robot/send?access_token=327a481ceb5bda5e71a560c7d1e87de8aa3e7edde2038bf4379db8c8389845ab'
             self.group_secret = 'SECf1842042def9a33612e3b7f064819033d2b5215d18deca79b14b3b1101d26081'
+            # 生成工单超链接参数
+            self.corpId = 'dinge728859def376cfbf2c783f7214b6d69'
+            self.agentId = '1336171749'
+            self.miniAppId = '5000000001345177'
+
         else:
+            # 生成目标群聊路由参数
             self.group_url = 'https://oapi.dingtalk.com/robot/send?access_token=a46ca41b47fc99c9e3994e701f099f7b648a0057bcd4767c55bd2e0db47b3f3e'
             self.group_secret = 'SEC3ba0eeb18377f850b2a207b5ff865602c07a8cf608fe1cad3dbd47767e5c1a07'
+            # 生成工单超链接参数
+            self.corpId = 'ding93de8775a6f22935ee0f45d8e4f7c288'
+            self.agentId = '1144203103'
+            self.miniAppId = '5000000000355953'
 
     def send_order(self, order):
         # 提醒消息里的链接类型 False 非巡检  True 巡检
         inspection = False
         section_name = ''
-        now_date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        d_now_date = datetime.datetime.now()
+        now_date = d_now_date.strftime('%Y-%m-%d %H:%M:%S')
         if order.work_type != '巡检':
             # 班组
             group = self.get_group_info()
@@ -243,7 +256,7 @@ class AutoDispatch(object):
             instance = GlobalCode.objects.filter(global_type__type_name='设备部门组织名称', use_flag=1,
                                                  global_type__use_flag=1).first()
             section_name = instance.global_name if instance else section_name
-            choice_all_user = get_staff_status(DinDinAPI(), section_name, group=group) if section_name else []
+            choice_all_user = get_staff_status(section_name, group=group, all_user=False) if section_name else []
             fault_name = order.result_fault_cause if order.result_fault_cause else (
                 order.equip_repair_standard.standard_name if order.equip_repair_standard else order.equip_maintenance_standard.standard_name)
         else:
@@ -258,12 +271,12 @@ class AutoDispatch(object):
                 order.save()
             inspection = True
             # 查询工单对应的包干人员[上班并且有空]
-            choice_all_user = get_maintenance_status(self.ding_api, order.equip_no, order.equip_repair_standard.type)
+            choice_all_user = get_maintenance_status(order.equip_no, order.equip_repair_standard.type, all_user=False)
             fault_name = order.equip_repair_standard.standard_name
         if not choice_all_user:
             logger.info(f'系统派单[{order.work_type}]: {order.work_order_no}-无人员可派单')
             return f'系统派单[{order.work_type}]: {order.work_order_no}-无人员可派单'
-        working_persons = [i for i in choice_all_user if i['optional']]
+        working_persons = [i for i in choice_all_user if i.get('optional')]
         if order.work_type != '巡检':
             section = Section.objects.filter(name=section_name).first()
             leader_phone_number = '' if not section else section.in_charge_user.phone_number
@@ -274,6 +287,7 @@ class AutoDispatch(object):
         content = {
             "title": "",
             "form": [{"key": "工单编号:", "value": order.work_order_no},
+                     {"key": "工单生成时间:", "value": order.created_date.strftime('%Y-%m-%d %H:%M:%S')},
                      {"key": "机台:", "value": order.equip_no},
                      {"key": "故障原因:", "value": fault_name},
                      {"key": "重要程度:", "value": order.importance_level},
@@ -288,7 +302,7 @@ class AutoDispatch(object):
         for per in working_persons:
             if order.work_type != '巡检':
                 # 5分钟内派过单的不再派单(维修工单)
-                c_time = datetime.datetime.now() - datetime.timedelta(minutes=5)
+                c_time = d_now_date - datetime.timedelta(minutes=5)
                 short_order = EquipApplyOrder.objects.filter(status='已指派', assign_to_user__icontains=per['username'],
                                                              assign_datetime__gte=c_time)
                 if short_order:
@@ -329,11 +343,21 @@ class AutoDispatch(object):
                     repair_instance.save()
             # 派单成功发送钉钉消息给当班人员
             content.update({'title': f"系统自动派发{order.work_type}工单成功，请尽快处理！"})
-            self.ding_api.send_message([per.get('ding_uid')], content, order_id=order.id, inspection=inspection)
-            # 派单成功发送消息到设备群聊
-            msg = f"系统自动派发设备工单成功，请尽快处理！\n工单编号:\n{order.work_order_no}\n机台:{order.equip_no}\n故障原因:{fault_name}\n重要程度:{order.importance_level}\n指派人:系统自动\n被指派人:{per['username']}\n指派时间:{now_date}"
-            url = self.get_group_url()
-            send_ding_msg(url=url, secret=self.group_secret, msg=msg, isAtAll=False)
+            # 2023-03-10 取消发送工作通知
+            # self.ding_api.send_message([per.get('ding_uid')], content, order_id=order.id, inspection=inspection)
+            # 派单成功机器人发送消息到设备群聊
+            msg = {
+                "msgtype": "actionCard",
+                "actionCard": {
+                    "title": "新的设备工单到达！",
+                    "text": f"系统自动派发设备工单成功，请尽快处理！\n\r工单编号:\n\r{order.work_order_no}\n\r工单生成时间:\n\r{order.created_date.strftime('%Y-%m-%d %H:%M:%S')}\n\r机台:{order.equip_no}\n\r故障原因:{fault_name}\n\r重要程度:{order.importance_level}\n\r指派人:系统自动\n\r被指派人:{per['username']}\n\r指派时间:{now_date}",
+                    "btnOrientation": "0",
+                    "singleTitle": "查看详情",
+                    "singleURL": f"dingtalk://dingtalkclient/action/open_micro_app?corpId={self.corpId}&agentId={self.agentId}&miniAppId={self.miniAppId}&pVersion=1&packageType=1&page=pages/repairOrder/repairOrder{quote('?id=' + str(order.id) + f'&inspection={inspection}')}"
+                }
+            }
+            remote_url = self.get_group_url()
+            send_res = send_ding_msg(url=remote_url, secret=self.group_secret, msg=msg, isAtAll=False, custom=True)
             logger.info(f"系统派单[{order.work_type}]-系统自动派单成功: {order.work_order_no}, 被指派人:{per['username']}")
             break
 
@@ -349,7 +373,7 @@ class AutoDispatch(object):
         group = '早班' if '08:00:00' < now_date[11:] < '20:00:00' else '夜班'
         record = WorkSchedulePlan.objects.filter(plan_schedule__day_time=now_date[:10], classes__global_name=group,
                                                  plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
-        return record.group.global_name
+        return record.group.global_name if record and record.group else ''
 
     def get_group_url(self):
         timestamp = str(round(time.time() * 1000))
@@ -365,7 +389,11 @@ if __name__ == '__main__':
     auto_dispatch = AutoDispatch()
     limit_range = datetime.datetime.now() - datetime.timedelta(days=5)
     repair_orders = list(EquipApplyOrder.objects.filter(status='已生成', back_order=False, created_date__gte=limit_range))
-    inspect_order = list(EquipInspectionOrder.objects.filter(status='已生成', back_order=False, created_date__gte=limit_range))
+    # 2023-03-31 巡检工单关联标准的周期单位不是班次的, 00:00:00-07:59:59不派单
+    filter_kwargs = {}
+    if '00:00:00' <= datetime.datetime.now().strftime('%H:%M:%S') <= '07:59:59':
+        filter_kwargs = {'equip_repair_standard__cycle_unit': '班次'}
+    inspect_order = list(EquipInspectionOrder.objects.filter(status='已生成', back_order=False, created_date__gte=limit_range, **filter_kwargs))
     orders = repair_orders + inspect_order
     if not orders:
         logger.info("系统派单: 没有新生成的工单可派")

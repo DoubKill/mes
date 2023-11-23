@@ -35,13 +35,14 @@ class SaveFinishRatio(object):
             factory_date__year=year,
             factory_date__month=month
         ).values('equip_no', 'factory_date', 'classes').annotate(total_trains=Count('id'))
+        now_date = get_current_factory_date()['factory_date']
         if month == datetime.now().month and year == datetime.now().year:
-            now_date = get_current_factory_date()['factory_date']
             schedule_queryset = WorkSchedulePlan.objects.filter(
                 plan_schedule__work_schedule__work_procedure__global_name='密炼',
                 plan_schedule__day_time__year=year,
                 plan_schedule__day_time__month=month,
-                plan_schedule__day_time__lte=now_date,
+                plan_schedule__day_time__lt=now_date,
+                start_time__lte=datetime.now()
             )
         else:
             schedule_queryset = WorkSchedulePlan.objects.filter(
@@ -53,9 +54,11 @@ class SaveFinishRatio(object):
         date_classes_dict = {'{}-{}'.format(i.plan_schedule.day_time.strftime("%m-%d"), i.classes.global_name): i.group.global_name for i in
                              schedule_queryset}
         down_data = EquipDownDetails.objects.filter(
+            ~Q(factory_date=now_date),
             delete_flag=False,
             factory_date__year=year,
-            factory_date__month=month
+            factory_date__month=month,
+            down_type__in=['计划停机', '计划检修']
         ).values('group', 'equip_no').annotate(s=Sum('times'))
         equip_target_data = MachineTargetYieldSettings.objects.filter(target_month=target_month).order_by('-day').values()
         target_data = {}
@@ -63,7 +66,8 @@ class SaveFinishRatio(object):
             target_data = equip_target_data[0]
         group_data_dict = {i: {'equip_no': i, 'target_trains': target_data.get(i, 0)} for i in
                            list(Equip.objects.filter(
-                               category__equip_type__global_name="密炼设备"
+                               category__equip_type__global_name="密炼设备",
+                               equip_no__startswith='Z'
                            ).order_by('equip_no').values_list("equip_no", flat=True))}
 
         for p in production_data:
@@ -98,8 +102,9 @@ class SaveFinishRatio(object):
         for i in group_data_dict.values():
             target_trains = i.get('target_trains')
             for g in group_list:
-                s_train, s_day = i.get(f'trains_{g}', 0), i.get(f'days_{g}', 0)
-                ratio = 0 if target_trains == 0 or s_day == 0 else round(s_train / (target_trains * s_day), 4)
+                # 2023-04-03 完成率 = 班组总车数 / (班组总天数 - 停机[计划/检修]时间 / 60 / 12) / 设备目标产量
+                s_train, s_day, s_down = i.get(f'trains_{g}', 0), i.get(f'days_{g}', 0), i.get(f'down_{g}', 0)
+                ratio = 0 if target_trains == 0 or s_day == 0 else round(s_train / (s_day - s_down / 60 / 12) / target_trains, 4)
                 if g not in res:
                     res[g] = {i.get('equip_no'): ratio}
                 else:

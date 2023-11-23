@@ -301,6 +301,20 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
         sheet.cell(6, 16).value = indicators_data_dict.get('TC50', {}).get('lower_limit')
         sheet.cell(5, 17).value = indicators_data_dict.get('TC90', {}).get('upper_limit')
         sheet.cell(6, 17).value = indicators_data_dict.get('TC90', {}).get('lower_limit')
+        sheet.cell(5, 18).value = indicators_data_dict.get('T5', {}).get('upper_limit')
+        sheet.cell(6, 18).value = indicators_data_dict.get('T5', {}).get('lower_limit')
+        sheet.cell(5, 19).value = indicators_data_dict.get('钢拔', {}).get('upper_limit')
+        sheet.cell(6, 19).value = indicators_data_dict.get('钢拔', {}).get('lower_limit')
+        sheet.cell(5, 20).value = indicators_data_dict.get('100%', {}).get('upper_limit')
+        sheet.cell(6, 20).value = indicators_data_dict.get('100%', {}).get('lower_limit')
+        sheet.cell(5, 21).value = indicators_data_dict.get('M300', {}).get('upper_limit')
+        sheet.cell(6, 21).value = indicators_data_dict.get('M300', {}).get('lower_limit')
+        sheet.cell(5, 22).value = indicators_data_dict.get('伸长率%', {}).get('upper_limit')
+        sheet.cell(6, 22).value = indicators_data_dict.get('伸长率%', {}).get('lower_limit')
+        sheet.cell(5, 23).value = indicators_data_dict.get('扯断强度', {}).get('upper_limit')
+        sheet.cell(6, 23).value = indicators_data_dict.get('扯断强度', {}).get('lower_limit')
+        sheet.cell(5, 24).value = indicators_data_dict.get('永久变形', {}).get('upper_limit')
+        sheet.cell(6, 24).value = indicators_data_dict.get('永久变形', {}).get('lower_limit')
         for i in result:
             deal_suggestion = ''
             result_data = lot_deal_result_dict.get(i['lot_no'])
@@ -337,6 +351,20 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
                 sheet.cell(6, 16).value = indicators_data_dict.get('TC50', {}).get('lower_limit')
                 sheet.cell(5, 17).value = indicators_data_dict.get('TC90', {}).get('upper_limit')
                 sheet.cell(6, 17).value = indicators_data_dict.get('TC90', {}).get('lower_limit')
+                sheet.cell(5, 18).value = indicators_data_dict.get('T5', {}).get('upper_limit')
+                sheet.cell(6, 18).value = indicators_data_dict.get('T5', {}).get('lower_limit')
+                sheet.cell(5, 19).value = indicators_data_dict.get('钢拔', {}).get('upper_limit')
+                sheet.cell(6, 19).value = indicators_data_dict.get('钢拔', {}).get('lower_limit')
+                sheet.cell(5, 20).value = indicators_data_dict.get('100%', {}).get('upper_limit')
+                sheet.cell(6, 20).value = indicators_data_dict.get('100%', {}).get('lower_limit')
+                sheet.cell(5, 21).value = indicators_data_dict.get('M300', {}).get('upper_limit')
+                sheet.cell(6, 21).value = indicators_data_dict.get('M300', {}).get('lower_limit')
+                sheet.cell(5, 22).value = indicators_data_dict.get('伸长率%', {}).get('upper_limit')
+                sheet.cell(6, 22).value = indicators_data_dict.get('伸长率%', {}).get('lower_limit')
+                sheet.cell(5, 23).value = indicators_data_dict.get('扯断强度', {}).get('upper_limit')
+                sheet.cell(6, 23).value = indicators_data_dict.get('扯断强度', {}).get('lower_limit')
+                sheet.cell(5, 24).value = indicators_data_dict.get('永久变形', {}).get('upper_limit')
+                sheet.cell(6, 24).value = indicators_data_dict.get('永久变形', {}).get('lower_limit')
             order_results = i['order_results']
             mn_machine_name = ''
             lb_machine_name = ''
@@ -368,8 +396,15 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
             sheet.cell(row_num, 15).value = ret.get('TC10')
             sheet.cell(row_num, 16).value = ret.get('TC50')
             sheet.cell(row_num, 17).value = ret.get('TC90')
-            sheet.cell(row_num, 18).value = i['state']
-            sheet.cell(row_num, 19).value = deal_suggestion
+            sheet.cell(row_num, 18).value = ret.get('T5')
+            sheet.cell(row_num, 19).value = ret.get('钢拔')
+            sheet.cell(row_num, 20).value = ret.get('100%')
+            sheet.cell(row_num, 21).value = ret.get('M300')
+            sheet.cell(row_num, 22).value = ret.get('伸长率%')
+            sheet.cell(row_num, 23).value = ret.get('扯断强度')
+            sheet.cell(row_num, 24).value = ret.get('永久变形')
+            sheet.cell(row_num, 25).value = i['state']
+            sheet.cell(row_num, 26).value = deal_suggestion
 
             # 写入汇总
             sheet0.cell(data_row0, 1).value = i['product_no']
@@ -389,8 +424,15 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
             sheet0.cell(data_row0, 15).value = ret.get('TC10')
             sheet0.cell(data_row0, 16).value = ret.get('TC50')
             sheet0.cell(data_row0, 17).value = ret.get('TC90')
-            sheet0.cell(data_row0, 18).value = i['state']
-            sheet0.cell(data_row0, 19).value = deal_suggestion
+            sheet0.cell(data_row0, 18).value = ret.get('T5')
+            sheet0.cell(data_row0, 19).value = ret.get('钢拔')
+            sheet0.cell(data_row0, 20).value = ret.get('100%')
+            sheet0.cell(data_row0, 21).value = ret.get('M300')
+            sheet0.cell(data_row0, 22).value = ret.get('伸长率%')
+            sheet0.cell(data_row0, 23).value = ret.get('扯断强度')
+            sheet0.cell(data_row0, 24).value = ret.get('永久变形')
+            sheet0.cell(data_row0, 25).value = i['state']
+            sheet0.cell(data_row0, 26).value = deal_suggestion
 
             row_num += 1
             data_row0 += 1
@@ -3008,11 +3050,12 @@ order by temp.PRODUCT_NO, temp.TEST_INDICATOR_NAME;""".format(where_str)
             tc90_unqualified_count, tc90_lower_count, tc90_upper_count = 0, 0, 0
 
             if test_indicator_name == '门尼':
-                mn_unqualified_count = qty
-                if flag == '-':
-                    mn_lower_count = qty
-                else:
-                    mn_upper_count = qty
+                if data_point_name == 'ML(1+4)':
+                    mn_unqualified_count = qty
+                    if flag == '-':
+                        mn_lower_count = qty
+                    else:
+                        mn_upper_count = qty
             elif test_indicator_name == '硬度':
                 yd_unqualified_count = qty
                 if flag == '-':

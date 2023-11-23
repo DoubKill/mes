@@ -557,6 +557,8 @@ class ReplaceRecipeMaterialViewSet(ModelViewSet):
         times = 1 if not max_times else max_times + 1
         multi_created_list = []
         for i in replace_ids:
+            if not i:
+                continue
             mes_recipe = ProductBatching.objects.filter(id=i).last()
             created_data = {'origin_material': origin_material, 'replace_material': replace_material,
                             'created_user': self.request.user, 'created_date': datetime.datetime.now(),

@@ -494,4 +494,4 @@ class CheckTemperatureTableFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = CheckTemperatureTable
-        fields = ('select_date', 'status')
+        fields = ('select_date', 'status', 'classes')

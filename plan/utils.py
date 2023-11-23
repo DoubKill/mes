@@ -100,8 +100,17 @@ def calculate_equip_recipe_avg_mixin_time(equip_no, recipe_name):
     if capacity:
         avg_mixin_time = capacity.avg_mixing_time + capacity.avg_interval_time
     else:
-        # TODO 如果该配方没有历史生产数据，密炼一车所消耗的时间默认值为多少？
-        avg_mixin_time = 150
+        if equip_no == 'Z04':
+            avg_mixin_time = 250
+        elif equip_no == 'Z07':
+            avg_mixin_time = 380
+        else:
+            if '1MB' in recipe_name:
+                avg_mixin_time = 179
+            elif '1MB' in recipe_name:
+                avg_mixin_time = 125
+            else:
+                avg_mixin_time = 150
     return avg_mixin_time
 
 
@@ -509,7 +518,7 @@ def plan_sort(product_demanded_rains, equip_tree_data):
     return equip_tree_data
 
 
-def convert_fm_weight(pb_no, version, factory_date):
+def convert_fm_weight(pb_no, version, factory_date, final_stage):
     stages = ['CMB', 'HMB', '1MB', '2MB', '3MB', '4MB', 'FM']
     stock_data = ProductStockDailySummary.objects.filter(
         factory_date=factory_date,
@@ -523,33 +532,38 @@ def convert_fm_weight(pb_no, version, factory_date):
     pb_no_stages = list(ProductBatching.objects.using('SFJ').filter(
         used_type=4, stage_product_batch_no__endswith='-{}-{}'.format(pb_no, version)
     ).values_list('stage__global_name', flat=True))
-    if 'FM' not in pb_no_stages:
+    if final_stage not in pb_no_stages:
         raise ValidationError('未找到该规格FM段次配方数据:{}-{}'.format(pb_no, version))
     pb_no_stages = list(set(stages) & set(pb_no_stages))
     sorted_rules = {'HMB': 1, 'CMB': 2, '1MB': 3, '2MB': 4, '3MB': 5, '4MB': 6, 'FM': 7}
     pb_no_stages = sorted(pb_no_stages, key=lambda x: sorted_rules[x])
     stage_weight_data = {i: 0 for i in pb_no_stages}
     for idx, s in enumerate(pb_no_stages):
-        if s == 'FM':
+        if s == final_stage:
             continue
         s_stock_weight = stock_weight_data.get(s, 0) + stage_weight_data.get(s, 0)
         if not s_stock_weight:
             continue
-        out_put_stage = pb_no_stages[idx+1]
+        try:
+            out_put_stage = pb_no_stages[idx+1]
+        except Exception:
+            return 0
         stage_recipe = ProductBatching.objects.using('SFJ').filter(
             used_type=4,
             stage_product_batch_no__endswith='-{}-{}-{}'.format(out_put_stage, pb_no, version)
         ).order_by('-batching_weight').first()
         if not stage_recipe:
-            raise ValidationError('未找到该规格{}段次配方数据:{}-{}'.format(out_put_stage, pb_no, version))
+            continue
+            # raise ValidationError('未找到该规格{}段次配方数据:{}-{}'.format(out_put_stage, pb_no, version))
         devoted_recipe = ProductBatchingDetail.objects.using('SFJ').filter(
             product_batching_id=stage_recipe.id,
             material__material_no__endswith='-{}-{}-{}'.format(s, pb_no, version)).first()
         if not devoted_recipe:
-            raise ValidationError('未找到该规格投入{}段次配方数据:{}-{}'.format(out_put_stage, pb_no, version))
+            continue
+            # raise ValidationError('未找到该规格投入{}段次配方数据:{}-{}'.format(out_put_stage, pb_no, version))
         trains = s_stock_weight / float(devoted_recipe.actual_weight)
         stage_weight_data[out_put_stage] = trains * float(stage_recipe.batching_weight)
-    return round(stage_weight_data['FM'] / 1000, 2)
+    return round(stage_weight_data[final_stage] / 1000, 2)
 
 
 if __name__ == '__main__':

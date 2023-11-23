@@ -74,9 +74,23 @@ class TrainsFeedbacksSerializer(BaseModelSerializer):
                                            current_trains=current_trains).last()
         if not equip:
             raise serializers.ValidationError("该车次数据无对应设备，请检查相关设备")
-        equip_status.update(temperature=equip.temperature,
-                            energy=equip.energy,
-                            rpm=equip.rpm)
+        # 2023-05-19 排胶温度从车次报表中获取
+        try:
+            if equip_no == 'Z01':
+                energy = round(object.evacuation_energy / 10, 1)
+            elif equip_no == 'Z02':
+                energy = round(object.evacuation_energy / 0.6, 1)
+            elif equip_no == 'Z04':
+                energy = round(object.evacuation_energy * 0.28 * object.plan_weight / 1000, 1)
+            elif equip_no == 'Z12':
+                energy = round(object.evacuation_energy / 5.3, 1)
+            elif equip_no == 'Z13':
+                energy = round(object.evacuation_energy / 31.7, 1)
+            else:
+                energy = round(object.evacuation_energy, 1)
+        except:
+            energy = 0
+        equip_status.update(temperature=object.temperature, energy=energy, rpm=equip.rpm)
         return equip_status
 
     def get_actual_weight(self, object):

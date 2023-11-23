@@ -572,7 +572,10 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
             if l_batch_no:
                 filter_dict.update(batch_no__icontains=l_batch_no)
             if tunnel:
-                filter_dict['location__startswith'] = 'ZCM-{}'.format(tunnel)
+                if store_name == '原材料库':
+                    filter_dict['location__startswith'] = 'ZCM-{}'.format(tunnel)
+                else:
+                    filter_dict['location__startswith'] = 'ZCB-{}'.format(tunnel)
             if is_entering:
                 if is_entering == 'Y':
                     queryset = queryset.filter(pallet_no__startswith=5)
@@ -660,7 +663,7 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         style.alignment.wrap = 1
 
         columns = ['序号', '出库单据号', '下架任务号', '巷道编码', '追踪码', '识别卡ID', '库位码', '物料名称', '物料编码',
-                   '批次号', '创建时间', '状态', '创建人', '数量', '重量', '件数', '唛头重量']
+                   '批次号', '创建时间', '状态', '创建人', '数量', '重量', '件数', '唛头重量', '开始时间', '完成时间']
         # 写入文件标题
         for col_num in range(len(columns)):
             sheet.write(0, col_num, columns[col_num])
@@ -683,7 +686,9 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
             sheet.write(data_row, 13, i['qty'])
             sheet.write(data_row, 14, i['weight'])
             sheet.write(data_row, 15, i['sl'])
-            sheet.write(data_row, 15, i['zl'])
+            sheet.write(data_row, 16, i['zl'])
+            sheet.write(data_row, 17, i['last_time'])
+            sheet.write(data_row, 18, i['fin_time'])
             data_row = data_row + 1
         # 写出到IO
         output = BytesIO()
@@ -2935,9 +2940,12 @@ class WmsStorageView(ListAPIView):
                           "托盘号": "container_no", "库位地址": "location", "单位": "unit",
                           "单位重量": "unit_weight", "总重量": "total_weight",
                           "核酸管控": "in_charged_tag", "品质状态": "quality_status",
-                          '件数': 'sl', '唛头重量': 'zl'}
+                          "入库时间": "in_storage_time", '件数': 'sl', '唛头重量': 'zl'}
 
     def list(self, request, *args, **kwargs):
+        # 2023-07-07 获取公共代码特殊账号进行验证[如果是特殊账号,品质状态只显示合格(1)和待检(5)]
+        special_names = set(GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='原材料库存明细特殊账号').values_list('global_name', flat=True))
+        special_flag = True if self.request.user.username in special_names else False
         filter_kwargs = {}
         # 模糊查询字段
         container_no = self.request.query_params.get('pallet_no')
@@ -2981,12 +2989,18 @@ class WmsStorageView(ListAPIView):
             filter_kwargs['batch_no'] = batch_no
         if quality_status:
             filter_kwargs['quality_status'] = quality_status
+        else:
+            if special_flag:
+                filter_kwargs['quality_status__in'] = ['1', '5']
         if st:
             filter_kwargs['in_storage_time__gte'] = st
         if et:
             filter_kwargs['in_storage_time__lte'] = et
         if tunnel:
-            filter_kwargs['location__startswith'] = 'ZCM-{}'.format(tunnel)
+            if self.DATABASE_CONF == 'wms':
+                filter_kwargs['location__startswith'] = 'ZCM-{}'.format(tunnel)
+            else:
+                filter_kwargs['location__startswith'] = 'ZCB-{}'.format(tunnel)
         queryset = WmsInventoryStock.objects.using(self.DATABASE_CONF).filter(**filter_kwargs).order_by('-in_storage_time')
         if is_entering:
             if is_entering == 'Y':
@@ -3046,6 +3060,7 @@ class WmsStorageView(ListAPIView):
                                       total_trains=Sum('qty'))
         data['total_weight'] = sum_data['total_weight']
         data['total_trains'] = sum_data['total_trains']
+        data['special_flag'] = special_flag
         return Response(data)
 
 
@@ -3075,7 +3090,7 @@ class WmsInventoryStockView(APIView):
         if not entrance_name:
             raise ValidationError('请选择出库口！')
         if material_name:
-            extra_where_str += " and c.Name like '%{}%'".format(material_name)
+            extra_where_str += " and c.Name = '{}'".format(material_name)
         if material_no:
             extra_where_str += " and c.MaterialCode like '%{}%'".format(material_no)
         if quality_status:
@@ -3230,7 +3245,8 @@ class WmsInStockView(APIView):
                  a.SpaceId,
                  a.Sn,
                  a.StandardUnit,
-                 a.CreaterTime
+                 a.CreaterTime,
+                 a.LadenToolNumber
             FROM 
                  dbo.t_inventory_stock AS a
              INNER JOIN t_inventory_space b ON b.Id = a.StorageSpaceEntityId
@@ -3266,7 +3282,8 @@ class WmsInStockView(APIView):
                  'Sn': item[5],
                  'unit': item[6],
                  'inventory_time': item[7],
-                 'position': '内' if item[4][6] in ('1', '2') else '外'
+                 'position': '内' if item[4][6] in ('1', '2') else '外',
+                 'RFID': item[8]
                  })
         sc.close()
         return Response(result)
@@ -3364,6 +3381,9 @@ class WMSExpireListView(APIView):
     DATABASE_CONF = WMS_CONF
 
     def get(self, request):
+        # 2023-07-31 获取公共代码特殊账号进行验证[如果是特殊账号,不展示即将超期数据]
+        username = self.request.user.username
+        special_flag = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='原材料库存明细特殊账号', global_name=username).exists()
         expire_days = self.request.query_params.get('expire_days', 30)
         page = self.request.query_params.get('page', 1)
         page_size = self.request.query_params.get('page_size', 15)
@@ -3385,7 +3405,7 @@ group by m.MaterialCode,
          a.StockDetailState
 order by m.MaterialCode;""".format(expire_days)
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)
-        temp = sc.all()
+        temp = sc.all() if not special_flag else []
         count = len(temp)
         result = []
         data = temp[st:et]
@@ -5478,6 +5498,8 @@ class LIBRARYINVENTORYView(APIView):
         locked_status = params.get("locked_status")
         ordering_field = params.get("ordering_field")
         order_by = params.get("order_by")
+        begin_date = params.get("begin_date")
+        end_date = params.get("end_date")
 
         product_validity_dict = dict(MaterialAttribute.objects.filter(
             period_of_validity__isnull=False
@@ -5505,6 +5527,10 @@ class LIBRARYINVENTORYView(APIView):
             filter_kwargs['quality_level'] = quality_level
         if equip_no:
             filter_kwargs['bill_id__iendswith'] = equip_no
+        if begin_date:
+            filter_kwargs['in_storage_time__date__gte'] = begin_date
+        if end_date:
+            filter_kwargs['in_storage_time__date__lte'] = end_date
         if locked_status:
             if locked_status == '1':
                 locked_lot_nos = list(
@@ -6029,6 +6055,9 @@ class WMSStockSummaryView(APIView):
         page_size = self.request.query_params.get('page_size', 15)
         st = (int(page) - 1) * int(page_size)
         et = int(page) * int(page_size)
+        username = self.request.user.username
+        special_flag = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True, global_type__type_name='原材料库存明细特殊账号',
+                                                 global_name=username).exists()
         extra_where_str = ""
         if material_name:
             extra_where_str += "where temp.MaterialName like '%{}%'".format(material_name)
@@ -6084,20 +6113,21 @@ class WMSStockSummaryView(APIView):
             quality_status = item[8]
             if quality_status == 2:
                 quality_status = 5
+            item_6, item_7 = [0, 0] if special_flag and quality_status == 3 else [item[6], item[7]]
             if item[1] not in data_dict:
                 data = {'name': item[0], 'code': item[1], 'zc_material_code': item[2], 'unit': item[3], 'pdm': item[4],
-                        'group_name': item[5], 'total_quantity': item[6], 'total_weight': item[7], 'total_sl': item[9],
+                        'group_name': item[5], 'total_quantity': item_6, 'total_weight': item_7, 'total_sl': item[9],
                         'total_zl': item[10], 'quantity_1': 0, 'weight_1': 0, 'quantity_3': 0, 'weight_3': 0,
                         'quantity_4': 0, 'weight_4': 0, 'quantity_5': 0, 'weight_5': 0,
-                        'quantity_{}'.format(quality_status): item[6], 'weight_{}'.format(quality_status): item[7]}
+                        'quantity_{}'.format(quality_status): item_6, 'weight_{}'.format(quality_status): item_7}
                 data_dict[item[1]] = data
             else:
-                data_dict[item[1]]['total_quantity'] += item[6]
-                data_dict[item[1]]['total_weight'] += item[7]
+                data_dict[item[1]]['total_quantity'] += item_6
+                data_dict[item[1]]['total_weight'] += item_7
                 data_dict[item[1]]['total_sl'] += item[9]
                 data_dict[item[1]]['total_zl'] += item[10]
-                data_dict[item[1]]['quantity_{}'.format(quality_status)] = item[6]
-                data_dict[item[1]]['weight_{}'.format(quality_status)] = item[7]
+                data_dict[item[1]]['quantity_{}'.format(quality_status)] = item_6
+                data_dict[item[1]]['weight_{}'.format(quality_status)] = item_7
         result = []
         for item in data_dict.values():
             weighting = safety_data.get(item['code'].strip())
@@ -6131,7 +6161,7 @@ class WMSStockSummaryView(APIView):
                 data = result
             return self.export_xls(data)
         return Response(
-            {'results': ret, "count": count,
+            {'results': ret, "count": count, 'special_flag': special_flag,
              'total_quantity': total_quantity, 'total_weight': total_weight, 'total_sl': total_sl, 'total_zl': total_zl,
              'total_quantity1': total_quantity1, 'total_weight1': total_weight1,
              'total_quantity3': total_quantity3, 'total_weight3': total_weight3,
@@ -6416,13 +6446,16 @@ class WmsOutboundOrderView(APIView):
         try:
             res = requests.post(url, json=data, timeout=10)
         except Exception as e:
+            logger.error(f'请求出库失败, 单据号:{task_num}, 异常原因:{e.args[0]}')
             raise ValidationError('请求出库失败，请联系管理员！')
         try:
             resp = json.loads(res.content)
-        except Exception:
+        except Exception as e:
+            logger.warning(f'请求出库响应解析失败, 单据号:{task_num}, 异常原因:{e.args[0]}')
             resp = {}
         resp_status = resp.get('state')
         if resp_status != 1:
+            logger.error(f'请求出库失败, 单据号:{task_num}, 异常码:{resp_status}')
             raise ValidationError('出库失败：{}'.format(resp.get('msg')))
         return Response('成功')
 
@@ -7227,14 +7260,17 @@ class ProductExpireDetailView(APIView):
         count = len(temp)
         data = temp[st:et]
         for i in data:
-            if i['lot_no']:
-                deal_result = MaterialDealResult.objects.filter(
-                    lot_no=i['lot_no']).first()
-                if deal_result:
-                    if deal_result.deal_user:
-                        i['deal_suggestion'] = deal_result.deal_suggestion
-                    else:
-                        i['deal_suggestion'] = 'PASS' if deal_result.test_result == 'PASS' else None
+            if i['quality_level'] == '待检品':
+                i['deal_suggestion'] = ''
+            else:
+                if i['lot_no']:
+                    deal_result = MaterialDealResult.objects.filter(
+                        lot_no=i['lot_no']).first()
+                    if deal_result:
+                        if deal_result.deal_user:
+                            i['deal_suggestion'] = deal_result.deal_suggestion
+                        else:
+                            i['deal_suggestion'] = 'PASS' if deal_result.test_result == 'PASS' else None
         total_weight = sum([i['total_weight'] for i in temp])
         total_quantity = sum([i['qty'] for i in temp])
         return Response(

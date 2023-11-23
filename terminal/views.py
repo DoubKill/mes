@@ -426,6 +426,16 @@ class LoadMaterialLogViewSet(TerminalCreateAPIView,
             return response(success=False, message='该物料(条码)已在其他计划中使用, 本计划不可修改')
         if batch_material.unit == '包' and int(left_weight) != left_weight:
             return response(success=False, message='包数应为整数')
+        # 计划中非料包重量修改上限
+        if batch_material.unit != '包':
+            limit_para = GlobalCode.objects.filter(global_type__use_flag=True, global_type__type_name='计划可变原料重量', use_flag=True).last()
+            try:
+                z_limit = int(limit_para.global_name)
+            except:
+                z_limit = 600
+            t_num = self.queryset.filter(plan_classes_uid=batch_material.plan_classes_uid, material_name=batch_material.material_name).aggregate(t_num=Sum('variety'))['t_num']
+            if t_num + int(left_weight) > z_limit:
+                return response(success=False, message=f'超过计划物料可修改量[{z_limit}kg]')
         update_records = last_bra_code_info.filter(plan_classes_uid=batch_material.plan_classes_uid)
         # 获取限定包数与重量
         limit_para = GlobalCode.objects.filter(global_type__use_flag=True, global_type__type_name='密炼投料物料可变重量', use_flag=True).values_list('global_name', flat=True)
@@ -696,10 +706,11 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         data.append(serializer)
                     else:
                         # 已经打印数据数据更新(打印时完成了50包, 最终计划完成100包)
-                        if k.package_fufil != k.package_plan_count:
+                        if k.package_fufil <= k.package_plan_count:
                             get_status = plan_model.objects.using(equip_no).filter(planid=k.plan_weight_uid).first()
                             if get_status:
                                 k.package_fufil = get_status.actno
+                                k.package_plan_count = get_status.setno
                                 # 更新未打印数量
                                 prints = WeightPackageLog.objects.filter(plan_weight_uid=k.plan_weight_uid, equip_no=equip_no).aggregate(prints=Sum('package_count'))['prints']
                                 prints = 0 if not prints else prints
@@ -730,10 +741,11 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         data.append(serializer)
                     else:
                         # 已经打印数据数据更新(打印时完成了50包, 最终计划完成100包)
-                        if k.package_fufil != k.package_plan_count:
+                        if k.package_fufil <= k.package_plan_count:
                             get_status = plan_model.objects.using(equip_no).filter(planid=k.plan_weight_uid).first()
                             if get_status:
                                 k.package_fufil = get_status.actno
+                                k.package_plan_count = get_status.setno
                                 # 更新未打印数量
                                 prints = WeightPackageLog.objects.filter(plan_weight_uid=k.plan_weight_uid, equip_no=equip_no).aggregate(prints=Sum('package_count'))['prints']
                                 prints = 0 if not prints else prints
@@ -751,10 +763,11 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                 already_print = self.get_queryset().filter(**weight_filter_kwargs).filter(bra_code__in=bra_codes)
             for k in already_print:
                 # 已经打印数据数据更新(打印时完成了50包, 最终计划完成100包)
-                if k.package_fufil != k.package_plan_count:
+                if k.package_fufil <= k.package_plan_count:
                     get_status = plan_model.objects.using(equip_no).filter(planid=k.plan_weight_uid).first()
                     if get_status:
                         k.package_fufil = get_status.actno
+                        k.package_plan_count = get_status.setno
                         # 更新未打印数量
                         prints = WeightPackageLog.objects.filter(plan_weight_uid=k.plan_weight_uid, equip_no=equip_no).aggregate(prints=Sum('package_count'))['prints']
                         prints = 0 if not prints else prints
@@ -1342,7 +1355,10 @@ class WeightPackageCViewSet(ListModelMixin, UpdateModelMixin, GenericViewSet):
                 if now:
                     current_plan = WorkSchedulePlan.objects.filter(start_time__lte=now, end_time__gte=now, plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
                     if current_plan:
-                        n_time = current_plan.plan_schedule.day_time.strftime('%Y-%m-%d')
+                        s_date_now = current_plan.plan_schedule.day_time
+                        if '07:00:00' <= now[-8:] < '08:00:00' and i.get('batch_classes') == '早班':
+                            s_date_now = s_date_now + datetime.timedelta(days=1)
+                        n_time = str(s_date_now)
                     else:
                         n_time = now
                 else:
@@ -2133,12 +2149,17 @@ class XLPlanVIewSet(ModelViewSet):
         equip_no = self.request.data.get('equip_no')
         # 嘉正称量系统下达的计划先通知才可以删除，非下达计划直接删除[下达也是等待状态]
         instance = self.get_object()
-        if equip_no in JZ_EQUIP_NO and instance.downtime:
+        if equip_no in JZ_EQUIP_NO:
+            if instance.downtime:
+                raise ValidationError('计划已经下达，请停止计划')
             try:
                 jz = JZCLSystem(equip_no)
                 res = jz.notice(table_seq=4, table_id=instance.id, opera_type=2)
             except Exception as e:
                 raise ValidationError(f'通知称量系统{equip_no}删除计划失败')
+        else:
+            if instance.state != '等待':
+                raise ValidationError('删除失败: 计划已经下达')
         instance.delete()
         return Response('删除成功')
 
@@ -3200,6 +3221,24 @@ class FeedingErrorLampForCarbonView(APIView):
         data = {'feeding_type': 2, 'feeding_port_no': feed_port, 'feeding_time': now_time,
                 'feeding_material_name': material_name, 'feeding_username': self.request.user.username,
                 'feed_reason': '', 'feeding_classes': feeding_class, 'feed_result': 'N'}
+        # 防错是否开启、是否为压送状态
+        try:
+            carbon_obj = CarbonDeliverySystem()
+            prevent_states = carbon_obj.prevent_state()
+        except Exception as e:
+            data.update({'feed_reason': '获取输送线防错、压送状态失败'})
+            FeedingOperationLog.objects.create(**data)
+            return Response({'state': 0, 'msg': f'获取输防错、压送状态失败: {e.args[0]}', 'FeedingResult': 2})
+        # 解析防错开关状态和压送状态
+        prevent_state = prevent_states.get('防错状态', False)
+        if not prevent_state:
+            data.update({'feed_reason': '输送线防错未打开, 手动模式'})
+            FeedingOperationLog.objects.create(**data)
+            return Response({'state': 0, 'msg': '输送线防错未打开, 手动模式', 'FeedingResult': 1})
+        if not prevent_states.get(feed_port[0:3], False):
+            data.update({'feed_reason': '输送线防错未打开或压送状态未开启'})
+            FeedingOperationLog.objects.create(**data)
+            return Response({'state': 0, 'msg': '输送线防错未打开或压送状态未开启', 'FeedingResult': 2})
         # 通过物料条码获取炭黑数量与重量
         carbon_out_info = MaterialOutHistory.objects.using('cb').filter(order_no=task_id).first()
         if not carbon_out_info:
@@ -3216,7 +3255,6 @@ class FeedingErrorLampForCarbonView(APIView):
             data['feeding_bar_code'] = '99999999'
         # 获取当前输送线与炭黑罐关系
         try:
-            carbon_obj = CarbonDeliverySystem()
             line_tank_info = carbon_obj.line_info()
         except Exception as e:
             data.update({'feed_reason': '获取输送线与炭黑罐信息失败'})
@@ -3577,8 +3615,9 @@ class XlRecipeNoticeView(APIView):
             return Response({'notice_flag': True, 'msg': ','.join(out_mes_materials)})
         # 配方和线体相同物料
         same_material_list = list(set(mes_xl_materials) & set(xl_equip_materials))
-        # 在使用称量配方不能下发
-        # 下发配方数据
+        # 记录要下发的配方名(增加料包过期时间使用)
+        wait_expire_recipe = []
+        # 下发配方数据(在使用称量配方不能下发)
         send_data = {'dev_type': product_batching.dev_type.category_no if not wf_flag else None}
         detail_msg = ""
         send_equip_list = []
@@ -3597,6 +3636,8 @@ class XlRecipeNoticeView(APIView):
                 continue
             send_data[send_recipe_name] = send_materials
             detail_msg += f'{single_equip_no}: 配方下发成功 '
+            if send_recipe_name not in wait_expire_recipe:
+                wait_expire_recipe.append(send_recipe_name)
         # 下传配方
         error_msg = '下发配方异常'
         try:
@@ -3608,6 +3649,15 @@ class XlRecipeNoticeView(APIView):
                     self.issue_xl_system(xl_equip, send_data)
         except Exception as e:
             raise ValidationError(f"{error_msg}:{e.args[0]}")
+        try:
+            exist_recipe = set(PackageExpire.objects.filter(product_name__in=wait_expire_recipe).values_list('product_name', flat=True))
+            real_wait_recipe = set(wait_expire_recipe) - exist_recipe
+            for i in real_wait_recipe:
+                PackageExpire.objects.create(product_no=i, product_name=i, package_fine_usefullife=7, package_sulfur_usefullife=5,
+                                             update_user=self.request.user.username, update_date=datetime.datetime.now().strftime('%Y-%m-%d'))
+
+        except Exception as e:
+            error_logger.error(f'记录料包 {wait_expire_recipe} 有效期异常, 原因: {e}')
         if '成功' in detail_msg:
             e_xl_equip = mes_xl_details.last().send_xl_equip
             if xl_equip not in e_xl_equip:
